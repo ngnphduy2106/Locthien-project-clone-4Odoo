@@ -197,10 +197,17 @@ async function getMisaOrderDetail(idOrName, isUuid = false) {
 
             // If fetching by Filter, data is Array
             if (Array.isArray(data) && data.length > 0) {
-                const detail = data[0];
-                if (detail.sale_order_no !== idOrName) {
-                    console.warn(`⚠️ Mismatch! Requested ${idOrName} but got ${detail.sale_order_no}. Ignoring.`);
-                    console.warn("Mismatch Detail:", JSON.stringify(detail, null, 2));
+                // Fix: MISA bug returns default list if filter fails.
+                // We must search LOCALLY in the returned list for the exact match.
+                const detail = data.find(d =>
+                    d.sale_order_no === idOrName ||
+                    d.SaleOrderNo === idOrName
+                );
+
+                if (!detail) {
+                    console.warn(`⚠️ Mismatch/Not Found! Requested ${idOrName}. MISA returned ${data.length} items but none matched.`);
+                    // Log first item to see what we got
+                    if (data[0]) console.warn(`   Sample return: ${data[0].sale_order_no}`);
                     return null;
                 }
                 return detail;
