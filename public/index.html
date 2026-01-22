@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#2563eb">
+    <title>LỘC THIÊN ERP</title>
+
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Flatpickr (Custom Date Picker) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://npmcdn.com/flatpickr/dist/l10n/vn.js"></script> <!-- Vietnamese Locale -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+
+    <!-- Custom CSS -->
+    <link href="/css/app.css" rel="stylesheet">
+</head>
+
+<body>
+
+    <!-- Loading Overlay -->
+    <div id="loading" class="loading-overlay hidden">
+        <div class="loading-spinner"></div>
+        <div class="mt-3 fw-bold text-secondary" id="load-txt">Đang xử lý...</div>
+    </div>
+
+    <!-- App Container -->
+    <div id="app" class="app-container">
+
+        <!-- Login View -->
+        <div id="view-login" class="view-login">
+            <div class="login-icon">
+                <i class="bi bi-box-seam"></i>
+            </div>
+            <h4 class="fw-bold text-primary mb-1">LỘC THIÊN ERP</h4>
+            <p class="text-muted small mb-4">Hệ thống Quản lý Kho vận</p>
+
+            <div class="text-start mb-3">
+                <label class="fw-bold text-secondary small mb-2">TÀI KHOẢN</label>
+                <input type="text" id="inp-user" class="form-control" placeholder="Số điện thoại..." value="0901234567">
+            </div>
+            <div class="text-start mb-4">
+                <label class="fw-bold text-secondary small mb-2">MẬT KHẨU</label>
+                <input type="password" id="inp-pass" class="form-control" placeholder="••••••" value="234567">
+            </div>
+            <button class="btn btn-primary w-100 py-3" onclick="handleLogin()">
+                <i class="bi bi-box-arrow-in-right me-2"></i>ĐĂNG NHẬP
+            </button>
+            <div class="mt-3 text-muted small">
+                Demo: 0901234567 / 234567
+            </div>
+        </div>
+
+        <!-- Home View -->
+        <div id="view-home" class="hidden">
+            <div class="app-header">
+                <div>
+                    <h5 id="txt-user-name" class="fw-bold mb-1">...</h5>
+                    <span class="badge bg-light text-dark border" id="txt-user-role">...</span>
+                </div>
+                <button class="btn btn-outline-danger btn-sm" onclick="doLogout()">
+                    <i class="bi bi-box-arrow-right"></i>
+                </button>
+            </div>
+
+            <!-- Dashboard Stats -->
+            <div class="row g-2 mb-4" id="dashboard-stats">
+                <div class="col-6">
+                    <div class="stat-card bg-primary">
+                        <div class="stat-value" id="stat-pending">-</div>
+                        <div class="stat-label">Đơn chờ</div>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="stat-card bg-success">
+                        <div class="stat-value" id="stat-stock">-</div>
+                        <div class="stat-label">Tồn kho (T)</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Admin Menu -->
+            <div id="area-admin" class="hidden">
+                <div class="row g-3">
+                    <div class="col-6">
+                        <div class="btnui" onclick="showView('view-orders')">
+                            <i class="bi bi-clipboard-check text-primary"></i>
+                            <b>ĐIỀU PHỐI</b>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="btnui" onclick="showView('view-create-order')">
+                            <i class="bi bi-plus-circle text-warning"></i>
+                            <b>TẠO ĐƠN</b>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="btnui" onclick="showView('view-hr')">
+                            <i class="bi bi-people text-info"></i>
+                            <b>NHÂN SỰ</b>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="btnui" onclick="showView('view-materials')">
+                            <i class="bi bi-box-seam" style="color:#8b5cf6"></i>
+                            <b>VẬT TƯ</b>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="btnui" onclick="showView('view-warehouse')">
+                            <i class="bi bi-building text-secondary"></i>
+                            <b>KHO HÀNG</b>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="btnui" onclick="showView('view-reports')">
+                            <i class="bi bi-bar-chart-line text-success"></i>
+                            <b>BÁO CÁO</b>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Driver Menu -->
+            <div id="area-driver" class="hidden mt-3">
+                <div class="btnui bg-primary text-white py-4" onclick="loadMyOrders()">
+                    <i class="bi bi-truck text-white" style="font-size:32px"></i>
+                    <b class="text-white">ĐƠN CỦA TÔI</b>
+                </div>
+            </div>
+        </div>
+
+        <!-- Orders View -->
+        <div id="view-orders" class="hidden">
+            <div class="view-header">
+                <button class="btn btn-light btn-sm rounded-circle" onclick="showView('view-home')">
+                    <i class="bi bi-arrow-left"></i>
+                </button>
+                <h5 class="fw-bold m-0">ĐIỀU PHỐI ĐƠN</h5>
+                <button class="btn btn-light btn-sm rounded-circle text-primary" onclick="loadOrders()">
+                    <i class="bi bi-arrow-clockwise"></i>
+                </button>
+            </div>
+
+            <div class="px-3 pb-2">
+                <input type="text" class="form-control mb-2"
+                    placeholder="🔍 Tìm đơn hàng (Số đơn, Khách, Ngày, Địa chỉ...)" oninput="searchOrders(this.value)">
+                <div class="d-flex gap-2">
+                    <input type="text" id="filter-date-from" class="form-control form-control-sm date-picker bg-white"
+                        placeholder="Từ ngày (dd/mm/yyyy)" title="Từ ngày">
+                    <input type="text" id="filter-date-to" class="form-control form-control-sm date-picker bg-white"
+                        placeholder="Đến ngày (dd/mm/yyyy)" title="Đến ngày">
+                    <button class="btn btn-sm btn-outline-secondary" onclick="clearDateFilter()"
+                        title="Xóa lọc ngày">✕</button>
+                </div>
+            </div>
+
+            <div class="tab-container mt-0">
+                <button class="tab-btn active" id="tab-pending" onclick="switchOrderTab('pending')">Chờ xử lý (<span
+                        id="countPending">0</span>)</button>
+                <button class="tab-btn" id="tab-assigned" onclick="switchOrderTab('assigned')">Đang giao</button>
+                <button class="tab-btn" id="tab-history" onclick="switchOrderTab('history')">Lịch sử (<span
+                        id="countHistory">0</span>)</button>
+            </div>
+
+            <div id="order-list"></div>
+        </div>
+
+        <!-- Create Order View -->
+        <div id="view-create-order" class="hidden">
+            <div class="view-header">
+                <button class="btn btn-light btn-sm rounded-circle" onclick="showView('view-home')">
+                    <i class="bi bi-arrow-left"></i>
+                </button>
+                <h5 class="fw-bold m-0 text-warning">TẠO ĐƠN NHẬP</h5>
+                <div></div>
+            </div>
+
+            <div class="card-custom">
+                <input type="date" id="order-date" class="form-control mb-2">
+                <input type="text" id="order-customer" class="form-control mb-2"
+                    placeholder="Nhà cung cấp / Khách hàng">
+                <input type="text" id="order-address" class="form-control mb-3" placeholder="Địa chỉ giao hàng">
+
+                <div class="mb-3">
+                    <label class="fw-bold small mb-2">Sản phẩm:</label>
+                    <div id="order-products"></div>
+
+                    <div class="row g-2 mt-2">
+                        <div class="col-5">
+                            <input type="text" id="prod-name" class="form-control form-control-sm" placeholder="Tên SP">
+                        </div>
+                        <div class="col-3">
+                            <input type="number" id="prod-qty" class="form-control form-control-sm" placeholder="SL">
+                        </div>
+                        <div class="col-4">
+                            <button class="btn btn-warning btn-sm w-100" onclick="addOrderProduct()">Thêm</button>
+                        </div>
+                    </div>
+                </div>
+
+                <button class="btn btn-primary w-100 py-3" onclick="submitOrder()">TẠO ĐƠN</button>
+            </div>
+        </div>
+
+        <!-- HR View -->
+        <div id="view-hr" class="hidden">
+            <div class="view-header">
+                <button class="btn btn-light btn-sm rounded-circle" onclick="showView('view-home')">
+                    <i class="bi bi-arrow-left"></i>
+                </button>
+                <h5 class="fw-bold m-0 text-info">NHÂN SỰ</h5>
+                <button class="btn btn-info btn-sm" onclick="toggleAddEmployee()">
+                    <i class="bi bi-plus-lg"></i>
+                </button>
+            </div>
+
+            <div id="form-add-employee" class="hidden card-custom mb-3">
+                <h6 class="fw-bold mb-3">Thêm Nhân Viên</h6>
+                <input id="emp-name" class="form-control mb-2" placeholder="Họ tên *">
+                <input id="emp-phone" class="form-control mb-2" placeholder="Số điện thoại *">
+                <select id="emp-role" class="form-select mb-2">
+                    <option value="DRIVER">Tài xế</option>
+                    <option value="WAREHOUSE">Kho</option>
+                    <option value="SALES">Kinh doanh</option>
+                    <option value="ADMIN">Admin</option>
+                </select>
+                <input id="emp-salary" type="number" class="form-control mb-3" placeholder="Lương cơ bản">
+                <button class="btn btn-info w-100" onclick="addEmployee()">Thêm</button>
+            </div>
+
+            <div id="hr-list"></div>
+        </div>
+
+        <!-- Materials View -->
+        <div id="view-materials" class="hidden">
+            <div class="view-header">
+                <button class="btn btn-light btn-sm rounded-circle" onclick="showView('view-home')">
+                    <i class="bi bi-arrow-left"></i>
+                </button>
+                <h5 class="fw-bold m-0" style="color:#8b5cf6">VẬT TƯ</h5>
+                <button class="btn btn-sm" style="background:#8b5cf6;color:white" onclick="toggleAddMaterial()">
+                    <i class="bi bi-plus-lg"></i>
+                </button>
+            </div>
+
+            <div id="form-add-material" class="hidden card-custom mb-3">
+                <h6 class="fw-bold mb-3">Thêm Vật Tư</h6>
+                <input id="mat-name" class="form-control mb-2" placeholder="Tên vật tư *">
+                <input id="mat-cas" class="form-control mb-2" placeholder="CAS Number">
+                <select id="mat-category" class="form-select mb-2">
+                    <option value="Acid">Acid</option>
+                    <option value="Base">Base</option>
+                    <option value="Solvent">Dung môi</option>
+                    <option value="Salt">Muối</option>
+                </select>
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <input id="mat-price" type="number" class="form-control" placeholder="Giá bán">
+                    </div>
+                    <div class="col-6">
+                        <button class="btn w-100 h-100" style="background:#8b5cf6;color:white"
+                            onclick="addMaterial()">Thêm</button>
+                    </div>
+                </div>
+            </div>
+
+            <input type="text" id="mat-search" class="form-control mb-3" placeholder="🔍 Tìm kiếm..."
+                oninput="searchMaterials()">
+            <div id="materials-list"></div>
+        </div>
+
+        <!-- Warehouse View -->
+        <div id="view-warehouse" class="hidden">
+            <div class="view-header">
+                <button class="btn btn-light btn-sm rounded-circle" onclick="showView('view-home')">
+                    <i class="bi bi-arrow-left"></i>
+                </button>
+                <h5 class="fw-bold m-0 text-secondary">KHO HÀNG</h5>
+                <button class="btn btn-secondary btn-sm" onclick="loadWarehouse()">
+                    <i class="bi bi-arrow-clockwise"></i>
+                </button>
+            </div>
+
+            <div class="tab-container mb-3">
+                <button class="tab-btn active" id="wh-tab-lt1" onclick="switchWarehouse('LT1')">LT1</button>
+                <button class="tab-btn" id="wh-tab-lt2" onclick="switchWarehouse('LT2')">LT2</button>
+                <button class="tab-btn" id="wh-tab-all" onclick="switchWarehouse('')">TẤT CẢ</button>
+            </div>
+
+            <div id="wh-alerts" class="mb-3"></div>
+            <div id="warehouse-list"></div>
+        </div>
+
+        <!-- Reports View -->
+        <div id="view-reports" class="hidden">
+            <div class="view-header">
+                <button class="btn btn-light btn-sm rounded-circle" onclick="showView('view-home')">
+                    <i class="bi bi-arrow-left"></i>
+                </button>
+                <h5 class="fw-bold m-0 text-success">BÁO CÁO</h5>
+                <div></div>
+            </div>
+
+            <div class="tab-container mb-3">
+                <button class="tab-btn active" id="rpt-tab-stock" onclick="switchReportTab('stock')">TỒN KHO</button>
+                <button class="tab-btn" id="rpt-tab-history" onclick="switchReportTab('history')">LỊCH SỬ</button>
+            </div>
+
+            <div id="report-content"></div>
+        </div>
+
+        <!-- Driver Orders View -->
+        <div id="view-driver-orders" class="hidden">
+            <div class="view-header">
+                <button class="btn btn-light btn-sm rounded-circle" onclick="showView('view-home')">
+                    <i class="bi bi-arrow-left"></i>
+                </button>
+                <h5 class="fw-bold m-0">ĐƠN CỦA TÔI</h5>
+                <button class="btn btn-light btn-sm rounded-circle" onclick="loadMyOrders()">
+                    <i class="bi bi-arrow-clockwise"></i>
+                </button>
+            </div>
+
+            <div id="my-orders-list"></div>
+        </div>
+
+    </div>
+
+    <!-- Order Detail Modal -->
+    <div class="modal fade" id="orderDetailModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title fw-bold" id="modalOrderTitle">Chi tiết đơn hàng</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                        aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-3">
+                    <!-- Customer Info -->
+                    <h6 class="fw-bold text-primary mb-2"><i class="bi bi-person me-1"></i>Khách hàng</h6>
+                    <div class="bg-light p-2 rounded mb-3 border">
+                        <div id="modalCustomerName" class="fw-bold">...</div>
+                        <div id="modalAddress" class="text-muted small">...</div>
+                    </div>
+
+                    <!-- Products Table -->
+                    <h6 class="fw-bold text-primary mb-2"><i class="bi bi-box-seam me-1"></i>Danh sách hàng hóa</h6>
+                    <div class="table-responsive mb-3">
+                        <table class="table table-bordered table-sm mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Mã</th>
+                                    <th>Tên hàng</th>
+                                    <th class="text-end">SL</th>
+                                    <th>ĐVT</th>
+                                </tr>
+                            </thead>
+                            <tbody id="modalProductList">
+                                <!-- JS Injection -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Internal Info (Driver/Note) -->
+                    <h6 class="fw-bold text-primary mb-2"><i class="bi bi-truck me-1"></i>Thông tin vận chuyển</h6>
+                    <div class="bg-light p-2 rounded border">
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <label class="small text-muted">Tài xế:</label>
+                                <div id="modalDriver" class="fw-bold">...</div>
+                            </div>
+                            <div class="col-6">
+                                <label class="small text-muted">Xe:</label>
+                                <div id="modalPlate" class="fw-bold">...</div>
+                            </div>
+                            <div class="col-12 border-top mt-2 pt-2">
+                                <label class="small text-muted">Ghi chú:</label>
+                                <div id="modalNote" class="text-danger fst-italic small">...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer p-2" id="modalFooter">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Đóng</button>
+                    <!-- Admin Actions injected here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delivery/Complete Modal -->
+    <div id="modal-delivery" class="overlay hidden"
+        style="background:rgba(0,0,0,0.5); position:fixed; inset:0; z-index:9990; display:flex; justify-content:center; align-items:center;">
+        <div class="bg-white w-100 p-3 m-3 rounded-4 shadow" style="max-height:90vh; overflow-y:auto;">
+            <h5 class="fw-bold text-success mb-3" id="del-modal-title">XÁC NHẬN GIAO HÀNG</h5>
+
+            <div class="card-custom mb-3">
+                <div class="row g-2 align-items-center mb-2">
+                    <div class="col-3 fw-bold text-secondary">Kho:</div>
+                    <div class="col-9">
+                        <div class="btn-group w-100">
+                            <input type="radio" class="btn-check" name="del-wh" id="del-wh1" value="LT1" checked>
+                            <label class="btn btn-outline-primary btn-sm" for="del-wh1">LT1</label>
+
+                            <input type="radio" class="btn-check" name="del-wh" id="del-wh2" value="LT2">
+                            <label class="btn btn-outline-primary btn-sm" for="del-wh2">LT2</label>
+
+                            <input type="radio" class="btn-check" name="del-wh" id="del-wh3" value="OTHER">
+                            <label class="btn btn-outline-primary btn-sm" for="del-wh3">Khác</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="alert alert-light border small mb-2">
+                <i class="bi bi-info-circle me-1"></i>Nhập số lượng thực tế & Chụp ảnh.
+            </div>
+
+            <!-- Cart List -->
+            <div id="delivery-cart-list" class="mb-3"></div>
+
+            <!-- Add Extra Item -->
+            <div class="card-custom mb-3 bg-light border-0">
+                <div class="d-flex justify-content-between align-items-center"
+                    onclick="$('#add-prod-area').toggleClass('hidden')">
+                    <span class="fw-bold text-primary small"><i class="bi bi-plus-circle"></i> Thêm hàng / Vỏ</span>
+                    <i class="bi bi-chevron-down"></i>
+                </div>
+                <div id="add-prod-area" class="hidden mt-2 pt-2 border-top">
+                    <select id="extra-prod-name" class="form-select mb-2">
+                        <option value="">-- Chọn hàng --</option>
+                        <option value="Can 30L">Can 30L (Vỏ)</option>
+                        <option value="Phuy 200L">Phuy 200L (Vỏ)</option>
+                        <option value="Tank 1000L">Tank 1000L (Vỏ)</option>
+                        <option value="Pallet">Pallet</option>
+                    </select>
+                    <div class="row g-2">
+                        <div class="col-6"><input type="number" id="extra-prod-qty" class="form-control"
+                                placeholder="SL"></div>
+                        <div class="col-6"><button class="btn btn-primary w-100" onclick="addExtraItem()">Thêm</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Proof -->
+            <label class="small fw-bold mb-1">📸 Ảnh chứng minh (Tối đa 10):</label>
+            <input type="file" id="inp-del-img" class="form-control mb-2" accept="image/*" multiple
+                onchange="handleImageSelect(this)">
+            <div id="img-preview-area" class="d-flex gap-2 overflow-auto mb-3"
+                style="white-space:nowrap; min-height:60px;"></div>
+
+            <textarea id="inp-del-note" class="form-control mb-3" rows="2" placeholder="Ghi chú (nếu có)..."></textarea>
+
+            <button id="btn-submit-delivery" class="btn btn-success w-100 py-3 fw-bold shadow-sm"
+                onclick="submitDelivery()">
+                <i class="bi bi-check-lg me-1"></i>HOÀN THÀNH
+            </button>
+            <button class="btn btn-light w-100 mt-2" onclick="closeDeliveryModal()">Hủy</button>
+        </div>
+    </div>
+
+    <!-- Image Viewer Modal -->
+    <div id="modal-image-viewer" class="overlay hidden" onclick="this.classList.add('hidden')"
+        style="background:rgba(0,0,0,0.9); position:fixed; inset:0; z-index:9999; display:flex; justify-content:center; align-items:center; cursor:zoom-out;">
+        <img id="viewer-img" src="" style="max-width:95%; max-height:95%; object-fit:contain; border-radius:4px;">
+        <button class="btn btn-sm btn-light position-absolute top-0 end-0 m-3 rounded-circle"
+            style="width:40px; height:40px;"><i class="bi bi-x-lg"></i></button>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/js/api.js?v=2"></script>
+    <script src="/js/app.js?v=2"></script>
+
+</body>
+
+</html>

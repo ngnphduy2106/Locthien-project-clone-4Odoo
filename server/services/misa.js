@@ -1,0 +1,650 @@
+// ===============================================
+// MISA CRM SYNC SERVICE
+// ===============================================
+
+import fetch from 'node-fetch';
+import db from '../db/index.js';
+import { sendTelegramMessage } from './telegram.js';
+
+const MISA_AUTH_URL = 'https://crmconnect.misa.vn/api/v2/Account';
+const MISA_ORDERS_URL = 'https://crmconnect.misa.vn/api/v2/SaleOrders';
+const MISA_PRODUCTS_URL = 'https://crmconnect.misa.vn/api/v2/Products';
+
+let cachedToken = null;
+
+async function loginMisa() {
+    try {
+        const response = await fetch(MISA_AUTH_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                client_id: process.env.MISA_CLIENT_ID,
+                client_secret: process.env.MISA_CLIENT_SECRET
+            })
+        });
+
+        const json = await response.json();
+
+        // Handle various casing from MISA API
+        const success = json.Success || json.success;
+        const data = json.Data || json.data;
+
+        if (success && data) {
+            cachedToken = data;
+            return cachedToken;
+        }
+        console.error('❌ MISA Login Failed:', json);
+        return null;
+    } catch (e) {
+        console.error('❌ MISA Login Error:', e.message);
+        return null; // Return null on failure
+    }
+}
+
+// Fetch all products from MISA and sync to DB
+export const syncMisaProducts = async () => {
+    console.log('🔄 Starting MISA Product Sync...');
+    if (!cachedToken) await loginMisa();
+    if (!cachedToken) return;
+
+    let page = 1;
+    let hasMore = true;
+    let totalSynced = 0;
+
+    try {
+        while (hasMore) {
+            console.log(`📡 Fetching MISA Products Page ${page}...`);
+            const response = await fetch(`${MISA_PRODUCTS_URL}?PageSize=100&Page=${page}`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${cachedToken}`,
+                    'Clientid': process.env.MISA_CLIENT_ID
+                }
+            });
+
+            const json = await response.json();
+            const success = json.Success || json.success;
+            const data = json.Data || json.data;
+
+            if (success && data && Array.isArray(data) && data.length > 0) {
+                // Upsert to Firestore
+                for (const p of data) {
+                    const material = {
+                        code: p.product_code,
+                        name: p.product_name,
+                        unit: p.unit || '',
+                        price: Number(p.price || 0),
+                        salePrice: Number(p.price || 0), // Map to UI field
+                        category: 'MISA CRM', // Default category for filter
+                        type: 'MisaProduct', // Tag as MISA
+                        status: p.status === 2 ? 'INACTIVE' : 'ACTIVE', // Guessing status enum, or just map
+                        description: p.description || ''
+                    };
+
+                    await db.addMaterial(material); // This handles upsert in our DB layer
+                }
+
+                totalSynced += data.length;
+                page++;
+            } else {
+                hasMore = false;
+            }
+        }
+        console.log(`✅ MISA Product Sync Complete. Total: ${totalSynced}`);
+    } catch (e) {
+        console.error('❌ MISA Product Sync Error:', e.message);
+    }
+};
+
+export async function getMisaOrders(retryCount = 0, fullSync = true) {
+    if (!cachedToken) await loginMisa();
+    if (!cachedToken) return [];
+
+    const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${cachedToken}`,
+        'Clientid': process.env.MISA_CLIENT_ID
+    };
+
+    const orderMap = new Map();
+
+    // PRIORITY 1: Fetch newest orders (no Page param = realtime data)
+    try {
+        console.log(`📡 [REALTIME] Fetching newest orders...`);
+        const url = `${MISA_ORDERS_URL}?PageSize=1000`;
+        const response = await fetch(url, { method: 'GET', headers });
+
+        if (response.ok) {
+            const json = await response.json();
+            const data = json.Data || json.data || [];
+            data.forEach(order => orderMap.set(order.sale_order_no, order));
+            console.log(`   ✅ Got ${data.length} newest orders`);
+        }
+    } catch (e) {
+        console.error(`❌ Realtime fetch error:`, e.message);
+    }
+
+    // PRIORITY 2: Fetch historical pages (only if fullSync enabled)
+    if (fullSync) {
+        for (let page = 1; page <= 3; page++) {
+            try {
+                await new Promise(r => setTimeout(r, 200));
+                console.log(`📡 [HISTORICAL] Page ${page}...`);
+                const url = `${MISA_ORDERS_URL}?PageSize=1000&Page=${page}`;
+                const response = await fetch(url, { method: 'GET', headers });
+
+                if (!response.ok) break;
+
+                const json = await response.json();
+                const data = json.Data || json.data || [];
+                if (data.length === 0) break;
+
+                const before = orderMap.size;
+                data.forEach(order => orderMap.set(order.sale_order_no, order));
+                console.log(`   + ${data.length} orders, ${orderMap.size - before} new`);
+
+                if (data.length < 100) break;
+            } catch (e) {
+                console.error(`❌ Page ${page} error:`, e.message);
+                break;
+            }
+        }
+    }
+
+    console.log(`\n📊 Total: ${orderMap.size} unique orders`);
+    return Array.from(orderMap.values());
+}
+
+// Helper to get detailed order info (including products) from MISA
+async function getMisaOrderDetail(idOrName, isUuid = false) {
+    if (!cachedToken) await loginMisa();
+    if (!cachedToken) return null;
+
+    try {
+        let url;
+        if (isUuid) {
+            // Direct fetch by UUID: https://crmconnect.misa.vn/api/v2/SaleOrders/{id}
+            url = `${MISA_ORDERS_URL}/${idOrName}`;
+        } else {
+            // Search by Order No (Legacy/Fallback)
+            // Fix: MISA OData filter likely uses PascalCase 'SaleOrderNo'
+            const filterVal = encodeURIComponent(idOrName);
+            url = `${MISA_ORDERS_URL}?PageSize=1&$filter=SaleOrderNo eq '${filterVal}'`;
+        }
+
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${cachedToken}`,
+                'Clientid': process.env.MISA_CLIENT_ID
+            }
+        });
+
+        const json = await response.json();
+
+        // MISA might return { Success: true, Data: {...} } OR direct object depending on endpoint?
+        // Usually /v2/SaleOrders/{id} returns the object directly or Data wrapped.
+
+        const success = json.Success !== false; // Sometimes implicit
+        const data = json.Data || json.data || json; // Handle direct object return
+
+        if (success && data) {
+            // If fetching by UUID, data might be the object itself
+            if (isUuid) return data;
+
+            // If fetching by Filter, data is Array
+            if (Array.isArray(data) && data.length > 0) {
+                const detail = data[0];
+                if (detail.sale_order_no !== idOrName) {
+                    console.warn(`⚠️ Mismatch! Requested ${idOrName} but got ${detail.sale_order_no}. Ignoring.`);
+                    return null;
+                }
+                return detail;
+            }
+        }
+        return null;
+    } catch (e) {
+        console.error('❌ MISA Detail Fetch Error:', e.message);
+        return null;
+    }
+}
+
+export const syncMisaOrders = async () => {
+    console.log('🔄 Starting MISA Sync...');
+
+    // 1. Get Orders from MISA
+    const misaOrders = await getMisaOrders();
+    if (!misaOrders.length) {
+        console.log('ℹ️ No orders found from MISA.');
+        return;
+    }
+
+    // 2. Get Existing Orders from DB to check for duplicates
+    // Optimization: In a huge DB we wouldn't fetch all, but for now it matches the n8n logic
+    // We can optimize by fetching IDs only if possible, or simple cache. 
+    // Since db.getOrders() returns all, we use it.
+    const dbOrders = await db.getOrders();
+    const existingIds = new Set(dbOrders.map(o => o.soDon || o.id));
+
+    let newCount = 0;
+
+    // 3. Process Orders
+    for (const item of misaOrders) {
+        // Normalize Keys
+        const saleOrderNo = item.sale_order_no || item.SaleOrderNo;
+
+        // Fix: item.id is Integer (useless for API). item.sale_order_id might be UUID.
+        // Only use if it looks like a UUID.
+        let rawId = item.sale_order_id || item.SaleOrderId || item.id;
+        const saleOrderId = (typeof rawId === 'string' && rawId.length > 30) ? rawId : null;
+
+        if (!saleOrderNo) continue;
+
+        // Debug First Item to check keys
+        if (newCount === 0) {
+            console.log('🔍 Sample MISA Item Keys:', Object.keys(item));
+            console.log('   sale_order_id (mapped):', saleOrderId);
+            console.log('   list_product:', JSON.stringify(item.list_product || [], null, 2));
+        }
+
+        let shouldFetchDetail = false;
+
+        if (!existingIds.has(saleOrderNo)) {
+            // New Order
+            shouldFetchDetail = true;
+            newCount++;
+        } else {
+            // Existing Order: Check if it has products. If not, update it.
+            const existingOrder = dbOrders.find(o => o.id === saleOrderNo || o.soDon === saleOrderNo);
+
+            // Calculate Status from MISA Item (List View)
+            const newStatus = mapMisaStatus(item);
+
+            if (existingOrder) {
+                // 1. Missing Data Check
+                const hasProducts = existingOrder.products && existingOrder.products.length > 0;
+                const hasZeroQty = hasProducts && existingOrder.products.some(p => p.qty === 0);
+
+                // 2. Status Change Check (Optimize: Only update if different and local is 'Mới')
+                // If local is 'Đã giao hàng' (manually completed), we might not want MISA to revert it, 
+                // but here we want MISA to PUSH 'Đã giao hàng' to us.
+                const statusChanged = existingOrder.status !== newStatus && existingOrder.status === 'Mới';
+
+                if (!hasProducts || hasZeroQty || statusChanged) {
+                    // console.log(`♻️ Updating ${saleOrderNo} (Diff detected)...`);
+                    shouldFetchDetail = true;
+                }
+            }
+        }
+
+        if (!shouldFetchDetail) continue;
+
+        // Fetch full details
+        let detail = null;
+        let products = [];
+        let shippingAddress = item.shipping_address || item.description || '';
+
+        // OPTIMIZATION: Check if List Item already has Product Mappings (It usually does!)
+        if (item.sale_order_product_mappings && item.sale_order_product_mappings.length > 0) {
+            // console.log(`⚡ Using List Data for ${saleOrderNo}`); // Debug
+            products = item.sale_order_product_mappings.map(p => ({
+                code: p.product_code,
+                // User Request: Name from Description if Product Name missing
+                name: p.product_name || p.description || p.product_code,
+                // User Request: Correct Quantity (usage_unit_amount is Physical Qty)
+                qty: Number(p.usage_unit_amount || p.amount || 0),
+                unit: p.unit || ''
+            }));
+            // If address is missing in List item, we might still want Detail? 
+            // Usually List has shipping_address too.
+        }
+        else {
+            // ... Fallback paths ...
+
+            // 1. Try Fetch Detail (UUID)
+            if (saleOrderId) {
+                detail = await getMisaOrderDetail(saleOrderId, true);
+            } else {
+                // Fallback to Filter
+                detail = await getMisaOrderDetail(saleOrderNo, false);
+            }
+
+            if (detail && detail.sale_order_no === saleOrderNo) {
+                // Success: Map from Detail
+                products = (detail.sale_order_product_mappings || []).map(p => ({
+                    code: p.product_code,
+                    name: p.product_name || p.description || p.product_code,
+                    qty: Number(p.amount || 0),
+                    unit: p.unit || ''
+                }));
+                shippingAddress = detail.shipping_address || detail.description || '';
+            } else {
+                // 2. FAILSAFE: Use list_product string (Quantity will be 0)
+                const productCodes = (item.list_product || '').split(',').map(s => s.trim()).filter(s => s);
+
+                if (productCodes.length > 0) {
+                    console.log(`⚠️ Using List Fallback (String) for ${saleOrderNo}: ${productCodes.join(', ')}`);
+                    const localMaterials = await db.getMaterials();
+                    products = productCodes.map(code => {
+                        const mat = localMaterials.find(m => m.code === code);
+                        return {
+                            code: code,
+                            name: mat ? mat.name : code,
+                            qty: 0, // Unknown
+                            unit: mat ? mat.unit : ''
+                        };
+                    });
+                } else {
+                    console.log(`⚠️ Skip ${saleOrderNo} (No Products found)`);
+                    continue;
+                }
+            }
+        }
+
+        // Pass RAW MISA data directly - addOrder will map to Supabase columns
+        const mappedOrder = {
+            ...item,  // All MISA fields including delivery_status
+            id: saleOrderNo,
+            status: mapMisaStatus(item),
+            delivery_status: item.delivery_status || 'Chưa giao hàng', // Preserve MISA delivery_status
+            sale_order_product_mappings: products,  // Products array
+        };
+
+        if (existingIds.has(saleOrderNo)) {
+            // Preserve Local Fields (Driver, Status, Note)
+            const oldOrder = dbOrders.find(o => o.soDon === saleOrderNo);
+            if (oldOrder) {
+                if (oldOrder.taiXe) mappedOrder.taiXe = oldOrder.taiXe;
+                if (oldOrder.bienSo) mappedOrder.bienSo = oldOrder.bienSo;
+                if (oldOrder.note) mappedOrder.note = oldOrder.note;
+
+                // Only allow MISA to update status if local is 'Mới', otherwise keep local status
+                // (Unless we implement a specific status mapping from MISA)
+                if (oldOrder.status !== 'Mới') {
+                    mappedOrder.status = oldOrder.status;
+                }
+            }
+            await db.updateOrder(saleOrderNo, mappedOrder);
+        } else {
+            mappedOrder.createdAt = new Date().toISOString();
+            await db.addOrder(mappedOrder);
+
+            // DISABLED: Telegram notification for bulk sync
+            // const money = mappedOrder.amount.toLocaleString('vi-VN');
+            // const msg = `🆕 <b>CÓ ĐƠN HÀNG MỚI TỪ MISA</b>\n📦 Mã: <b>${mappedOrder.soDon}</b>\n📅 Ngày: ${mappedOrder.ngay}\n🏢 Khách: ${mappedOrder.khach}\n💰 Tổng: ${money} VNĐ\n📝 GC: ${mappedOrder.diaChi}`;
+            // await sendTelegramMessage(msg);
+        }
+
+        console.log(`✅ Synced/Updated Order: ${saleOrderNo}`);
+    }
+
+    console.log(`✨ Sync Complete. New Orders: ${newCount}`);
+};
+
+// ============================================================
+// MISA MAPPINGS (FROM N8N)
+// ============================================================
+const STOCK_MAPPING = {
+    "HH": "HH",
+    "TP": "TP",
+    "K1": "KHO_1",
+    "LT1": "LT1",
+    "Kho hàng hóa": "KHO_HANG_HOA"
+};
+
+// Helper to map MISA status to local status (now using same values!)
+// MISA Status Text: "Chưa thực hiện", "Đang thực hiện", "Đã thực hiện", "Đã hủy bỏ"
+function mapMisaStatus(item) {
+    // 1. Priority: Check delivery_status field
+    const dStatus = (item.delivery_status || '').toLowerCase();
+    if (dStatus.includes('đã giao') || dStatus.includes('delivered') || dStatus.includes('hoàn thành')) {
+        return 'Đã thực hiện';
+    }
+    if (dStatus.includes('đang giao') || dStatus.includes('shipping')) {
+        return 'Đang thực hiện';
+    }
+
+    // 2. If status is already a MISA text value, return it directly
+    const statusText = String(item.status || '').trim();
+    if (['Chưa thực hiện', 'Đang thực hiện', 'Đã thực hiện', 'Đã hủy bỏ'].includes(statusText)) {
+        return statusText;
+    }
+
+    // 3. Fallback for numeric status (legacy)
+    const oStatus = Number(item.status);
+    switch (oStatus) {
+        case 1: return 'Chưa thực hiện';
+        case 2: return 'Đang thực hiện';
+        case 3: return 'Đã thực hiện';
+        case 4: return 'Đã hủy bỏ';
+        default: return 'Chưa thực hiện';
+    }
+}
+
+const DEFAULT_STOCK = "HH";
+
+const UNIT_MAPPING = {
+    "kg": "kg", "Kg": "kg", "KG": "kg",
+    "cái": "cái", "Cái": "cái",
+    "lit": "lít", "lít": "lít"
+};
+
+export const updateMisaOrder = async (orderId, updateData) => {
+    if (!orderId) return;
+    if (!cachedToken) await loginMisa();
+
+    console.log(`📡 Pushing update to MISA for Order ${orderId}...`);
+    console.log('📋 Update Data:', JSON.stringify(updateData, null, 2));
+
+    try {
+        // 1. Fetch Original Order to get Prices & Original Data
+        const originalOrder = await getMisaOrderDetail(orderId);
+        if (!originalOrder) {
+            console.error(`❌ Could not fetch original order: ${orderId}`);
+            return false;
+        }
+        const originalProducts = originalOrder.sale_order_product_mappings || [];
+
+        // Create Price Map: ProductCode -> Original Item Data
+        const originalItemMap = {};
+        originalProducts.forEach(p => {
+            originalItemMap[p.product_code] = p;
+        });
+
+        // Pre-fetch materials from Local DB for NEW items fallback
+        const allMaterials = await db.getMaterials();
+        const localPriceMap = {};
+        allMaterials.forEach(m => {
+            if (m.code) localPriceMap[m.code] = Number(m.salePrice || m.price || 0);
+        });
+
+        // 2. Map Status to MISA TEXT values (MISA uses text, not numeric!)
+        // MISA Status Text: "Chưa thực hiện", "Đang thực hiện", "Đã thực hiện", "Đã hủy bỏ"
+        let misaStatus = originalOrder.status || 'Chưa thực hiện'; // Keep original if not specified
+        if (updateData.status) {
+            const statusMap = {
+                'Chưa thực hiện': 'Chưa thực hiện',
+                'Đang thực hiện': 'Đang thực hiện',
+                'Đã thực hiện': 'Đã thực hiện',
+                'Đã hủy bỏ': 'Đã hủy bỏ',
+                'Mới': 'Chưa thực hiện',
+                'Chờ giao': 'Đang thực hiện',
+                'Đang giao': 'Đang thực hiện',
+                'Đang giao hàng': 'Đang thực hiện',
+                'Hoàn thành': 'Đã thực hiện',
+                'Đã giao hàng': 'Đã thực hiện',
+                'WAITING': 'Chưa thực hiện',
+                'DELIVERING': 'Đang thực hiện',
+                'DELIVERED': 'Đã thực hiện',
+                'COMPLETED': 'Đã thực hiện',
+                'CANCELLED': 'Đã hủy bỏ'
+            };
+            misaStatus = statusMap[updateData.status] || misaStatus;
+        }
+
+        // If delivery_status indicates completion, set status accordingly
+        if (updateData.delivery_status === 'Đã giao hàng') {
+            misaStatus = 'Đã thực hiện';
+        } else if (updateData.delivery_status === 'Đang giao hàng' || updateData.delivery_status === 'Shipping') {
+            misaStatus = 'Đang thực hiện';
+        }
+
+        // 3. Prepare Product List with Correct Calculations
+        let mappedProducts = [];
+        let orderTotalAmount = 0;
+        let orderTotalDiscount = 0;
+        let orderTotalTax = 0;
+        let orderGrandTotal = 0;
+
+        if (updateData.cart && Array.isArray(updateData.cart) && updateData.cart.length > 0) {
+            mappedProducts = updateData.cart.map(p => {
+                // Map Stock & Unit
+                let stockInput = String(p.warehouse || p.stock_name || "").trim();
+                let stock = STOCK_MAPPING[stockInput] || stockInput || DEFAULT_STOCK;
+                let unitInput = String(p.unit || "").trim();
+                let unit = UNIT_MAPPING[unitInput] || unitInput || "kg";
+
+                // Get Product Code
+                const pCode = p.product_code || p.code || p.id || "";
+
+                // Lookup Original Item for prices and tax rates
+                const originalItem = originalItemMap[pCode] || {};
+
+                // Get Price - from original order first, then local DB fallback
+                let price = Number(p.price || originalItem.price || 0);
+                if (price === 0 && localPriceMap[pCode]) {
+                    price = localPriceMap[pCode];
+                }
+
+                // Get Quantity - from update data
+                const qty = Number(p.weight_kg || p.qty || p.amount || 0);
+
+                // Get Tax & Discount rates from original
+                const discountPercent = Number(p.discount_percent || originalItem.discount_percent || 0);
+                const taxPercent = Number(p.tax_percent || originalItem.tax_percent || 0);
+
+                // === FINANCIAL CALCULATIONS ===
+                // to_currency = price * qty (before discount)
+                const toCurrency = Math.round(price * qty);
+
+                // discount = to_currency * discount_percent / 100
+                const discountAmt = Math.round(toCurrency * discountPercent / 100);
+
+                // amount_after_discount = to_currency - discount
+                const amountAfterDiscount = toCurrency - discountAmt;
+
+                // tax = amount_after_discount * tax_percent / 100
+                const taxAmt = Math.round(amountAfterDiscount * taxPercent / 100);
+
+                // total = amount_after_discount + tax
+                const totalAmt = amountAfterDiscount + taxAmt;
+
+                // Accumulate for order totals
+                orderTotalAmount += toCurrency;
+                orderTotalDiscount += discountAmt;
+                orderTotalTax += taxAmt;
+                orderGrandTotal += totalAmt;
+
+                return {
+                    "product_code": pCode,
+                    "stock_name": stock,
+                    "unit": unit,
+                    "amount": qty,
+                    "price": price,
+                    "to_currency": toCurrency,
+                    "discount": discountAmt,
+                    "discount_percent": discountPercent,
+                    "tax": taxAmt,
+                    "tax_percent": taxPercent,
+                    "total": totalAmt,
+                    // OC (Original Currency) fields - same as VND for now
+                    "to_currency_oc": toCurrency,
+                    "discount_oc": discountAmt,
+                    "tax_oc": taxAmt,
+                    "total_oc": totalAmt,
+                    // Usage unit fields
+                    "usage_unit": unit,
+                    "usage_unit_amount": qty,
+                    // Description/Note
+                    "description": p.note || p.description || originalItem.description || ""
+                };
+            });
+        }
+
+        // 4. Construct MISA Payload
+        const payload = {
+            "sale_order_no": orderId,
+            "form_layout": originalOrder.form_layout || "Mẫu tiêu chuẩn",
+            "status": misaStatus,
+            "description": updateData.description || originalOrder.description || undefined
+        };
+
+        // Delivery Status
+        if (updateData.delivery_status) {
+            payload["delivery_status"] = updateData.delivery_status;
+        }
+
+        // Driver & Plate (Custom Fields)
+        if (updateData.driver) {
+            payload["custom_field13"] = updateData.driver;
+        }
+        if (updateData.plate) {
+            payload["custom_field14"] = updateData.plate;
+        }
+
+        // Shipping Address
+        if (updateData.shipping_address) {
+            payload["shipping_address"] = updateData.shipping_address;
+        }
+
+        // Products & Order Totals
+        if (mappedProducts.length > 0) {
+            payload["sale_order_product_mappings"] = mappedProducts;
+
+            // Order-level totals (calculated from products)
+            payload["sale_order_amount"] = orderGrandTotal;
+            payload["total_summary"] = orderTotalAmount;
+            payload["discount_summary"] = orderTotalDiscount;
+            payload["tax_summary"] = orderTotalTax;
+            payload["to_currency_summary"] = orderTotalAmount - orderTotalDiscount;
+
+            // OC (Original Currency) summaries
+            payload["total_summary_oc"] = orderTotalAmount;
+            payload["discount_summary_oc"] = orderTotalDiscount;
+            payload["tax_summary_oc"] = orderTotalTax;
+            payload["to_currency_summary_oc"] = orderTotalAmount - orderTotalDiscount;
+            payload["sale_order_amount_oc"] = orderGrandTotal;
+        }
+
+        console.log('📝 MISA Payload:', JSON.stringify(payload, null, 2));
+
+        // 5. Send PUT Request
+        const response = await fetch(MISA_ORDERS_URL, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${cachedToken}`,
+                'Clientid': process.env.MISA_CLIENT_ID
+            },
+            body: JSON.stringify([payload])
+        });
+
+        const json = await response.json();
+        const success = json.Success || json.success;
+
+        if (success) {
+            console.log(`✅ MISA Updated Successfully: ${orderId}`);
+            console.log(`   Status: ${misaStatus}, Products: ${mappedProducts.length}, Total: ${orderGrandTotal.toLocaleString()} VND`);
+            return true;
+        } else {
+            console.error(`❌ MISA Update Failed:`, json);
+            return false;
+        }
+
+    } catch (e) {
+        console.error('❌ MISA Update Exception:', e.message);
+        return false;
+    }
+};
