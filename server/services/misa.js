@@ -169,8 +169,9 @@ async function getMisaOrderDetail(idOrName, isUuid = false) {
         } else {
             // Search by Order No (Legacy/Fallback)
             // Fix: MISA OData filter likely uses PascalCase 'SaleOrderNo'
+            // BUG: If filter fails and PageSize=1, MISA returns Top 1 order! -> Use PageSize=10 to safely filter locally.
             const filterVal = encodeURIComponent(idOrName);
-            url = `${MISA_ORDERS_URL}?PageSize=1&$filter=SaleOrderNo eq '${filterVal}'`;
+            url = `${MISA_ORDERS_URL}?PageSize=10&$filter=SaleOrderNo eq '${filterVal}'`;
         }
 
         const response = await fetch(url, {
@@ -199,6 +200,7 @@ async function getMisaOrderDetail(idOrName, isUuid = false) {
                 const detail = data[0];
                 if (detail.sale_order_no !== idOrName) {
                     console.warn(`⚠️ Mismatch! Requested ${idOrName} but got ${detail.sale_order_no}. Ignoring.`);
+                    console.warn("Mismatch Detail:", JSON.stringify(detail, null, 2));
                     return null;
                 }
                 return detail;

@@ -138,7 +138,8 @@ router.put('/:id/assign', async (req, res) => {
         const order = await db.updateOrder(id, {
             taiXe: driverName,
             bienSo: plate,
-            status: CONFIG.STATUS.WAITING,
+            status: CONFIG.STATUS.DELIVERING,
+            delivery_status: 'Đang giao hàng',
             note: note || '' // Save internal note
         });
 
@@ -192,11 +193,22 @@ router.post('/:id/complete', async (req, res) => {
         const prefix = type === 'NHAP' ? 'N' : 'X';
         const ticketId = prefix + ts.short;
 
-        // Update order status
+        // Prepare actual delivered products for DB update
+        const updatedProducts = cart.filter(c => !c.isShell).map(item => ({
+            code: item.product?.code || item.product?.id || item.code || '',
+            name: item.product?.name || item.name || item.product || '',
+            qty: Number(item.weight_kg || item.qty || 0),
+            unit: item.unit || 'Kg'
+            // density: item.density
+        }));
+
+        // Update order status AND products
         await db.updateOrder(id, {
             status: CONFIG.STATUS.DELIVERED,
+            delivery_status: 'Đã giao hàng',
             taiXe: driver_name,
-            bienSo: plate
+            bienSo: plate,
+            cart: updatedProducts
         });
 
         // Create warehouse tickets
