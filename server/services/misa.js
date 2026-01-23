@@ -167,11 +167,9 @@ async function getMisaOrderDetail(idOrName, isUuid = false) {
             // Direct fetch by UUID: https://crmconnect.misa.vn/api/v2/SaleOrders/{id}
             url = `${MISA_ORDERS_URL}/${idOrName}`;
         } else {
-            // Search by Order No (Legacy/Fallback)
-            // Fix: MISA OData filter likely uses PascalCase 'SaleOrderNo'
-            // BUG: If filter fails and PageSize=1, MISA returns Top 1 order! -> Use PageSize=10 to safely filter locally.
+            // Search by Order No using specific /code endpoint (Works for Drafts!)
             const filterVal = encodeURIComponent(idOrName);
-            url = `${MISA_ORDERS_URL}?PageSize=10&$filter=SaleOrderNo eq '${filterVal}'`;
+            url = `${MISA_ORDERS_URL}/code?code=${filterVal}`;
         }
 
         const response = await fetch(url, {
@@ -195,19 +193,16 @@ async function getMisaOrderDetail(idOrName, isUuid = false) {
             // If fetching by UUID, data might be the object itself
             if (isUuid) return data;
 
-            // If fetching by Filter, data is Array
+            // If fetching by /code, data is Array
             if (Array.isArray(data) && data.length > 0) {
-                // Fix: MISA bug returns default list if filter fails.
-                // We must search LOCALLY in the returned list for the exact match.
+                // Find exact match just in case (though /code seems precise)
                 const detail = data.find(d =>
                     d.sale_order_no === idOrName ||
                     d.SaleOrderNo === idOrName
                 );
 
                 if (!detail) {
-                    console.warn(`⚠️ Mismatch/Not Found! Requested ${idOrName}. MISA returned ${data.length} items but none matched.`);
-                    // Log first item to see what we got
-                    if (data[0]) console.warn(`   Sample return: ${data[0].sale_order_no}`);
+                    console.warn(`⚠️ Mismatch! Requested ${idOrName}. /code returned items but none matched.`);
                     return null;
                 }
                 return detail;
@@ -511,7 +506,7 @@ export const updateMisaOrder = async (orderId, updateData) => {
             mappedProducts = updateData.cart.map(p => {
                 // Map Stock & Unit
                 let stockInput = String(p.warehouse || p.stock_name || "").trim();
-                let stock = STOCK_MAPPING[stockInput] || stockInput || DEFAULT_STOCK;
+                let stock = STOCK_MAPPING[stockInput] || DEFAULT_STOCK;
                 let unitInput = String(p.unit || "").trim();
                 let unit = UNIT_MAPPING[unitInput] || unitInput || "kg";
 
@@ -565,13 +560,11 @@ export const updateMisaOrder = async (orderId, updateData) => {
                     "to_currency": toCurrency,
                     "discount": discountAmt,
                     "discount_percent": discountPercent,
-                    "tax": taxAmt,
-                    "tax_percent": taxPercent,
+                    // Tax fields removed due to MISA validation - requires tax_code reference
                     "total": totalAmt,
                     // OC (Original Currency) fields - same as VND for now
                     "to_currency_oc": toCurrency,
                     "discount_oc": discountAmt,
-                    "tax_oc": taxAmt,
                     "total_oc": totalAmt,
                     // Usage unit fields
                     "usage_unit": unit,
@@ -648,7 +641,7 @@ export const updateMisaOrder = async (orderId, updateData) => {
             console.log(`   Status: ${misaStatus}, Products: ${mappedProducts.length}, Total: ${orderGrandTotal.toLocaleString()} VND`);
             return true;
         } else {
-            console.error(`❌ MISA Update Failed:`, json);
+            console.error(`❌ MISA Update Failed:`, JSON.stringify(json, null, 2));
             return false;
         }
 

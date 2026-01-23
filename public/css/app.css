@@ -20,7 +20,9 @@
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
 }
 
-* { box-sizing: border-box; }
+* {
+  box-sizing: border-box;
+}
 
 body {
   background-color: var(--bg);
@@ -40,13 +42,15 @@ body {
   padding-bottom: 100px;
 }
 
-.hidden { display: none !important; }
+.hidden {
+  display: none !important;
+}
 
 /* === LOADING === */
 .loading-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(255,255,255,0.95);
+  background: rgba(255, 255, 255, 0.95);
   z-index: 9999;
   display: flex;
   flex-direction: column;
@@ -65,7 +69,9 @@ body {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* === LOGIN === */
@@ -172,7 +178,8 @@ body {
 }
 
 /* === FORMS === */
-.form-control, .form-select {
+.form-control,
+.form-select {
   border-radius: 12px;
   padding: 12px 16px;
   border: 1.5px solid var(--border);
@@ -181,7 +188,8 @@ body {
   transition: all 0.2s ease;
 }
 
-.form-control:focus, .form-select:focus {
+.form-control:focus,
+.form-select:focus {
   border-color: var(--primary);
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
@@ -334,4 +342,43 @@ body {
   border-radius: var(--radius);
   padding: 12px 16px;
   margin-bottom: 16px;
+}
+
+/* === CHAT MESSAGES === */
+.chat-msg {
+  padding: 4px 8px;
+}
+
+.chat-me {
+  text-align: right;
+}
+
+.chat-other {
+  text-align: left;
+}
+
+.chat-sender {
+  margin-bottom: 2px;
+}
+
+.chat-bubble {
+  display: inline-block;
+  padding: 8px 12px;
+  border-radius: 12px;
+  max-width: 80%;
+  word-wrap: break-word;
+  text-align: left;
+}
+
+.chat-me .chat-bubble {
+  border-bottom-right-radius: 4px;
+}
+
+.chat-other .chat-bubble {
+  border-bottom-left-radius: 4px;
+}
+
+.chat-time {
+  font-size: 10px;
+  margin-top: 2px;
 }

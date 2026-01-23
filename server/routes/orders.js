@@ -56,6 +56,31 @@ router.get('/', async (req, res) => {
     }
 });
 
+// GET /api/orders/export-tickets - Get recent export tickets
+router.get('/export-tickets', async (req, res) => {
+    try {
+        const { createClient } = await import('@supabase/supabase-js');
+        const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+        const { data, error } = await supabase
+            .from('export_tickets')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(50);
+
+        if (error) {
+            return res.json(createResponse(true, 'Lỗi: ' + error.message));
+        }
+
+        res.json({
+            error: false,
+            data: data || []
+        });
+    } catch (e) {
+        res.json(createResponse(true, e.message));
+    }
+});
+
 // GET /api/orders/my/:driverName - Get orders for driver
 router.get('/my/:driverName', async (req, res) => {
     try {
@@ -155,7 +180,8 @@ router.put('/:id/assign', async (req, res) => {
             delivery_status: 'Đang giao hàng',
             status: 'Đang thực hiện', // Maps to MISA status 2
             driver: driverName,
-            plate: plate
+            plate: plate,
+            cart: fullOrder?.cart || fullOrder?.products || [] // Include cart to avoid empty product error
         }).catch(console.error);
 
     } catch (e) {
@@ -177,6 +203,78 @@ router.put('/:id/start', async (req, res) => {
         }
 
         res.json(createResponse(false, 'Đã nhận đơn!'));
+
+    } catch (e) {
+        res.json(createResponse(true, e.message));
+    }
+});
+
+// POST /api/orders/:id/assign-multi - Multi-driver assignment
+router.post('/:id/assign-multi', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { assignments } = req.body;
+
+        if (!assignments || !assignments.length) {
+            return res.json(createResponse(true, 'Chưa có phân công nào!'));
+        }
+
+        // Get Supabase client
+        const { createClient } = await import('@supabase/supabase-js');
+        const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+        // Delete existing assignments for this order
+        await supabase.from('order_driver_assignments').delete().eq('order_id', id);
+
+        // Insert new assignments
+        const insertData = assignments.map(a => ({
+            order_id: id,
+            driver_name: a.driver_name,
+            driver_type: a.type || 'internal',
+            plate: a.plate || '',
+            assigned_qty: Number(a.qty) || 0,
+            status: 'pending',
+            note: a.note || ''
+        }));
+
+        const { error } = await supabase.from('order_driver_assignments').insert(insertData);
+
+        if (error) {
+            return res.json(createResponse(true, 'Lỗi lưu phân công: ' + error.message));
+        }
+
+        // Update order with first driver info (main driver)
+        const mainDriver = assignments[0];
+        await db.updateOrder(id, {
+            status: CONFIG.STATUS.ASSIGNED,
+            taiXe: mainDriver.driver_name,
+            bienSo: mainDriver.plate || '',
+            note: assignments.length > 1 ? `Chia ${assignments.length} tài xế` : (mainDriver.note || '')
+        });
+
+        // Send Telegram notification
+        try {
+            const { sendTelegramMessage } = await import('../services/telegram.js');
+            const orderInfo = await db.getOrder(id);
+
+            let msg = `🚛 <b>PHÂN CÔNG NHIỀU TÀI XẾ</b>\n`;
+            msg += `#${orderInfo?.soDon || id}\n`;
+            msg += `👤 KH: ${orderInfo?.khach || ''}\n\n`;
+            msg += `<b>Danh sách tài xế:</b>\n`;
+
+            assignments.forEach((a, i) => {
+                const typeLabel = a.type === 'external' ? '(Ngoài)' : '(NB)';
+                msg += `${i + 1}. ${a.driver_name} ${typeLabel} - ${a.qty}kg\n`;
+            });
+
+            msg += `\n🔔 @sales`;
+
+            await sendTelegramMessage(msg);
+        } catch (tgErr) {
+            console.error('Telegram Error:', tgErr.message);
+        }
+
+        res.json(createResponse(false, `Đã phân công ${assignments.length} tài xế!`));
 
     } catch (e) {
         res.json(createResponse(true, e.message));
@@ -238,6 +336,46 @@ router.post('/:id/complete', async (req, res) => {
 
         res.json(createResponse(false, 'Hoàn thành! Mã phiếu: ' + ticketId, { ticketId }));
 
+        // Create Export Ticket in Supabase (Background)
+        (async () => {
+            try {
+                const { createClient } = await import('@supabase/supabase-js');
+                const supabase = createClient(
+                    process.env.SUPABASE_URL,
+                    process.env.SUPABASE_KEY
+                );
+
+                const orderInfo = await db.getOrder(id);
+                const totalQty = cart.reduce((sum, c) => sum + Number(c.weight_kg || c.qty || 0), 0);
+
+                await supabase.from('export_tickets').insert({
+                    ticket_no: ticketId,
+                    order_id: id,
+                    order_no: orderInfo?.soDon || id,
+                    customer_name: partner,
+                    customer_address: orderInfo?.diaChi || '',
+                    driver_name: driver_name,
+                    plate: plate,
+                    warehouse: warehouse,
+                    products: cart.map(c => ({
+                        code: c.product?.code || c.code || '',
+                        name: c.product?.name || c.product || c.name || '',
+                        qty: Number(c.weight_kg || c.qty || 0),
+                        unit: c.unit || 'kg',
+                        isShell: c.isShell || false
+                    })),
+                    total_qty: totalQty,
+                    note: note,
+                    images: images || [],
+                    created_by: sender || driver_name
+                });
+
+                console.log(`✅ Export Ticket Created: ${ticketId}`);
+            } catch (err) {
+                console.error('Export Ticket Error:', err.message);
+            }
+        })();
+
         // Sync to MISA (Background) & Notification
         (async () => {
             try {
@@ -265,15 +403,19 @@ router.post('/:id/complete', async (req, res) => {
                     }
                 }
 
-                // Check for Extra Items
+                // Check for Extra Items (non-shell)
                 cart.forEach(c => {
-                    if (c.isShell) return; // Ignore shells/pallets
+                    if (c.isShell) return; // Shells handled separately
                     const cCode = c.product.code || c.product.id || '';
                     const exists = originalProducts.find(p => (p.code || '') === cCode || p.name === c.product.name);
                     if (!exists) {
                         diffMsg.push(`- ➕ PHÁT SINH: ${c.product.name} (${c.weight_kg}kg)`);
                     }
                 });
+
+                // Check for Shell Items (FeCl2/can/phuy/tank) - always notify
+                const shellItems = cart.filter(c => c.isShell);
+                const hasShellItems = shellItems.length > 0;
 
                 // 2. Telegram Message
                 const isDiff = diffMsg.length > 0;
@@ -284,9 +426,16 @@ router.post('/:id/complete', async (req, res) => {
 
                 if (isDiff) {
                     msg += `\n⚠️ <b>CÓ THAY ĐỔI (LỆCH):</b>\n${diffMsg.join('\n')}\n`;
-                    msg += `\n‼️ @admin @sales_manager (kiểm tra lại)`; // Tagging
+                    msg += `\n‼️ @sales (kiểm tra lại)`;
                 } else {
                     msg += `\n✅ <i>Đúng số lượng yêu cầu</i>`;
+                }
+
+                // Notify about extra shell items (FeCl2/can/phuy/tank)
+                if (hasShellItems) {
+                    const shellSummary = shellItems.map(s => `${s.product?.name || s.product} x${s.weight_kg || s.qty}`).join(', ');
+                    msg += `\n\n📦 <b>HÀNG PHỤ:</b> ${shellSummary}`;
+                    msg += `\n🔔 @sales`;
                 }
 
                 if (note) msg += `\n📝 Note: ${note}`;

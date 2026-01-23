@@ -97,9 +97,9 @@
                         </div>
                     </div>
                     <div class="col-6">
-                        <div class="btnui" onclick="showView('view-create-order')">
-                            <i class="bi bi-plus-circle text-warning"></i>
-                            <b>TẠO ĐƠN</b>
+                        <div class="btnui" onclick="showView('view-imports')">
+                            <i class="bi bi-box-arrow-in-down text-success"></i>
+                            <b>PHIẾU NHẬP</b>
                         </div>
                     </div>
                     <div class="col-6">
@@ -163,12 +163,40 @@
                 </div>
             </div>
 
-            <div class="tab-container mt-0">
-                <button class="tab-btn active" id="tab-pending" onclick="switchOrderTab('pending')">Chờ xử lý (<span
-                        id="countPending">0</span>)</button>
-                <button class="tab-btn" id="tab-assigned" onclick="switchOrderTab('assigned')">Đang giao</button>
-                <button class="tab-btn" id="tab-history" onclick="switchOrderTab('history')">Lịch sử (<span
-                        id="countHistory">0</span>)</button>
+            <!-- Order Section Box -->
+            <div class="mx-3 mb-3 p-2 bg-white rounded-3 shadow-sm border">
+                <!-- Main Section Toggle: XUẤT / NHẬP -->
+                <div class="d-flex gap-2 mb-2">
+                    <button class="btn flex-fill btn-primary position-relative" id="section-xuat"
+                        onclick="switchOrderSection('xuat')">
+                        <i class="bi bi-box-arrow-up"></i> ĐƠN XUẤT
+                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+                            id="countXuat">0</span>
+                    </button>
+                    <button class="btn flex-fill btn-outline-success position-relative" id="section-nhap"
+                        onclick="switchOrderSection('nhap')">
+                        <i class="bi bi-box-arrow-in-down"></i> ĐƠN NHẬP
+                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-success"
+                            id="countNhap">0</span>
+                    </button>
+                </div>
+
+                <!-- Status Tabs (changes based on section) -->
+                <div class="d-flex gap-1" id="order-tabs-container">
+                    <!-- For XUẤT (MISA orders) -->
+                    <button class="btn btn-sm flex-fill btn-warning" id="tab-pending"
+                        onclick="switchOrderTab('pending')">
+                        Chờ gán <span class="badge bg-dark" id="countPending">0</span>
+                    </button>
+                    <button class="btn btn-sm flex-fill btn-outline-primary" id="tab-assigned"
+                        onclick="switchOrderTab('assigned')">
+                        Đang giao <span class="badge bg-primary" id="countAssigned">0</span>
+                    </button>
+                    <button class="btn btn-sm flex-fill btn-outline-secondary" id="tab-history"
+                        onclick="switchOrderTab('history')">
+                        Hoàn thành <span class="badge bg-secondary" id="countHistory">0</span>
+                    </button>
+                </div>
             </div>
 
             <div id="order-list"></div>
@@ -333,6 +361,50 @@
             <div id="my-orders-list"></div>
         </div>
 
+        <!-- Import Tickets View -->
+        <div id="view-imports" class="hidden">
+            <div class="view-header">
+                <button class="btn btn-light btn-sm rounded-circle" onclick="showView('view-home')">
+                    <i class="bi bi-arrow-left"></i>
+                </button>
+                <h5 class="fw-bold m-0 text-success">PHIẾU NHẬP</h5>
+                <button class="btn btn-success btn-sm" onclick="toggleCreateImport()">
+                    <i class="bi bi-plus-lg"></i>
+                </button>
+            </div>
+
+            <!-- Create Import Form -->
+            <div id="form-create-import" class="hidden card-custom mb-3 bg-success bg-opacity-10 border-success">
+                <h6 class="fw-bold text-success mb-3"><i class="bi bi-plus-circle me-1"></i>Tạo phiếu nhập mới</h6>
+                <input id="imp-supplier" class="form-control mb-2" placeholder="Tên nhà cung cấp *">
+                <input id="imp-address" class="form-control mb-2" placeholder="Địa chỉ NCC">
+                <input id="imp-date" type="date" class="form-control mb-2" placeholder="Ngày dự kiến">
+                <select id="imp-warehouse" class="form-select mb-2">
+                    <option value="LT1">Kho LT1</option>
+                    <option value="LT2">Kho LT2</option>
+                </select>
+
+                <div class="mb-2">
+                    <label class="small fw-bold">Sản phẩm:</label>
+                    <div id="imp-products-list"></div>
+                    <div class="row g-2 mt-1">
+                        <div class="col-5"><input id="imp-prod-name" class="form-control form-control-sm"
+                                placeholder="Tên SP"></div>
+                        <div class="col-3"><input id="imp-prod-qty" type="number" class="form-control form-control-sm"
+                                placeholder="SL"></div>
+                        <div class="col-4"><button class="btn btn-outline-success btn-sm w-100"
+                                onclick="addImportProduct()">+ Thêm</button></div>
+                    </div>
+                </div>
+
+                <textarea id="imp-note" class="form-control mb-2" rows="2" placeholder="Ghi chú..."></textarea>
+                <button class="btn btn-success w-100" onclick="submitImport()">TẠO PHIẾU NHẬP</button>
+            </div>
+
+            <!-- Import List -->
+            <div id="imports-list"></div>
+        </div>
+
     </div>
 
     <!-- Order Detail Modal -->
@@ -388,6 +460,88 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- Driver Assignment Section (Multi-Driver Support) -->
+                    <div id="modalAssignSection" class="mt-3 d-none">
+                        <h6 class="fw-bold text-warning mb-2"><i class="bi bi-people me-1"></i>Phân công tài xế</h6>
+
+                        <!-- Current Assignments List -->
+                        <div id="driverAssignmentsList" class="mb-2"></div>
+
+                        <!-- Add Driver Form -->
+                        <div class="bg-warning bg-opacity-10 p-2 rounded border border-warning">
+                            <div class="row g-2 mb-2">
+                                <div class="col-6">
+                                    <select class="form-select form-select-sm" id="modal_drv_select"
+                                        onchange="toggleModalExternalDriver()">
+                                        <option value="">-- Chọn tài xế --</option>
+                                        <!-- Options injected by JS -->
+                                    </select>
+                                </div>
+                                <div class="col-6">
+                                    <input type="number" class="form-control form-control-sm" id="modal_drv_qty"
+                                        placeholder="Số lượng (kg)">
+                                </div>
+                            </div>
+                            <div id="modal_ext_drv" class="d-none mb-2 p-2 bg-white rounded">
+                                <input type="text" class="form-control form-control-sm mb-1" id="modal_ext_name"
+                                    placeholder="Tên tài xế ngoài">
+                                <input type="text" class="form-control form-control-sm" id="modal_ext_plate"
+                                    placeholder="Biển số xe">
+                            </div>
+                            <input type="text" class="form-control form-control-sm mb-2" id="modal_note"
+                                placeholder="Ghi chú">
+                            <button class="btn btn-warning w-100 btn-sm fw-bold" onclick="addDriverAssignment()">
+                                <i class="bi bi-plus-lg me-1"></i>THÊM TÀI XẾ
+                            </button>
+                        </div>
+
+                        <!-- Summary -->
+                        <div class="mt-2 p-2 bg-light rounded border small">
+                            <div class="d-flex justify-content-between">
+                                <span>Tổng CRM:</span>
+                                <span class="fw-bold" id="totalCrmQty">0 kg</span>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <span>Đã phân:</span>
+                                <span class="fw-bold text-primary" id="totalAssignedQty">0 kg</span>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <span>Còn lại:</span>
+                                <span class="fw-bold text-danger" id="remainingQty">0 kg</span>
+                            </div>
+                        </div>
+
+                        <button class="btn btn-success w-100 btn-sm mt-2 fw-bold" id="modal_assign_btn"
+                            onclick="submitAllDriverAssignments()">
+                            <i class="bi bi-check2-circle me-1"></i>XÁC NHẬN PHÂN CÔNG
+                        </button>
+                    </div>
+
+                    <!-- Chat Section -->
+                    <h6 class="fw-bold text-primary mb-2 mt-3"><i class="bi bi-chat-dots me-1"></i>Trao đổi đơn hàng
+                    </h6>
+                    <div class="border rounded" style="max-height: 200px; overflow-y: auto;" id="chatMessages">
+                        <div class="text-center text-muted p-3"><i class="bi bi-chat-dots"></i> Đang tải...</div>
+                    </div>
+                    <div id="chatImagePreview" class="mt-2 d-none">
+                        <img id="chatImageThumb" src="" class="rounded border" style="max-height:60px; cursor:pointer"
+                            onclick="clearChatImage()">
+                        <span class="small text-muted ms-1">Click để xóa</span>
+                    </div>
+                    <div class="input-group mt-2">
+                        <input type="file" id="chatImageInput" class="d-none" accept="image/*"
+                            onchange="previewChatImage(this)">
+                        <button class="btn btn-outline-secondary btn-sm"
+                            onclick="document.getElementById('chatImageInput').click()" title="Gửi ảnh">
+                            <i class="bi bi-image"></i>
+                        </button>
+                        <input type="text" class="form-control form-control-sm" id="chatInput"
+                            placeholder="Nhập tin nhắn..." onkeydown="if(event.key==='Enter')sendChatMessage()">
+                        <button class="btn btn-primary btn-sm" onclick="sendChatMessage()">
+                            <i class="bi bi-send"></i>
+                        </button>
+                    </div>
                 </div>
                 <div class="modal-footer p-2" id="modalFooter">
                     <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Đóng</button>
@@ -437,7 +591,8 @@
                 </div>
                 <div id="add-prod-area" class="hidden mt-2 pt-2 border-top">
                     <select id="extra-prod-name" class="form-select mb-2">
-                        <option value="">-- Chọn hàng --</option>
+                        <option value="">-- Chọn hàng phụ --</option>
+                        <option value="FeCl2 (thải)">FeCl2 (thải)</option>
                         <option value="Can 30L">Can 30L (Vỏ)</option>
                         <option value="Phuy 200L">Phuy 200L (Vỏ)</option>
                         <option value="Tank 1000L">Tank 1000L (Vỏ)</option>

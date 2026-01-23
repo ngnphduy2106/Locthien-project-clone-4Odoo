@@ -19,6 +19,8 @@ import materialRoutes from './routes/materials.js';
 import warehouseRoutes from './routes/warehouse.js';
 import reportRoutes from './routes/reports.js';
 import webhookRoutes from './routes/webhooks.js';
+import chatRoutes from './routes/chat.js';
+import importRoutes from './routes/imports.js';
 
 import { syncMisaOrders, syncMisaProducts } from './services/misa.js';
 import { autoSeedMockData } from './seeds/auto_seed.js';
@@ -61,11 +63,15 @@ app.post('/api/sync', async (req, res) => {
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/chat', chatRoutes);
 app.use('/api/hr', hrRoutes);
 app.use('/api/materials', materialRoutes);
 app.use('/api/warehouse', warehouseRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/webhooks', webhookRoutes);
+
+// Import tickets routes
+app.use('/api/imports', importRoutes);
 
 // Health check
 app.get('/api/health', async (req, res) => {
