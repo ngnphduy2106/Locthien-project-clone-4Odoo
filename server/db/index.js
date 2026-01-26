@@ -13,9 +13,12 @@ const getMode = () => {
     return { useSupabase, useFirebase };
 };
 
-// Log current preferred mode at startup
+// Log detailed diagnostics at startup
 const { useSupabase, useFirebase } = getMode();
-console.log(`📦 Preferred Database Mode: ${useSupabase ? 'Supabase' : (useFirebase ? 'Firebase RTDB' : 'Mock (In-Memory)')}`);
+console.log(`📦 DATABASE DIAGNOSTICS:`);
+console.log(`   - SUPABASE_URL: ${process.env.SUPABASE_URL ? 'PRESENT' : 'MISSING'}`);
+console.log(`   - SUPABASE_KEY: ${process.env.SUPABASE_KEY ? 'PRESENT' : 'MISSING'}`);
+console.log(`   - PREFERRED MODE: ${useSupabase ? 'Supabase' : (useFirebase ? 'Firebase RTDB' : 'Mock (In-Memory)')}`);
 
 // ===============================================
 // MOCK DATA (Fallback)

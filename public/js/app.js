@@ -267,6 +267,7 @@ async function handleLogin() {
 
     try {
         const res = await api.login(username, password);
+        console.log('📦 Phản hồi Login raw:', res);
         hideLoading();
 
         if (!res || res.error) {
@@ -275,6 +276,7 @@ async function handleLogin() {
         }
 
         if (!res.user) {
+            console.error('❌ Lỗi: Payload không có object user', res);
             alert('Lỗi: Không tìm thấy thông tin người dùng trong phản hồi từ máy chủ.');
             return;
         }
@@ -1662,13 +1664,6 @@ async function compressImage(file, maxWidth = 1200, maxHeight = 1200, quality = 
         reader.readAsDataURL(file);
     });
 }
-
-const toBase64 = file => new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = error => reject(error);
-});
 
 async function submitDelivery() {
     if (!state.deliveryCart.length) return alert('Giỏ hàng trống!');

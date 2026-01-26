@@ -12,12 +12,15 @@ const router = Router();
 router.post('/login', async (req, res) => {
     try {
         const { username, password } = req.body;
+        console.log(`🔑 Login Attempt: [${username}]`);
 
         if (!username || !password) {
             return res.json(createResponse(true, 'Vui lòng nhập đủ thông tin!'));
         }
 
         const users = await db.getUsers();
+        console.log(`👥 DB Fetch: Got ${users?.length || 0} users`);
+
         const uInput = String(username).trim().toLowerCase().replace(/^0+/, '');
         const pInput = String(password).trim();
 
@@ -61,7 +64,7 @@ router.post('/login', async (req, res) => {
             db.getSuppliers()
         ]);
 
-        res.json({
+        const responsePayload = {
             error: false,
             user: userFound,
             staffList: allStaff,
@@ -69,9 +72,13 @@ router.post('/login', async (req, res) => {
             customerList: customers,
             supplierList: suppliers,
             drivers: allStaff.filter(s => s.role === CONFIG.ROLES.DRIVER)
-        });
+        };
+
+        console.log(`✅ Login Success for: ${userFound.name}. Payload contains user: ${!!responsePayload.user}`);
+        res.json(responsePayload);
 
     } catch (e) {
+        console.error('❌ Login Error Trace:', e);
         res.json(createResponse(true, 'Lỗi Login: ' + e.message));
     }
 });
