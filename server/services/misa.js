@@ -524,16 +524,8 @@ export const updateMisaOrder = async (orderId, updateData) => {
 
         if (updateData.cart && Array.isArray(updateData.cart) && updateData.cart.length > 0) {
             mappedProducts = updateData.cart.map(p => {
-                // Map Stock & Unit
-                let stockInput = String(p.warehouse || p.stock_name || "").trim();
-                let stock = STOCK_MAPPING[stockInput] || DEFAULT_STOCK;
-
-                // Fallback: If mapped stock is default but original item had a specific stock, preserve it.
-                // This prevents MISA from rejecting the update due to invalid/missing stock code.
-                if (!stockInput && originalItem.stock_name) {
-                    stock = originalItem.stock_name;
-                }
-                if (!stock) stock = "HH"; // Default to Goods Warehouse if all else fails
+                // Map Stock & Unit (Force "HH" as per user request to fix MISA category error)
+                let stock = "HH";
 
                 let unitInput = String(p.unit || "").trim();
                 let unit = UNIT_MAPPING[unitInput] || unitInput || "kg";
