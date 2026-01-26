@@ -4,12 +4,16 @@
 
 import fetch from 'node-fetch';
 
-export const sendTelegramMessage = async (text) => {
-    const token = process.env.TELEGRAM_BOT_TOKEN;
-    const chatId = process.env.TELEGRAM_CHAT_ID;
+export const sendTelegramMessage = async (text, type = 'NOTIFY') => {
+    const token = process.env.TELEGRAM_TOKEN;
 
-    if (!token || !chatId || token === 'YOUR_TELEGRAM_BOT_TOKEN') {
-        console.warn('⚠️ Telegram not configured. Skipping notification.');
+    // Select chat ID based on type
+    let chatId = process.env.TELEGRAM_CHAT_NOTIFY;
+    if (type === 'NHAP') chatId = process.env.TELEGRAM_CHAT_NHAP;
+    if (type === 'XUAT') chatId = process.env.TELEGRAM_CHAT_XUAT;
+
+    if (!token || !chatId || token.includes('YOUR_')) {
+        console.warn(`⚠️ Telegram not configured for ${type}. Skipping notification.`);
         return;
     }
 
@@ -29,11 +33,11 @@ export const sendTelegramMessage = async (text) => {
 
         const json = await response.json();
         if (!json.ok) {
-            console.error('❌ Telegram Error:', json.description);
+            console.error(`❌ Telegram Error (${type}):`, json.description);
         } else {
-            console.log('✅ Telegram Sent.');
+            console.log(`✅ Telegram Sent (${type}).`);
         }
     } catch (e) {
-        console.error('❌ Telegram Exception:', e.message);
+        console.error(`❌ Telegram Exception (${type}):`, e.message);
     }
 };

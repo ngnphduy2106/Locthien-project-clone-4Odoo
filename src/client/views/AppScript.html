@@ -52,7 +52,7 @@
 
     const showScreen = (id) => {
         const screens = [
-            'view-login', 'view-home', 'view-admin-dispatch', 'view-delivery', 'view-form',
+            'view-login', 'view-home', 'view-admin-dispatch', 'view-driver-orders', 'view-form',
             'view-mixing', 'view-report', 'view-create-import', 'view-hr', 'view-materials', 'view-warehouse'
         ];
         screens.forEach(s => hide(s));
@@ -63,6 +63,7 @@
         if (id === 'view-hr') loadEmployees();
         if (id === 'view-materials') loadMaterials();
         if (id === 'view-warehouse') loadWarehouseData();
+        if (id === 'view-driver-orders') loadMyOrders();
     };
 
     const showLoading = (text = 'Đang xử lý...') => {
@@ -298,80 +299,337 @@
     }
 
     // === DRIVER ORDERS ===
+    state.currentDriverTab = 'active';
+
+    function switchDriverTab(tab) {
+        state.currentDriverTab = tab;
+
+        // UI Contrast Fix
+        if (tab === 'active') {
+            $('#drv-tab-active').addClass('active');
+            $('#drv-tab-history').removeClass('active');
+        } else {
+            $('#drv-tab-history').addClass('active');
+            $('#drv-tab-active').removeClass('active');
+        }
+
+        renderDriverOrders();
+    }
+
     function loadMyOrders() {
-        showScreen('view-delivery');
-        $('#driver-search-text').val('');
-        $('#driver-search-date').val('');
+        showScreen('view-driver-orders');
+        $('#my-orders-list').html('<div class="text-center mt-5"><div class="loading-spinner mx-auto"></div></div>');
 
         google.script.run
             .withSuccessHandler(r => {
                 state.myOrders = r.data || [];
-                filterDriverOrders();
+
+                // Calculate counts
+                const activeCount = state.myOrders.filter(o =>
+                    !['Đã thực hiện', 'Đã giao hàng', 'Đã hủy bỏ'].includes(o.status)
+                ).length;
+                const historyCount = state.myOrders.length - activeCount;
+
+                // Update Tab Badges
+                $('#drv-tab-active').html(`Đang chạy <span class="badge bg-white text-primary ms-1">${activeCount}</span>`);
+                $('#drv-tab-history').html(`Lịch sử <span class="badge bg-light text-secondary ms-1">${historyCount}</span>`);
+
+                renderDriverOrders();
             })
             .getMyOrders(state.user.name, state.user.role);
     }
 
-    function filterDriverOrders() {
-        const txt = $('#driver-search-text').val().toLowerCase().trim();
-        const date = $('#driver-search-date').val();
-
-        const filtered = state.myOrders.filter(o => {
-            const matchText = !txt || o.soDon.toLowerCase().includes(txt) || o.khach.toLowerCase().includes(txt) || o.diaChi.toLowerCase().includes(txt);
-            const matchDate = !date || o.ngay === date;
-            return matchText && matchDate;
+    function renderDriverOrders() {
+        const list = state.myOrders.filter(o => {
+            const isCompleted = o.status === 'Đã thực hiện' || o.status === 'Đã giao hàng' || o.status === 'Đã hủy bỏ';
+            if (state.currentDriverTab === 'active') return !isCompleted;
+            return isCompleted;
         });
 
-        renderDriverOrders(filtered);
-    }
-
-    function renderDriverOrders(list) {
-        const c = $('#my-order-list');
+        const c = $('#my-orders-list');
         c.empty();
-        if (!list.length) return c.html('<div class="text-center mt-5 text-secondary"><i class="bi bi-truck fs-1"></i><div class="mt-2">Không tìm thấy đơn.</div></div>');
+
+        if (!list.length) {
+            const otherTab = state.currentDriverTab === 'active' ? 'Lịch sử' : 'Đang chạy';
+            return c.html(`
+                <div class="text-center mt-5 text-secondary">
+                    <i class="bi bi-truck fs-1 text-muted opacity-50"></i>
+                    <div class="mt-2 fw-bold">Trống ở mục này</div>
+                    <div class="small text-muted mt-1">Bạn có thể kiểm tra tab <b>"${otherTab}"</b>.</div>
+                </div>`);
+        }
 
         list.forEach(o => {
-            const iconClass = o.type === 'IMPORT' ? 'icon-import' : 'icon-export';
-            const btnLabel = o.type === 'IMPORT' ? 'VỀ KHO' : 'NHẬN ĐƠN';
-            const btnAction = o.statusCode === 'DANG_GIAO'
-                ? `<button class="btn btn-success w-100 py-2 fw-bold" onclick="doFinish(${o.rowIndex})">HOÀN THÀNH</button>`
-                : `<button class="btn btn-primary w-100 py-2 fw-bold" onclick="setStatus(${o.rowIndex})">${btnLabel}</button>`;
-            const jsonStr = encodeURIComponent(JSON.stringify(o));
+            const isDelivering = o.statusCode === 'DANG_GIAO';
+            const isHistory = state.currentDriverTab === 'history';
 
+            let statusBadge = isDelivering
+                ? '<span class="badge bg-primary bg-opacity-10 text-primary border border-primary px-2"><i class="bi bi-lightning-fill"></i> Đang giao</span>'
+                : (isHistory
+                    ? '<span class="badge bg-success bg-opacity-10 text-success border border-success px-2"><i class="bi bi-check-all"></i> Hoàn thành</span>'
+                    : '<span class="badge bg-warning bg-opacity-10 text-warning border border-warning px-2"><i class="bi bi-hourglass-split"></i> Chờ nhận</span>');
+
+            let btnAction = '';
+            if (!isHistory) {
+                btnAction = isDelivering
+                    ? `<button class="btn btn-success fw-bold flex-fill shadow-sm" onclick="event.stopPropagation(); doFinish('${o.rowIndex}')"><i class="bi bi-check-lg"></i> HOÀN THÀNH</button>`
+                    : `<button class="btn btn-primary fw-bold flex-fill shadow-sm" onclick="event.stopPropagation(); setStatus('${o.rowIndex}')"><i class="bi bi-truck"></i> NHẬN ĐƠN</button>`;
+            }
+
+            // Products summary
+            const prodSum = (o.products || []).slice(0, 2).map(p =>
+                `<div class="d-flex justify-content-between small"><span>${p.name}</span><span class="fw-bold">${p.qty} ${p.unit}</span></div>`
+            ).join('');
+            const more = (o.products || []).length > 2 ? `<div class="text-center small text-muted fst-italic">+ ${(o.products.length - 2)} SP khác</div>` : '';
+
+            // Card HTML
             c.append(`
-      <div class="order-card p-3">
-        <div class="d-flex justify-content-between mb-2">
-          <span class="badge bg-light text-dark border"><span class="circle-icon ${iconClass}"></span>#${o.soDon}</span>
-          <span class="small fw-bold text-secondary">${o.ngay}</span>
-        </div>
-        <h6 class="fw-bold mb-1 text-primary">${o.khach}</h6>
-        <div class="text-secondary small mb-3"><i class="bi bi-geo-alt me-1"></i>${o.diaChi}</div>
-        <div class="mb-3 text-center">
-          <span class="text-primary small" style="cursor:pointer; text-decoration:underline;" onclick="showDetail('${jsonStr}')">
-            <i class="bi bi-eye"></i> Xem chi tiết hàng hóa (${o.products.length})
-          </span>
-        </div>
-        <div class="d-grid">${btnAction}</div>
-      </div>
-    `);
+                <div class="card bg-white border-0 shadow-sm mb-3 rounded-4 overflow-hidden" onclick="showDetail('${encodeURIComponent(JSON.stringify(o))}')">
+                    <div class="card-body p-0">
+                        <div class="p-3 border-bottom bg-light bg-opacity-25">
+                            <div class="d-flex justify-content-between mb-1">
+                                <h6 class="fw-bold text-dark text-truncate mb-0" style="max-width:70%">${o.khach}</h6>
+                                ${statusBadge}
+                            </div>
+                            <div class="small text-muted"><i class="bi bi-calendar3 me-1"></i>${o.ngay} <span class="mx-1">•</span> <i class="bi bi-geo-alt me-1"></i>${o.diaChi || 'Trống'}</div>
+                        </div>
+                        <div class="p-3">
+                            <div class="bg-light p-2 rounded mb-3 border border-light">
+                                ${prodSum}
+                                ${more}
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-light border flex-fill text-primary" onclick="event.stopPropagation(); showDetail('${encodeURIComponent(JSON.stringify(o))}')">
+                                    <i class="bi bi-chat-dots-fill"></i> Chat
+                                </button>
+                                ${btnAction}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `);
         });
     }
 
     function showDetail(j) {
         const o = JSON.parse(decodeURIComponent(j));
-        let h = `<h6 class="fw-bold text-primary">${o.khach}</h6>`;
-        h += `<p class="text-secondary small border-bottom pb-2 mb-2">${o.diaChi}</p>`;
+        state.currentOrder = o; // Store for chat/actions
 
+        // Header
+        $('#modalOrderTitle').text(`#${o.soDon} - ${o.khach}`);
+        $('#modalCustomerName').text(o.khach);
+        $('#modalAddress').html(`<i class="bi bi-geo-alt-fill text-danger me-1"></i> ${o.diaChi || '---'}`);
+
+        // Products
+        const list = $('#modalProductList');
+        list.empty();
         if (o.products && o.products.length > 0) {
             o.products.forEach(p => {
-                const d = p.density ? `<span class="badge bg-light text-dark border ms-2">d=${p.density}</span>` : '';
-                h += `<div class="d-flex justify-content-between py-1"><span>${p.name} ${d}</span><span class="fw-bold">${Number(p.qty).toLocaleString()} ${p.unit}</span></div>`;
+                list.append(`
+                    <div class="d-flex justify-content-between py-1 border-bottom border-light">
+                        <span class="text-dark">${p.name}</span>
+                        <span class="fw-bold text-primary">${p.qty} ${p.unit}</span>
+                    </div>
+                `);
             });
         } else {
-            h += '<div class="text-secondary fst-italic">Chưa có thông tin hàng</div>';
+            list.html('<div class="text-center text-muted py-2 fst-italic">Không có thông tin SP</div>');
         }
 
-        $('#detail-content').html(h);
+        // Footer Actions based on role and status
+        const footer = $('#modalFooterActions');
+        footer.empty();
+        const role = (state.user.role || '').toUpperCase();
+        const isAssigned = (o.statusCode === 'DANG_GIAO');
+        const isMe = (o.taiXe === state.user.name);
+
+        if (isAssigned && (isMe || role === 'ADMIN' || role === 'TESTER')) {
+            footer.append(`<button class="btn btn-success btn-sm flex-fill fw-bold" onclick="openDeliveryModal('${encodeURIComponent(JSON.stringify(o))}')"><i class="bi bi-check-lg"></i> HOÀN THÀNH</button>`);
+        }
+
+        // Chat
+        loadOrderChat(o.id || o.soDon);
+
         show('modal-detail');
+    }
+
+    // --- CHAT LOGIC ---
+    let chatInterval = null;
+    function loadOrderChat(orderId) {
+        const container = $('#chatMessages');
+        container.html('<div class="text-center p-4"><div class="spinner-border spinner-border-sm text-primary"></div></div>');
+
+        if (chatInterval) clearInterval(chatInterval);
+
+        const fetchChat = () => {
+            google.script.run
+                .withSuccessHandler(res => {
+                    if (res && res.messages) renderChatMessages(res.messages);
+                })
+                .getOrderChat(orderId);
+        };
+
+        fetchChat();
+        chatInterval = setInterval(fetchChat, 5000); // Auto refresh
+    }
+
+    function renderChatMessages(msgs) {
+        const c = $('#chatMessages');
+        const isAtBottom = c.scrollTop() + c.innerHeight() >= c[0].scrollHeight - 50;
+
+        c.empty();
+        if (!msgs.length) {
+            c.html('<div class="text-center text-muted p-4 small italic">Chưa có trao đổi nào.</div>');
+            return;
+        }
+
+        msgs.forEach(m => {
+            const isMe = m.sender_name === state.user.name;
+            const align = isMe ? 'text-end' : 'text-start';
+            const bg = isMe ? 'bg-primary text-white' : 'bg-light text-dark';
+            const margin = isMe ? 'ms-auto' : 'me-auto';
+            const imgHtml = m.image ? `<img src="${m.image}" class="img-fluid rounded mt-1 mb-1 border" style="max-height:150px; cursor:zoom-in" onclick="window.open('${m.image}')">` : '';
+
+            c.append(`
+                <div class="mb-2 ${align}">
+                    <div class="small text-muted mb-1 px-1" style="font-size:10px">${m.sender_name} (${m.sender_role})</div>
+                    <div class="d-inline-block p-2 rounded-3 shadow-sm ${bg} ${margin}" style="max-width:85%; word-wrap:break-word; font-size:13px">
+                        ${m.message ? `<div>${m.message}</div>` : ''}
+                        ${imgHtml}
+                    </div>
+                </div>
+            `);
+        });
+
+        if (isAtBottom) c.scrollTop(c[0].scrollHeight);
+    }
+
+    function sendChatMessage() {
+        const msg = $('#chatInput').val().trim();
+        const img = $('#chatImageThumb').attr('src') || null;
+        if (!msg && !img) return;
+
+        const orderId = state.currentOrder.id || state.currentOrder.soDon;
+
+        // Visual feedback
+        $('#chatInput').val('').prop('disabled', true);
+
+        google.script.run
+            .withSuccessHandler(res => {
+                $('#chatInput').prop('disabled', false).focus();
+                clearChatImage();
+                loadOrderChat(orderId);
+            })
+            .sendOrderChat(orderId, {
+                sender_name: state.user.name,
+                sender_role: state.user.role,
+                message: msg,
+                image: img
+            });
+    }
+
+    function previewChatImage(input) {
+        if (input.files && input.files[0]) {
+            const reader = new FileReader();
+            reader.onload = e => {
+                $('#chatImageThumb').attr('src', e.target.result);
+                $('#chatImagePreview').removeClass('d-none');
+            };
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+
+    function clearChatImage() {
+        $('#chatImageInput').val('');
+        $('#chatImageThumb').attr('src', '');
+        $('#chatImagePreview').addClass('d-none');
+    }
+
+    // --- DELIVERY FORM ---
+    function openDeliveryModal(j) {
+        const o = JSON.parse(decodeURIComponent(j));
+        state.currentOrder = o;
+
+        $('#del-modal-title').text('XÁC NHẬN GIAO: ' + o.soDon);
+        const list = $('#delivery-items-list');
+        list.empty();
+
+        o.products.forEach((p, i) => {
+            list.append(`
+                <div class="card-custom bg-light border-0 p-2 mb-2">
+                    <div class="fw-bold small mb-1">${p.name}</div>
+                    <div class="row g-2">
+                        <div class="col-8">
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text">Thực tế</span>
+                                <input type="number" class="form-control fw-bold text-success del-qty" data-idx="${i}" value="${p.qty}">
+                                <span class="input-group-text">${p.unit}</span>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                             <input type="number" class="form-control form-control-sm del-dens" data-idx="${i}" placeholder="d" value="${p.density || ''}">
+                        </div>
+                    </div>
+                </div>
+            `);
+        });
+
+        show('modal-delivery');
+    }
+
+    async function submitDeliveryForm() {
+        const files = $('#inp-del-img')[0].files;
+        if (!files.length) return alert('Vui lòng chụp ít nhất 1 ảnh chứng minh!');
+
+        showLoading('Đang xử lý...');
+
+        const images = [];
+        for (let i = 0; i < files.length; i++) {
+            const b64 = await toBase64(files[i]);
+            images.push(b64);
+        }
+
+        const data = {
+            type: state.currentOrder.soDon.startsWith('NK') ? 'NHAP' : 'XUAT',
+            report_date: new Date().toISOString().split('T')[0],
+            partner: state.currentOrder.khach,
+            driver_name: state.user.name,
+            plate: state.user.plate || '',
+            warehouse: $('input[name="del-wh"]:checked').val(),
+            cart: state.currentOrder.products.map((p, i) => ({
+                product: p.name,
+                code: p.code,
+                weight_kg: $(`.del-qty[data-idx="${i}"]`).val(),
+                density: $(`.del-dens[data-idx="${i}"]`).val(),
+                unit: p.unit,
+                isShell: false
+            })),
+            images: images,
+            note: $('#inp-del-note').val(),
+            orderRowIndex: state.currentOrder.rowIndex,
+            sender: state.user.name
+        };
+
+        google.script.run
+            .withSuccessHandler(res => {
+                hideLoading();
+                alert(res.msg);
+                if (!res.error) {
+                    hide('modal-delivery');
+                    hide('modal-detail');
+                    loadMyOrders();
+                }
+            })
+            .submitDeliveryForm(data);
+    }
+
+    function toBase64(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = error => reject(error);
+        });
     }
 
     function setStatus(i) {
@@ -384,56 +642,6 @@
                 })
                 .processDriverAction({ rowIndex: i, action: 'START' });
         }
-    }
-
-    function doFinish(idx) {
-        showLoading();
-        google.script.run
-            .withSuccessHandler(res => {
-                hideLoading();
-                const order = res.data.find(o => o.rowIndex === idx);
-                if (order) {
-                    state.currentOrder = order;
-                    openDriverForm(order);
-                }
-            })
-            .getMyOrders(state.user.name, state.user.role);
-    }
-
-    function openDriverForm(order) {
-        showScreen('view-form');
-        $('#txt-form-title').text(order.type === 'IMPORT' ? 'NHẬP KHO' : 'XUẤT KHO');
-        $('#inp-date').val(new Date().toISOString().split('T')[0]);
-
-        const l = order.type === 'IMPORT' ? state.suppliers : state.customers;
-        const d = $('#list-partner');
-        d.empty();
-        l.forEach(p => d.append(`<option value="${p}">`));
-
-        const m = $('#list-main');
-        m.empty();
-        state.staff.filter(x => x.role === 'DRIVER').forEach(s => m.append(`<option value="${s.name}">`));
-
-        const k = $('#lst-trucks');
-        k.empty();
-        state.trucks.forEach(t => k.append(`<option value="${t}">`));
-
-        $('#inp-partner').val(order.khach);
-        $('#inp-driver').val(order.taiXe);
-        $('#inp-plate').val(order.bienSo);
-
-        state.cart = order.products.map(p => ({
-            product: p.name,
-            weight_kg: p.qty,
-            unit: p.unit,
-            density: p.density || '',
-            code: p.code || '',
-            isShell: false
-        }));
-
-        renderCart();
-        renderCat();
-        state.type = order.type === 'IMPORT' ? 'NHAP' : 'XUAT';
     }
 
     // === CART FUNCTIONS ===

@@ -172,11 +172,39 @@ router.put('/:id/complete', async (req, res) => {
         const { id } = req.params;
         const { actual_products, note } = req.body;
 
+        // Fetch original to merge (No-Delete logic)
+        const { data: original } = await supabase.from('import_tickets').select('*').eq('id', id).single();
+        if (!original) return res.json(createResponse(true, 'Không tìm thấy phiếu nhập'));
+
+        const originalProducts = original.products || [];
+        const originalMap = {};
+        originalProducts.forEach(p => {
+            originalMap[p.name || p.code || ''] = { ...p, qty_planned: p.qty, actual_qty: 0 };
+        });
+
+        // Actual items delivered/restocked
+        if (actual_products && Array.isArray(actual_products)) {
+            actual_products.forEach(p => {
+                const key = p.name || p.code || '';
+                if (originalMap[key]) {
+                    originalMap[key].actual_qty = Number(p.qty || 0);
+                } else {
+                    originalMap[key] = { ...p, qty_planned: 0, actual_qty: Number(p.qty || 0) };
+                }
+            });
+        }
+
+        // Final merged list
+        const mergedProducts = Object.values(originalMap).map(m => ({
+            ...m,
+            qty: m.actual_qty || m.qty // Use actual if provided, else keep original
+        }));
+
         const { data, error } = await supabase
             .from('import_tickets')
             .update({
                 status: 'completed',
-                products: actual_products || undefined,
+                products: mergedProducts,
                 note: note || undefined,
                 completed_at: new Date().toISOString()
             })
@@ -186,6 +214,23 @@ router.put('/:id/complete', async (req, res) => {
 
         if (error) {
             return res.json(createResponse(true, 'Lỗi hoàn thành: ' + error.message));
+        }
+
+        // Send Telegram notification
+        try {
+            const { sendTelegramMessage } = await import('../services/telegram.js');
+            let msg = `✅ <b>PHIẾU NHẬP ĐÃ HOÀN THÀNH</b>\n`;
+            msg += `#${data.ticket_no}\n`;
+            msg += `🏭 NCC: ${data.supplier_name}\n`;
+            msg += `\n📋 <b>Chi tiết:</b>\n`;
+            mergedProducts.forEach(p => {
+                msg += `- ${p.name}: ${p.qty} ${p.unit || 'Kg'}\n`;
+            });
+            if (note) msg += `\n📝 Note: ${note}`;
+
+            await sendTelegramMessage(msg, 'NHAP');
+        } catch (tgErr) {
+            console.error('Telegram Error:', tgErr.message);
         }
 
         res.json({

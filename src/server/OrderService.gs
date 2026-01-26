@@ -679,4 +679,120 @@ const OrderService = {
       console.error('Error sending Telegram notification:', e);
     }
   }
+  /**
+   * Lấy tin nhắn chat từ Supabase
+   */
+  getOrderChat: function(orderId) {
+    try {
+      const url = `${CONFIG.SUPABASE_URL}/rest/v1/order_messages?order_id=eq.${orderId}&select=*&order=created_at.asc`;
+      const options = {
+        method: 'get',
+        headers: {
+          'apikey': CONFIG.SUPABASE_KEY,
+          'Authorization': `Bearer ${CONFIG.SUPABASE_KEY}`
+        }
+      };
+      
+      const res = UrlFetchApp.fetch(url, options);
+      const data = JSON.parse(res.getContentText());
+      
+      return { error: false, messages: data || [] };
+    } catch (e) {
+      return { error: true, messages: [], msg: e.toString() };
+    }
+  },
+
+  /**
+   * Gửi tin nhắn chat lên Supabase
+   */
+  sendOrderChat: function(orderId, msgData) {
+    try {
+      const url = `${CONFIG.SUPABASE_URL}/rest/v1/order_messages`;
+      const payload = {
+        order_id: orderId,
+        sender_name: msgData.sender_name,
+        sender_role: msgData.sender_role,
+        message: msgData.message,
+        image: msgData.image
+      };
+      
+      const options = {
+        method: 'post',
+        contentType: 'application/json',
+        headers: {
+          'apikey': CONFIG.SUPABASE_KEY,
+          'Authorization': `Bearer ${CONFIG.SUPABASE_KEY}`,
+          'Prefer': 'return=representation'
+        },
+        payload: JSON.stringify(payload)
+      };
+      
+      UrlFetchApp.fetch(url, options);
+      return { error: false, msg: "Gửi thành công" };
+    } catch (e) {
+      return { error: true, msg: e.toString() };
+    }
+  },
+
+  /**
+   * Lấy đơn hàng cho tài xế (Mở rộng cho Lịch sử)
+   */
+  getOrdersForDriver: function(driverName, role) {
+    try {
+      const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+      const sheet = ss.getSheetByName(CONFIG.SHEETS.ORDERS);
+      const lastRow = sheet.getLastRow();
+      if (lastRow < 2) return { error: false, data: [] };
+
+      const LIMIT = 500; // Load history 500 dòng
+      const startRow = Math.max(2, lastRow - LIMIT + 1);
+      const numRows = lastRow - startRow + 1;
+      const data = sheet.getRange(startRow, 1, numRows, sheet.getLastColumn()).getValues();
+      const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => String(h).toLowerCase().trim());
+
+      const idx = {
+        SO_DON: headers.indexOf("sale_order_no"),
+        KHACH: headers.indexOf("account_name"),
+        NGAY: headers.indexOf("sale_order_date"),
+        DIA_CHI: headers.indexOf("shipping_address"),
+        STATUS_GIAO: headers.indexOf("delivery_status"),
+        STATUS_MAIN: headers.indexOf("status"),
+        TAI_XE: headers.indexOf("custom_field13"),
+        BIEN_SO: headers.indexOf("custom_field14"),
+        JSON_HANG: headers.indexOf("sale_order_product_mappings"),
+        MO_TA: headers.indexOf("description")
+      };
+
+      const myName = String(driverName).trim().toUpperCase();
+      const result = [];
+
+      for (let i = data.length - 1; i >= 0; i--) {
+        const row = data[i];
+        const tName = String(row[idx.TAI_XE] || "").trim().toUpperCase();
+        if(!tName || tName === "0") continue;
+
+        // Filter: Admin thấy hết, Driver chỉ thấy mình
+        if (role !== 'ADMIN' && role !== 'TESTER' && tName !== myName) continue;
+
+        const statusGiao = String(row[idx.STATUS_GIAO] || "").trim();
+        const statusMain = String(row[idx.STATUS_MAIN] || "").trim();
+
+        result.push({
+          rowIndex: startRow + i,
+          soDon: String(row[idx.SO_DON]),
+          ngay: formatDate(row[idx.NGAY]),
+          khach: row[idx.KHACH] || "",
+          diaChi: row[idx.DIA_CHI] || "",
+          taiXe: row[idx.TAI_XE],
+          status: statusMain || statusGiao,
+          statusCode: (statusGiao === CONFIG.STATUS.DELIVERING) ? 'DANG_GIAO' : 'CHO_GIAO',
+          products: this._parseProducts(row[idx.JSON_HANG], row[idx.MO_TA])
+        });
+      }
+
+      return { error: false, data: result };
+    } catch(e) {
+      return { error: true, msg: e.toString() };
+    }
+  }
 };

@@ -59,82 +59,137 @@
             </div>
         </div>
 
-        <!-- Home View -->
-        <div id="view-home" class="hidden">
-            <div class="app-header">
-                <div>
-                    <h5 id="txt-user-name" class="fw-bold mb-1">...</h5>
-                    <span class="badge bg-light text-dark border" id="txt-user-role">...</span>
+        <!-- Main Layout (Sidebar + Content) -->
+        <div id="view-dashboard" class="d-flex h-100 hidden">
+            <!-- Sidebar -->
+            <div class="sidebar bg-white border-end d-flex flex-column p-3" style="width: 250px;">
+                <div class="mb-4 px-2">
+                    <h5 class="fw-bold text-primary m-0"><i class="bi bi-box-seam me-2"></i>LỘC THIÊN</h5>
+                    <small class="text-muted" id="txt-user-role-display">...</small>
                 </div>
-                <button class="btn btn-outline-danger btn-sm" onclick="doLogout()">
-                    <i class="bi bi-box-arrow-right"></i>
-                </button>
-            </div>
 
-            <!-- Dashboard Stats -->
-            <div class="row g-2 mb-4" id="dashboard-stats">
-                <div class="col-6">
-                    <div class="stat-card bg-primary">
-                        <div class="stat-value" id="stat-pending">-</div>
-                        <div class="stat-label">Đơn chờ</div>
-                    </div>
+                <div class="nav flex-column gap-1">
+                    <button class="btn btn-light text-start fw-bold text-primary active"
+                        onclick="showSection('dashboard')">
+                        <i class="bi bi-speedometer2 me-2"></i>Dashboard
+                    </button>
+                    <button class="btn btn-light text-start" onclick="showSection('orders')">
+                        <i class="bi bi-clipboard-check me-2"></i>Điều phối
+                    </button>
+                    <button class="btn btn-light text-start" onclick="showSection('imports')">
+                        <i class="bi bi-box-arrow-in-down me-2"></i>Phiếu nhập
+                    </button>
+                    <button class="btn btn-light text-start" onclick="showSection('my-orders')">
+                        <i class="bi bi-truck me-2"></i>Đơn của tôi
+                    </button>
+                    <div class="border-top my-2"></div>
+                    <button class="btn btn-light text-start" onclick="showSection('warehouse')">
+                        <i class="bi bi-building me-2"></i>Kho hàng
+                    </button>
+                    <button class="btn btn-light text-start" onclick="showSection('materials')">
+                        <i class="bi bi-box me-2"></i>Vật tư
+                    </button>
+                    <button class="btn btn-light text-start" onclick="showSection('hr')">
+                        <i class="bi bi-people me-2"></i>Nhân sự
+                    </button>
+                    <button class="btn btn-light text-start" onclick="showSection('reports')">
+                        <i class="bi bi-bar-chart-line me-2"></i>Báo cáo
+                    </button>
                 </div>
-                <div class="col-6">
-                    <div class="stat-card bg-success">
-                        <div class="stat-value" id="stat-stock">-</div>
-                        <div class="stat-label">Tồn kho (T)</div>
-                    </div>
-                </div>
-            </div>
 
-            <!-- Admin Menu -->
-            <div id="area-admin" class="hidden">
-                <div class="row g-3">
-                    <div class="col-6">
-                        <div class="btnui" onclick="showView('view-orders')">
-                            <i class="bi bi-clipboard-check text-primary"></i>
-                            <b>ĐIỀU PHỐI</b>
+                <div class="mt-auto">
+                    <div class="d-flex align-items-center p-2 bg-light rounded">
+                        <div class="flex-grow-1">
+                            <div class="fw-bold small" id="txt-user-name">...</div>
                         </div>
-                    </div>
-                    <div class="col-6">
-                        <div class="btnui" onclick="showView('view-imports')">
-                            <i class="bi bi-box-arrow-in-down text-success"></i>
-                            <b>PHIẾU NHẬP</b>
-                        </div>
-                    </div>
-                    <div class="col-6">
-                        <div class="btnui" onclick="showView('view-hr')">
-                            <i class="bi bi-people text-info"></i>
-                            <b>NHÂN SỰ</b>
-                        </div>
-                    </div>
-                    <div class="col-6">
-                        <div class="btnui" onclick="showView('view-materials')">
-                            <i class="bi bi-box-seam" style="color:#8b5cf6"></i>
-                            <b>VẬT TƯ</b>
-                        </div>
-                    </div>
-                    <div class="col-6">
-                        <div class="btnui" onclick="showView('view-warehouse')">
-                            <i class="bi bi-building text-secondary"></i>
-                            <b>KHO HÀNG</b>
-                        </div>
-                    </div>
-                    <div class="col-6">
-                        <div class="btnui" onclick="showView('view-reports')">
-                            <i class="bi bi-bar-chart-line text-success"></i>
-                            <b>BÁO CÁO</b>
-                        </div>
+                        <button class="btn btn-sm text-danger" onclick="doLogout()"><i
+                                class="bi bi-box-arrow-right"></i></button>
                     </div>
                 </div>
             </div>
 
-            <!-- Driver Menu -->
-            <div id="area-driver" class="hidden mt-3">
-                <div class="btnui bg-primary text-white py-4" onclick="loadMyOrders()">
-                    <i class="bi bi-truck text-white" style="font-size:32px"></i>
-                    <b class="text-white">ĐƠN CỦA TÔI</b>
+            <!-- Main Content Area -->
+            <div class="flex-grow-1 bg-light overflow-auto p-4" id="main-content">
+
+                <!-- Dashboard Section -->
+                <div id="section-dashboard">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h4 class="fw-bold m-0">Tổng quan</h4>
+                        <button id="btn-force-sync" class="btn btn-primary btn-sm rounded-pill px-3 shadow-sm"
+                            onclick="forceSyncMisa()">
+                            <i class="bi bi-arrow-repeat me-1"></i>Đồng bộ MISA
+                        </button>
+                    </div>
+
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-3">
+                            <div class="card border-0 shadow-sm p-3 border-start border-4 border-warning">
+                                <div class="text-muted small fw-bold">CHỜ XỬ LÝ</div>
+                                <div class="fs-2 fw-bold text-warning" id="dash-pending">-</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card border-0 shadow-sm p-3 border-start border-4 border-primary">
+                                <div class="text-muted small fw-bold">ĐANG THỰC HIỆN</div>
+                                <div class="fs-2 fw-bold text-primary" id="dash-assigned">-</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card border-0 shadow-sm p-3 border-start border-4 border-success">
+                                <div class="text-muted small fw-bold">HOÀN THÀNH (Hôm nay)</div>
+                                <div class="fs-2 fw-bold text-success" id="dash-completed">-</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card border-0 shadow-sm p-3 border-start border-4 border-info">
+                                <div class="text-muted small fw-bold">PHIẾU NHẬP</div>
+                                <div class="fs-2 fw-bold text-info" id="dash-imports">-</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <div class="card border-0 shadow-sm h-100">
+                                <div class="card-header bg-white fw-bold py-3">Đơn hàng gần đây</div>
+                                <div class="card-body p-0">
+                                    <div class="table-responsive">
+                                        <table class="table table-hover align-middle mb-0">
+                                            <thead class="bg-light">
+                                                <tr>
+                                                    <th class="ps-3">Mã đơn</th>
+                                                    <th>Khách hàng</th>
+                                                    <th>Trạng thái</th>
+                                                    <th>Ngày</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="dash-recent-orders">
+                                                <tr>
+                                                    <td colspan="4" class="text-center py-4 text-muted">Đang tải...</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card border-0 shadow-sm h-100">
+                                <div class="card-header bg-white fw-bold py-3">Hoạt động kho</div>
+                                <div class="card-body">
+                                    <div id="dash-activity-log" class="small text-muted">
+                                        <!-- Activity items will be here -->
+                                        <p>Chưa có hoạt động mới.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
+
+                <!-- Placeholder for other sections (injected via JS) -->
+                <div id="dynamic-content"></div>
+
             </div>
         </div>
 
@@ -347,18 +402,41 @@
         </div>
 
         <!-- Driver Orders View -->
-        <div id="view-driver-orders" class="hidden">
-            <div class="view-header">
-                <button class="btn btn-light btn-sm rounded-circle" onclick="showView('view-home')">
-                    <i class="bi bi-arrow-left"></i>
-                </button>
-                <h5 class="fw-bold m-0">ĐƠN CỦA TÔI</h5>
-                <button class="btn btn-light btn-sm rounded-circle" onclick="loadMyOrders()">
-                    <i class="bi bi-arrow-clockwise"></i>
-                </button>
+        <div id="view-driver-orders" class="hidden h-100 flex-column">
+            <div
+                class="view-header bg-white border-bottom shadow-sm p-3 d-flex justify-content-between align-items-center">
+                <h5 class="fw-bold m-0 text-primary">ĐƠN CỦA TÔI</h5>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-light btn-sm rounded-circle text-primary" onclick="loadMyOrders()"
+                        title="Làm mới">
+                        <i class="bi bi-arrow-clockwise fs-5"></i>
+                    </button>
+                    <button class="btn btn-light btn-sm rounded-circle text-danger" onclick="doLogout()"
+                        title="Đăng xuất">
+                        <i class="bi bi-box-arrow-right fs-5"></i>
+                    </button>
+                </div>
             </div>
 
-            <div id="my-orders-list"></div>
+            <!-- Driver Tabs -->
+            <div class="bg-white px-3 pb-2 pt-1 border-bottom">
+                <ul class="nav nav-pills nav-fill gap-2 p-1 bg-light rounded-pill" role="tablist">
+                    <li class="nav-item">
+                        <button class="nav-link active py-2 rounded-pill fw-bold small" id="drv-tab-active"
+                            onclick="switchDriverTab('active')">
+                            Đang thực hiện
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link py-2 rounded-pill fw-bold small" id="drv-tab-history"
+                            onclick="switchDriverTab('history')">
+                            Lịch sử
+                        </button>
+                    </li>
+                </ul>
+            </div>
+
+            <div id="my-orders-list" class="flex-grow-1 overflow-auto p-3" style="background:#f8f9fa;"></div>
         </div>
 
         <!-- Import Tickets View -->

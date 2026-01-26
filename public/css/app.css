@@ -35,12 +35,29 @@ body {
 }
 
 .app-container {
-  max-width: 600px;
+  width: 100%;
   margin: 0 auto;
   min-height: 100vh;
+  /* Default mobile padding */
   padding: 16px;
   padding-bottom: 100px;
 }
+
+/* Desktop: Allow full width for Dashboard */
+@media (min-width: 992px) {
+  .app-container {
+    padding: 0;
+    max-width: 100%;
+  }
+
+  /* Constrain specific views that look bad full-width */
+  #view-login {
+    max-width: 420px;
+    margin: 80px auto;
+  }
+}
+
+/* Mobile Constraint (only apply max-width if NOT in dashboard mode) - handled via layout classes or just let it stretch for now as user requested desktop view */
 
 .hidden {
   display: none !important;

@@ -31,10 +31,10 @@ const __dirname = dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Schedule MISA Sync every 1 minute for low latency
+// Schedule MISA Sync every 15 seconds for low latency
 setInterval(() => {
     syncMisaOrders().catch(err => console.error('Sync Job Failed:', err));
-}, 1 * 60 * 1000); // 1 minute
+}, 15 * 1000); // 15 seconds for realtime feel
 
 // Run once on startup
 syncMisaOrders()
@@ -123,14 +123,27 @@ app.use((err, req, res, next) => {
     });
 });
 
-// Start server
-app.listen(PORT, () => {
-    console.log('\n  ╔════════════════════════════════════════╗');
-    console.log('  ║     LỘC THIÊN ERP - Server v2.0.0      ║');
-    console.log('  ╠════════════════════════════════════════╣');
-    console.log('  ║  🚀 Server running on port ' + PORT.toString().padEnd(14) + '║');
-    console.log('  ║  📍 http://localhost:' + PORT.toString().padEnd(18) + '║');
-    console.log('  ╚════════════════════════════════════════╝\n');
-});
+// Start server ONLY if run directly (local dev)
+if (import.meta.url === `file://${fileURLToPath(import.meta.url)}`) {
+    // Run once on startup
+    syncMisaOrders()
+        .then(() => syncMisaProducts())
+        .catch(err => console.error('Startup Sync Failed:', err));
 
+    // Schedule MISA Sync every 15 seconds (ONLY in long-running process)
+    setInterval(() => {
+        syncMisaOrders().catch(err => console.error('Sync Job Failed:', err));
+    }, 15 * 1000);
+
+    app.listen(PORT, () => {
+        console.log('\n  ╔════════════════════════════════════════╗');
+        console.log('  ║     LỘC THIÊN ERP - Server v2.0.0      ║');
+        console.log('  ╠════════════════════════════════════════╣');
+        console.log('  ║  🚀 Server running on port ' + PORT.toString().padEnd(14) + '║');
+        console.log('  ║  📍 http://localhost:' + PORT.toString().padEnd(18) + '║');
+        console.log('  ╚════════════════════════════════════════╝\n');
+    });
+}
+
+export { app };
 export default app;

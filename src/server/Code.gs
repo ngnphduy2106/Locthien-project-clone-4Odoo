@@ -138,12 +138,33 @@ function processDriverAction(data) {
 }
 
 /**
- * Submit form hoàn thành đơn
+ * Submit form hoàn thành đơn (Preferred naming)
  * @param {Object} form - Dữ liệu form
  * @returns {Object} Kết quả
  */
+function submitDeliveryForm(form) {
+    return OrderService.submitDeliveryForm(form);
+}
+
+/**
+ * Submit form hoàn thành đơn (Legacy compatibility)
+ */
 function submitForm(form) {
-  return OrderService.submitDeliveryForm(form);
+    return OrderService.submitDeliveryForm(form);
+}
+
+/**
+ * Lấy lịch sử chat của đơn hàng
+ */
+function getOrderChat(orderId) {
+    return OrderService.getOrderChat(orderId);
+}
+
+/**
+ * Gửi tin nhắn chat mới
+ */
+function sendOrderChat(orderId, msgData) {
+    return OrderService.sendOrderChat(orderId, msgData);
 }
 
 // ===============================================

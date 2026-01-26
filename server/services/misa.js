@@ -75,7 +75,7 @@ export const syncMisaProducts = async () => {
                         name: p.product_name,
                         unit: p.unit || '',
                         price: Number(p.price || 0),
-                        salePrice: Number(p.price || 0), // Map to UI field
+                        sale_price: Number(p.price || 0), // Map to UI field (snake_case for Supabase)
                         category: 'MISA CRM', // Default category for filter
                         type: 'MisaProduct', // Tag as MISA
                         status: p.status === 2 ? 'INACTIVE' : 'ACTIVE', // Guessing status enum, or just map
@@ -182,6 +182,7 @@ async function getMisaOrderDetail(idOrName, isUuid = false) {
         });
 
         const json = await response.json();
+        console.log(`DEBUG: MISA Detail Response for ${idOrName}:`, JSON.stringify(json).substring(0, 500));
 
         // MISA might return { Success: true, Data: {...} } OR direct object depending on endpoint?
         // Usually /v2/SaleOrders/{id} returns the object directly or Data wrapped.
@@ -270,13 +271,12 @@ export const syncMisaOrders = async () => {
                 // 1. Missing Data Check
                 const hasProducts = existingOrder.products && existingOrder.products.length > 0;
                 const hasZeroQty = hasProducts && existingOrder.products.some(p => p.qty === 0);
+                const hasMisaId = !!existingOrder.misa_id;
 
                 // 2. Status Change Check (Optimize: Only update if different and local is 'Mới')
-                // If local is 'Đã giao hàng' (manually completed), we might not want MISA to revert it, 
-                // but here we want MISA to PUSH 'Đã giao hàng' to us.
                 const statusChanged = existingOrder.status !== newStatus && existingOrder.status === 'Mới';
 
-                if (!hasProducts || hasZeroQty || statusChanged) {
+                if (!hasProducts || hasZeroQty || statusChanged || !hasMisaId) {
                     // console.log(`♻️ Updating ${saleOrderNo} (Diff detected)...`);
                     shouldFetchDetail = true;
                 }
@@ -351,6 +351,7 @@ export const syncMisaOrders = async () => {
         const mappedOrder = {
             ...item,  // All MISA fields including delivery_status
             id: saleOrderNo,
+            misa_id: item.id, // Store Numeric MISA ID for reliable updates
             status: mapMisaStatus(item),
             delivery_status: item.delivery_status || 'Chưa giao hàng', // Preserve MISA delivery_status
             sale_order_product_mappings: products,  // Products array
@@ -375,10 +376,26 @@ export const syncMisaOrders = async () => {
             mappedOrder.createdAt = new Date().toISOString();
             await db.addOrder(mappedOrder);
 
-            // DISABLED: Telegram notification for bulk sync
-            // const money = mappedOrder.amount.toLocaleString('vi-VN');
-            // const msg = `🆕 <b>CÓ ĐƠN HÀNG MỚI TỪ MISA</b>\n📦 Mã: <b>${mappedOrder.soDon}</b>\n📅 Ngày: ${mappedOrder.ngay}\n🏢 Khách: ${mappedOrder.khach}\n💰 Tổng: ${money} VNĐ\n📝 GC: ${mappedOrder.diaChi}`;
-            // await sendTelegramMessage(msg);
+            // Send Telegram notification for new orders
+            const money = (mappedOrder.sale_order_amount || 0).toLocaleString('vi-VN');
+            const productsList = (mappedOrder.sale_order_product_mappings || [])
+                .map(p => `- ${p.name}: ${p.qty} ${p.unit}`)
+                .join('\n');
+
+            let msg = `🆕 <b>ĐƠN HÀNG MỚI TỪ MISA</b>\n`;
+            msg += `📦 Mã: <b>${saleOrderNo}</b>\n`;
+            msg += `📅 Ngày: ${item.sale_order_date || 'N/A'}\n`;
+            msg += `👤 Khách: ${item.account_name || 'N/A'}\n`;
+            msg += `💰 Tổng: <b>${money} VNĐ</b>\n`;
+            msg += `📍 Địa chỉ: ${mappedOrder.shipping_address || 'N/A'}\n`;
+
+            if (productsList) {
+                msg += `\n📋 <b>Sản phẩm:</b>\n${productsList}\n`;
+            }
+
+            msg += `\n🔔 @sales (Vào Điều Phối gán tài xế)`;
+
+            await sendTelegramMessage(msg);
         }
 
         console.log(`✅ Synced/Updated Order: ${saleOrderNo}`);
@@ -444,12 +461,15 @@ export const updateMisaOrder = async (orderId, updateData) => {
 
     try {
         // 1. Fetch Original Order to get Prices & Original Data
+        console.log(`📡 Fetching detail for MISA Order: ${orderId}...`);
         const originalOrder = await getMisaOrderDetail(orderId);
+
         if (!originalOrder) {
-            console.error(`❌ Could not fetch original order: ${orderId}`);
-            return false;
+            console.warn(`⚠️ Warning: Could not fetch original order detail for ${orderId}. Proceeding with updateData values only.`);
         }
-        const originalProducts = originalOrder.sale_order_product_mappings || [];
+
+        const originalProducts = originalOrder?.sale_order_product_mappings || [];
+        console.log(`DEBUG: Original Products Count: ${originalProducts.length}`);
 
         // Create Price Map: ProductCode -> Original Item Data
         const originalItemMap = {};
@@ -466,7 +486,7 @@ export const updateMisaOrder = async (orderId, updateData) => {
 
         // 2. Map Status to MISA TEXT values (MISA uses text, not numeric!)
         // MISA Status Text: "Chưa thực hiện", "Đang thực hiện", "Đã thực hiện", "Đã hủy bỏ"
-        let misaStatus = originalOrder.status || 'Chưa thực hiện'; // Keep original if not specified
+        let misaStatus = originalOrder?.status || 'Chưa thực hiện'; // Keep original if not specified
         if (updateData.status) {
             const statusMap = {
                 'Chưa thực hiện': 'Chưa thực hiện',
@@ -507,6 +527,14 @@ export const updateMisaOrder = async (orderId, updateData) => {
                 // Map Stock & Unit
                 let stockInput = String(p.warehouse || p.stock_name || "").trim();
                 let stock = STOCK_MAPPING[stockInput] || DEFAULT_STOCK;
+
+                // Fallback: If mapped stock is default but original item had a specific stock, preserve it.
+                // This prevents MISA from rejecting the update due to invalid/missing stock code.
+                if (!stockInput && originalItem.stock_name) {
+                    stock = originalItem.stock_name;
+                }
+                if (!stock) stock = "HH"; // Default to Goods Warehouse if all else fails
+
                 let unitInput = String(p.unit || "").trim();
                 let unit = UNIT_MAPPING[unitInput] || unitInput || "kg";
 
@@ -516,8 +544,12 @@ export const updateMisaOrder = async (orderId, updateData) => {
                 // Lookup Original Item for prices and tax rates
                 const originalItem = originalItemMap[pCode] || {};
 
-                // Get Price - from original order first, then local DB fallback
-                let price = Number(p.price || originalItem.price || 0);
+                // Get Price - Priority: Update Data > Original Order > Local DB
+                let price = 0;
+                if (p.price && Number(p.price) > 0) price = Number(p.price);
+                else if (originalItem.price && Number(originalItem.price) > 0) price = Number(originalItem.price);
+
+                // Fallback: If price is STILL 0 (e.g. original order data was damaged/cleared), lookup local DB
                 if (price === 0 && localPriceMap[pCode]) {
                     price = localPriceMap[pCode];
                 }
@@ -525,12 +557,32 @@ export const updateMisaOrder = async (orderId, updateData) => {
                 // Get Quantity - from update data
                 const qty = Number(p.weight_kg || p.qty || p.amount || 0);
 
-                // Get Tax & Discount rates from original
+                // Get Tax & Discount rates from original (default to 0 if missing)
                 const discountPercent = Number(p.discount_percent || originalItem.discount_percent || 0);
-                const taxPercent = Number(p.tax_percent || originalItem.tax_percent || 0);
+
+                // Handle tax percent: MISA requires strict string format matching category (e.g. "0%", "8%")
+                let taxPercentVal = 0; // Numeric value for calculation
+                let taxPercentStr = originalItem.tax_percent; // String value for API payload
+
+                const rawTax = p.tax_percent || originalItem.tax_percent;
+                if (rawTax !== undefined && rawTax !== null) {
+                    if (typeof rawTax === 'string') {
+                        taxPercentVal = Number(rawTax.replace('%', ''));
+                        taxPercentStr = rawTax;
+                    } else {
+                        taxPercentVal = Number(rawTax);
+                        taxPercentStr = `${taxPercentVal}%`;
+                    }
+                }
+
+                // Default to "0%" if still missing to avoid validation error
+                if (!taxPercentStr) {
+                    taxPercentStr = "0%";
+                    taxPercentVal = 0;
+                }
 
                 // === FINANCIAL CALCULATIONS ===
-                // to_currency = price * qty (before discount)
+                // to_currency = price * qty (Value before discount/tax)
                 const toCurrency = Math.round(price * qty);
 
                 // discount = to_currency * discount_percent / 100
@@ -540,9 +592,9 @@ export const updateMisaOrder = async (orderId, updateData) => {
                 const amountAfterDiscount = toCurrency - discountAmt;
 
                 // tax = amount_after_discount * tax_percent / 100
-                const taxAmt = Math.round(amountAfterDiscount * taxPercent / 100);
+                const taxAmt = Math.round(amountAfterDiscount * taxPercentVal / 100);
 
-                // total = amount_after_discount + tax
+                // total = amount_after_discount + tax (Grand total for this line)
                 const totalAmt = amountAfterDiscount + taxAmt;
 
                 // Accumulate for order totals
@@ -557,14 +609,17 @@ export const updateMisaOrder = async (orderId, updateData) => {
                     "unit": unit,
                     "amount": qty,
                     "price": price,
+                    // VND Fields
                     "to_currency": toCurrency,
                     "discount": discountAmt,
                     "discount_percent": discountPercent,
-                    // Tax fields removed due to MISA validation - requires tax_code reference
+                    "tax_percent": taxPercentStr, // Send correctly formatted string
+                    "tax": taxAmt,
                     "total": totalAmt,
-                    // OC (Original Currency) fields - same as VND for now
+                    // OC (Original Currency) fields - identical for VND
                     "to_currency_oc": toCurrency,
                     "discount_oc": discountAmt,
+                    "tax_oc": taxAmt,
                     "total_oc": totalAmt,
                     // Usage unit fields
                     "usage_unit": unit,
@@ -577,11 +632,16 @@ export const updateMisaOrder = async (orderId, updateData) => {
 
         // 4. Construct MISA Payload
         const payload = {
-            "sale_order_no": orderId,
-            "form_layout": originalOrder.form_layout || "Mẫu tiêu chuẩn",
+            "sale_order_no": updateData.sale_order_no || orderId,
+            "form_layout": originalOrder?.form_layout || "Mẫu tiêu chuẩn", // Mandatory field
             "status": misaStatus,
-            "description": updateData.description || originalOrder.description || undefined
+            "description": updateData.description || originalOrder?.description || undefined
         };
+
+        // IF we have the internal numeric ID, MISA prefers it for PUT
+        if (updateData.misa_id || originalOrder?.id) {
+            payload["id"] = Number(updateData.misa_id || originalOrder.id);
+        }
 
         // Delivery Status
         if (updateData.delivery_status) {
@@ -606,18 +666,24 @@ export const updateMisaOrder = async (orderId, updateData) => {
             payload["sale_order_product_mappings"] = mappedProducts;
 
             // Order-level totals (calculated from products)
-            payload["sale_order_amount"] = orderGrandTotal;
-            payload["total_summary"] = orderTotalAmount;
+            // Use original order amount as fallback if calculated total is 0
+            const finalAmount = orderGrandTotal > 0 ? orderGrandTotal : (originalOrder?.sale_order_amount || orderTotalAmount);
+
+            payload["sale_order_amount"] = finalAmount;
+            payload["total_summary"] = orderTotalAmount || originalOrder?.total_summary || finalAmount;
             payload["discount_summary"] = orderTotalDiscount;
-            payload["tax_summary"] = orderTotalTax;
-            payload["to_currency_summary"] = orderTotalAmount - orderTotalDiscount;
+            payload["tax_summary"] = orderTotalTax || originalOrder?.tax_summary || 0;
+            payload["to_currency_summary"] = (orderTotalAmount - orderTotalDiscount) || finalAmount;
 
             // OC (Original Currency) summaries
-            payload["total_summary_oc"] = orderTotalAmount;
+            payload["total_summary_oc"] = orderTotalAmount || finalAmount;
             payload["discount_summary_oc"] = orderTotalDiscount;
-            payload["tax_summary_oc"] = orderTotalTax;
-            payload["to_currency_summary_oc"] = orderTotalAmount - orderTotalDiscount;
-            payload["sale_order_amount_oc"] = orderGrandTotal;
+            payload["tax_summary_oc"] = orderTotalTax || 0;
+            payload["to_currency_summary_oc"] = (orderTotalAmount - orderTotalDiscount) || finalAmount;
+            payload["sale_order_amount_oc"] = finalAmount;
+        } else {
+            // No products, but still must provide sale_order_amount
+            payload["sale_order_amount"] = originalOrder?.sale_order_amount || 0;
         }
 
         console.log('📝 MISA Payload:', JSON.stringify(payload, null, 2));
@@ -634,6 +700,7 @@ export const updateMisaOrder = async (orderId, updateData) => {
         });
 
         const json = await response.json();
+        console.log(`DEBUG: MISA PUT Response for ${orderId}:`, JSON.stringify(json));
         const success = json.Success || json.success;
 
         if (success) {

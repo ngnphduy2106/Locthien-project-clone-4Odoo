@@ -177,6 +177,7 @@ export const db = {
             const safeOrder = {
                 id,
                 // Core Info
+                misa_id: order.misa_id || order.id || null, // Preserve numeric MISA ID
                 sale_order_no: order.sale_order_no || order.soDon || null,
                 sale_order_name: order.sale_order_name || null,
                 sale_order_date: order.sale_order_date || order.ngay || null,
@@ -245,6 +246,7 @@ export const db = {
 
             // Direct mappings (camelCase/Vietnamese → Supabase columns)
             if (data.status !== undefined) safeData.status = data.status;
+            if (data.misa_id !== undefined) safeData.misa_id = data.misa_id;
             if (data.note !== undefined) safeData.description = data.note;
             if (data.description !== undefined) safeData.description = data.description;
 
