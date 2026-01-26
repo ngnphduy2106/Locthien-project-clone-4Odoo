@@ -25,29 +25,29 @@ import importRoutes from './routes/imports.js';
 import { syncMisaOrders, syncMisaProducts } from './services/misa.js';
 import { autoSeedMockData } from './seeds/auto_seed.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+// Safe path resolution for ESM
+const getDirname = () => {
+    try {
+        return dirname(fileURLToPath(import.meta.url));
+    } catch (e) {
+        return process.cwd(); // Fallback for some serverless environments
+    }
+};
+const __dirname = getDirname();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-
-// Schedule MISA Sync every 15 seconds for low latency
-setInterval(() => {
-    syncMisaOrders().catch(err => console.error('Sync Job Failed:', err));
-}, 15 * 1000); // 15 seconds for realtime feel
-
-// Run once on startup
-syncMisaOrders()
-    .then(() => syncMisaProducts())
-    .catch(err => console.error('Startup Sync Failed:', err));
+const IS_NETLIFY = process.env.NETLIFY === 'true' || !!process.env.LAMBDA_TASK_ROOT;
 
 // Middleware
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// Serve static files
-app.use(express.static(join(__dirname, '../public')));
+// Serve static files (ONLY if not on Netlify, as Netlify serves them via CDN)
+if (!IS_NETLIFY) {
+    app.use(express.static(join(__dirname, '../public')));
+}
 
 // Create an API Router to handle both prefixed and non-prefixed calls (for Netlify compatibility)
 const apiRouter = express.Router();
@@ -113,8 +113,11 @@ app.get('/api/system/seed', async (req, res) => {
     }
 });
 
-// Serve frontend for all other routes
+// Serve frontend for all other routes (ONLY if not on Netlify)
 app.get('*', (req, res) => {
+    if (IS_NETLIFY) {
+        return res.status(404).json({ error: true, msg: 'API Endpoint not found' });
+    }
     res.sendFile(join(__dirname, '../public/index.html'));
 });
 

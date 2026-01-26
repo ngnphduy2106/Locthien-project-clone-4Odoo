@@ -11,8 +11,15 @@ import fs from 'fs';
 
 dotenv.config();
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+// Safe path resolution for ESM/Serverless
+const getDirname = () => {
+    try {
+        return dirname(fileURLToPath(import.meta.url));
+    } catch (e) {
+        return process.cwd();
+    }
+};
+const __dirname = getDirname();
 
 let db = null;
 let firebaseInitialized = false;
