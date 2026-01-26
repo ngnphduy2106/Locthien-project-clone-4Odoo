@@ -51,11 +51,34 @@ apiRouter.use('/reports', reportRoutes);
 apiRouter.use('/webhooks', webhookRoutes);
 apiRouter.use('/imports', importRoutes);
 
-// Manual Sync Endpoint
+// Manual Sync Endpoint (Two-way: Pull New & Push Pending)
 apiRouter.post('/sync', async (req, res) => {
     try {
+        console.log('⚡ Two-way Sync Triggered...');
+
+        // 1. Pull from MISA (Existing logic)
         await syncMisaOrders();
-        res.json({ success: true, message: 'Sync started' });
+
+        // 2. Push from ERP to MISA (Forced sync for active/recent orders)
+        // We'll push current assigned/delivering orders just to be sure
+        const orders = await db.getOrders();
+        const pendingPush = orders.filter(o => o.status === 'Đang thực hiện' || o.status === 'Đang giao hàng');
+
+        let pushCount = 0;
+        for (const order of pendingPush) {
+            if (order.misa_id) {
+                await updateMisaOrder(order.sale_order_no || order.id, {
+                    misa_id: order.misa_id,
+                    status: order.status,
+                    driver: order.taiXe,
+                    plate: order.bienSo,
+                    cart: order.cart || order.products || []
+                });
+                pushCount++;
+            }
+        }
+
+        res.json({ success: true, message: `Đã đồng bộ xong! (Tải về đơn mới + Đẩy lên ${pushCount} đơn đang giao)` });
     } catch (e) {
         res.status(500).json({ success: false, error: e.message });
     }

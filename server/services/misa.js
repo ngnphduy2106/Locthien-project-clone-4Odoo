@@ -705,15 +705,15 @@ export const updateMisaOrder = async (orderId, updateData) => {
 
         if (success) {
             console.log(`✅ MISA Updated Successfully: ${orderId}`);
-            console.log(`   Status: ${misaStatus}, Products: ${mappedProducts.length}, Total: ${orderGrandTotal.toLocaleString()} VND`);
-            return true;
+            return { success: true, message: 'Cập nhật MISA thành công' };
         } else {
-            console.error(`❌ MISA Update Failed:`, JSON.stringify(json, null, 2));
-            return false;
+            const errorDetail = json.Data || json.Message || JSON.stringify(json);
+            console.error(`❌ MISA Update Failed:`, errorDetail);
+            return { success: false, message: `MISA từ chối: ${errorDetail}` };
         }
 
     } catch (e) {
         console.error('❌ MISA Update Exception:', e.message);
-        return false;
+        return { success: false, message: `Lỗi kết nối MISA: ${e.message}` };
     }
 };

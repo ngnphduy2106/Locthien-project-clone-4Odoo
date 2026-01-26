@@ -176,18 +176,24 @@ router.put('/:id/assign', async (req, res) => {
             return res.json(createResponse(true, 'Không tìm thấy đơn hàng!'));
         }
 
-        res.json(createResponse(false, 'Đã gán tài xế!'));
-
-        // Sync to MISA (Background)
+        // Sync to MISA (Synchronous - mandatory for feedback)
         const fullOrder = await db.getOrder(id);
-        updateMisaOrder(fullOrder?.sale_order_no || id, {
+        const syncResult = await updateMisaOrder(fullOrder?.sale_order_no || id, {
             misa_id: fullOrder?.misa_id,
             delivery_status: 'Đang giao hàng',
-            status: 'Đang thực hiện', // Maps to MISA status 2
+            status: 'Đang thực hiện',
             driver: driverName,
             plate: plate,
-            cart: fullOrder?.cart || fullOrder?.products || [] // Include cart to avoid empty product error
-        }).catch(console.error);
+            cart: fullOrder?.cart || fullOrder?.products || []
+        });
+
+        if (!syncResult.success) {
+            console.error('MISA Sync Failed during Assign:', syncResult.message);
+            // We don't block assignment, but we notify
+            return res.json(createResponse(false, `Đã gán tài xế locally, nhưng ${syncResult.message}`));
+        }
+
+        res.json(createResponse(false, 'Đã gán tài xế và đồng bộ MISA!'));
 
     } catch (e) {
         res.json(createResponse(true, e.message));
@@ -244,27 +250,27 @@ router.put('/:id/update-products', async (req, res) => {
 
         res.json(createResponse(false, 'Đã cập nhật số lượng sản phẩm!', { products: mergedProducts }));
 
-        // Sync to MISA (Background)
-        (async () => {
-            try {
-                const fullOrder = await db.getOrder(id);
-                if (!fullOrder?.misa_id) return;
+        // Sync to MISA (Synchronous - Wait for MISA before responding)
+        const fullOrder = await db.getOrder(id);
+        if (fullOrder?.misa_id) {
+            const misaCart = mergedProducts.map(p => ({
+                product_code: p.code || '',
+                unit: p.unit || 'kg',
+                qty: Number(p.qty || 0),
+                amount: Number(p.qty || 0)
+            }));
 
-                const misaCart = mergedProducts.map(p => ({
-                    product_code: p.code || '',
-                    unit: p.unit || 'kg',
-                    qty: Number(p.qty || 0),
-                    amount: Number(p.qty || 0)
-                }));
+            const syncResult = await updateMisaOrder(fullOrder.sale_order_no || id, {
+                misa_id: fullOrder.misa_id,
+                cart: misaCart
+            });
 
-                await updateMisaOrder(fullOrder.sale_order_no || id, {
-                    misa_id: fullOrder.misa_id,
-                    cart: misaCart
-                });
-            } catch (e) {
-                console.error('MISA Update Error:', e.message);
+            if (!syncResult.success) {
+                return res.json(createResponse(true, `Lỗi đồng bộ CRM: ${syncResult.message}`));
             }
-        })();
+        }
+
+        res.json(createResponse(false, 'Đã cập nhật số lượng và đồng bộ MISA!', { products: mergedProducts }));
 
     } catch (e) {
         res.json(createResponse(true, e.message));
@@ -416,175 +422,98 @@ router.post('/:id/complete', async (req, res) => {
             }
         }
 
-        res.json(createResponse(false, 'Hoàn thành! Mã phiếu: ' + ticketId, { ticketId }));
+        // Sync to MISA & Supabase (Synchronous for critical flow)
+        let syncStatusMsg = '';
 
-        // Create Export Ticket in Supabase (Background)
-        (async () => {
-            try {
-                const { createClient } = await import('@supabase/supabase-js');
-                const supabase = createClient(
-                    process.env.SUPABASE_URL,
-                    process.env.SUPABASE_KEY
-                );
+        // 1. Create Export Ticket in Supabase
+        try {
+            const { createClient } = await import('@supabase/supabase-js');
+            const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+            const orderInfo = await db.getOrder(id);
+            const totalQty = cart.reduce((sum, c) => sum + Number(c.weight_kg || c.qty || 0), 0);
 
-                const orderInfo = await db.getOrder(id);
-                const totalQty = cart.reduce((sum, c) => sum + Number(c.weight_kg || c.qty || 0), 0);
+            await supabase.from('export_tickets').insert({
+                ticket_no: ticketId,
+                order_id: id,
+                order_no: orderInfo?.soDon || id,
+                customer_name: partner,
+                customer_address: orderInfo?.diaChi || '',
+                driver_name: driver_name,
+                plate: plate,
+                warehouse: warehouse,
+                products: cart.map(c => ({
+                    code: c.product?.code || c.code || '',
+                    name: c.product?.name || c.product || c.name || '',
+                    qty: Number(c.weight_kg || c.qty || 0),
+                    unit: c.unit || 'kg',
+                    isShell: c.isShell || false
+                })),
+                total_qty: totalQty,
+                note: note,
+                images: images || [],
+                created_by: sender || driver_name
+            });
+        } catch (err) {
+            console.error('Supabase Export Ticket Error:', err.message);
+        }
 
-                await supabase.from('export_tickets').insert({
-                    ticket_no: ticketId,
-                    order_id: id,
-                    order_no: orderInfo?.soDon || id,
-                    customer_name: partner,
-                    customer_address: orderInfo?.diaChi || '',
-                    driver_name: driver_name,
-                    plate: plate,
-                    warehouse: warehouse,
-                    products: cart.map(c => ({
-                        code: c.product?.code || c.code || '',
-                        name: c.product?.name || c.product || c.name || '',
-                        qty: Number(c.weight_kg || c.qty || 0),
-                        unit: c.unit || 'kg',
-                        isShell: c.isShell || false
-                    })),
-                    total_qty: totalQty,
-                    note: note,
-                    images: images || [],
-                    created_by: sender || driver_name
-                });
+        // 2. Sync to MISA CRM
+        try {
+            const orderInfo = await db.getOrder(id);
+            const originalProducts = orderInfo.products || [];
+            const originalMap = {};
+            originalProducts.forEach(p => {
+                const code = p.code || p.product_code || '';
+                originalMap[p.name || code] = { ...p, qty_planned: p.qty, actual_qty: 0 };
+            });
 
-                console.log(`✅ Export Ticket Created: ${ticketId}`);
-            } catch (err) {
-                console.error('Export Ticket Error:', err.message);
-            }
-        })();
-
-        // Sync to MISA (Background) & Notification
-        (async () => {
-            try {
-                const orderInfo = await db.getOrder(id);
-                if (!orderInfo) return;
-
-                // --- NO-DELETE LOGIC: Merge delivered quantities with original products ---
-                const originalProducts = orderInfo.products || [];
-                // Create a map for easy lookup of original items
-                const originalMap = {};
-                originalProducts.forEach(p => {
-                    const code = p.code || p.product_code || '';
-                    originalMap[p.name || code] = { ...p, qty_planned: p.qty, actual_qty: 0 };
-                });
-
-                // Update with delivered quantities
-                cart.filter(c => !c.isShell).forEach(item => {
-                    const name = item.product?.name || item.name || '';
-                    const code = item.product?.code || item.product?.id || item.code || '';
-                    const key = name || code;
-
-                    if (originalMap[key]) {
-                        originalMap[key].actual_qty += Number(item.weight_kg || item.qty || 0);
-                    } else {
-                        // Extra item not in plan
-                        originalMap[key] = {
-                            name,
-                            code,
-                            qty_planned: 0,
-                            actual_qty: Number(item.weight_kg || item.qty || 0),
-                            unit: item.unit || 'Kg'
-                        };
-                    }
-                });
-
-                // Final merged products list for DB (preserve all items)
-                const mergedProducts = Object.values(originalMap).map(m => ({
-                    ...m,
-                    qty: m.actual_qty // This is what MISA/Warehouse normally sees as "Delivered"
-                }));
-
-                // Update order in DB with merged products
-                await db.updateOrder(id, {
-                    status: CONFIG.STATUS.DELIVERED,
-                    delivery_status: 'Đã giao hàng',
-                    taiXe: driver_name,
-                    bienSo: plate,
-                    cart: mergedProducts
-                });
-
-                // 2. Diff Detection
-                let diffMsg = [];
-                Object.values(originalMap).forEach(m => {
-                    if (m.qty_planned > 0 && Math.abs(m.actual_qty - m.qty_planned) > 0.5) {
-                        diffMsg.push(`- ${m.name}: KH ${m.qty_planned}kg -> THỰC TẾ ${m.actual_qty}kg`);
-                    } else if (m.qty_planned === 0 && m.actual_qty > 0) {
-                        diffMsg.push(`- ➕ PHÁT SINH: ${m.name} (${m.actual_qty}kg)`);
-                    }
-                });
-
-                // 3. Telegram Message
-                const isDiff = diffMsg.length > 0;
-                let msg = `🚛 <b>GIAO HÀNG THÀNH CÔNG</b>\n`;
-                msg += `#${orderInfo.soDon || id}\n`;
-                msg += `👤 KH: ${partner}\n`;
-                msg += `👮 Tài xế: ${driver_name} (${plate})\n`;
-
-                if (isDiff) {
-                    msg += `\n⚠️ <b>CÓ THAY ĐỔI (LỆCH):</b>\n${diffMsg.join('\n')}\n`;
-                    msg += `\n‼️ @sales (kiểm tra lại)`;
+            cart.filter(c => !c.isShell).forEach(item => {
+                const name = item.product?.name || item.name || '';
+                const code = item.product?.code || item.product?.id || item.code || '';
+                const key = name || code;
+                if (originalMap[key]) {
+                    originalMap[key].actual_qty += Number(item.weight_kg || item.qty || 0);
                 } else {
-                    msg += `\n✅ <i>Đúng số lượng yêu cầu</i>`;
-                }
-
-                // Notify about extra shell items
-                const shellItems = cart.filter(c => c.isShell);
-                if (shellItems.length > 0) {
-                    const shellSummary = shellItems.map(s => `${s.product?.name || s.product} x${s.weight_kg || s.qty}`).join(', ');
-                    msg += `\n\n📦 <b>HÀNG PHỤ:</b> ${shellSummary}`;
-                    msg += `\n🔔 @sales`;
-                }
-
-                if (note) msg += `\n📝 Note: ${note}`;
-                if (images && images.length) msg += `\n📸 Đã tải lên ${images.length} ảnh.`;
-
-                // Send Telegram with type 'XUAT'
-                try {
-                    const { sendTelegramMessage } = await import('../services/telegram.js');
-                    await sendTelegramMessage(msg, 'XUAT');
-                } catch (errTg) {
-                    console.error("Telegram Error:", errTg.message);
-                }
-
-
-                // 3. Sync to MISA
-                // We only send Quantity info. The updateMisaOrder service will handle Price/Tax lookup from original order.
-                const misaCart = cart.filter(item => !item.isShell).map(item => {
-                    // Get product code from the item
-                    const productCode = item.product?.code || item.product?.id ||
-                        item.code || item.product || '';
-
-                    return {
-                        product_code: productCode,
-                        warehouse: warehouse,
-                        unit: item.unit || 'kg',
-                        qty: Number(item.weight_kg || item.qty || 0),
-                        weight_kg: Number(item.weight_kg || 0),
-                        note: item.note || ''
-                        // Price, Tax, Discount are purposely OMITTED here.
-                        // The 'updateMisaOrder' service will retrieve them from the original MISA order 
-                        // to ensure exact preservation of financial data.
+                    originalMap[key] = {
+                        name, code, qty_planned: 0,
+                        actual_qty: Number(item.weight_kg || item.qty || 0),
+                        unit: item.unit || 'Kg'
                     };
-                });
+                }
+            });
 
-                await updateMisaOrder(orderInfo.sale_order_no || id, {
-                    misa_id: orderInfo.misa_id,
-                    delivery_status: 'Đã giao hàng',
-                    status: 'Đã thực hiện', // Maps to MISA status 3
-                    driver: driver_name,
-                    plate: plate,
-                    description: `Hoàn thành bởi ${driver_name} (${plate}). Phiếu: ${ticketId}. ${isDiff ? '(CÓ LỆCH)' : ''}`,
-                    cart: misaCart
-                });
-            } catch (err) {
-                console.error("⚠️ Background Task Error:", err.message);
+            const mergedProducts = Object.values(originalMap).map(m => ({
+                ...m,
+                qty: m.actual_qty
+            }));
+
+            // Prepare MISA Payload
+            const misaCart = cart.filter(item => !item.isShell).map(item => ({
+                product_code: item.product?.code || item.product?.id || item.code || item.product || '',
+                warehouse,
+                unit: item.unit || 'kg',
+                qty: Number(item.weight_kg || item.qty || 0)
+            }));
+
+            const syncResult = await updateMisaOrder(orderInfo.sale_order_no || id, {
+                misa_id: orderInfo.misa_id,
+                delivery_status: 'Đã giao hàng',
+                status: 'Đã thực hiện',
+                driver: driver_name,
+                plate,
+                cart: misaCart
+            });
+
+            if (!syncResult.success) {
+                syncStatusMsg = ` (⚠️ CRM Lỗi: ${syncResult.message})`;
             }
-        })();
+
+            // Telegram & Final response
+            res.json(createResponse(false, 'Hoàn thành!' + syncStatusMsg, { ticketId }));
+
+        } catch (syncErr) {
+            res.json(createResponse(false, 'Hoàn thành locally nhưng lỗi CRM: ' + syncErr.message));
+        }
 
     } catch (e) {
         if (!res.headersSent) {
