@@ -49,8 +49,21 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 // Serve static files
 app.use(express.static(join(__dirname, '../public')));
 
-// Manual Sync Endpoint
-app.post('/api/sync', async (req, res) => {
+// Create an API Router to handle both prefixed and non-prefixed calls (for Netlify compatibility)
+const apiRouter = express.Router();
+
+apiRouter.use('/auth', authRoutes);
+apiRouter.use('/orders', orderRoutes);
+apiRouter.use('/chat', chatRoutes);
+apiRouter.use('/hr', hrRoutes);
+apiRouter.use('/materials', materialRoutes);
+apiRouter.use('/warehouse', warehouseRoutes);
+apiRouter.use('/reports', reportRoutes);
+apiRouter.use('/webhooks', webhookRoutes);
+apiRouter.use('/imports', importRoutes);
+
+// Manual Sync Endpoint on Router
+apiRouter.post('/sync', async (req, res) => {
     console.log('⚡ Manual Sync Triggered...');
     try {
         await syncMisaOrders();
@@ -60,18 +73,9 @@ app.post('/api/sync', async (req, res) => {
     }
 });
 
-// API Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/orders', orderRoutes);
-app.use('/api/chat', chatRoutes);
-app.use('/api/hr', hrRoutes);
-app.use('/api/materials', materialRoutes);
-app.use('/api/warehouse', warehouseRoutes);
-app.use('/api/reports', reportRoutes);
-app.use('/api/webhooks', webhookRoutes);
-
-// Import tickets routes
-app.use('/api/imports', importRoutes);
+// Mount the router
+app.use('/api', apiRouter); // For local dev and standard calls
+app.use('/', apiRouter);   // Fallback for Netlify if prefix is stripped
 
 // Health check
 app.get('/api/health', async (req, res) => {

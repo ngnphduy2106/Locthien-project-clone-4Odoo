@@ -269,8 +269,13 @@ async function handleLogin() {
         const res = await api.login(username, password);
         hideLoading();
 
-        if (res.error) {
-            alert(res.msg);
+        if (!res || res.error) {
+            alert(res ? res.msg : 'Lỗi kết nối máy chủ (Không có phản hồi)');
+            return;
+        }
+
+        if (!res.user) {
+            alert('Lỗi: Không tìm thấy thông tin người dùng trong phản hồi từ máy chủ.');
             return;
         }
 

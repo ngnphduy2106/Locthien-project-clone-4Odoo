@@ -2,7 +2,22 @@
 // LỘC THIÊN ERP - API CLIENT
 // ===============================================
 
-const API_BASE = '/api';
+const getApiBase = () => {
+    // 1. Check URL parameters first (high priority for manual overrides)
+    const urlParams = new URLSearchParams(window.location.search);
+    const apiOverride = urlParams.get('apiUrl');
+    if (apiOverride) return apiOverride;
+
+    // 2. Check local storage (persistent setting)
+    const savedApi = localStorage.getItem('LT_API_URL');
+    if (savedApi) return savedApi;
+
+    // 3. Fallback to default
+    // If running on localhost or Netlify, use relative /api
+    return '/api';
+};
+
+const API_BASE = getApiBase();
 
 const api = {
 

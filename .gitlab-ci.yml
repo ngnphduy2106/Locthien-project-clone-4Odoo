@@ -1,0 +1,17 @@
+# GitLab CI/CD for GitLab Pages
+# This will deploy the 'public' folder to your-group.gitlab.io/your-project
+
+image: node:latest
+
+pages:
+  stage: deploy
+  script:
+    - mkdir .public
+    - cp -r public/* .public
+    - mv .public public
+    # GitLab Pages expects files in a 'public' directory at the root
+  artifacts:
+    paths:
+      - public
+  only:
+    - main
