@@ -27,8 +27,8 @@ async function initFirebase() {
 
         const DATABASE_URL = 'https://locthien-scm-default-rtdb.asia-southeast1.firebasedatabase.app/';
 
-        // 1. Try Service Account File first
-        const saPath = join(process.cwd(), 'firebase-service-account.json');
+        // 1. Try Service Account File first (using absolute path for Render robustness)
+        const saPath = resolve(process.cwd(), 'firebase-service-account.json');
         if (fs.existsSync(saPath)) {
             const sa = JSON.parse(fs.readFileSync(saPath, 'utf8'));
             initializeApp({
