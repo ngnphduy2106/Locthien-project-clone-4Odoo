@@ -388,13 +388,14 @@ router.post('/:id/complete', async (req, res) => {
             // density: item.density
         }));
 
-        // Update order status AND products
+        // Update order status AND products + Set initial sync status
         await db.updateOrder(id, {
             status: CONFIG.STATUS.DELIVERED,
             delivery_status: 'Đã giao hàng',
             taiXe: driver_name,
             bienSo: plate,
-            cart: updatedProducts
+            cart: updatedProducts,
+            crm_sync_status: 'PUSHING' // Mark as in progress
         });
 
         // Create warehouse tickets
@@ -424,6 +425,7 @@ router.post('/:id/complete', async (req, res) => {
 
         // Sync to MISA & Supabase (Synchronous for critical flow)
         let syncStatusMsg = '';
+        let crmSyncStatus = 'SYNCED';
 
         // 1. Create Export Ticket in Supabase
         try {
@@ -504,15 +506,25 @@ router.post('/:id/complete', async (req, res) => {
                 cart: misaCart
             });
 
-            if (!syncResult.success) {
+            if (syncResult.success) {
+                crmSyncStatus = 'SYNCED';
+            } else {
+                crmSyncStatus = 'FAILED';
                 syncStatusMsg = ` (⚠️ CRM Lỗi: ${syncResult.message})`;
             }
 
-            // Telegram & Final response
-            res.json(createResponse(false, 'Hoàn thành!' + syncStatusMsg, { ticketId }));
+            // Update Database with Final Sync Result
+            await db.updateOrder(id, {
+                crm_sync_status: crmSyncStatus,
+                sync_error: syncResult.success ? null : syncResult.message
+            });
+
+            // Final response
+            res.json(createResponse(!syncResult.success, syncResult.success ? 'Hoàn thành!' : 'Đã lưu cục bộ nhưng CRM lỗi' + syncStatusMsg, { ticketId, crmStatus: crmSyncStatus }));
 
         } catch (syncErr) {
-            res.json(createResponse(false, 'Hoàn thành locally nhưng lỗi CRM: ' + syncErr.message));
+            await db.updateOrder(id, { crm_sync_status: 'FAILED', sync_error: syncErr.message });
+            res.json(createResponse(true, 'Hoàn thành locally nhưng lỗi hệ thống CRM: ' + syncErr.message));
         }
 
     } catch (e) {

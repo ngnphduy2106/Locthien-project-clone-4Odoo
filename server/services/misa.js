@@ -10,6 +10,12 @@ const MISA_AUTH_URL = 'https://crmconnect.misa.vn/api/v2/Account';
 const MISA_ORDERS_URL = 'https://crmconnect.misa.vn/api/v2/SaleOrders';
 const MISA_PRODUCTS_URL = 'https://crmconnect.misa.vn/api/v2/Products';
 
+let cachedToken = null;
+let isSyncing = false; // Prevent race conditions
+
+// Helper to check if syncing
+export const getSyncStatus = () => isSyncing;
+
 // Helper for fetch with timeout
 async function fetchWithTimeout(url, options, timeout = 10000) {
     const controller = new AbortController();
@@ -235,8 +241,25 @@ async function getMisaOrderDetail(idOrName, isUuid = false) {
 }
 
 export const syncMisaOrders = async () => {
+    if (isSyncing) {
+        console.log('⚠️ Sync already in progress. Skipping...');
+        return;
+    }
+
+    isSyncing = true;
     console.log('🔄 Starting MISA Sync...');
 
+    try {
+        // ... (existing logic continues in try block)
+    } catch (e) {
+        console.error('❌ MISA Sync Fatal Error:', e.message);
+    } finally {
+        isSyncing = false;
+    }
+};
+
+// Internal actual sync logic to keep it clean
+const performSync = async () => {
     // 1. Get Orders from MISA
     const misaOrders = await getMisaOrders();
     if (!misaOrders.length) {
@@ -709,6 +732,12 @@ export const updateMisaOrder = async (orderId, updateData) => {
             body: JSON.stringify([payload])
         }, 12000); // Slightly longer for updates (12s)
 
+        if (response.status === 401) {
+            console.warn('⚠️ MISA Token Expired (401). Resetting...');
+            cachedToken = null;
+            return { success: false, message: 'Token hết hạn, vui lòng thử lại', code: 'UNAUTHORIZED' };
+        }
+
         const json = await response.json();
         console.log(`DEBUG: MISA PUT Response for ${orderId}:`, JSON.stringify(json));
         const success = json.Success || json.success;
@@ -719,7 +748,11 @@ export const updateMisaOrder = async (orderId, updateData) => {
         } else {
             const errorDetail = json.Data || json.Message || JSON.stringify(json);
             console.error(`❌ MISA Update Failed:`, errorDetail);
-            return { success: false, message: `MISA từ chối: ${errorDetail}` };
+            // Check for specific rejection that might be 401 wrapped in 200
+            if (String(errorDetail).includes('Unauthorized') || String(errorDetail).includes('expired')) {
+                cachedToken = null;
+            }
+            return { success: false, message: `MISA từ chối: ${errorDetail}`, code: 'REJECTED' };
         }
 
     } catch (e) {

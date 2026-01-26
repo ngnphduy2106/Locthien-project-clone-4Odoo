@@ -53,36 +53,56 @@ apiRouter.use('/imports', importRoutes);
 
 // Manual Sync Endpoint (Two-way: Pull New & Push Pending)
 apiRouter.post('/sync', async (req, res) => {
+    if (getSyncStatus()) { // Check mismatching logic: using the helper
+        return res.json({ success: false, error: 'Tiến trình đồng bộ đang chạy, vui lòng thử lại sau.' });
+    }
+
     try {
         console.log('⚡ Two-way Sync Triggered...');
 
-        // 1. Pull from MISA (Existing logic)
+        // 1. Pull from MISA (Sync wrapper handles locking)
         await syncMisaOrders();
 
-        // 2. Push from ERP to MISA (Forced sync for active/recent orders)
-        // We'll push current assigned/delivering orders just to be sure
-        const orders = await db.getOrders();
-        const pendingPush = orders.filter(o => o.status === 'Đang thực hiện' || o.status === 'Đang giao hàng');
+        // 2. Extra Push for failed ones
+        await retryFailedSyncs();
 
-        let pushCount = 0;
-        for (const order of pendingPush) {
-            if (order.misa_id) {
-                await updateMisaOrder(order.sale_order_no || order.id, {
-                    misa_id: order.misa_id,
-                    status: order.status,
-                    driver: order.taiXe,
-                    plate: order.bienSo,
-                    cart: order.cart || order.products || []
-                });
-                pushCount++;
-            }
-        }
-
-        res.json({ success: true, message: `Đã đồng bộ xong! (Tải về đơn mới + Đẩy lên ${pushCount} đơn đang giao)` });
+        res.json({ success: true, message: `Đồng bộ hoàn tất! Đã kiểm tra và đẩy lại các đơn kẹt.` });
     } catch (e) {
         res.status(500).json({ success: false, error: e.message });
     }
 });
+
+// Periodic Task: Retry FAILED syncs
+async function retryFailedSyncs() {
+    try {
+        const orders = await db.getOrders();
+        const failedOrders = orders.filter(o => o.crm_sync_status === 'FAILED');
+
+        if (failedOrders.length === 0) return;
+
+        console.log(`♻️ Retrying ${failedOrders.length} failed syncs...`);
+
+        for (const order of failedOrders) {
+            console.log(`   - Retrying Order: ${order.sale_order_no || order.id}`);
+            const res = await updateMisaOrder(order.sale_order_no || order.id, {
+                misa_id: order.misa_id,
+                status: order.status,
+                delivery_status: order.delivery_status,
+                driver: order.taiXe,
+                plate: order.bienSo,
+                cart: order.cart || order.products || []
+            });
+
+            if (res.success) {
+                await db.updateOrder(order.id, { crm_sync_status: 'SYNCED', sync_error: null });
+            } else {
+                await db.updateOrder(order.id, { sync_error: res.message });
+            }
+        }
+    } catch (e) {
+        console.error('❌ Retry Sync Logic Failed:', e.message);
+    }
+}
 
 app.use('/api', apiRouter);
 app.use('/', apiRouter);
@@ -127,6 +147,11 @@ if (!IS_SERVERLESS) {
     setInterval(() => {
         syncMisaOrders().catch(err => console.error('Sync Job Failed:', err));
     }, 15 * 1000);
+
+    // Retry failed syncs every 5 minutes
+    setInterval(() => {
+        retryFailedSyncs().catch(err => console.error('Retry Job Failed:', err));
+    }, 5 * 60 * 1000);
 
     app.listen(PORT, () => {
         console.log(`🚀 Lộc Thiên ERP running on port ${PORT}`);

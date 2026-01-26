@@ -579,6 +579,7 @@ function renderOrderList() {
                 <span class="badge bg-light text-dark border small">#${order.soDon}</span>
                 <span class="badge ${statusClass} small">${statusBadge}</span>
                 ${driverInfo}
+                ${renderSyncBadge(order)}
             </div>
             <span class="small text-muted">${formatDateVN(order.ngay)}</span>
         </div>
@@ -618,6 +619,32 @@ function openOrderDetail(id) {
     document.getElementById('modalDriver').textContent = order.taiXe || 'Chưa gán';
     document.getElementById('modalPlate').textContent = order.bienSo || '---';
     document.getElementById('modalNote').textContent = order.note || '';
+
+    // Sync Status in Details
+    const syncArea = document.getElementById('modalSyncInfo');
+    if (syncArea) {
+        if (order.crm_sync_status === 'FAILED') {
+            syncArea.innerHTML = `
+                <div class="alert alert-danger p-2 mb-2 small">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <i class="bi bi-exclamation-octagon me-1"></i> 
+                            <strong>Lỗi MISA:</strong> ${order.sync_error || 'Không xác định'}
+                        </div>
+                        <button class="btn btn-xs btn-danger ms-2 py-0" onclick="retryMisaSync('${order.id}')">
+                            <i class="bi bi-arrow-clockwise"></i> Thử lại
+                        </button>
+                    </div>
+                </div>
+            `;
+            syncArea.classList.remove('d-none');
+        } else if (order.crm_sync_status === 'PUSHING') {
+            syncArea.innerHTML = '<div class="text-warning small mb-2"><i class="spinner-border spinner-border-sm me-1"></i> Đang đẩy lên CRM...</div>';
+            syncArea.classList.remove('d-none');
+        } else {
+            syncArea.classList.add('d-none');
+        }
+    }
 
     // Products
     const list = document.getElementById('modalProductList');
@@ -2419,4 +2446,37 @@ async function completeImportTicket() {
         hideLoading();
         alert('Lỗi: ' + e.message);
     }
+}
+// Manual retry for a single order sync
+async function retryMisaSync(orderId) {
+    showLoading('Đang đẩy lại lên MISA...');
+    try {
+        const res = await fetch(`/api/sync`, { method: 'POST' }); // Using global sync for now as it handles failed ones
+        const data = await res.json();
+        hideLoading();
+
+        if (data.success) {
+            alert('✅ Đã nạp lại lệnh đồng bộ thành công!');
+            loadOrders();
+            // Close modal to refresh state
+            bootstrap.Modal.getInstance(document.getElementById('orderDetailModal')).hide();
+        } else {
+            alert('❌ Vẫn thất bại: ' + (data.error || 'Unknown error'));
+        }
+    } catch (e) {
+        hideLoading();
+        alert('Lỗi: ' + e.message);
+    }
+}
+
+// Helper to render sync status badge
+function renderSyncBadge(order) {
+    if (!order.status || order.status === 'Mới') return '';
+
+    const status = order.crm_sync_status;
+    if (status === 'SYNCED') return '<span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 ms-1" title="Đã đồng bộ CRM"><i class="bi bi-check-circle-fill"></i> MISA</span>';
+    if (status === 'FAILED') return '<span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 ms-1" title="Lỗi đồng bộ CRM"><i class="bi bi-exclamation-triangle-fill"></i> Lỗi CRM</span>';
+    if (status === 'PUSHING') return '<span class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 ms-1"><i class="spinner-border spinner-border-sm py-0"></i> CRM</span>';
+
+    return '<span class="badge bg-light text-muted border ms-1">? CRM</span>';
 }
