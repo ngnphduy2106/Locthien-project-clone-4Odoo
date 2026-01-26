@@ -10,8 +10,15 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+// Safe path resolution for ESM/Serverless
+const getDirname = () => {
+    try {
+        return dirname(fileURLToPath(import.meta.url));
+    } catch (e) {
+        return process.cwd();
+    }
+};
+const __dirname = getDirname();
 
 const SPREADSHEET_ID = '1kShrJvZ3Fiw1f3KEBtb6668GEJqoToy1ifqU_9Rb2BI';
 const credentialsPath = join(__dirname, '../../firebase-service-account.json');

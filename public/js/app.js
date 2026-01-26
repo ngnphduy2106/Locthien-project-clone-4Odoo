@@ -270,8 +270,10 @@ async function handleLogin() {
         console.log('📦 Phản hồi Login raw:', res);
         hideLoading();
 
-        if (!res || res.error) {
-            alert(res ? res.msg : 'Lỗi kết nối máy chủ (Không có phản hồi)');
+        if (!res || res.error || res.errorMessage) {
+            const errorMsg = res?.errorMessage || res?.msg || 'Lỗi kết nối máy chủ (Không có phản hồi)';
+            console.error('❌ Lỗi hệ thống:', res);
+            alert('Lỗi: ' + errorMsg);
             return;
         }
 
