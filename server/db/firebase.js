@@ -12,14 +12,7 @@ import fs from 'fs';
 dotenv.config();
 
 // Safe path resolution for ESM/Serverless
-const getDirname = () => {
-    try {
-        return dirname(fileURLToPath(import.meta.url));
-    } catch (e) {
-        return process.cwd();
-    }
-};
-const __dirname = getDirname();
+const __dirname = process.env.NETLIFY ? '.' : dirname(fileURLToPath(import.meta.url));
 
 let db = null;
 let firebaseInitialized = false;
@@ -35,7 +28,7 @@ async function initFirebase() {
         const DATABASE_URL = 'https://locthien-scm-default-rtdb.asia-southeast1.firebasedatabase.app/';
 
         // 1. Try Service Account File first
-        const saPath = join(__dirname, '../../firebase-service-account.json');
+        const saPath = join(process.cwd(), 'firebase-service-account.json');
         if (fs.existsSync(saPath)) {
             const sa = JSON.parse(fs.readFileSync(saPath, 'utf8'));
             initializeApp({

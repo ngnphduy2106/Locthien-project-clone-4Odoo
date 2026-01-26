@@ -11,19 +11,13 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 // Safe path resolution for ESM/Serverless
-const getDirname = () => {
-    try {
-        return dirname(fileURLToPath(import.meta.url));
-    } catch (e) {
-        return process.cwd();
-    }
-};
-const __dirname = getDirname();
+const __dirname = process.env.NETLIFY ? '.' : dirname(fileURLToPath(import.meta.url));
 
 const SPREADSHEET_ID = '1kShrJvZ3Fiw1f3KEBtb6668GEJqoToy1ifqU_9Rb2BI';
-const credentialsPath = join(__dirname, '../../firebase-service-account.json');
+// Move credentialsPath into the function to avoid top-level path errors
 
 async function getSheetsClient() {
+    const credentialsPath = join(process.cwd(), 'firebase-service-account.json');
     if (!fs.existsSync(credentialsPath)) {
         throw new Error('Service account file not found! Please check firebase-service-account.json');
     }

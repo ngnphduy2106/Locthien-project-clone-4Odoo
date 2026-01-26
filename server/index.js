@@ -26,18 +26,11 @@ import { syncMisaOrders, syncMisaProducts } from './services/misa.js';
 import { autoSeedMockData } from './seeds/auto_seed.js';
 
 // Safe path resolution for ESM
-const getDirname = () => {
-    try {
-        return dirname(fileURLToPath(import.meta.url));
-    } catch (e) {
-        return process.cwd(); // Fallback for some serverless environments
-    }
-};
-const __dirname = getDirname();
+const __dirname = process.env.NETLIFY ? '.' : dirname(fileURLToPath(import.meta.url));
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-const IS_NETLIFY = process.env.NETLIFY === 'true' || !!process.env.LAMBDA_TASK_ROOT;
+const IS_NETLIFY = !!process.env.NETLIFY || !!process.env.LAMBDA_TASK_ROOT;
 
 // Middleware
 app.use(cors());
