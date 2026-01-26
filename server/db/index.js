@@ -7,10 +7,15 @@ import { supabase, supabaseInitialized } from './supabase.js';
 import { db as firebaseDb, firebaseInitialized } from './firebase.js';
 
 // Priority: Supabase > Firebase > Mock
-const useSupabase = supabaseInitialized && supabase !== null;
-const useFirebase = !useSupabase && firebaseInitialized && firebaseDb !== null;
+const getMode = () => {
+    const useSupabase = supabaseInitialized && supabase !== null;
+    const useFirebase = !useSupabase && firebaseInitialized && firebaseDb !== null;
+    return { useSupabase, useFirebase };
+};
 
-console.log(`📦 Database Mode: ${useSupabase ? 'Supabase' : (useFirebase ? 'Firebase RTDB' : 'Mock (In-Memory)')}`);
+// Log current preferred mode at startup
+const { useSupabase, useFirebase } = getMode();
+console.log(`📦 Preferred Database Mode: ${useSupabase ? 'Supabase' : (useFirebase ? 'Firebase RTDB' : 'Mock (In-Memory)')}`);
 
 // ===============================================
 // MOCK DATA (Fallback)
@@ -48,6 +53,7 @@ export const db = {
 
     // === USERS ===
     getUsers: async () => {
+        const { useSupabase, useFirebase } = getMode();
         if (useSupabase) {
             const { data, error } = await supabase.from('users').select('*');
             if (error) console.error('Supabase getUsers error:', error);
@@ -67,6 +73,7 @@ export const db = {
     },
 
     getUserById: async (id) => {
+        const { useSupabase, useFirebase } = getMode();
         if (useSupabase) {
             const { data, error } = await supabase.from('users').select('*').eq('id', id).single();
             return data;
@@ -79,6 +86,7 @@ export const db = {
     },
 
     addUser: async (user) => {
+        const { useSupabase, useFirebase } = getMode();
         const id = sanitizeId(user.id || ('USER' + Date.now()));
         const newUser = { ...user, id, createdAt: new Date().toISOString() };
         if (useSupabase) {
@@ -95,6 +103,7 @@ export const db = {
     },
 
     updateUser: async (id, data) => {
+        const { useSupabase, useFirebase } = getMode();
         const safeId = sanitizeId(id);
         if (useSupabase) {
             const { data: updated, error } = await supabase.from('users').update(data).eq('id', safeId).select().single();
@@ -114,6 +123,7 @@ export const db = {
 
     // === ORDERS ===
     getOrders: async () => {
+        const { useSupabase, useFirebase } = getMode();
         if (useSupabase) {
             const { data, error } = await supabase.from('orders').select('*').order('sale_order_date', { ascending: false });
             if (error) console.error('Supabase getOrders error:', error);
@@ -159,6 +169,7 @@ export const db = {
     },
 
     getOrder: async (id) => {
+        const { useSupabase, useFirebase } = getMode();
         if (useSupabase) {
             const { data, error } = await supabase.from('orders').select('*').eq('id', sanitizeId(id)).single();
             return data;
@@ -171,6 +182,7 @@ export const db = {
     },
 
     addOrder: async (order) => {
+        const { useSupabase, useFirebase } = getMode();
         if (useSupabase) {
             const id = sanitizeId(order.id || order.sale_order_no || order.soDon);
             // Map ALL MISA fields directly to Supabase columns
@@ -239,6 +251,7 @@ export const db = {
     },
 
     updateOrder: async (id, data) => {
+        const { useSupabase, useFirebase } = getMode();
         const safeId = sanitizeId(id);
         if (useSupabase) {
             // Map incoming data to Supabase column names
@@ -296,6 +309,7 @@ export const db = {
     },
 
     clearOrders: async () => {
+        const { useSupabase, useFirebase } = getMode();
         if (useSupabase) {
             const { error } = await supabase.from('orders').delete().neq('id', '');
             if (error) console.error('Supabase clearOrders error:', error);
@@ -310,6 +324,7 @@ export const db = {
 
     // === MATERIALS ===
     getMaterials: async () => {
+        const { useSupabase, useFirebase } = getMode();
         if (useSupabase) {
             const { data, error } = await supabase.from('materials').select('*');
             if (error) console.error('Supabase getMaterials error:', error);
@@ -323,6 +338,7 @@ export const db = {
     },
 
     addMaterial: async (material) => {
+        const { useSupabase, useFirebase } = getMode();
         if (useSupabase) {
             const id = sanitizeId(material.id || material.code);
             const safeMaterial = { ...material, id };
@@ -341,6 +357,7 @@ export const db = {
     },
 
     updateMaterial: async (code, data) => {
+        const { useSupabase, useFirebase } = getMode();
         if (useSupabase) {
             const { data: updated, error } = await supabase.from('materials').update(data).eq('id', sanitizeId(code)).select().single();
             return updated || { code, ...data };
@@ -354,6 +371,7 @@ export const db = {
 
     // === EMPLOYEES ===
     getEmployees: async () => {
+        const { useSupabase, useFirebase } = getMode();
         if (useSupabase) {
             const { data, error } = await supabase.from('employees').select('*');
             return data || [];
@@ -366,6 +384,7 @@ export const db = {
     },
 
     addEmployee: async (employee) => {
+        const { useSupabase, useFirebase } = getMode();
         const id = sanitizeId('EMP' + Date.now());
         const newEmployee = { ...employee, id, status: 'ACTIVE' };
         if (useSupabase) {
@@ -381,6 +400,7 @@ export const db = {
     },
 
     updateEmployee: async (id, data) => {
+        const { useSupabase, useFirebase } = getMode();
         const safeId = sanitizeId(id);
         if (useSupabase) {
             const { data: updated, error } = await supabase.from('employees').update(data).eq('id', safeId).select().single();
@@ -395,6 +415,7 @@ export const db = {
 
     // === INVENTORY ===
     getInventory: async () => {
+        const { useSupabase, useFirebase } = getMode();
         if (useSupabase) {
             const { data, error } = await supabase.from('inventory').select('*');
             return data || [];

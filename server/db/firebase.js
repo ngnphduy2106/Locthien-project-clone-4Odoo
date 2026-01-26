@@ -69,7 +69,7 @@ async function initFirebase() {
 }
 
 // Initialize on module load
-await initFirebase();
+initFirebase().catch(e => console.error('Firebase late init error:', e));
 
 export { db, firebaseInitialized };
 export default db;
