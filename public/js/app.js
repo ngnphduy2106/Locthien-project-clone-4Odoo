@@ -704,8 +704,9 @@ function openOrderDetail(id) {
     const modal = new bootstrap.Modal(document.getElementById('orderDetailModal'));
     modal.show();
 
-    // Load chat for this order
-    loadOrderChat(order.id);
+    // Load chat for this order using soDon (Critical for cross-user sync)
+    const chatRoomId = order.soDon || order.id;
+    loadOrderChat(chatRoomId);
     startChatRefresh();
 
     // Stop refresh when modal closes
@@ -1750,7 +1751,8 @@ async function loadOrderChat(orderId) {
     container.innerHTML = '<div class="text-center text-muted p-3"><i class="bi bi-chat-dots"></i> Đang tải...</div>';
 
     try {
-        const res = await fetch(`/api/chat/${encodeURIComponent(orderId)}/messages`);
+        const chatRoomId = String(orderId); // We expect soDon to be passed now
+        const res = await fetch(`/api/chat/${encodeURIComponent(chatRoomId)}/messages`);
         const data = await res.json();
 
         if (data.error) {
@@ -1808,7 +1810,8 @@ async function sendChatMessage() {
     input.disabled = true;
 
     try {
-        const res = await fetch(`/api/chat/${encodeURIComponent(currentChatOrderId)}/messages`, {
+        const chatRoomId = String(currentChatOrderId);
+        const res = await fetch(`/api/chat/${encodeURIComponent(chatRoomId)}/messages`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -2295,16 +2298,7 @@ async function assignImportDriver() {
 }
 
 // Open chat for import ticket
-// Open chat for import ticket
 function openImportChat(ticketId) {
-    // Close order modal first
-    const orderModal = bootstrap.Modal.getInstance($('#orderModal'));
-    if (orderModal) orderModal.hide();
-
-    // Set import context and open chat
-    state.currentChatContext = { type: 'import', id: ticketId };
-    currentChatOrderId = ticketId; // Set this for standard chat refresh/send logic if needed
-
     // Use existing chat modal
     const chatModal = $('#modal-chat');
     if (chatModal) {

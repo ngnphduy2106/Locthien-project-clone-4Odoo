@@ -10,11 +10,29 @@ const MISA_AUTH_URL = 'https://crmconnect.misa.vn/api/v2/Account';
 const MISA_ORDERS_URL = 'https://crmconnect.misa.vn/api/v2/SaleOrders';
 const MISA_PRODUCTS_URL = 'https://crmconnect.misa.vn/api/v2/Products';
 
-let cachedToken = null;
+// Helper for fetch with timeout
+async function fetchWithTimeout(url, options, timeout = 10000) {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeout);
+    try {
+        const response = await fetch(url, {
+            ...options,
+            signal: controller.signal
+        });
+        clearTimeout(id);
+        return response;
+    } catch (e) {
+        clearTimeout(id);
+        if (e.name === 'AbortError') {
+            throw new Error('MISA API Timeout (Chưa phản hồi sau 10 giây)');
+        }
+        throw e;
+    }
+}
 
 async function loginMisa() {
     try {
-        const response = await fetch(MISA_AUTH_URL, {
+        const response = await fetchWithTimeout(MISA_AUTH_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -172,7 +190,7 @@ async function getMisaOrderDetail(idOrName, isUuid = false) {
             url = `${MISA_ORDERS_URL}/code?code=${filterVal}`;
         }
 
-        const response = await fetch(url, {
+        const response = await fetchWithTimeout(url, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',
@@ -681,7 +699,7 @@ export const updateMisaOrder = async (orderId, updateData) => {
         console.log('📝 MISA Payload:', JSON.stringify(payload, null, 2));
 
         // 5. Send PUT Request
-        const response = await fetch(MISA_ORDERS_URL, {
+        const response = await fetchWithTimeout(MISA_ORDERS_URL, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
@@ -689,7 +707,7 @@ export const updateMisaOrder = async (orderId, updateData) => {
                 'Clientid': process.env.MISA_CLIENT_ID
             },
             body: JSON.stringify([payload])
-        });
+        }, 12000); // Slightly longer for updates (12s)
 
         const json = await response.json();
         console.log(`DEBUG: MISA PUT Response for ${orderId}:`, JSON.stringify(json));

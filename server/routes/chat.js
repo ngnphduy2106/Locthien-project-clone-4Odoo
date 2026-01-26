@@ -69,11 +69,14 @@ router.post('/:id/messages', async (req, res) => {
             image: image || null
         };
 
+        // Standardize: always use a string for IDs in Supabase to match Order Numbers
+        const safeId = String(id);
+
         // Set the correct reference field
         if (type === 'import') {
-            insertData.import_ticket_id = id;
+            insertData.import_ticket_id = safeId;
         } else {
-            insertData.order_id = id;
+            insertData.order_id = safeId;
         }
 
         const { data, error } = await supabase
