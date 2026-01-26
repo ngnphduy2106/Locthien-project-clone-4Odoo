@@ -10,8 +10,8 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Safe path resolution for ESM/Serverless
-const __dirname = process.env.NETLIFY ? '.' : dirname(fileURLToPath(import.meta.url));
+// Safe documentation path placeholder
+const __dirname = '.';
 
 const SPREADSHEET_ID = '1kShrJvZ3Fiw1f3KEBtb6668GEJqoToy1ifqU_9Rb2BI';
 // Move credentialsPath into the function to avoid top-level path errors

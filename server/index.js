@@ -26,7 +26,8 @@ import { syncMisaOrders, syncMisaProducts } from './services/misa.js';
 import { autoSeedMockData } from './seeds/auto_seed.js';
 
 // Safe path resolution for ESM
-const __dirname = process.env.NETLIFY ? '.' : dirname(fileURLToPath(import.meta.url));
+// Safe path resolution for ESM
+const __dirname = '.'; // Fallback for root-level path joins on Netlify
 
 const app = express();
 const PORT = process.env.PORT || 3001;

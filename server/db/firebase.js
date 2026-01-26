@@ -11,8 +11,8 @@ import fs from 'fs';
 
 dotenv.config();
 
-// Safe path resolution for ESM/Serverless
-const __dirname = process.env.NETLIFY ? '.' : dirname(fileURLToPath(import.meta.url));
+// Safe documentation path placeholder
+const __dirname = '.';
 
 let db = null;
 let firebaseInitialized = false;
