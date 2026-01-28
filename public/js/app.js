@@ -198,69 +198,255 @@ async function forceSyncMisa() {
 // === DASHBOARD ===
 async function loadDashboard() {
     try {
-        const res = await api.getDashboardStats();
-        const data = res?.data || res || {};
+        // Get orders data
+        const res = await api.getOrders();
+        const allOrders = [...(res.pending || []), ...(res.assigned || []), ...(res.completed || [])];
 
-        // Update stat cards with defensive null checks
-        const statProducts = window.$('#stat-total-products');
-        const statValue = window.$('#stat-total-value');
-        const statLowStock = window.$('#stat-low-stock');
-        const statExpired = window.$('#stat-expired');
+        // Get period filter
+        const periodSelect = window.$('#dashboard-period');
+        const period = periodSelect?.value || 'month';
 
-        if (statProducts) statProducts.textContent = data.totalProducts || 0;
-        if (statValue) statValue.textContent = formatCurrency(data.totalValue || 0);
-        if (statLowStock) statLowStock.textContent = data.lowStock || 0;
-        if (statExpired) statExpired.textContent = data.expired || 0;
+        // Filter orders by period
+        const now = new Date();
+        const filteredOrders = allOrders.filter(order => {
+            const orderDate = new Date(order.ngay || order.sale_order_date || order.created_at);
+            if (isNaN(orderDate.getTime())) return false;
 
-        // Load chart
-        loadInventoryChart();
+            switch (period) {
+                case 'today':
+                    return orderDate.toDateString() === now.toDateString();
+                case 'week':
+                    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+                    return orderDate >= weekAgo;
+                case 'month':
+                    return orderDate.getMonth() === now.getMonth() && orderDate.getFullYear() === now.getFullYear();
+                case 'year':
+                    return orderDate.getFullYear() === now.getFullYear();
+                default:
+                    return true;
+            }
+        });
+
+        // Calculate stats
+        const orderCount = filteredOrders.length;
+        const orderValue = filteredOrders.reduce((sum, o) => sum + (parseFloat(o.amount || o.sale_order_amount) || 0), 0);
+        const pendingCount = (res.pending || []).length;
+        const completedCount = (res.completed || []).length;
+        const completedRate = orderCount > 0 ? Math.round((completedCount / orderCount) * 100) : 0;
+
+        // Update stat cards
+        const elOrderCount = window.$('#stat-order-count');
+        const elOrderValue = window.$('#stat-order-value');
+        const elPendingCount = window.$('#stat-pending-count');
+        const elCompletedCount = window.$('#stat-completed-count');
+        const elCompletedRate = window.$('#stat-completed-rate');
+        const elUpdateTime = window.$('#dashboard-update-time');
+
+        if (elOrderCount) elOrderCount.textContent = orderCount.toLocaleString('vi-VN');
+        if (elOrderValue) elOrderValue.textContent = formatCurrency(orderValue);
+        if (elPendingCount) elPendingCount.textContent = pendingCount;
+        if (elCompletedCount) elCompletedCount.textContent = completedCount;
+        if (elCompletedRate) elCompletedRate.textContent = `${completedRate}% tỷ lệ hoàn thành`;
+        if (elUpdateTime) elUpdateTime.textContent = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+
+        // Load charts
+        loadOrdersTimeChart(filteredOrders, period);
+        loadValueTimeChart(filteredOrders, period);
+
+        // Load analytics
+        loadTopProducts(filteredOrders);
+        loadTopCustomers(filteredOrders);
+        loadTopDrivers(res.completed || []);
+
     } catch (e) {
         console.error('Dashboard error:', e);
     }
 }
 
-function loadInventoryChart() {
-    const ctx = window.$('#inventoryChart');
+function loadOrdersTimeChart(orders, period) {
+    const ctx = window.$('#ordersTimeChart');
     if (!ctx) return;
 
-    // Destroy existing chart if any
-    if (window.inventoryChartInstance) {
-        window.inventoryChartInstance.destroy();
+    if (window.ordersTimeChartInstance) {
+        window.ordersTimeChartInstance.destroy();
     }
 
-    window.inventoryChartInstance = new Chart(ctx, {
+    // Group orders by date
+    const grouped = {};
+    orders.forEach(order => {
+        const date = (order.ngay || order.sale_order_date || '').split('T')[0];
+        if (date) {
+            grouped[date] = (grouped[date] || 0) + 1;
+        }
+    });
+
+    const labels = Object.keys(grouped).sort().slice(-14);
+    const data = labels.map(d => grouped[d] || 0);
+
+    window.ordersTimeChartInstance = new Chart(ctx, {
         type: 'line',
         data: {
-            labels: ['Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6', 'Tháng 7'],
+            labels: labels.map(d => new Date(d).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })),
             datasets: [{
-                label: 'Giá Trị Đơn Hàng',
-                data: [0, 0, 0, 0, 0, 0, 0],
+                label: 'Số đơn',
+                data: data,
                 borderColor: '#4dabf7',
                 backgroundColor: 'rgba(77, 171, 247, 0.1)',
                 tension: 0.4,
                 fill: true,
-                pointRadius: 6,
+                pointRadius: 4,
                 pointBackgroundColor: '#4dabf7'
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'bottom'
-                }
-            },
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true } }
+        }
+    });
+}
+
+function loadValueTimeChart(orders, period) {
+    const ctx = window.$('#valueTimeChart');
+    if (!ctx) return;
+
+    if (window.valueTimeChartInstance) {
+        window.valueTimeChartInstance.destroy();
+    }
+
+    // Group orders by date
+    const grouped = {};
+    orders.forEach(order => {
+        const date = (order.ngay || order.sale_order_date || '').split('T')[0];
+        const value = parseFloat(order.amount || order.sale_order_amount) || 0;
+        if (date) {
+            grouped[date] = (grouped[date] || 0) + value;
+        }
+    });
+
+    const labels = Object.keys(grouped).sort().slice(-14);
+    const data = labels.map(d => grouped[d] || 0);
+
+    window.valueTimeChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels.map(d => new Date(d).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })),
+            datasets: [{
+                label: 'Giá trị',
+                data: data,
+                backgroundColor: 'rgba(81, 207, 102, 0.7)',
+                borderColor: '#51cf66',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
             scales: {
                 y: {
                     beginAtZero: true,
-                    ticks: {
-                        callback: (value) => value / 1000000 + 'M'
-                    }
+                    ticks: { callback: (v) => (v / 1000000).toFixed(0) + 'M' }
                 }
             }
         }
     });
+}
+
+function loadTopProducts(orders) {
+    const container = window.$('#top-products-list');
+    if (!container) return;
+
+    // Count product occurrences
+    const productCounts = {};
+    orders.forEach(order => {
+        const products = order.products || order.cart || [];
+        products.forEach(p => {
+            const name = p.tenVatTu || p.name || p.productName || 'Sản phẩm';
+            productCounts[name] = (productCounts[name] || 0) + (parseInt(p.soLuong || p.qty) || 1);
+        });
+    });
+
+    const sorted = Object.entries(productCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+    if (sorted.length === 0) {
+        container.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding:40px;"><i class="bi bi-inbox" style="font-size:32px; opacity:0.5;"></i><p style="margin-top:8px;">Không có dữ liệu</p></div>';
+        return;
+    }
+
+    container.innerHTML = sorted.map(([name, count], i) => `
+        <div style="display:flex; align-items:center; padding:8px 0; border-bottom:1px solid var(--border);">
+            <span style="width:24px; height:24px; background:var(--primary); color:#fff; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:600;">${i + 1}</span>
+            <span style="flex:1; margin-left:12px; font-weight:500;">${name}</span>
+            <span style="color:var(--text-muted);">${count} đơn vị</span>
+        </div>
+    `).join('');
+}
+
+function loadTopCustomers(orders) {
+    const container = window.$('#top-customers-list');
+    if (!container) return;
+
+    // Count customer orders and value
+    const customerStats = {};
+    orders.forEach(order => {
+        const name = order.khach || order.account_name || 'Khách hàng';
+        if (!customerStats[name]) customerStats[name] = { count: 0, value: 0 };
+        customerStats[name].count++;
+        customerStats[name].value += parseFloat(order.amount || order.sale_order_amount) || 0;
+    });
+
+    const sorted = Object.entries(customerStats).sort((a, b) => b[1].value - a[1].value).slice(0, 5);
+
+    if (sorted.length === 0) {
+        container.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding:40px;"><i class="bi bi-inbox" style="font-size:32px; opacity:0.5;"></i><p style="margin-top:8px;">Không có dữ liệu</p></div>';
+        return;
+    }
+
+    container.innerHTML = sorted.map(([name, stats], i) => `
+        <div style="display:flex; align-items:center; padding:8px 0; border-bottom:1px solid var(--border);">
+            <span style="width:24px; height:24px; background:#51cf66; color:#fff; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:600;">${i + 1}</span>
+            <div style="flex:1; margin-left:12px;">
+                <div style="font-weight:500;">${name}</div>
+                <div style="font-size:12px; color:var(--text-muted);">${stats.count} đơn</div>
+            </div>
+            <span style="font-weight:600; color:var(--success);">${formatCurrency(stats.value)}</span>
+        </div>
+    `).join('');
+}
+
+function loadTopDrivers(completedOrders) {
+    const container = window.$('#top-drivers-list');
+    if (!container) return;
+
+    // Count driver deliveries
+    const driverStats = {};
+    completedOrders.forEach(order => {
+        const driver = order.taiXe || order.driver || order.custom_field13;
+        if (!driver) return;
+        if (!driverStats[driver]) driverStats[driver] = { count: 0, value: 0 };
+        driverStats[driver].count++;
+        driverStats[driver].value += parseFloat(order.amount || order.sale_order_amount) || 0;
+    });
+
+    const sorted = Object.entries(driverStats).sort((a, b) => b[1].count - a[1].count).slice(0, 5);
+
+    if (sorted.length === 0) {
+        container.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding:40px;"><i class="bi bi-inbox" style="font-size:32px; opacity:0.5;"></i><p style="margin-top:8px;">Không có dữ liệu</p></div>';
+        return;
+    }
+
+    container.innerHTML = sorted.map(([name, stats], i) => `
+        <div style="display:flex; align-items:center; padding:8px 0; border-bottom:1px solid var(--border);">
+            <span style="width:24px; height:24px; background:#845ef7; color:#fff; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:600;">${i + 1}</span>
+            <div style="flex:1; margin-left:12px;">
+                <div style="font-weight:500;">${name}</div>
+                <div style="font-size:12px; color:var(--text-muted);">${formatCurrency(stats.value)}</div>
+            </div>
+            <span style="font-weight:600;">${stats.count} đơn</span>
+        </div>
+    `).join('');
 }
 
 // === ORDERS / DISPATCH ===
