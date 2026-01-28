@@ -128,7 +128,7 @@ export const db = {
     getOrders: async () => {
         const { useSupabase, useFirebase } = getMode();
         if (useSupabase) {
-            const { data, error } = await supabase.from('orders').select('*').order('sale_order_date', { ascending: false }).limit(100);
+            const { data, error } = await supabase.from('orders').select('*').order('sale_order_date', { ascending: false });
             if (error) console.error('Supabase getOrders error:', error);
             // Map to frontend field names for compatibility
             return (data || []).map(o => {
