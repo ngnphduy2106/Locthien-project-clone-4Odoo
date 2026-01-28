@@ -2,22 +2,7 @@
 // LỘC THIÊN ERP - API CLIENT
 // ===============================================
 
-const getApiBase = () => {
-    // 1. Check URL parameters first (high priority for manual overrides)
-    const urlParams = new URLSearchParams(window.location.search);
-    const apiOverride = urlParams.get('apiUrl');
-    if (apiOverride) return apiOverride;
-
-    // 2. Check local storage (persistent setting)
-    const savedApi = localStorage.getItem('LT_API_URL');
-    if (savedApi) return savedApi;
-
-    // 3. Fallback to default
-    // If running on localhost or Netlify, use relative /api
-    return '/api';
-};
-
-const API_BASE = getApiBase();
+const API_BASE = '/api';
 
 const api = {
 
@@ -159,64 +144,7 @@ const api = {
     getDashboard: async () => {
         const res = await fetch(`${API_BASE}/reports/dashboard`);
         return res.json();
-    },
-
-    // Alias for getDashboard (used by new UI)
-    getDashboardStats: async () => {
-        const res = await fetch(`${API_BASE}/reports/dashboard`);
-        return res.json();
-    },
-
-    // === COMPLETE ORDER ===
-    completeOrder: async (id, data) => {
-        const res = await fetch(`${API_BASE}/orders/${id}/complete`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-        });
-        return res.json();
-    },
-
-    // === ORDER HISTORY ===
-    getOrderHistory: async () => {
-        const res = await fetch(`${API_BASE}/orders/history`);
-        return res.json();
-    },
-
-
-    // === IMPORTS ===
-    createImport: async (data) => {
-        const res = await fetch(`${API_BASE}/imports`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-        });
-        return res.json();
-    },
-
-    getImports: async () => {
-        const res = await fetch(`${API_BASE}/imports`);
-        return res.json();
-    },
-
-    assignImportDriver: async (id, driverName, plate) => {
-        const res = await fetch(`${API_BASE}/imports/${id}/assign`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ driver_name: driverName, plate })
-        });
-        return res.json();
-    },
-
-    completeImport: async (id, data) => {
-        const res = await fetch(`${API_BASE}/imports/${id}/complete`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-        });
-        return res.json();
     }
 };
 
 window.api = api;
-

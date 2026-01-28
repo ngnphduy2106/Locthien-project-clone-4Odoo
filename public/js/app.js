@@ -1,262 +1,109 @@
 // ===============================================
-// LỘC THIÊN ERP - MAIN APP
+// LỘC THIÊN ERP - MAIN APP V3
+// Rewritten for new UI Design
 // ===============================================
 
 // === STATE ===
-// === STATE ===
 let state = {
     user: null,
-    orders: { pending: [], assigned: [], history: [], imports: [], exports: [] },
+    orders: { pending: [], assigned: [], completed: [], imports: [] },
+    imports: { pending: [], assigned: [], completed: [] },
     drivers: [],
-    currentOrderSection: 'xuat', // 'xuat' = MISA orders, 'nhap' = import tickets
-    currentOrderTab: 'pending',
-    currentWarehouse: 'LT1',
-    deliveryCart: [],
-    currentDeliveryOrder: null,
-    currentReportTab: 'stock',
+    currentSection: 'dashboard',
+    currentDispatchTab: 'pending',
+    currentOrderType: 'export',
     orderProducts: [],
-    selectedImages: []
+    historyPage: 1,
+    historyPerPage: 10
 };
 
-// ... (skipping unchanged parts)
 
-// === ORDERS ===
-async function loadOrders() {
-    const container = $('#order-list');
-    container.innerHTML = '<div class="loading-spinner mx-auto mt-5"></div>';
+// === DOM HELPERS (use globals from core.js) ===
+// Note: $ and $$ are defined in core.js and exported to window
+// Use window.$ and window.$$ directly in this file
 
-    try {
-        // Load MISA orders (XUẤT)
-        const res = await api.getOrders();
-        state.orders.pending = res.pending || [];
-        state.orders.assigned = res.assigned || [];
-        state.orders.history = res.completed || [];
-        state.drivers = res.drivers || [];
-
-        // Load Import tickets (NHẬP)
-        await loadImportTickets();
-
-        // Update counts
-        updateOrderCounts();
-
-        renderOrderList();
-
-    } catch (e) {
-        container.innerHTML = `<div class="alert alert-danger">${e.message}</div>`;
-    }
-}
-
-async function loadImportTickets() {
-    try {
-        const res = await fetch('/api/imports');
-        const data = await res.json();
-        const imports = data.data || [];
-
-        // Categorize imports by status
-        state.orders.imports_pending = imports.filter(t => t.status === 'pending');
-        state.orders.imports_assigned = imports.filter(t => t.status === 'assigned' || t.status === 'in_transit');
-        state.orders.imports_completed = imports.filter(t => t.status === 'completed');
-        state.orders.imports = imports.filter(t => t.status !== 'completed' && t.status !== 'cancelled');
-    } catch (e) {
-        console.error('Load imports error:', e);
-    }
-}
-
-function updateOrderCounts() {
-    // XUẤT counts (MISA orders)
-    const totalXuat = state.orders.pending.length + state.orders.assigned.length;
-    if ($('#countXuat')) $('#countXuat').textContent = totalXuat;
-    if ($('#countPending')) $('#countPending').textContent = state.orders.pending.length;
-    if ($('#countAssigned')) $('#countAssigned').textContent = state.orders.assigned.length;
-    if ($('#countHistory')) $('#countHistory').textContent = state.orders.history.length;
-
-    // NHẬP counts (Import tickets)
-    const totalNhap = (state.orders.imports_pending?.length || 0) + (state.orders.imports_assigned?.length || 0);
-    if ($('#countNhap')) $('#countNhap').textContent = totalNhap;
-}
-
-function switchOrderSection(section) {
-    state.currentOrderSection = section;
-
-    // Update section buttons
-    const btnXuat = $('#section-xuat');
-    const btnNhap = $('#section-nhap');
-
-    if (section === 'xuat') {
-        btnXuat.className = 'btn flex-fill btn-primary position-relative';
-        btnNhap.className = 'btn flex-fill btn-outline-success position-relative';
-        state.currentOrderTab = 'pending';
-        renderXuatTabs();
-    } else {
-        btnXuat.className = 'btn flex-fill btn-outline-primary position-relative';
-        btnNhap.className = 'btn flex-fill btn-success position-relative';
-        state.currentOrderTab = 'imports_pending';
-        renderNhapTabs();
-    }
-
-    renderOrderList();
-}
-
-function renderXuatTabs() {
-    const container = $('#order-tabs-container');
-    container.innerHTML = `
-        <button class="btn btn-sm flex-fill btn-warning" id="tab-pending" onclick="switchOrderTab('pending')">
-            Chờ gán <span class="badge bg-dark" id="countPending">${state.orders.pending.length}</span>
-        </button>
-        <button class="btn btn-sm flex-fill btn-outline-primary" id="tab-assigned" onclick="switchOrderTab('assigned')">
-            Đang giao <span class="badge bg-primary" id="countAssigned">${state.orders.assigned.length}</span>
-        </button>
-        <button class="btn btn-sm flex-fill btn-outline-secondary" id="tab-history" onclick="switchOrderTab('history')">
-            Hoàn thành <span class="badge bg-secondary" id="countHistory">${state.orders.history.length}</span>
-        </button>
-    `;
-}
-
-function renderNhapTabs() {
-    const container = $('#order-tabs-container');
-    container.innerHTML = `
-        <button class="btn btn-sm flex-fill btn-warning" id="tab-imports_pending" onclick="switchOrderTab('imports_pending')">
-            Chờ gán <span class="badge bg-dark" id="countImportsPending">${state.orders.imports_pending?.length || 0}</span>
-        </button>
-        <button class="btn btn-sm flex-fill btn-outline-primary" id="tab-imports_assigned" onclick="switchOrderTab('imports_assigned')">
-            Đang nhận <span class="badge bg-primary" id="countImportsAssigned">${state.orders.imports_assigned?.length || 0}</span>
-        </button>
-        <button class="btn btn-sm flex-fill btn-outline-secondary" id="tab-imports_completed" onclick="switchOrderTab('imports_completed')">
-            Hoàn thành <span class="badge bg-secondary" id="countImportsCompleted">${state.orders.imports_completed?.length || 0}</span>
-        </button>
-    `;
-}
-
-
-// === DOM HELPERS ===
-const $ = (sel) => document.querySelector(sel);
-const $$ = (sel) => document.querySelectorAll(sel);
-
-const show = (id) => {
-    const el = typeof id === 'string' ? $(`#${id}`) : id;
+function show(id) {
+    const el = typeof id === 'string' ? (id.startsWith('#') ? window.$(id) : window.$(`#${id}`)) : id;
     if (el) el.classList.remove('hidden');
-};
+}
 
-const hide = (id) => {
-    const el = typeof id === 'string' ? $(`#${id}`) : id;
+function hide(id) {
+    const el = typeof id === 'string' ? (id.startsWith('#') ? window.$(id) : window.$(`#${id}`)) : id;
     if (el) el.classList.add('hidden');
-};
+}
 
-const showLoading = (text = 'Đang xử lý...') => {
-    $('#load-txt').textContent = text;
+function showLoading(text = 'Đang xử lý...') {
+    const loadTxt = window.$('#load-txt');
+    if (loadTxt) loadTxt.textContent = text;
     show('loading');
-};
-
-const hideLoading = () => hide('loading');
-
-// === VIEW MANAGEMENT ===
-const views = ['view-login', 'view-home', 'view-orders', 'view-create-order', 'view-hr', 'view-materials', 'view-warehouse', 'view-reports', 'view-driver-orders', 'view-imports'];
-
-function showView(viewId) {
-    views.forEach(v => hide(v));
-    show(viewId);
-
-    // Load data for specific views
-    if (viewId === 'view-orders') loadOrders();
-    if (viewId === 'view-hr') loadEmployees();
-    if (viewId === 'view-materials') loadMaterials();
-    if (viewId === 'view-warehouse') loadWarehouse();
-    if (viewId === 'view-reports') loadReports();
-    if (viewId === 'view-create-order') initCreateOrder();
-    if (viewId === 'view-imports') loadImports();
-    if (viewId === 'view-driver-orders') loadMyOrders();
 }
 
-// === INITIALIZATION ===
-document.addEventListener('DOMContentLoaded', () => {
-    const session = localStorage.getItem('LT_SESSION');
-    if (session) {
-        try {
-            state = { ...state, ...JSON.parse(session) };
-            // FIX: Ensure structure exists if restoring from old session
-            if (!state.orders) state.orders = { pending: [], assigned: [], history: [] };
-            if (!state.orders.history) state.orders.history = [];
+function hideLoading() {
+    hide('loading');
+}
 
-            if (state.user) {
-                initApp();
-                return;
-            }
-        } catch (e) { }
-    }
-    showView('view-login');
-});
-
-// === NAVIGATION ===
+// === SECTION NAVIGATION ===
 function showSection(sectionId) {
-    // Hide all sections first
-    const sections = ['dashboard', 'orders', 'imports', 'my-orders', 'warehouse', 'materials', 'hr', 'reports'];
-    sections.forEach(s => {
-        const el = $(`#section-${s}`);
-        if (el) el.classList.add('hidden');
-        // also hide original views if they exist at root level
-        hide(`view-${s}`);
-    });
+    // Hide all sections
+    window.$$('[id^="section-"]').forEach(el => el.classList.add('hidden'));
 
-    hide('dynamic-content');
+    // Show target section
+    const target = window.$(`#section-${sectionId}`);
+    if (target) target.classList.remove('hidden');
 
-    // Update active nav state
-    $$('.nav button').forEach(btn => btn.classList.remove('active', 'text-primary', 'fw-bold'));
-    const activeBtn = $(`.nav button[onclick="showSection('${sectionId}')"]`);
-    if (activeBtn) activeBtn.classList.add('active', 'text-primary', 'fw-bold');
+    // Update nav active state
+    window.$$('.sidebar-nav .nav-link').forEach(btn => btn.classList.remove('active'));
+    const activeBtn = window.$(`.nav-link[onclick="showSection('${sectionId}')"]`);
+    if (activeBtn) activeBtn.classList.add('active');
 
-    // Show selected section
-    if (sectionId === 'dashboard') {
-        const el = $('#section-dashboard');
-        if (el) el.classList.remove('hidden');
-        show('view-dashboard'); // FIX: Ensure the parent container is visible!
-        loadDashboard();
-    } else {
-        // For other sections, we might reuse existing views but inject them into the main content
-        const el = $('#section-dashboard');
-        if (el) el.classList.add('hidden');
+    // Update header title
+    const titles = {
+        'dashboard': 'Tổng quan',
+        'dispatch': 'Quản lý đơn hàng',
+        'create-order': 'Quản lý đơn hàng',
+        'my-orders': 'Quản lý đơn hàng',
+        'order-history': 'Lịch sử đơn hàng',
+        'hr': 'Nhân sự',
+        'materials': 'Vật tư',
+        'warehouse': 'Kho hàng'
+    };
+    const headerTitle = window.$('#header-title');
+    if (headerTitle) headerTitle.textContent = titles[sectionId] || 'Tổng quan';
 
-        // Show the corresponding view (legacy compatibility)
-        let viewId = `view-${sectionId}`;
-        if (sectionId === 'my-orders') viewId = 'view-driver-orders';
-        showView(viewId);
+    state.currentSection = sectionId;
+
+    // Load section data
+    switch (sectionId) {
+        case 'dashboard':
+            loadDashboard();
+            break;
+        case 'dispatch':
+            loadOrders();
+            break;
+        case 'create-order':
+            initCreateOrder();
+            break;
+        case 'my-orders':
+            loadMyOrders();
+            break;
+        case 'order-history':
+            loadOrderHistory();
+            break;
     }
 }
 
-// === POLLING ===
-let pollingInterval = null;
-
-function startPolling() {
-    if (pollingInterval) clearInterval(pollingInterval);
-    pollingInterval = setInterval(() => {
-        // Only pool if user is active and window is visible
-        if (document.hidden) return;
-
-        console.log('🔄 Auto-refreshing data...');
-        if (state.user) {
-            // Refresh Dashboard if active
-            if (!$('#section-dashboard').classList.contains('hidden')) {
-                loadDashboard();
-            }
-            // Refresh Order List if active
-            if (!$('#view-orders').classList.contains('hidden')) {
-                loadOrders();
-            }
-            // Refresh Driver My Orders if active
-            if (!$('#view-driver-orders').classList.contains('hidden')) {
-                loadMyOrders();
-            }
-        }
-    }, 15000); // 15 seconds
-}
-
-function stopPolling() {
-    if (pollingInterval) clearInterval(pollingInterval);
+function toggleSubmenu(btn) {
+    btn.classList.toggle('expanded');
+    const submenu = btn.nextElementSibling;
+    if (submenu) {
+        submenu.style.display = submenu.style.display === 'none' ? 'block' : 'none';
+    }
 }
 
 // === AUTH ===
 async function handleLogin() {
-    const username = $('#inp-user').value.trim();
-    const password = $('#inp-pass').value.trim();
+    const username = window.$('#inp-user').value.trim();
+    const password = window.$('#inp-pass').value.trim();
 
     if (!username || !password) {
         alert('Vui lòng nhập đủ thông tin!');
@@ -267,526 +114,1658 @@ async function handleLogin() {
 
     try {
         const res = await api.login(username, password);
-        console.log('📦 Phản hồi Login raw:', res);
         hideLoading();
 
         if (!res || res.error || res.errorMessage) {
-            const errorMsg = res?.errorMessage || res?.msg || 'Lỗi kết nối máy chủ (Không có phản hồi)';
-            console.error('❌ Lỗi hệ thống:', res);
-            alert('Lỗi: ' + errorMsg);
+            alert('Lỗi: ' + (res?.errorMessage || res?.msg || 'Không thể đăng nhập'));
             return;
         }
 
-        if (!res.user) {
-            console.error('❌ Lỗi: Payload không có object user', res);
-            alert('Lỗi: Không tìm thấy thông tin người dùng trong phản hồi từ máy chủ.');
-            return;
-        }
+        state.user = res.data || res;
+        localStorage.setItem('LT_SESSION', JSON.stringify(state));
 
-        state.user = res.user;
-        state.staff = res.staffList || [];
-        state.trucks = res.truckList || [];
-        state.customers = res.customerList || [];
-        state.suppliers = res.supplierList || [];
+        initApp();
+    } catch (e) {
+        hideLoading();
+        console.error('Login error:', e);
+        alert('Lỗi kết nối máy chủ');
+    }
+}
+
+function doLogout() {
+    localStorage.removeItem('LT_SESSION');
+    state.user = null;
+    hide('view-app');
+    show('view-login');
+}
+
+function initApp() {
+    hide('view-login');
+    show('view-app');
+
+    // Set user info
+    if (state.user) {
+        const initial = (state.user.name || state.user.phone || 'A').charAt(0).toUpperCase();
+        const userInitial = window.$('#user-initial');
+        if (userInitial) userInitial.textContent = initial;
+    }
+
+    // Show dashboard
+    showSection('dashboard');
+}
+
+// === SYNC MISA ===
+async function forceSyncMisa() {
+    const btn = window.$('#btn-force-sync');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="bi bi-arrow-repeat spinning"></i> Đang đồng bộ...';
+    }
+
+    showLoading('Đang đồng bộ với MISA CRM...');
+
+    try {
+        const res = await fetch('/api/sync', { method: 'POST' });
+        const json = await res.json();
+
+        hideLoading();
+
+        if (json.success) {
+            // Delay to allow server to process
+            setTimeout(async () => {
+                await loadDashboard();
+                await loadOrders();
+                alert('✅ Đã đồng bộ thành công! Dữ liệu đã cập nhật.');
+            }, 2000);
+        } else {
+            alert('❌ Lỗi đồng bộ: ' + (json.error || json.message || 'Không xác định'));
+        }
+    } catch (e) {
+        hideLoading();
+        alert('❌ Lỗi kết nối: ' + e.message);
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-arrow-repeat"></i> Đồng bộ MISA';
+        }
+    }
+}
+
+// === DASHBOARD ===
+async function loadDashboard() {
+    try {
+        const res = await api.getDashboardStats();
+        const data = res?.data || res || {};
+
+        // Update stat cards with defensive null checks
+        const statProducts = window.$('#stat-total-products');
+        const statValue = window.$('#stat-total-value');
+        const statLowStock = window.$('#stat-low-stock');
+        const statExpired = window.$('#stat-expired');
+
+        if (statProducts) statProducts.textContent = data.totalProducts || 0;
+        if (statValue) statValue.textContent = formatCurrency(data.totalValue || 0);
+        if (statLowStock) statLowStock.textContent = data.lowStock || 0;
+        if (statExpired) statExpired.textContent = data.expired || 0;
+
+        // Load chart
+        loadInventoryChart();
+    } catch (e) {
+        console.error('Dashboard error:', e);
+    }
+}
+
+function loadInventoryChart() {
+    const ctx = window.$('#inventoryChart');
+    if (!ctx) return;
+
+    // Destroy existing chart if any
+    if (window.inventoryChartInstance) {
+        window.inventoryChartInstance.destroy();
+    }
+
+    window.inventoryChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: ['Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6', 'Tháng 7'],
+            datasets: [{
+                label: 'Giá Trị Đơn Hàng',
+                data: [0, 0, 0, 0, 0, 0, 0],
+                borderColor: '#4dabf7',
+                backgroundColor: 'rgba(77, 171, 247, 0.1)',
+                tension: 0.4,
+                fill: true,
+                pointRadius: 6,
+                pointBackgroundColor: '#4dabf7'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: (value) => value / 1000000 + 'M'
+                    }
+                }
+            }
+        }
+    });
+}
+
+// === ORDERS / DISPATCH ===
+async function loadOrders() {
+    const container = window.$('#dispatch-order-list');
+    if (!container) return;
+
+    container.innerHTML = '<div class="loading-spinner" style="margin: 40px auto;"></div>';
+
+    try {
+        const res = await api.getOrders();
+        state.orders.pending = res.pending || [];
+        state.orders.assigned = res.assigned || [];
+        state.orders.completed = res.completed || [];
         state.drivers = res.drivers || [];
 
-        localStorage.setItem('LT_SESSION', JSON.stringify(state));
-        initApp();
+        renderDispatchOrders();
+    } catch (e) {
+        container.innerHTML = '<p style="text-align:center; color:var(--danger);">Lỗi tải đơn hàng</p>';
+    }
+}
 
+function switchDispatchTab(tab) {
+    state.currentDispatchTab = tab;
+
+    // Update tab buttons
+    window.$$('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    window.$(`#tab-${tab}`)?.classList.add('active');
+
+    // Render appropriate list based on order type
+    if (state.currentOrderType === 'import') {
+        renderImportList();
+    } else {
+        renderDispatchOrders();
+    }
+}
+
+// === ORDER TYPE (Export/Import) ===
+function switchOrderType(type) {
+    state.currentOrderType = type;
+
+    // Update type buttons
+    const exportBtn = window.$('#type-export');
+    const importBtn = window.$('#type-import');
+
+    if (type === 'import') {
+        exportBtn?.classList.remove('btn-primary');
+        exportBtn?.classList.add('btn-outline');
+        importBtn?.classList.add('btn-primary');
+        importBtn?.classList.remove('btn-outline');
+        loadImportTickets();
+    } else {
+        importBtn?.classList.remove('btn-primary');
+        importBtn?.classList.add('btn-outline');
+        exportBtn?.classList.add('btn-primary');
+        exportBtn?.classList.remove('btn-outline');
+        // Fix: call correct function name
+        loadOrders();
+    }
+}
+
+
+async function loadImportTickets() {
+    const container = window.$('#dispatch-order-list');
+    if (!container) return;
+
+    container.innerHTML = '<div style="text-align:center; padding:40px;"><i class="bi bi-arrow-repeat spin"></i> Đang tải phiếu nhập...</div>';
+
+    try {
+        const res = await api.getImports();
+        const imports = res?.data || [];
+
+        // Group by status
+        state.imports = {
+            pending: imports.filter(i => i.status === 'pending' || i.status === 'Chưa thực hiện'),
+            assigned: imports.filter(i => i.status === 'assigned' || i.status === 'in_transit'),
+            completed: imports.filter(i => i.status === 'completed')
+        };
+
+        renderImportList();
+    } catch (e) {
+        container.innerHTML = '<p style="text-align:center; color:var(--danger);">Lỗi tải phiếu nhập</p>';
+    }
+}
+
+function renderImportList() {
+    const container = window.$('#dispatch-order-list');
+    if (!container) return;
+
+    let imports = state.imports?.[state.currentDispatchTab] || [];
+
+    // Apply date filter
+    if (currentDateFilter) {
+        imports = imports.filter(imp => {
+            const impDate = imp.expected_date || imp.created_at || '';
+            return impDate.startsWith(currentDateFilter);
+        });
+    }
+
+    // Apply search filter
+    if (currentSearchKeyword) {
+        imports = imports.filter(imp => {
+            const searchFields = [
+                imp.ticket_no,
+                imp.supplier_name,
+                imp.supplier_address,
+                imp.driver_name,
+                imp.plate
+            ].filter(Boolean).join(' ').toLowerCase();
+            return searchFields.includes(currentSearchKeyword);
+        });
+    }
+
+    if (imports.length === 0) {
+        container.innerHTML = `
+            <div style="text-align:center; padding:60px; color:var(--text-muted);">
+                <i class="bi bi-inbox" style="font-size:48px; opacity:0.5;"></i>
+                <p style="margin-top:16px;">${currentSearchKeyword || currentDateFilter ? 'Không tìm thấy phiếu nhập phù hợp' : 'Không có phiếu nhập nào'}</p>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = imports.map(imp => `
+        <div class="order-card">
+            <div class="order-card-header">
+                <div>
+                    <div class="order-id">#${imp.ticket_no || imp.id}</div>
+                    <div class="order-customer">${imp.supplier_name || 'NCC'}</div>
+                </div>
+                <span class="badge badge-${getStatusBadge(imp.status)}">${getStatusText(imp.status)}</span>
+            </div>
+            <div class="order-meta">
+                <div class="order-meta-item">
+                    <i class="bi bi-calendar3"></i>
+                    ${formatDate(imp.expected_date || imp.created_at)}
+                </div>
+                <div class="order-meta-item">
+                    <i class="bi bi-geo-alt"></i>
+                    ${imp.supplier_address || 'Chưa có địa chỉ'}
+                </div>
+                ${imp.driver_name ? `
+                <div class="order-meta-item">
+                    <i class="bi bi-truck"></i>
+                    ${imp.driver_name}${imp.plate ? ' - ' + imp.plate : ''}
+                </div>
+                ` : ''}
+            </div>
+            <div class="order-card-footer">
+                <button class="btn btn-outline btn-sm" onclick="viewImportDetail('${imp.id}')">
+                    <i class="bi bi-eye"></i> Chi tiết
+                </button>
+                ${state.currentDispatchTab === 'pending' ? `
+                    <button class="btn btn-info btn-sm" onclick="assignImportDriver('${imp.id}')">
+                        <i class="bi bi-person-plus"></i> Gán tài xế
+                    </button>
+                ` : ''}
+                ${state.currentDispatchTab === 'assigned' && state.user?.role === 'ADMIN' ? `
+                    <button class="btn btn-success btn-sm" onclick="adminCompleteImport('${imp.id}')">
+                        <i class="bi bi-check-circle"></i> Hoàn thành
+                    </button>
+                ` : ''}
+            </div>
+        </div>
+    `).join('');
+}
+
+// Store filters for dispatch
+let currentSearchKeyword = '';
+let currentDateFilter = '';
+
+function searchOrders(keyword) {
+    currentSearchKeyword = (keyword || '').toLowerCase().trim();
+    renderDispatchOrders();
+}
+
+function filterByDate(date) {
+    currentDateFilter = date || '';
+    renderDispatchOrders();
+}
+
+function clearDateFilter() {
+    currentDateFilter = '';
+    const dateInput = window.$('#order-date-filter');
+    if (dateInput) dateInput.value = '';
+    renderDispatchOrders();
+}
+
+function renderDispatchOrders() {
+    const container = window.$('#dispatch-order-list');
+    if (!container) return;
+
+    let orders = state.orders[state.currentDispatchTab] || [];
+
+    // Apply date filter if set
+    if (currentDateFilter) {
+        orders = orders.filter(order => {
+            const orderDate = order.ngay || order.sale_order_date || '';
+            // Compare date strings (YYYY-MM-DD format)
+            return orderDate.startsWith(currentDateFilter);
+        });
+    }
+
+    // Apply search filter if keyword exists
+    if (currentSearchKeyword) {
+        orders = orders.filter(order => {
+            const searchFields = [
+                order.soDon,
+                order.sale_order_no,
+                order.id,
+
+                order.khach,
+                order.account_name,
+                order.diaChi,
+                order.shipping_address,
+                order.taiXe,
+                order.driver,
+                order.bienSo,
+                order.plate
+            ].filter(Boolean).join(' ').toLowerCase();
+
+            return searchFields.includes(currentSearchKeyword);
+        });
+    }
+
+    if (orders.length === 0) {
+        container.innerHTML = `
+            <div style="text-align:center; padding:60px; color:var(--text-muted);">
+                <i class="bi bi-inbox" style="font-size:48px; opacity:0.5;"></i>
+                <p style="margin-top:16px;">${currentSearchKeyword ? 'Không tìm thấy đơn hàng phù hợp' : 'Không có đơn hàng nào'}</p>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = orders.map(order => `
+        <div class="order-card">
+            <div class="order-card-header">
+                <div>
+                    <div class="order-id">#${order.soDon || order.sale_order_no || order.id}</div>
+                    <div class="order-customer">${order.khach || order.account_name || 'Khách hàng'}</div>
+                </div>
+                <span class="badge badge-${getStatusBadge(order.status)}">${getStatusText(order.status)}</span>
+            </div>
+            <div class="order-meta">
+                <div class="order-meta-item">
+                    <i class="bi bi-calendar3"></i>
+                    ${formatDate(order.ngay || order.sale_order_date)}
+                </div>
+                <div class="order-meta-item">
+                    <i class="bi bi-geo-alt"></i>
+                    ${order.diaChi || order.shipping_address || 'Chưa có địa chỉ'}
+                </div>
+                ${order.taiXe ? `
+                <div class="order-meta-item">
+                    <i class="bi bi-truck"></i>
+                    ${order.taiXe}${order.bienSo ? ' - ' + order.bienSo : ''}
+                </div>
+                ` : ''}
+            </div>
+            <div class="order-total">${formatCurrency(order.amount || order.sale_order_amount || 0)}</div>
+            <div class="order-card-footer">
+                <button class="btn btn-outline btn-sm" onclick="viewOrderDetail('${order.id}')">
+                    <i class="bi bi-eye"></i> Chi tiết
+                </button>
+                ${state.currentDispatchTab === 'pending' ? `
+                    <button class="btn btn-info btn-sm" onclick="assignDriver('${order.id}')">
+                        <i class="bi bi-person-plus"></i> Gán tài xế
+                    </button>
+                ` : ''}
+                ${state.currentDispatchTab === 'assigned' && state.user?.role === 'ADMIN' ? `
+                    <button class="btn btn-success btn-sm" onclick="adminCompleteOrder('${order.id}')">
+                        <i class="bi bi-check-circle"></i> Hoàn thành
+                    </button>
+                ` : ''}
+            </div>
+        </div>
+    `).join('');
+}
+
+
+// === CREATE ORDER ===
+
+function initCreateOrder() {
+    // Set default date
+    const dateInput = window.$('#order-date');
+    if (dateInput) {
+        dateInput.value = new Date().toISOString().split('T')[0];
+    }
+
+    state.orderProducts = [];
+    renderOrderProducts();
+}
+
+function addOrderProduct() {
+    const name = window.$('#prod-name').value.trim();
+    const qty = parseInt(window.$('#prod-qty').value) || 0;
+
+    if (!name || qty <= 0) {
+        alert('Vui lòng nhập tên và số lượng sản phẩm');
+        return;
+    }
+
+    state.orderProducts.push({ name, qty });
+
+    // Clear inputs
+    window.$('#prod-name').value = '';
+    window.$('#prod-qty').value = '';
+
+    renderOrderProducts();
+}
+
+function renderOrderProducts() {
+    const container = window.$('#order-products-list');
+    if (!container) return;
+
+    if (state.orderProducts.length === 0) {
+        container.innerHTML = `
+            <div class="product-list-empty">
+                <i class="bi bi-inbox"></i>
+                <h4>Chưa có sản phẩm nào</h4>
+                <p>Nhập thông tin sản phẩm bên dưới để thêm vào đơn hàng</p>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = state.orderProducts.map((p, i) => `
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:12px; background:var(--body-bg); border-radius:8px; margin-bottom:8px;">
+            <div>
+                <strong>${p.name}</strong>
+                <span style="color:var(--text-muted); margin-left:8px;">x${p.qty}</span>
+            </div>
+            <button class="btn btn-sm" style="color:var(--danger);" onclick="removeOrderProduct(${i})">
+                <i class="bi bi-trash"></i>
+            </button>
+        </div>
+    `).join('');
+}
+
+function removeOrderProduct(index) {
+    state.orderProducts.splice(index, 1);
+    renderOrderProducts();
+}
+
+async function submitOrder() {
+    const date = window.$('#order-date').value;
+    const customer = window.$('#order-customer').value.trim();
+    const address = window.$('#order-address').value.trim();
+
+    if (!customer || state.orderProducts.length === 0) {
+        alert('Vui lòng nhập đầy đủ thông tin và thêm ít nhất 1 sản phẩm');
+        return;
+    }
+
+    showLoading('Đang tạo đơn...');
+
+    try {
+        const res = await api.createImport({
+            date,
+            supplier: customer,
+            address,
+            products: state.orderProducts
+        });
+
+        hideLoading();
+
+        if (res.success || res.data) {
+            alert('Tạo đơn nhập thành công!');
+            state.orderProducts = [];
+            initCreateOrder();
+        } else {
+            alert('Lỗi: ' + (res.message || 'Không thể tạo đơn'));
+        }
+    } catch (e) {
+        hideLoading();
+        alert('Lỗi kết nối');
+    }
+}
+
+// === MY ORDERS ===
+async function loadMyOrders() {
+    try {
+        const driverName = state.user?.name || state.user?.phone || '';
+        const role = state.user?.role || 'driver';
+        const res = await api.getMyOrders(driverName, role);
+        const orders = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
+
+        const delivering = orders.filter(o => o.status === 'assigned' || o.status === 'in_transit');
+        const completed = orders.filter(o => o.status === 'completed');
+
+        // Update stats with null checks
+        const deliveringStat = window.$('#my-orders-delivering');
+        const completedStat = window.$('#my-orders-completed');
+        if (deliveringStat) deliveringStat.textContent = delivering.length;
+        if (completedStat) completedStat.textContent = completed.length;
+
+        // Render lists
+        renderMyOrdersList('my-orders-delivering-list', delivering, 'delivering');
+        renderMyOrdersList('my-orders-completed-list', completed, 'completed');
+    } catch (e) {
+        console.error('Load my orders error:', e);
+    }
+}
+
+function renderMyOrdersList(containerId, orders, type) {
+    const container = window.$(`#${containerId}`);
+    if (!container) return;
+
+    if (orders.length === 0) {
+        container.innerHTML = `<p style="color:var(--text-muted); text-align:center; padding:20px;">Không có đơn hàng</p>`;
+        return;
+    }
+
+    container.innerHTML = orders.map(order => `
+        <div class="order-card">
+            <div class="order-card-header">
+                <div>
+                    <div class="order-id">#${order.orderCode || order.id}</div>
+                    <div class="order-customer">${order.customerName || 'Khách hàng'}</div>
+                </div>
+                <span class="badge badge-${type === 'completed' ? 'completed' : 'processing'}">${type === 'completed' ? 'Hoàn thành' : 'Đang giao'}</span>
+            </div>
+            <div class="order-meta">
+                <div class="order-meta-item">
+                    <i class="bi bi-geo-alt"></i>
+                    ${order.address || 'Chưa có địa chỉ'}
+                </div>
+                <div class="order-meta-item">
+                    <i class="bi bi-calendar3"></i>
+                    ${formatDate(order.orderDate || order.createdAt)}
+                </div>
+            </div>
+            <div class="order-total">${formatCurrency(order.totalAmount || 0)}</div>
+            ${type === 'delivering' ? `
+                <div class="order-card-footer">
+                    <button class="btn btn-success btn-sm" onclick="completeOrder('${order.id}')">
+                        <i class="bi bi-check"></i> Hoàn thành
+                    </button>
+                </div>
+            ` : ''}
+        </div>
+    `).join('');
+}
+
+// === ORDER HISTORY ===
+async function loadOrderHistory() {
+    const tbody = window.$('#history-table-body');
+    if (!tbody) return;
+
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:40px;">Đang tải...</td></tr>';
+
+    try {
+        const res = await api.getOrderHistory();
+        const orders = res.data || res || [];
+
+        if (orders.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:40px; color:var(--text-muted);">Chưa có đơn hàng nào</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = orders.map(order => `
+            <tr>
+                <td><strong>${order.orderCode || order.id}</strong></td>
+                <td>${order.customerName || '-'}</td>
+                <td>${formatDate(order.orderDate || order.createdAt)}</td>
+                <td>${formatCurrency(order.totalAmount || 0)}</td>
+                <td><span class="badge badge-${getStatusBadge(order.status)}">${getStatusText(order.status)}</span></td>
+                <td>${order.driverName || '-'}</td>
+                <td>${order.completedAt ? formatDate(order.completedAt) : '-'}</td>
+            </tr>
+        `).join('');
+
+        // Update pagination
+        const totalPages = Math.ceil(orders.length / state.historyPerPage) || 1;
+        window.$('#pagination-info').textContent = `Trang ${state.historyPage} / ${totalPages}`;
+    } catch (e) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:var(--danger);">Lỗi tải dữ liệu</td></tr>';
+    }
+}
+
+function goToPage(direction) {
+    if (direction === 'prev' && state.historyPage > 1) {
+        state.historyPage--;
+    } else if (direction === 'next') {
+        state.historyPage++;
+    }
+    loadOrderHistory();
+}
+
+// === HELPERS ===
+function formatCurrency(amount) {
+    return new Intl.NumberFormat('vi-VN').format(amount) + ' VNĐ';
+}
+
+function formatDate(dateStr) {
+    if (!dateStr) return '-';
+    const d = new Date(dateStr);
+    return `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
+}
+
+function getStatusBadge(status) {
+    const map = {
+        'pending': 'pending',
+        'assigned': 'processing',
+        'in_transit': 'processing',
+        'completed': 'completed',
+        'cancelled': 'cancelled'
+    };
+    return map[status] || 'pending';
+}
+
+function getStatusText(status) {
+    const map = {
+        'pending': 'Chờ xử lý',
+        'assigned': 'Đang giao',
+        'in_transit': 'Đang giao',
+        'completed': 'Hoàn thành',
+        'cancelled': 'Đã hủy'
+    };
+    return map[status] || status;
+}
+
+function viewOrderDetail(orderId) {
+    console.log('viewOrderDetail called with:', orderId);
+    console.log('state.orders:', state.orders);
+
+    // Find order from state - try multiple matching approaches
+    const allOrders = [...(state.orders.pending || []), ...(state.orders.assigned || []), ...(state.orders.completed || [])];
+    console.log('allOrders count:', allOrders.length);
+
+    // More robust matching: try id, soDon, sale_order_no
+    const order = allOrders.find(o => {
+        const oIdStr = String(o.id);
+        const searchIdStr = String(orderId);
+        return oIdStr === searchIdStr ||
+            o.id === orderId ||
+            o.id === parseInt(orderId) ||
+            o.soDon === orderId ||
+            o.sale_order_no === orderId;
+    });
+
+    console.log('Found order:', order);
+
+    if (!order) {
+        console.error('Order not found! Available IDs:', allOrders.map(o => o.id));
+        alert('Không tìm thấy đơn hàng! ID: ' + orderId);
+        return;
+    }
+
+    // Build products list HTML - handle both formats
+    const products = order.products || order.cart || [];
+    const productsHtml = products.length > 0
+        ? products.map(p => `
+            <tr>
+                <td>${p.name || p.productName || '-'}</td>
+                <td>${p.qty || p.quantity || 0}</td>
+                <td>${p.unit || '-'}</td>
+                <td>${formatCurrency(p.price || p.amount || 0)}</td>
+            </tr>
+        `).join('')
+        : '<tr><td colspan="4" style="text-align:center; color:var(--text-muted);">Không có sản phẩm</td></tr>';
+
+    // Show modal - use correct IDs matching index.html
+    const modal = window.$('#modal-order-detail');
+    const modalBody = window.$('#modal-order-body');
+    const modalTitle = window.$('#modal-order-title');
+
+    if (modalTitle) modalTitle.textContent = `Chi tiết đơn hàng #${order.soDon || order.sale_order_no || order.id}`;
+
+    if (modalBody) {
+        modalBody.innerHTML = `
+            <div class="order-detail-grid">
+                <div class="detail-row">
+                    <label>Mã đơn hàng:</label>
+                    <span><strong>#${order.soDon || order.sale_order_no || order.id}</strong></span>
+                </div>
+                <div class="detail-row">
+                    <label>Khách hàng:</label>
+                    <span>${order.khach || order.account_name || 'Chưa có'}</span>
+                </div>
+                <div class="detail-row">
+                    <label>Ngày đặt:</label>
+                    <span>${formatDate(order.ngay || order.sale_order_date)}</span>
+                </div>
+                <div class="detail-row">
+                    <label>Địa chỉ:</label>
+                    <span>${order.diaChi || order.shipping_address || 'Chưa có địa chỉ'}</span>
+                </div>
+                <div class="detail-row">
+                    <label>Trạng thái:</label>
+                    <span class="badge badge-${getStatusBadge(order.status)}">${getStatusText(order.status)}</span>
+                </div>
+                <div class="detail-row">
+                    <label>Tài xế:</label>
+                    <span>${order.taiXe || order.driver || 'Chưa phân công'}</span>
+                </div>
+                <div class="detail-row">
+                    <label>Biển số xe:</label>
+                    <span>${order.bienSo || order.plate || 'Chưa có'}</span>
+                </div>
+                <div class="detail-row">
+                    <label>Tổng tiền:</label>
+                    <span style="color:var(--primary); font-weight:600;">${formatCurrency(order.amount || order.sale_order_amount || 0)}</span>
+                </div>
+            </div>
+            
+            <h4 style="margin: 24px 0 12px; font-size:14px; color:var(--text-secondary);">Danh sách sản phẩm</h4>
+            <table class="data-table" style="width:100%;">
+                <thead>
+                    <tr>
+                        <th>Sản phẩm</th>
+                        <th>SL</th>
+                        <th>Đơn vị</th>
+                        <th>Giá</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${productsHtml}
+                </tbody>
+            </table>
+            
+            ${order.note ? `<div style="margin-top:16px; padding:12px; background:var(--body-bg); border-radius:8px;"><strong>Ghi chú:</strong> ${order.note}</div>` : ''}
+            
+            <!-- CHAT SECTION -->
+            <div style="margin-top:24px; border-top:1px solid var(--border); padding-top:16px;">
+                <h4 style="margin: 0 0 12px; font-size:14px; color:var(--text-secondary); display:flex; justify-content:space-between; align-items:center;">
+                    <span><i class="bi bi-chat-dots" style="margin-right:6px;"></i> Tin nhắn</span>
+                    <button class="btn btn-outline btn-sm" onclick="loadOrderChat('${order.soDon || order.sale_order_no || order.id}')" style="font-size:12px;">
+                        <i class="bi bi-arrow-clockwise"></i> Refresh
+                    </button>
+                </h4>
+                <div id="chatMessages" style="max-height:200px; overflow-y:auto; border:1px solid var(--border); border-radius:8px; padding:12px; background:var(--body-bg); margin-bottom:12px;">
+                    <div style="text-align:center; color:var(--text-muted); padding:20px;"><i class="bi bi-chat-dots"></i> Nhấn Refresh để tải tin nhắn</div>
+                </div>
+                
+                <!-- Chat Input -->
+                <div style="display:flex; gap:8px; align-items:flex-end;">
+                    <div style="flex:1;">
+                        <input type="text" id="chatInput" class="form-control" placeholder="Nhập tin nhắn..." onkeydown="if(event.key==='Enter') sendChatMessage()">
+                    </div>
+                    <label class="btn btn-outline" style="cursor:pointer; padding:8px 12px;">
+                        <i class="bi bi-image"></i>
+                        <input type="file" id="chatImageInput" accept="image/*" onchange="previewChatImage(this)" style="display:none;">
+                    </label>
+                    <button class="btn btn-primary" onclick="sendChatMessage()" style="padding:8px 16px;">
+                        <i class="bi bi-send"></i>
+                    </button>
+                </div>
+                
+                <!-- Image Preview -->
+                <div id="chatImagePreview" class="hidden" style="margin-top:8px; position:relative; display:inline-block;">
+                    <img id="chatImageThumb" style="max-width:100px; border-radius:8px; border:2px solid var(--primary);">
+                    <button onclick="clearChatImage()" style="position:absolute; top:-8px; right:-8px; background:var(--danger); color:white; border:none; border-radius:50%; width:20px; height:20px; cursor:pointer; font-size:12px;">×</button>
+                </div>
+            </div>
+            
+            <!-- ACTION BUTTONS -->
+            <div style="margin-top:20px; padding-top:16px; border-top:1px solid var(--border); display:flex; gap:8px; flex-wrap:wrap;">
+                ${order.status === 'Mới' || order.status === 'Chưa thực hiện' ? `
+                    <button class="btn btn-primary" onclick="closeOrderModal(); assignDriver('${order.id}')">
+                        <i class="bi bi-person-plus"></i> Phân công tài xế
+                    </button>
+                ` : ''}
+                ${(order.status === 'Đang thực hiện' || order.status === 'Chờ giao' || order.status === 'assigned') && state.user?.role === 'ADMIN' ? `
+                    <button class="btn btn-success" onclick="adminCompleteOrder('${order.id}')">
+                        <i class="bi bi-check-circle"></i> Admin hoàn thành
+                    </button>
+                ` : ''}
+                ${state.user?.role === 'ADMIN' ? `
+                    <button class="btn btn-warning" onclick="closeOrderModal(); editOrder('${order.id}')">
+                        <i class="bi bi-pencil"></i> Chỉnh sửa
+                    </button>
+                ` : ''}
+                <button class="btn btn-outline" onclick="closeOrderModal()">
+                    <i class="bi bi-x-lg"></i> Đóng
+                </button>
+            </div>
+
+        `;
+
+        // Initialize chat auto-refresh
+        currentChatOrderId = order.soDon || order.sale_order_no || order.id;
+        startChatRefresh();
+    }
+
+    if (modal) modal.classList.remove('hidden');
+}
+
+function closeOrderModal(event) {
+    // If called from overlay click, check if clicked on overlay itself
+    if (event && event.target && !event.target.closest('.modal-content')) {
+        // Clicked on overlay, close modal
+    } else if (event) {
+        // Clicked inside modal content, don't close
+        return;
+    }
+
+    // Stop chat refresh
+    stopChatRefresh();
+
+    // Hide modal
+    const modal = window.$('#modal-order-detail');
+    if (modal) modal.classList.add('hidden');
+}
+
+
+function assignDriver(orderId) {
+
+    console.log('assignDriver called with:', orderId);
+
+    // Find order from pending - robust matching
+    const order = (state.orders.pending || []).find(o => {
+        const oIdStr = String(o.id);
+        const searchIdStr = String(orderId);
+        return oIdStr === searchIdStr ||
+            o.id === orderId ||
+            o.id === parseInt(orderId) ||
+            o.soDon === orderId ||
+            o.sale_order_no === orderId;
+    });
+
+    console.log('Found order for assignment:', order);
+
+    if (!order) {
+        console.error('Order not found for assignment!');
+        alert('Không tìm thấy đơn hàng!');
+        return;
+    }
+
+    // Store current order ID for assignment
+    state.currentAssignOrderId = orderId;
+
+    // Calculate total qty from products
+    const products = order.products || order.chiTiet || order.cart || [];
+    const totalQty = products.reduce((sum, p) => sum + (parseFloat(p.qty || p.quantity || 0)), 0);
+    state.currentOrderTotalQty = totalQty;
+
+    // Init driver assignments array
+    state.driverAssignments = [];
+
+    // Build driver select options with plate data
+    const driverOptions = (state.drivers || []).map(d =>
+        `<option value="${d.name}" data-plate="${d.plate || ''}">${d.name}${d.plate ? ' - ' + d.plate : ''}</option>`
+    ).join('');
+
+    // Show modal
+    const modal = window.$('#modal-order-detail');
+    const modalBody = window.$('#modal-order-body');
+    const modalTitle = window.$('#modal-order-title');
+
+    if (modalTitle) modalTitle.textContent = `Phân công tài xế - Đơn #${order.soDon || order.sale_order_no || order.id}`;
+
+    if (modalBody) {
+        modalBody.innerHTML = `
+            <div class="order-detail-grid" style="margin-bottom:16px;">
+                <div class="detail-row">
+                    <label>Khách hàng:</label>
+                    <span>${order.khach || order.account_name || 'Chưa có'}</span>
+                </div>
+                <div class="detail-row">
+                    <label>Địa chỉ:</label>
+                    <span>${order.diaChi || order.shipping_address || 'Chưa có'}</span>
+                </div>
+                <div class="detail-row">
+                    <label>Tổng SL:</label>
+                    <span style="color:var(--primary); font-weight:600;">${formatNumber(totalQty)} kg</span>
+                </div>
+            </div>
+            
+            <!-- Multi-Driver Assignment Section -->
+            <div style="background:var(--body-bg); padding:16px; border-radius:8px; margin-bottom:16px;">
+                <h4 style="margin:0 0 12px; font-size:14px;">Phân công tài xế</h4>
+                
+                <!-- Driver List -->
+                <div id="driver-assignments-list" style="margin-bottom:16px;"></div>
+                
+                <!-- Add Driver Form -->
+                <div style="border:1px dashed var(--border); padding:12px; border-radius:8px;">
+                    <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end;">
+                        <div style="flex:1; min-width:150px;">
+                            <label class="form-label" style="font-size:12px;">Chọn tài xế</label>
+                            <select id="new-driver-select" class="form-control" onchange="onNewDriverChange(this)">
+                                <option value="">-- Chọn tài xế --</option>
+                                ${driverOptions}
+                                <option value="__EXTERNAL__">➕ Tài xế ngoài...</option>
+                            </select>
+                        </div>
+                        <div id="external-driver-fields" class="hidden" style="display:flex; gap:8px; flex:2;">
+                            <div style="flex:1;">
+                                <label class="form-label" style="font-size:12px;">Tên tài xế ngoài</label>
+                                <input type="text" id="external-driver-name" class="form-control" placeholder="Nhập tên...">
+                            </div>
+                            <div style="flex:1;">
+                                <label class="form-label" style="font-size:12px;">Biển số xe</label>
+                                <input type="text" id="external-driver-plate" class="form-control" placeholder="Biển số...">
+                            </div>
+                        </div>
+                        <div style="width:100px;">
+                            <label class="form-label" style="font-size:12px;">Số lượng (kg)</label>
+                            <input type="number" id="new-driver-qty" class="form-control" placeholder="SL" value="">
+                        </div>
+                        <button class="btn btn-primary" onclick="addDriverAssignmentRow()" style="height:38px;">
+                            <i class="bi bi-plus"></i> Thêm
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Summary -->
+                <div id="qty-summary" style="margin-top:12px; padding:8px; background:var(--card-bg); border-radius:4px; font-size:13px;"></div>
+            </div>
+            
+            <div style="display:flex; gap:12px; margin-top:16px;">
+                <button class="btn btn-outline" onclick="closeOrderModal()">Hủy</button>
+                <button class="btn btn-success" onclick="submitMultiDriverAssignment()">
+                    <i class="bi bi-check-all"></i> Xác nhận phân công
+                </button>
+            </div>
+        `;
+
+        // Render summary
+        updateQtySummaryDisplay();
+    }
+
+    if (modal) modal.classList.remove('hidden');
+}
+
+// Handle driver select change for external driver
+function onNewDriverChange(selectEl) {
+    const externalFields = window.$('#external-driver-fields');
+    if (selectEl.value === '__EXTERNAL__') {
+        externalFields?.classList.remove('hidden');
+        externalFields.style.display = 'flex';
+    } else {
+        externalFields?.classList.add('hidden');
+        externalFields.style.display = 'none';
+        // Auto-fill plate
+        const selectedOption = selectEl.options[selectEl.selectedIndex];
+        const plate = selectedOption?.getAttribute('data-plate') || '';
+        const externalPlate = window.$('#external-driver-plate');
+        if (externalPlate) externalPlate.value = plate;
+    }
+}
+
+// Add driver to assignment list
+function addDriverAssignmentRow() {
+    const select = window.$('#new-driver-select');
+    const qtyInput = window.$('#new-driver-qty');
+    const externalName = window.$('#external-driver-name');
+    const externalPlate = window.$('#external-driver-plate');
+
+    let driverName = select?.value;
+    let plate = '';
+
+    // Handle external driver
+    if (driverName === '__EXTERNAL__') {
+        driverName = externalName?.value?.trim();
+        plate = externalPlate?.value?.trim() || '';
+        if (!driverName) {
+            alert('Vui lòng nhập tên tài xế ngoài!');
+            return;
+        }
+    } else {
+        if (!driverName) {
+            alert('Vui lòng chọn tài xế!');
+            return;
+        }
+        const selectedOption = select.options[select.selectedIndex];
+        plate = selectedOption?.getAttribute('data-plate') || '';
+    }
+
+    const qty = parseFloat(qtyInput?.value) || 0;
+    if (qty <= 0) {
+        alert('Vui lòng nhập số lượng hợp lệ!');
+        return;
+    }
+
+    // Add to list
+    state.driverAssignments.push({
+        driver_name: driverName,
+        plate: plate,
+        qty: qty,
+        is_external: select?.value === '__EXTERNAL__'
+    });
+
+    // Reset form
+    select.value = '';
+    qtyInput.value = '';
+    if (externalName) externalName.value = '';
+    if (externalPlate) externalPlate.value = '';
+    window.$('#external-driver-fields')?.classList.add('hidden');
+
+    renderDriverAssignmentsList();
+    updateQtySummaryDisplay();
+}
+
+// Remove driver from list
+function removeDriverAssignmentRow(idx) {
+    state.driverAssignments.splice(idx, 1);
+    renderDriverAssignmentsList();
+    updateQtySummaryDisplay();
+}
+
+// Render driver assignments list
+function renderDriverAssignmentsList() {
+    const container = window.$('#driver-assignments-list');
+    if (!container) return;
+
+    if (!state.driverAssignments.length) {
+        container.innerHTML = '<p style="color:var(--text-muted); text-align:center; margin:16px 0;">Chưa có tài xế được phân công</p>';
+        return;
+    }
+
+    container.innerHTML = state.driverAssignments.map((a, idx) => `
+        <div style="display:flex; align-items:center; gap:12px; padding:10px; background:var(--card-bg); border-radius:6px; margin-bottom:8px; border-left:3px solid ${a.is_external ? 'var(--warning)' : 'var(--primary)'};">
+            <div style="flex:1;">
+                <strong>${a.driver_name}</strong>
+                ${a.is_external ? '<span style="font-size:11px; background:var(--warning); color:#000; padding:2px 6px; border-radius:4px; margin-left:6px;">Tài xế ngoài</span>' : ''}
+                <br><small style="color:var(--text-muted);">🚗 ${a.plate || 'Chưa có biển số'}</small>
+            </div>
+            <div style="font-weight:600; color:var(--primary);">${formatNumber(a.qty)} kg</div>
+            <button onclick="removeDriverAssignmentRow(${idx})" style="background:var(--danger); color:white; border:none; border-radius:4px; width:28px; height:28px; cursor:pointer;">
+                <i class="bi bi-x"></i>
+            </button>
+        </div>
+    `).join('');
+}
+
+// Update qty summary
+function updateQtySummaryDisplay() {
+    const container = window.$('#qty-summary');
+    if (!container) return;
+
+    const totalAssigned = state.driverAssignments.reduce((sum, a) => sum + a.qty, 0);
+    const totalOrder = state.currentOrderTotalQty || 0;
+    const remaining = totalOrder - totalAssigned;
+
+    const color = remaining === 0 ? 'var(--success)' : (remaining < 0 ? 'var(--danger)' : 'var(--warning)');
+
+    container.innerHTML = `
+        <div style="display:flex; justify-content:space-between;">
+            <span>Tổng đơn hàng:</span>
+            <strong>${formatNumber(totalOrder)} kg</strong>
+        </div>
+        <div style="display:flex; justify-content:space-between;">
+            <span>Đã phân công:</span>
+            <strong>${formatNumber(totalAssigned)} kg</strong>
+        </div>
+        <div style="display:flex; justify-content:space-between; color:${color};">
+            <span>Còn lại:</span>
+            <strong>${formatNumber(remaining)} kg</strong>
+        </div>
+    `;
+}
+
+// Submit multi-driver assignment
+async function submitMultiDriverAssignment() {
+    if (!state.driverAssignments.length) {
+        alert('Vui lòng thêm ít nhất 1 tài xế!');
+        return;
+    }
+
+    const totalAssigned = state.driverAssignments.reduce((sum, a) => sum + a.qty, 0);
+    const totalOrder = state.currentOrderTotalQty || 0;
+
+    if (Math.abs(totalAssigned - totalOrder) > 0.5) {
+        if (!confirm(`Tổng số lượng phân (${formatNumber(totalAssigned)} kg) khác tổng đơn (${formatNumber(totalOrder)} kg). Tiếp tục?`)) {
+            return;
+        }
+    }
+
+    showLoading('Đang phân công tài xế...');
+
+    try {
+        const orderId = state.currentAssignOrderId;
+        const res = await fetch(`/api/orders/${orderId}/assign-multi`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ assignments: state.driverAssignments })
+        });
+
+        const data = await res.json();
+        hideLoading();
+
+        if (!data.error) {
+            alert(data.msg || 'Đã phân công thành công!');
+            closeOrderModal();
+            loadOrders();
+        } else {
+            alert('Lỗi: ' + (data.msg || 'Không thể phân công'));
+        }
     } catch (e) {
         hideLoading();
         alert('Lỗi kết nối: ' + e.message);
     }
 }
 
-function doLogout() {
-    localStorage.removeItem('LT_SESSION');
-    stopPolling();
-    location.reload();
-}
 
-function initApp() {
-    $('#txt-user-name').textContent = state.user.name;
-    // $('#txt-user-role').textContent = state.user.role; // Legacy
-    if ($('#txt-user-role-display')) $('#txt-user-role-display').textContent = state.user.role === 'ADMIN' ? 'Quản trị viên' : state.user.name;
-
-    // Use new dashboard view
-    hide('view-login');
-    show('view-dashboard');
-
-    if (['ADMIN', 'TESTER', 'MANAGER'].includes(state.user.role)) {
-        showSection('dashboard');
-    } else if (state.user.role === 'DRIVER') {
-        // Hide sidebar items not relevant to driver if needed
-        showSection('my-orders');
-    }
-
-    // Start Polling
-    startPolling();
-}
-
-async function forceSyncMisa() {
-    const btn = $('#btn-force-sync');
-    if (btn) {
-        btn.disabled = true;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Đang đồng bộ...';
-    }
-
-    try {
-        const res = await fetch('/api/sync', { method: 'POST' });
-        const json = await res.json();
-
-        if (json.success) {
-            // Introduce a small delay to allow server to process
-            setTimeout(async () => {
-                await loadDashboard();
-                await loadOrders();
-                alert('✅ Đã gửi lệnh đồng bộ! Dữ liệu sẽ cập nhật trong vài giây.');
-            }, 2000);
-        } else {
-            alert('❌ Lỗi đồng bộ: ' + (json.error || 'Unknown error'));
-        }
-    } catch (e) {
-        alert('❌ Lỗi kết nối: ' + e.message);
-    } finally {
-        if (btn) {
-            btn.disabled = false;
-            btn.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>Đồng bộ MISA';
-        }
+// Auto-fill plate when selecting driver
+function onDriverChange(selectEl) {
+    const selectedOption = selectEl.options[selectEl.selectedIndex];
+    const plate = selectedOption?.getAttribute('data-plate') || '';
+    const plateInput = window.$('#assign-plate');
+    if (plateInput) {
+        plateInput.value = plate;
     }
 }
 
-async function loadDashboard() {
-    try {
-        // Fetch summary stats
-        const res = await api.getOrders(); // Or a dedicated dashboard API if available
+async function confirmAssignDriver() {
+    const orderId = state.currentAssignOrderId;
+    const driverSelect = window.$('#assign-driver-select');
+    const plateInput = window.$('#assign-plate');
+    const noteInput = window.$('#assign-note');
 
-        const pending = res.pending.length;
-        const assigned = res.assigned.length;
-        // Count completed ONLY for today
-        const today = new Date().toDateString();
-        const completedToday = res.completed.filter(o => new Date(o.ngay || o.createdAt).toDateString() === today).length;
+    const driverName = driverSelect?.value;
+    const plate = plateInput?.value?.trim() || '';
+    const note = noteInput?.value?.trim() || '';
 
-        $('#dash-pending').textContent = pending;
-        $('#dash-assigned').textContent = assigned;
-        $('#dash-completed').textContent = completedToday;
-
-        // Fetch imports count
-        const impRes = await fetch('/api/imports');
-        const impData = await impRes.json();
-        const imports = impData.data || [];
-        $('#dash-imports').textContent = imports.filter(i => i.status === 'pending').length;
-
-        // Render Recent Orders
-        const recentList = $('#dash-recent-orders');
-        const allRecent = [...res.pending, ...res.assigned].sort((a, b) => new Date(b.ngay) - new Date(a.ngay)).slice(0, 5);
-
-        if (allRecent.length === 0) {
-            recentList.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-muted">Không có đơn hàng mới</td></tr>';
-        } else {
-            recentList.innerHTML = allRecent.map(o => `
-                <tr>
-                    <td class="ps-3"><span class="badge bg-light text-dark border">#${o.soDon}</span></td>
-                    <td>${o.khach}</td>
-                    <td><span class="badge ${o.status === 'pending' || !o.taiXe ? 'bg-warning text-dark' : 'bg-primary'}">${o.status || 'Chờ xử lý'}</span></td>
-                    <td class="text-muted small">${formatDateVN(o.ngay)}</td>
-                </tr>
-            `).join('');
-        }
-
-    } catch (e) {
-        console.error("Dashboard load error", e);
-    }
-}
-
-
-
-
-function switchOrderTab(tab) {
-    state.currentOrderTab = tab;
-
-    // Update button active states
-    const container = $('#order-tabs-container');
-    const buttons = container.querySelectorAll('button');
-
-    buttons.forEach(btn => {
-        const isActive = btn.id === `tab-${tab}`;
-        // Reset to outline style, then make active one solid
-        if (btn.id.includes('pending') || btn.id.includes('imports_pending')) {
-            btn.className = isActive ? 'btn btn-sm flex-fill btn-warning' : 'btn btn-sm flex-fill btn-outline-warning';
-        } else if (btn.id.includes('assigned') || btn.id.includes('imports_assigned')) {
-            btn.className = isActive ? 'btn btn-sm flex-fill btn-primary' : 'btn btn-sm flex-fill btn-outline-primary';
-        } else {
-            btn.className = isActive ? 'btn btn-sm flex-fill btn-secondary' : 'btn btn-sm flex-fill btn-outline-secondary';
-        }
-    });
-
-    renderOrderList();
-}
-
-function searchOrders(keyword) {
-    state.searchTerm = keyword.toLowerCase().trim();
-    renderOrderList();
-}
-
-// Helper to format date dd/mm/yyyy
-function formatDateVN(dateStr) {
-    if (!dateStr) return '';
-    try {
-        const date = new Date(dateStr);
-        if (isNaN(date.getTime())) return dateStr;
-        return date.toLocaleDateString('en-GB');
-    } catch (e) {
-        return dateStr;
-    }
-}
-
-function filterOrdersByDate() {
-    // Parse dd/mm/yyyy manually since inputs are now text
-    const parseVN = (str) => {
-        if (!str) return null;
-        const [d, m, y] = str.split('/');
-        return new Date(`${y}-${m}-${d}`);
-    };
-
-    const dFrom = $('#filter-date-from').value;
-    const dTo = $('#filter-date-to').value;
-
-    state.dateFrom = parseVN(dFrom);
-    state.dateTo = parseVN(dTo);
-
-    // Reset time to start/end of day
-    if (state.dateFrom) state.dateFrom.setHours(0, 0, 0, 0);
-    if (state.dateTo) state.dateTo.setHours(23, 59, 59, 999);
-
-    renderOrderList();
-}
-
-function clearDateFilter() {
-    // Clear Flatpickr if instance exists (optional, or just clear input)
-    const fpFrom = document.querySelector('#filter-date-from')._flatpickr;
-    const fpTo = document.querySelector('#filter-date-to')._flatpickr;
-    if (fpFrom) fpFrom.clear();
-    if (fpTo) fpTo.clear();
-
-    state.dateFrom = null;
-    state.dateTo = null;
-    renderOrderList();
-}
-
-// Initialize Flatpickr
-function initDatePickers() {
-    flatpickr(".date-picker", {
-        dateFormat: "d/m/Y",
-        locale: "vn",
-        allowInput: true,
-        onChange: function (selectedDates, dateStr, instance) {
-            filterOrdersByDate();
-        }
-    });
-}
-
-// Call init after DOM load (or immediately if script is deferred)
-document.addEventListener('DOMContentLoaded', initDatePickers);
-
-function renderOrderList() {
-    let list = state.orders[state.currentOrderTab];
-
-    // 1. Filter by search term
-    if (state.searchTerm && list) {
-        list = list.filter(o =>
-            (o.soDon && o.soDon.toLowerCase().includes(state.searchTerm)) ||
-            (o.khach && o.khach.toLowerCase().includes(state.searchTerm)) ||
-            (o.diaChi && o.diaChi.toLowerCase().includes(state.searchTerm)) ||
-            (formatDateVN(o.ngay).includes(state.searchTerm)) // Search by DD/MM/YYYY
-        );
-    }
-
-    // 2. Filter by Date Range (Using CRM 'ngay' field)
-    if ((state.dateFrom || state.dateTo) && list) {
-        list = list.filter(o => {
-            const dateStr = o.ngay || o.createdAt; // Fallback to createdAt if ngay missing
-            if (!dateStr) return false;
-
-            const orderDate = new Date(dateStr);
-            // Normalize orderDate to midnight for fair comparison if it includes time
-            orderDate.setHours(0, 0, 0, 0);
-
-            if (state.dateFrom && orderDate < state.dateFrom) return false;
-            if (state.dateTo && orderDate > state.dateTo) return false;
-            return true;
-        });
-    }
-
-    // 3. Sort by Date (Newest First), then by Order Number (Descending)
-    if (list && Array.isArray(list)) {
-        list.sort((a, b) => {
-            // Primary: Sort by date descending
-            const dA = a.ngay ? new Date(a.ngay) : new Date(0);
-            const dB = b.ngay ? new Date(b.ngay) : new Date(0);
-            const dateDiff = dB - dA;
-
-            if (dateDiff !== 0) return dateDiff;
-
-            // Secondary: Sort by order number descending (extract numeric part)
-            const numA = parseInt((a.soDon || '').replace(/\D/g, '') || '0');
-            const numB = parseInt((b.soDon || '').replace(/\D/g, '') || '0');
-            return numB - numA;
-        });
-    }
-
-    console.log(`RENDER [${state.currentOrderTab}]:`, list ? list.length : 'NULL');
-    const container = $('#order-list');
-
-    // Handle special tabs (import tickets in NHẬP section)
-    if (state.currentOrderTab.startsWith('imports_')) {
-        const importList = state.orders[state.currentOrderTab] || [];
-        renderImportTickets(container, importList);
-        return;
-    }
-
-    if (!list || !list.length) {
-        container.innerHTML = '<div class="empty-state"><i class="bi bi-box-seam"></i><div>Không tìm thấy đơn hàng</div></div>';
-        return;
-    }
-
-    // const driverOptions = ... (Moved into loop)
-
-    container.innerHTML = list.map(order => {
-        let statusBadge = '';
-        let statusClass = 'bg-secondary';
-        if (state.currentOrderTab === 'pending') {
-            statusBadge = 'Chờ gán';
-            statusClass = 'bg-warning text-dark';
-        }
-        if (state.currentOrderTab === 'assigned') {
-            statusBadge = 'Đang giao';
-            statusClass = 'bg-primary';
-        }
-        if (state.currentOrderTab === 'history') {
-            statusBadge = order.status || 'Hoàn thành';
-            statusClass = (order.status === 'Đã thực hiện' || order.status === 'Đã giao hàng') ? 'bg-success' : 'bg-secondary';
-        }
-
-        // Minimal card - just essential info
-        const productCount = Array.isArray(order.products) ? order.products.length : 0;
-        const driverInfo = order.taiXe ? `<span class="badge bg-info text-dark"><i class="bi bi-truck"></i> ${order.taiXe}</span>` : '';
-
-        return `
-      <div class="order-card p-2 mb-2 border rounded shadow-sm bg-white" onclick="openOrderDetail('${order.id}')">
-        <div class="d-flex justify-content-between align-items-center">
-            <div class="d-flex align-items-center gap-2">
-                <span class="badge bg-light text-dark border small">#${order.soDon}</span>
-                <span class="badge ${statusClass} small">${statusBadge}</span>
-                ${driverInfo}
-                ${renderSyncBadge(order)}
-            </div>
-            <span class="small text-muted">${formatDateVN(order.ngay)}</span>
-        </div>
-        <div class="mt-1">
-            <span class="fw-bold text-primary small">${order.khach}</span>
-            <span class="text-muted small ms-2">(${productCount} SP)</span>
-        </div>
-      </div>
-    `;
-    }).join('');
-}
-
-function openOrderDetail(id) {
-    // Find order in all tabs including history and DRIVER specific list
-    const order = state.orders.pending.find(o => o.id === id)
-        || state.orders.assigned.find(o => o.id === id)
-        || state.orders.history.find(o => o.id === id)
-        || (state.myOrders || []).find(o => o.id === id);
-    if (!order) return;
-
-    // Store current order ID for modal actions
-    window.currentModalOrderId = id;
-
-    // Determine order state
-    const isPending = state.orders.pending.some(o => o.id === id);
-    const isAssigned = state.orders.assigned.some(o => o.id === id);
-    const isHistory = state.orders.history.some(o => o.id === id);
-
-    // Populate Header
-    document.getElementById('modalOrderTitle').textContent = `#${order.soDon} - ${order.khach}`;
-
-    // Populate Fields
-    document.getElementById('modalCustomerName').textContent = order.khach;
-    document.getElementById('modalAddress').textContent = order.diaChi || 'Không có địa chỉ';
-
-    // Driver Info
-    document.getElementById('modalDriver').textContent = order.taiXe || 'Chưa gán';
-    document.getElementById('modalPlate').textContent = order.bienSo || '---';
-    document.getElementById('modalNote').textContent = order.note || '';
-
-    // Sync Status in Details
-    const syncArea = document.getElementById('modalSyncInfo');
-    if (syncArea) {
-        if (order.crm_sync_status === 'FAILED') {
-            syncArea.innerHTML = `
-                <div class="alert alert-danger p-2 mb-2 small">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <i class="bi bi-exclamation-octagon me-1"></i> 
-                            <strong>Lỗi MISA:</strong> ${order.sync_error || 'Không xác định'}
-                        </div>
-                        <button class="btn btn-xs btn-danger ms-2 py-0" onclick="retryMisaSync('${order.id}')">
-                            <i class="bi bi-arrow-clockwise"></i> Thử lại
-                        </button>
-                    </div>
-                </div>
-            `;
-            syncArea.classList.remove('d-none');
-        } else if (order.crm_sync_status === 'PUSHING') {
-            syncArea.innerHTML = '<div class="text-warning small mb-2"><i class="spinner-border spinner-border-sm me-1"></i> Đang đẩy lên CRM...</div>';
-            syncArea.classList.remove('d-none');
-        } else {
-            syncArea.classList.add('d-none');
-        }
-    }
-
-    // Products
-    const list = document.getElementById('modalProductList');
-    list.innerHTML = (order.products || []).map(p => `
-        <tr>
-            <td><span class="badge bg-secondary">${p.code || '-'}</span></td>
-            <td>${p.name}</td>
-            <td class="text-end fw-bold">${p.qty}</td>
-            <td>${p.unit}</td>
-        </tr>
-    `).join('');
-
-    // Driver Assignment Section - Show for pending/assigned orders (BUT HIDE FOR DRIVERS)
-    const assignSection = document.getElementById('modalAssignSection');
-    const role = (state.user.role || '').toUpperCase();
-
-    if ((isPending || isAssigned) && role !== 'DRIVER') {
-        assignSection.classList.remove('d-none');
-
-        // Populate driver dropdown
-        const select = document.getElementById('modal_drv_select');
-        let foundDriver = false;
-        const drvOptionsHTML = state.drivers.map(d => {
-            const val = `${d.name}|${d.plate}`;
-            const isSelected = (order.taiXe === d.name);
-            if (isSelected) foundDriver = true;
-            return `<option value="${val}" ${isSelected ? 'selected' : ''}>${d.name} - ${d.plate}</option>`;
-        }).join('');
-
-        const isExternal = !foundDriver && order.taiXe;
-        select.innerHTML = `
-            <option value="">-- Chọn tài xế --</option>
-            ${drvOptionsHTML}
-            <option value="EXTERNAL" ${isExternal ? 'selected' : ''}>Xe Ngoài (Nhập tay)</option>
-        `;
-
-        // Set external driver values if applicable
-        if (isExternal) {
-            document.getElementById('modal_ext_drv').classList.remove('d-none');
-            document.getElementById('modal_ext_name').value = order.taiXe || '';
-            document.getElementById('modal_ext_plate').value = order.bienSo || '';
-        } else {
-            document.getElementById('modal_ext_drv').classList.add('d-none');
-        }
-
-        document.getElementById('modal_note').value = order.note || '';
-
-        // Initialize multi-driver assignments
-        initDriverAssignments(order);
-    } else {
-        assignSection.classList.add('d-none');
-    }
-
-    // Footer Actions
-    const footer = document.getElementById('modalFooter');
-    let actionBtns = '';
-
-    if (isHistory) {
-        actionBtns = `
-            <button class="btn btn-outline-primary btn-sm" onclick="openDeliveryModal('${order.id}')">
-                <i class="bi bi-pencil-square me-1"></i>Xem lại / Sửa
-            </button>
-        `;
-    } else if (role === 'ADMIN' || role === 'TESTER' || role === 'MANAGER') {
-        actionBtns = `
-            <button class="btn btn-success btn-sm" onclick="openDeliveryModal('${order.id}')">
-                <i class="bi bi-check-circle me-1"></i>Hoàn thành
-            </button>
-        `;
-    } else if (role === 'DRIVER' && isAssigned && order.taiXe === state.user.name) {
-        // Driver Action
-        actionBtns = `
-            <button class="btn btn-success btn-sm fw-bold shadow-sm" onclick="openDeliveryModal('${order.id}')">
-                <i class="bi bi-check-lg me-1"></i> HOÀN THÀNH
-            </button>
-        `;
-    }
-
-    footer.innerHTML = `
-        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Đóng</button>
-        ${actionBtns}
-    `;
-
-    const modal = new bootstrap.Modal(document.getElementById('orderDetailModal'));
-    modal.show();
-
-    // Load chat for this order using soDon (Critical for cross-user sync)
-    const chatRoomId = order.soDon || order.id;
-    loadOrderChat(chatRoomId);
-    startChatRefresh();
-
-    // Stop refresh when modal closes
-    document.getElementById('orderDetailModal').addEventListener('hidden.bs.modal', stopChatRefresh, { once: true });
-}
-
-function toggleModalExternalDriver() {
-    const val = document.getElementById('modal_drv_select').value;
-    const extArea = document.getElementById('modal_ext_drv');
-    if (val === 'EXTERNAL') {
-        extArea.classList.remove('d-none');
-    } else {
-        extArea.classList.add('d-none');
-    }
-}
-
-async function assignOrderFromModal(id) {
-    const sel = document.getElementById('modal_drv_select');
-    let name, plate;
-
-    if (sel.value === 'EXTERNAL') {
-        name = document.getElementById('modal_ext_name').value.trim();
-        plate = document.getElementById('modal_ext_plate').value.trim();
-        if (!name || !plate) {
-            alert('Vui lòng nhập Tên và Biển số xe ngoài!');
-            return;
-        }
-    } else if (sel.value) {
-        [name, plate] = sel.value.split('|');
-    } else {
+    if (!driverName) {
         alert('Vui lòng chọn tài xế!');
         return;
     }
 
-    const note = document.getElementById('modal_note').value.trim();
-
-    showLoading();
+    showLoading('Đang gán tài xế...');
 
     try {
-        const res = await api.assignOrder(id, name, plate || '', note);
+        const res = await api.assignOrder(orderId, driverName, plate, note);
         hideLoading();
-        alert(res.msg);
 
-        // Close modal and refresh
-        const modalEl = document.getElementById('orderDetailModal');
-        const modal = bootstrap.Modal.getInstance(modalEl);
-        if (modal) modal.hide();
-
-        loadOrders();
+        // Fix: API returns { error: false, msg: '...' }, not { success: true }
+        if (!res.error) {
+            alert(res.msg || 'Đã gán tài xế thành công!');
+            closeOrderModal();
+            loadOrders();
+        } else {
+            alert('Lỗi: ' + (res.msg || res.message || 'Không thể gán tài xế'));
+        }
     } catch (e) {
         hideLoading();
-        alert(e.message);
+        console.error('Assign driver error:', e);
+        alert('Lỗi kết nối: ' + e.message);
     }
+}
+
+
+function completeOrder(orderId) {
+    // Open delivery modal instead of directly completing
+    openDeliveryModal(orderId);
+}
+
+function toggleUserMenu() {
+    // TODO: Toggle user dropdown menu
+    console.log('Toggle user menu');
+}
+
+// === DELIVERY MODAL (HOÀN THÀNH ĐƠN) ===
+
+function openDeliveryModal(orderId) {
+    // Search in all lists with robust matching
+    const allOrders = [...(state.orders.pending || []), ...(state.orders.assigned || []), ...(state.orders.completed || [])];
+
+    const findOrder = (list) => list.find(o => {
+        const oIdStr = String(o.id);
+        const searchIdStr = String(orderId);
+        return oIdStr === searchIdStr ||
+            o.id === orderId ||
+            o.id === parseInt(orderId) ||
+            o.soDon === orderId ||
+            o.sale_order_no === orderId;
+    });
+
+    const order = findOrder(allOrders) || findOrder(state.myOrders || []);
+
+    if (!order) {
+        console.error('Order not found for delivery modal:', orderId);
+        alert('Không tìm thấy đơn hàng!');
+        return;
+    }
+
+    state.currentDeliveryOrder = order;
+
+    // Initialize Cart from Order Products
+    state.deliveryCart = (order.products || []).map(p => ({
+        product: p.name || p.productName,
+        code: p.code || '',
+        planQty: p.qty || p.quantity,
+        qty: p.qty || p.quantity,
+        unit: p.unit || 'Kg',
+        density: p.density || 1,
+        isShell: false,
+        note: ''
+    }));
+
+    state.selectedImages = [];
+
+    // Render modal content - use correct IDs
+    const modal = window.$('#modal-order-detail');
+    const modalBody = window.$('#modal-order-body');
+    const modalTitle = window.$('#modal-order-title');
+
+    const isCompleted = order.status === 'completed';
+    if (modalTitle) {
+        modalTitle.textContent = isCompleted
+            ? 'Chỉnh sửa đơn đã giao'
+            : 'Xác nhận giao hàng';
+    }
+
+    if (modalBody) {
+        modalBody.innerHTML = `
+            <div class="order-detail-grid" style="margin-bottom:20px;">
+                <div class="detail-row">
+                    <label>Mã đơn:</label>
+                    <span><strong>#${order.soDon || order.sale_order_no || order.id}</strong></span>
+                </div>
+                <div class="detail-row">
+                    <label>Khách hàng:</label>
+                    <span>${order.khach || order.account_name || '-'}</span>
+                </div>
+            </div>
+            
+            <h4 style="margin:20px 0 12px; font-size:14px; color:var(--text-secondary);">Sản phẩm giao</h4>
+            <div id="delivery-cart-list"></div>
+            
+            <div class="form-group" style="margin-top:20px;">
+                <label class="form-label">Kho xuất</label>
+                <div style="display:flex; gap:16px;">
+                    <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                        <input type="radio" name="del-wh" value="LT1" checked> Kho LT1
+                    </label>
+                    <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                        <input type="radio" name="del-wh" value="LT2"> Kho LT2
+                    </label>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Ảnh giao hàng</label>
+                <input type="file" id="inp-del-img" accept="image/*" multiple 
+                    onchange="handleImageSelect(this)" class="form-control">
+                <div id="img-preview-area" style="display:flex; flex-wrap:wrap; gap:8px; margin-top:12px;"></div>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Ghi chú</label>
+                <textarea id="inp-del-note" class="form-control" rows="2" placeholder="Ghi chú khi giao...">${order.note || ''}</textarea>
+            </div>
+            
+            <div style="display:flex; gap:12px; margin-top:24px;">
+                <button class="btn btn-outline" onclick="closeDeliveryModal()">Hủy</button>
+                <button class="btn btn-success" id="btn-submit-delivery" onclick="submitDelivery()">
+                    <i class="bi bi-check-lg"></i> ${isCompleted ? 'Cập nhật' : 'Hoàn thành'}
+                </button>
+            </div>
+        `;
+    }
+
+    renderDeliveryCart();
+    if (modal) modal.classList.remove('hidden');
+}
+
+function closeDeliveryModal() {
+    hide('modal-order-detail');
+    state.currentDeliveryOrder = null;
+    state.deliveryCart = [];
+    state.selectedImages = [];
+}
+
+function renderDeliveryCart() {
+    const list = window.$('#delivery-cart-list');
+    if (!list) return;
+
+    if (!state.deliveryCart || !state.deliveryCart.length) {
+        list.innerHTML = '<div style="text-align:center; padding:20px; color:var(--text-muted);">Giỏ hàng trống</div>';
+        return;
+    }
+
+    list.innerHTML = state.deliveryCart.map((item, idx) => `
+        <div style="background:var(--body-bg); padding:12px; border-radius:8px; margin-bottom:8px; border-left:3px solid ${item.isShell ? 'var(--warning)' : 'var(--primary)'};">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                <div style="font-weight:600; color:var(--primary);">${item.product}</div>
+                ${item.isShell
+            ? '<button class="btn btn-sm" style="color:var(--danger); padding:4px;" onclick="removeCartItem(' + idx + ')"><i class="bi bi-x-lg"></i></button>'
+            : '<span class="badge badge-completed" style="font-size:10px;"><i class="bi bi-lock"></i> CRM</span>'
+        }
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
+                <div>
+                    <div style="font-size:11px; color:var(--text-muted);">Yêu cầu</div>
+                    <div style="font-weight:600;">${item.planQty || 0} ${item.unit}</div>
+                </div>
+                <div>
+                    <div style="font-size:11px; color:var(--text-muted);">Thực tế</div>
+                    <input type="number" class="form-control" style="padding:6px 8px; font-size:13px;"
+                        value="${item.qty}" onchange="updateCartQty(${idx}, this.value)">
+                </div>
+                <div>
+                    <div style="font-size:11px; color:var(--text-muted);">Ghi chú</div>
+                    <input type="text" class="form-control" style="padding:6px 8px; font-size:13px;"
+                        placeholder="..." value="${item.note || ''}" onchange="updateCartNote(${idx}, this.value)">
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function updateCartQty(idx, val) {
+    if (state.deliveryCart && state.deliveryCart[idx]) {
+        state.deliveryCart[idx].qty = Number(val);
+    }
+}
+
+function updateCartNote(idx, val) {
+    if (state.deliveryCart && state.deliveryCart[idx]) {
+        state.deliveryCart[idx].note = val;
+    }
+}
+
+function removeCartItem(idx) {
+    const item = state.deliveryCart[idx];
+    if (!item || !item.isShell) {
+        alert('Không thể xóa hàng chính từ CRM!');
+        return;
+    }
+    state.deliveryCart.splice(idx, 1);
+    renderDeliveryCart();
+}
+
+function handleImageSelect(input) {
+    const files = input.files;
+    if (!files || !files.length) return;
+
+    const previewArea = window.$('#img-preview-area');
+    if (!previewArea) return;
+
+    state.selectedImages = state.selectedImages || [];
+
+    for (const file of files) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            state.selectedImages.push(e.target.result);
+
+            const imgWrapper = document.createElement('div');
+            imgWrapper.style.cssText = 'position:relative; width:80px; height:80px;';
+            imgWrapper.innerHTML = `
+                <img src="${e.target.result}" style="width:100%; height:100%; object-fit:cover; border-radius:8px;">
+                <button type="button" onclick="this.parentElement.remove()" 
+                    style="position:absolute; top:-6px; right:-6px; width:20px; height:20px; border-radius:50%; background:var(--danger); color:white; border:none; cursor:pointer; font-size:12px;">×</button>
+            `;
+            previewArea.appendChild(imgWrapper);
+        };
+        reader.readAsDataURL(file);
+    }
+}
+
+async function submitDelivery() {
+    if (!state.deliveryCart || !state.deliveryCart.length) {
+        alert('Giỏ hàng trống!');
+        return;
+    }
+
+    if (!state.selectedImages || !state.selectedImages.length) {
+        if (!confirm('Cảnh báo: Chưa có ảnh chứng minh. Tiếp tục?')) return;
+    }
+
+    const warehouseGroup = document.getElementsByName('del-wh');
+    let warehouse = 'LT1';
+    for (const r of warehouseGroup) if (r.checked) warehouse = r.value;
+
+    const noteEl = window.$('#inp-del-note');
+    const note = noteEl?.value || '';
+    const order = state.currentDeliveryOrder;
+
+    if (!order) {
+        alert('Không tìm thấy đơn hàng!');
+        return;
+    }
+
+    const payload = {
+        type: order.type || 'EXPORT',
+        warehouse: warehouse,
+        partner: order.customerName || order.khach,
+        driver_name: order.driverName || order.taiXe || state.user?.name,
+        plate: order.plate || order.bienSo || '',
+        note: note,
+        sender: state.user?.name,
+        cart: state.deliveryCart.map(i => ({
+            product: { name: i.product, code: i.code },
+            weight_kg: i.qty,
+            unit: i.unit,
+            density: i.density,
+            isShell: i.isShell,
+            note: i.note
+        })),
+        images: state.selectedImages || []
+    };
+
+    showLoading('Đang xử lý...');
+
+    try {
+        const res = await api.completeOrder(order.id, payload);
+        hideLoading();
+
+        if (res.error) {
+            alert('Lỗi: ' + (res.msg || res.message));
+        } else {
+            alert(res.msg || 'Đã hoàn thành đơn hàng!');
+            closeDeliveryModal();
+            loadOrders();
+        }
+    } catch (e) {
+        hideLoading();
+        console.error('Submit delivery error:', e);
+        alert('Lỗi kết nối: ' + e.message);
+    }
+}
+
+// === START ORDER (DRIVER) ===
+async function startOrder(orderId) {
+    if (!confirm('Xác nhận nhận đơn này?')) return;
+
+    showLoading('Đang cập nhật...');
+
+    try {
+        const res = await api.startOrder(orderId);
+        hideLoading();
+        alert(res.msg || 'Đã nhận đơn!');
+        loadMyOrders();
+    } catch (e) {
+        hideLoading();
+        alert('Lỗi: ' + e.message);
+    }
+}
+
+// ===============================================
+// ORDER CHAT SYSTEM
+// ===============================================
+
+let currentChatOrderId = null;
+let chatRefreshInterval = null;
+let pendingChatImage = null;
+
+async function loadOrderChat(orderId) {
+    currentChatOrderId = orderId;
+    const container = document.getElementById('chatMessages');
+    if (!container) return;
+
+    container.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding:20px;"><i class="bi bi-chat-dots"></i> Đang tải...</div>';
+
+    try {
+        const chatRoomId = String(orderId);
+        const res = await fetch(`/api/chat/${encodeURIComponent(chatRoomId)}/messages`);
+        const data = await res.json();
+
+        if (data.error) {
+            container.innerHTML = '<div style="color:var(--danger); padding:10px;">Lỗi tải tin nhắn</div>';
+            return;
+        }
+
+        if (!data.messages || data.messages.length === 0) {
+            container.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding:20px;"><i class="bi bi-chat-dots"></i> Chưa có tin nhắn</div>';
+            return;
+        }
+
+        container.innerHTML = data.messages.map(msg => {
+            const isMe = msg.sender_name === state.user?.name;
+            const time = new Date(msg.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+            const roleColor = msg.sender_role === 'DRIVER' ? 'success' : 'primary';
+
+            const imageHtml = msg.image
+                ? `<img src="${msg.image}" style="max-width:150px; cursor:pointer; border-radius:8px; margin-top:8px;" onclick="showChatImage('${msg.image.replace(/'/g, "\\'")}')">`
+                : '';
+
+            return `
+                <div class="chat-msg ${isMe ? 'chat-me' : 'chat-other'}" style="margin-bottom:12px; ${isMe ? 'text-align:right;' : ''}">
+                    <div style="font-size:12px; margin-bottom:4px;">
+                        <span class="badge badge-${roleColor}" style="font-size:10px;">${msg.sender_role}</span>
+                        <span style="color:var(--text-muted);">${msg.sender_name}</span>
+                    </div>
+                    <div style="display:inline-block; padding:10px 14px; border-radius:12px; max-width:80%; ${isMe ? 'background:var(--primary); color:white;' : 'background:var(--surface); border:1px solid var(--border);'}">
+                        ${msg.message || ''}
+                        ${imageHtml}
+                    </div>
+                    <div style="font-size:11px; color:var(--text-muted); margin-top:4px;">${time}</div>
+                </div>
+            `;
+        }).join('');
+
+        container.scrollTop = container.scrollHeight;
+
+    } catch (e) {
+        container.innerHTML = '<div style="color:var(--danger); padding:10px;">Lỗi kết nối</div>';
+    }
+}
+
+async function sendChatMessage() {
+    if (!currentChatOrderId) return;
+
+    const input = document.getElementById('chatInput');
+    const message = input?.value?.trim();
+    const image = pendingChatImage;
+
+    if (!message && !image) return;
+
+    if (input) input.disabled = true;
+
+    try {
+        const chatRoomId = String(currentChatOrderId);
+        const res = await fetch(`/api/chat/${encodeURIComponent(chatRoomId)}/messages`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                sender_name: state.user?.name || 'Unknown',
+                sender_role: state.user?.role || 'ADMIN',
+                message: message,
+                image: image
+            })
+        });
+
+        const data = await res.json();
+        if (input) input.disabled = false;
+
+        if (!data.error) {
+            if (input) input.value = '';
+            clearChatImage();
+            loadOrderChat(currentChatOrderId);
+        } else {
+            alert('Lỗi gửi tin: ' + data.message);
+        }
+
+    } catch (e) {
+        if (input) input.disabled = false;
+        alert('Lỗi kết nối');
+    }
+}
+
+function previewChatImage(input) {
+    if (!input.files || !input.files[0]) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const maxSize = 800;
+            let width = img.width;
+            let height = img.height;
+
+            if (width > maxSize || height > maxSize) {
+                if (width > height) {
+                    height = (maxSize / width) * height;
+                    width = maxSize;
+                } else {
+                    width = (maxSize / height) * width;
+                    height = maxSize;
+                }
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+
+            pendingChatImage = canvas.toDataURL('image/jpeg', 0.7);
+
+            const thumb = document.getElementById('chatImageThumb');
+            const preview = document.getElementById('chatImagePreview');
+            if (thumb) thumb.src = pendingChatImage;
+            if (preview) preview.classList.remove('hidden');
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(input.files[0]);
+}
+
+function clearChatImage() {
+    pendingChatImage = null;
+    const inputEl = document.getElementById('chatImageInput');
+    const previewEl = document.getElementById('chatImagePreview');
+    if (inputEl) inputEl.value = '';
+    if (previewEl) previewEl.classList.add('hidden');
+}
+
+function showChatImage(src) {
+    const viewer = document.getElementById('modal-image-viewer');
+    const viewImg = document.getElementById('viewer-img');
+    if (viewImg) viewImg.src = src;
+    if (viewer) viewer.classList.remove('hidden');
+}
+
+function closeChatImageViewer() {
+    const viewer = document.getElementById('modal-image-viewer');
+    if (viewer) viewer.classList.add('hidden');
+}
+
+function startChatRefresh() {
+    if (chatRefreshInterval) clearInterval(chatRefreshInterval);
+    chatRefreshInterval = setInterval(() => {
+        if (currentChatOrderId) {
+            loadOrderChat(currentChatOrderId);
+        }
+    }, 10000);
+}
+
+function stopChatRefresh() {
+    if (chatRefreshInterval) {
+        clearInterval(chatRefreshInterval);
+        chatRefreshInterval = null;
+    }
+    currentChatOrderId = null;
+    clearChatImage();
 }
 
 // ===============================================
@@ -795,16 +1774,16 @@ async function assignOrderFromModal(id) {
 
 let driverAssignments = [];
 let currentOrderTotalQty = 0;
+let currentModalOrderId = null;
 
 function initDriverAssignments(order) {
     driverAssignments = [];
-    currentOrderTotalQty = (order.products || []).reduce((sum, p) => sum + Number(p.qty || 0), 0);
+    currentOrderTotalQty = (order.products || order.cart || []).reduce((sum, p) => sum + Number(p.qty || p.quantity || 0), 0);
 
-    // If order already has a driver, add as initial assignment
-    if (order.taiXe) {
+    if (order.taiXe || order.driver) {
         driverAssignments.push({
-            driver_name: order.taiXe,
-            plate: order.bienSo || '',
+            driver_name: order.taiXe || order.driver,
+            plate: order.bienSo || order.plate || '',
             qty: currentOrderTotalQty,
             type: 'internal',
             note: order.note || ''
@@ -820,20 +1799,20 @@ function renderDriverAssignments() {
     if (!container) return;
 
     if (!driverAssignments.length) {
-        container.innerHTML = '<div class="text-muted small text-center py-2">Chưa có tài xế nào</div>';
+        container.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding:12px;">Chưa có tài xế nào</div>';
         return;
     }
 
     container.innerHTML = driverAssignments.map((a, idx) => `
-        <div class="d-flex justify-content-between align-items-center bg-white p-2 rounded border mb-1">
+        <div style="display:flex; justify-content:space-between; align-items:center; background:var(--surface); padding:10px; border-radius:8px; border:1px solid var(--border); margin-bottom:8px;">
             <div>
-                <span class="badge ${a.type === 'external' ? 'bg-secondary' : 'bg-primary'} me-1">${a.type === 'external' ? 'Ngoài' : 'Nội bộ'}</span>
-                <span class="fw-bold">${a.driver_name}</span>
-                <span class="text-muted small">(${a.plate})</span>
+                <span class="badge badge-${a.type === 'external' ? 'secondary' : 'primary'}" style="font-size:10px; margin-right:6px;">${a.type === 'external' ? 'Ngoài' : 'Nội bộ'}</span>
+                <strong>${a.driver_name}</strong>
+                <span style="color:var(--text-muted); font-size:12px;">(${a.plate})</span>
             </div>
-            <div class="d-flex align-items-center gap-2">
-                <span class="badge bg-success">${a.qty} kg</span>
-                <button class="btn btn-sm text-danger p-0" onclick="removeDriverAssignment(${idx})">
+            <div style="display:flex; align-items:center; gap:8px;">
+                <span class="badge badge-success">${a.qty} kg</span>
+                <button class="btn btn-outline btn-sm" onclick="removeDriverAssignment(${idx})" style="padding:4px 8px;">
                     <i class="bi bi-x-lg"></i>
                 </button>
             </div>
@@ -845,16 +1824,22 @@ function updateQtySummary() {
     const totalAssigned = driverAssignments.reduce((sum, a) => sum + Number(a.qty || 0), 0);
     const remaining = currentOrderTotalQty - totalAssigned;
 
-    document.getElementById('totalCrmQty').textContent = currentOrderTotalQty + ' kg';
-    document.getElementById('totalAssignedQty').textContent = totalAssigned + ' kg';
-    document.getElementById('remainingQty').textContent = remaining + ' kg';
-    document.getElementById('remainingQty').className = remaining === 0 ? 'fw-bold text-success' : 'fw-bold text-danger';
+    const totalEl = document.getElementById('totalCrmQty');
+    const assignedEl = document.getElementById('totalAssignedQty');
+    const remainingEl = document.getElementById('remainingQty');
+
+    if (totalEl) totalEl.textContent = currentOrderTotalQty + ' kg';
+    if (assignedEl) assignedEl.textContent = totalAssigned + ' kg';
+    if (remainingEl) {
+        remainingEl.textContent = remaining + ' kg';
+        remainingEl.style.color = remaining === 0 ? 'var(--success)' : 'var(--danger)';
+    }
 }
 
 function addDriverAssignment() {
     const sel = document.getElementById('modal_drv_select');
     const qtyInput = document.getElementById('modal_drv_qty');
-    const qty = Number(qtyInput.value);
+    const qty = Number(qtyInput?.value);
 
     if (!qty || qty <= 0) {
         alert('Nhập số lượng hợp lệ!');
@@ -863,22 +1848,22 @@ function addDriverAssignment() {
 
     let name, plate, type = 'internal';
 
-    if (sel.value === 'EXTERNAL') {
-        name = document.getElementById('modal_ext_name').value.trim();
-        plate = document.getElementById('modal_ext_plate').value.trim();
+    if (sel?.value === 'EXTERNAL') {
+        name = document.getElementById('modal_ext_name')?.value?.trim();
+        plate = document.getElementById('modal_ext_plate')?.value?.trim();
         type = 'external';
         if (!name || !plate) {
             alert('Vui lòng nhập Tên và Biển số xe ngoài!');
             return;
         }
-    } else if (sel.value) {
+    } else if (sel?.value) {
         [name, plate] = sel.value.split('|');
     } else {
         alert('Vui lòng chọn tài xế!');
         return;
     }
 
-    const note = document.getElementById('modal_note').value.trim();
+    const note = document.getElementById('modal_note')?.value?.trim() || '';
 
     driverAssignments.push({
         driver_name: name,
@@ -889,10 +1874,12 @@ function addDriverAssignment() {
     });
 
     // Reset form
-    sel.value = '';
-    qtyInput.value = '';
-    document.getElementById('modal_note').value = '';
-    document.getElementById('modal_ext_drv').classList.add('d-none');
+    if (sel) sel.value = '';
+    if (qtyInput) qtyInput.value = '';
+    const noteEl = document.getElementById('modal_note');
+    if (noteEl) noteEl.value = '';
+    const extDiv = document.getElementById('modal_ext_drv');
+    if (extDiv) extDiv.classList.add('hidden');
 
     renderDriverAssignments();
     updateQtySummary();
@@ -917,14 +1904,12 @@ async function submitAllDriverAssignments() {
         }
     }
 
-    const orderId = window.currentModalOrderId;
-    if (!orderId) return;
+    if (!currentModalOrderId) return;
 
-    showLoading();
+    showLoading('Đang phân công...');
 
     try {
-        // Save assignments to database
-        const res = await fetch(`/api/orders/${orderId}/assign-multi`, {
+        const res = await fetch(`/api/orders/${currentModalOrderId}/assign-multi`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ assignments: driverAssignments })
@@ -937,11 +1922,7 @@ async function submitAllDriverAssignments() {
             alert('Lỗi: ' + data.msg);
         } else {
             alert(data.msg || 'Đã phân công thành công!');
-
-            const modalEl = document.getElementById('orderDetailModal');
-            const modal = bootstrap.Modal.getInstance(modalEl);
-            if (modal) modal.hide();
-
+            closeOrderModal();
             loadOrders();
         }
 
@@ -951,1112 +1932,83 @@ async function submitAllDriverAssignments() {
     }
 }
 
-async function adminCompleteOrder(id) {
-    if (!confirm('ADMIN: Mở form hoàn thành cho đơn này?')) return;
-    openDeliveryModal(id);
-}
-
-function toggleExternalDriver(id) {
-    const val = document.getElementById(`drv_${id}`).value;
-    const extArea = document.getElementById(`ext_drv_${id}`);
-    if (val === 'EXTERNAL') {
-        extArea.classList.remove('d-none');
+function toggleExternalDriverInput() {
+    const sel = document.getElementById('modal_drv_select');
+    const extDiv = document.getElementById('modal_ext_drv');
+    if (sel?.value === 'EXTERNAL') {
+        extDiv?.classList.remove('hidden');
     } else {
-        extArea.classList.add('d-none');
+        extDiv?.classList.add('hidden');
     }
 }
 
-async function assignOrder(id) {
-    const sel = document.getElementById(`drv_${id}`);
-    let name, plate;
-
-    if (sel.value === 'EXTERNAL') {
-        name = document.getElementById(`ext_name_${id}`).value.trim();
-        plate = document.getElementById(`ext_plate_${id}`).value.trim();
-        if (!name || !plate) {
-            alert('Vui lòng nhập Tên và Biển số xe ngoài!');
-            return;
-        }
-    } else if (sel.value) {
-        [name, plate] = sel.value.split('|');
-    } else {
-        alert('Vui lòng chọn tài xế!');
-        return;
-    }
-
-    const note = document.getElementById(`note_${id}`).value.trim();
-
-    showLoading();
-
-    try {
-        const res = await api.assignOrder(id, name, plate || '', note);
-        hideLoading();
-        alert(res.msg);
-        loadOrders();
-    } catch (e) {
-        hideLoading();
-        alert(e.message);
-    }
-}
-
-// === CREATE ORDER ===
-function initCreateOrder() {
-    $('#order-date').value = new Date().toISOString().split('T')[0];
-    $('#order-customer').value = '';
-    $('#order-address').value = '';
-    state.orderProducts = [];
-    renderOrderProducts();
-}
-
-function addOrderProduct() {
-    const name = $('#prod-name').value.trim();
-    const qty = parseFloat($('#prod-qty').value);
-
-    if (!name || !qty) {
-        alert('Nhập đủ thông tin sản phẩm!');
-        return;
-    }
-
-    state.orderProducts.push({ name, qty, unit: 'Kg' });
-    renderOrderProducts();
-    $('#prod-name').value = '';
-    $('#prod-qty').value = '';
-}
-
-function renderOrderProducts() {
-    const container = $('#order-products');
-    container.innerHTML = state.orderProducts.map((p, i) =>
-        `<div class="d-flex justify-content-between align-items-center p-2 bg-light rounded mb-2">
-      <span>${p.name}: ${p.qty} ${p.unit}</span>
-      <button class="btn btn-sm btn-outline-danger" onclick="removeOrderProduct(${i})">✕</button>
-    </div>`
-    ).join('');
-}
-
-function removeOrderProduct(index) {
-    state.orderProducts.splice(index, 1);
-    renderOrderProducts();
-}
-
-async function submitOrder() {
-    if (!state.orderProducts.length) {
-        alert('Thêm ít nhất 1 sản phẩm!');
-        return;
-    }
-
-    showLoading();
-
-    try {
-        const res = await api.createOrder({
-            date: $('#order-date').value,
-            customer: $('#order-customer').value,
-            address: $('#order-address').value,
-            products: state.orderProducts
-        });
-
-        hideLoading();
-        alert(res.msg);
-        if (!res.error) showView('view-home');
-
-    } catch (e) {
-        hideLoading();
-        alert(e.message);
-    }
-}
-
-// === HR ===
-async function loadEmployees() {
-    const container = $('#hr-list');
-    container.innerHTML = '<div class="loading-spinner mx-auto mt-5"></div>';
-
-    try {
-        const res = await api.getEmployees();
-        if (res.error) throw new Error(res.msg);
-
-        if (!res.data.length) {
-            container.innerHTML = '<div class="empty-state"><i class="bi bi-people"></i><div>Chưa có nhân viên</div></div>';
-            return;
-        }
-
-        container.innerHTML = res.data.map(emp => `
-      <div class="list-item">
-        <div>
-          <h6 class="fw-bold mb-1">${emp.fullName}</h6>
-          <div class="small text-muted">${emp.role} ${emp.plate ? '• ' + emp.plate : ''}</div>
-        </div>
-        <span class="badge ${emp.status === 'ACTIVE' ? 'bg-success' : 'bg-secondary'}">${emp.status}</span>
-      </div>
-    `).join('');
-
-    } catch (e) {
-        container.innerHTML = `<div class="alert alert-danger">${e.message}</div>`;
-    }
-}
-
-function toggleAddEmployee() {
-    $('#form-add-employee').classList.toggle('hidden');
-}
-
-async function addEmployee() {
-    const data = {
-        fullName: $('#emp-name').value,
-        phone: $('#emp-phone').value,
-        role: $('#emp-role').value,
-        baseSalary: $('#emp-salary').value
-    };
-
-    if (!data.fullName || !data.phone) {
-        alert('Nhập đủ họ tên và SĐT!');
-        return;
-    }
-
-    showLoading();
-
-    try {
-        const res = await api.addEmployee(data);
-        hideLoading();
-        alert(res.msg);
-        if (!res.error) {
-            hide('form-add-employee');
-            loadEmployees();
-        }
-    } catch (e) {
-        hideLoading();
-        alert(e.message);
-    }
-}
-
-// === MATERIALS ===
-let allMaterials = [];
-
-async function loadMaterials() {
-    const container = $('#materials-list');
-    container.innerHTML = '<div class="loading-spinner mx-auto mt-5"></div>';
-
-    try {
-        const res = await api.getMaterials();
-        if (res.error) throw new Error(res.msg);
-
-        allMaterials = res.data || [];
-        renderMaterials(allMaterials);
-
-    } catch (e) {
-        container.innerHTML = `<div class="alert alert-danger">${e.message}</div>`;
-    }
-}
-
-function searchMaterials() {
-    const query = $('#mat-search').value.toLowerCase();
-    const filtered = allMaterials.filter(m =>
-        m.name.toLowerCase().includes(query) ||
-        m.code.toLowerCase().includes(query) ||
-        (m.casNumber && m.casNumber.includes(query))
-    );
-    renderMaterials(filtered);
-}
-
-function renderMaterials(list) {
-    const container = $('#materials-list');
-
-    if (!list.length) {
-        container.innerHTML = '<div class="empty-state"><i class="bi bi-box-seam"></i><div>Không tìm thấy vật tư</div></div>';
-        return;
-    }
-
-    container.innerHTML = list.map(mat => `
-    <div class="list-item">
-      <div>
-        <h6 class="fw-bold mb-1" style="color:#8b5cf6">${mat.name}</h6>
-        <div class="small text-muted">${mat.code} ${mat.casNumber ? '• CAS: ' + mat.casNumber : ''}</div>
-      </div>
-      <div class="text-end">
-        <span class="badge bg-light text-dark border">${mat.category}</span>
-        <div class="small text-success fw-bold">${mat.salePrice ? mat.salePrice.toLocaleString() + ' đ' : ''}</div>
-      </div>
-    </div>
-  `).join('');
-}
-
-function toggleAddMaterial() {
-    $('#form-add-material').classList.toggle('hidden');
-}
-
-async function addMaterial() {
-    const data = {
-        name: $('#mat-name').value,
-        casNumber: $('#mat-cas').value,
-        category: $('#mat-category').value,
-        salePrice: $('#mat-price').value
-    };
-
-    if (!data.name) {
-        alert('Nhập tên vật tư!');
-        return;
-    }
-
-    showLoading();
-
-    try {
-        const res = await api.addMaterial(data);
-        hideLoading();
-        alert(res.msg);
-        if (!res.error) {
-            hide('form-add-material');
-            loadMaterials();
-        }
-    } catch (e) {
-        hideLoading();
-        alert(e.message);
-    }
-}
-
-// === WAREHOUSE ===
-async function loadWarehouse() {
-    const container = $('#warehouse-list');
-    container.innerHTML = '<div class="loading-spinner mx-auto mt-5"></div>';
-
-    try {
-        const [inventoryRes, alertsRes] = await Promise.all([
-            api.getInventory(state.currentWarehouse),
-            api.getAlerts()
-        ]);
-
-        // Render alerts
-        if (!alertsRes.error && alertsRes.data && alertsRes.data.length > 0) {
-            $('#wh-alerts').innerHTML = `
-        <div class="alert alert-warning py-2">
-          <strong><i class="bi bi-exclamation-triangle"></i> Cảnh báo:</strong>
-          <ul class="mb-0 mt-1">
-            ${alertsRes.data.slice(0, 3).map(a => `<li>${a.name}: ${a.qty} Kg</li>`).join('')}
-          </ul>
-        </div>
-      `;
-        } else {
-            $('#wh-alerts').innerHTML = '';
-        }
-
-        // Render inventory
-        if (inventoryRes.error) throw new Error(inventoryRes.msg);
-
-        if (!inventoryRes.data.length) {
-            container.innerHTML = '<div class="empty-state"><i class="bi bi-building"></i><div>Không có dữ liệu</div></div>';
-            return;
-        }
-
-        container.innerHTML = inventoryRes.data.map(item => {
-            let borderClass = item.status === 'OUT_OF_STOCK' ? 'out' : (item.status === 'LOW' ? 'low' : '');
-            let qtyClass = item.qty < 0 ? 'text-danger' : (item.qty < 100 ? 'text-warning' : 'text-success');
-
-            return `
-        <div class="inventory-item ${borderClass}">
-          <div>
-            <h6 class="fw-bold mb-0">${item.name}</h6>
-            <div class="small text-muted">${item.warehouse || state.currentWarehouse}</div>
-          </div>
-          <div class="text-end">
-            <div class="fs-5 fw-bold ${qtyClass}">${item.qty.toLocaleString()}</div>
-            <div class="small text-muted">Kg</div>
-          </div>
-        </div>
-      `;
-        }).join('');
-
-    } catch (e) {
-        container.innerHTML = `<div class="alert alert-danger">${e.message}</div>`;
-    }
-}
-
-function switchWarehouse(wh) {
-    state.currentWarehouse = wh;
-    $$('.tab-container .tab-btn').forEach(btn => btn.classList.remove('active'));
-    $(`#wh-tab-${wh.toLowerCase() || 'all'}`).classList.add('active');
-    loadWarehouse();
-}
-
-// === REPORTS ===
-async function loadReports() {
-    const container = $('#report-content');
-    container.innerHTML = '<div class="loading-spinner mx-auto mt-5"></div>';
-
-    try {
-        const res = await api.getReportInventory();
-        if (res.error) throw new Error(res.msg);
-
-        if (!res.data.length) {
-            container.innerHTML = '<div class="empty-state"><i class="bi bi-bar-chart-line"></i><div>Không có dữ liệu</div></div>';
-            return;
-        }
-
-        container.innerHTML = `
-      <div class="card-custom">
-        <table class="table table-striped mb-0">
-          <thead>
-            <tr><th>Tên</th><th class="text-end">Tồn (Kg)</th></tr>
-          </thead>
-          <tbody>
-            ${res.data.map(item => {
-            const color = item.qty < 0 ? 'text-danger' : (item.qty < 100 ? 'text-warning' : 'text-success');
-            return `<tr><td>${item.name}</td><td class="text-end fw-bold ${color}">${item.qty.toLocaleString()}</td></tr>`;
-        }).join('')}
-          </tbody>
-        </table>
-      </div>
-    `;
-
-    } catch (e) {
-        container.innerHTML = `<div class="alert alert-danger">${e.message}</div>`;
-    }
-}
-
-function switchReportTab(tab) {
-    state.currentReportTab = tab;
-    $$('.tab-container .tab-btn').forEach(btn => btn.classList.remove('active'));
-    $(`#rpt-tab-${tab}`).classList.add('active');
-    loadReports();
-}
-
-// === DRIVER ORDERS ===
-state.currentDriverTab = 'active'; // active | history
-
-function switchDriverTab(tab) {
-    state.currentDriverTab = tab;
-
-    // UI Contrast Fix
-    const btnActive = document.getElementById('drv-tab-active');
-    const btnHistory = document.getElementById('drv-tab-history');
-
-    if (tab === 'active') {
-        btnActive.classList.add('active');
-        btnHistory.classList.remove('active');
-    } else {
-        btnHistory.classList.add('active');
-        btnActive.classList.remove('active');
-    }
-
-    renderDriverOrders();
-}
-
-async function loadMyOrders() {
-    showView('view-driver-orders');
-    const container = $('#my-orders-list');
-    container.innerHTML = '<div class="loading-spinner mx-auto mt-5"></div>';
-
-    try {
-        const res = await api.getMyOrders(state.user.name, state.user.role);
-        if (res.error) throw new Error(res.msg);
-
-        state.myOrders = res.data || [];
-
-        // Calculate counts
-        const activeCount = state.myOrders.filter(o =>
-            !['Đã thực hiện', 'Đã giao hàng', 'Đã hủy bỏ'].includes(o.status)
-        ).length;
-        const historyCount = state.myOrders.length - activeCount;
-
-        // Update Tab Titles
-        const btnActive = document.getElementById('drv-tab-active');
-        const btnHistory = document.getElementById('drv-tab-history');
-        if (btnActive) btnActive.innerHTML = `Đang chạy <span class="badge bg-white text-primary ms-1">${activeCount}</span>`;
-        if (btnHistory) btnHistory.innerHTML = `Lịch sử <span class="badge bg-light text-secondary ms-1">${historyCount}</span>`;
-
-        renderDriverOrders();
-
-    } catch (e) {
-        container.innerHTML = `<div class="alert alert-danger">${e.message}</div>`;
-    }
-}
-
-function renderDriverOrders() {
-    const container = $('#my-orders-list');
-
-    // Filter List
-    let list = state.myOrders.filter(o => {
-        const isCompleted = o.status === 'Đã thực hiện' || o.status === 'Đã giao hàng' || o.status === 'Đã hủy bỏ';
-        if (state.currentDriverTab === 'active') return !isCompleted;
-        return isCompleted;
-    });
-
-    if (!list.length) {
-        const otherTab = state.currentDriverTab === 'active' ? 'Lịch sử' : 'Đang chạy';
-        container.innerHTML = `
-            <div class="empty-state text-center mt-5">
-                <i class="bi bi-truck fs-1 text-muted opacity-50"></i>
-                <div class="mt-2 text-secondary fw-bold">Trống ở mục này</div>
-                <div class="small text-muted mt-1">Hãy nhấn vào tab <b>"${otherTab}"</b> để xem thêm.</div>
-            </div>`;
-        return;
-    }
-
-    container.innerHTML = list.map(order => {
-        const isDelivering = order.statusCode === 'DANG_GIAO';
-        const isHistory = state.currentDriverTab === 'history';
-
-        let btnAction = '';
-        if (!isHistory) {
-            btnAction = isDelivering
-                ? `<button class="btn btn-success flex-fill fw-bold py-2 shadow-sm" onclick="event.stopPropagation(); handleCompleteOrder('${order.id}')">
-                    <i class="bi bi-check-lg me-1"></i> HOÀN THÀNH
-                </button>`
-                : `<button class="btn btn-primary flex-fill fw-bold py-2 shadow-sm" onclick="event.stopPropagation(); startOrder('${order.id}')">
-                    <i class="bi bi-truck me-1"></i> NHẬN ĐƠN
-                </button>`;
-        } else {
-            btnAction = `<span class="badge bg-secondary py-2 px-3">Đã hoàn thành</span>`;
-        }
-
-        const statusBadge = isDelivering
-            ? '<span class="badge bg-primary bg-opacity-10 text-primary px-2 py-1 rounded-pill"><i class="bi bi-lightning-charge-fill me-1"></i>Đang giao</span>'
-            : (isHistory ? '<span class="badge bg-success bg-opacity-10 text-success px-2 py-1 rounded-pill"><i class="bi bi-check-all me-1"></i>Lịch sử</span>' : '<span class="badge bg-warning bg-opacity-10 text-warning px-2 py-1 rounded-pill"><i class="bi bi-hourglass-split me-1"></i>Chờ nhận</span>');
-
-        return `
-    <div class="card border-0 shadow-sm mb-3 overflow-hidden rounded-4" style="cursor:pointer;" onclick="openOrderDetail('${order.id}')">
-        <div class="card-body p-0">
-        <!-- Header -->
-        <div class="d-flex justify-content-between align-items-start p-3 bg-light bg-opacity-50 border-bottom border-light">
-            <div>
-                <div class="d-flex align-items-center gap-2 mb-1">
-                    <span class="fw-bold text-dark text-truncate" style="max-width: 200px;">${order.khach}</span>
-                </div>
-                <div class="small text-muted"><i class="bi bi-calendar3 me-1"></i>${order.ngay}</div>
-            </div>
-            ${statusBadge}
-        </div>
-
-        <!-- Body -->
-        <div class="p-3">
-            <div class="d-flex align-items-start gap-2 mb-3">
-                <i class="bi bi-geo-alt-fill text-danger mt-1"></i>
-                <div class="small text-secondary lh-sm">${order.diaChi || 'Chưa có địa chỉ'}</div>
-            </div>
-
-            <!-- Product Summary (First 2 items) -->
-            <div class="bg-light rounded p-2 mb-3">
-                ${(order.products || []).slice(0, 2).map(p => `
-                    <div class="d-flex justify-content-between small mb-1">
-                        <span class="text-truncate" style="max-width: 70%;">${p.name}</span>
-                        <span class="fw-bold">${p.qty} ${p.unit}</span>
-                    </div>
-                `).join('')}
-                ${(order.products || []).length > 2 ? `<div class="small text-muted text-center">+ ${(order.products.length - 2)} sản phẩm khác</div>` : ''}
-            </div>
-
-            <!-- Actions Grid -->
-            <div class="d-flex gap-2 align-items-center">
-                <button class="btn btn-light flex-fill border" onclick="event.stopPropagation(); openOrderDetail('${order.id}')">
-                    <i class="bi bi-chat-dots-fill text-primary"></i> <span class="small d-block">Chat</span>
-                </button>
-                ${btnAction}
-            </div>
-        </div>
-        </div>
-    </div>
-    `;
-    }).join('');
-}
-
-async function startOrder(id) {
-    if (!confirm('Xác nhận nhận đơn này?')) return;
-
-    showLoading();
-
-    try {
-        const res = await api.startOrder(id);
-        hideLoading();
-        alert(res.msg);
-        loadMyOrders();
-    } catch (e) {
-        hideLoading();
-        alert(e.message);
-    }
-}
-
-function handleCompleteOrder(id) {
-    if (!confirm('Xác nhận hoàn thành đơn này?')) return;
-    openDeliveryModal(id);
-}
-
-// === DELIVERY MODAL LOGIC ===
-
-// === DELIVERY MODAL LOGIC ===
-
-function openDeliveryModal(orderId) {
-    // Search in all lists (including history)
-    const order = state.orders.pending.find(o => o.id === orderId) ||
-        state.orders.assigned.find(o => o.id === orderId) ||
-        state.orders.history.find(o => o.id === orderId) ||
-        (state.myOrders || []).find(o => o.id === orderId);
-
-    if (!order) return console.error("Order not found", orderId);
-
-    state.currentDeliveryOrder = order;
-
-    // Initialize Cart from Order Products
-    // Store 'planQty' for reference and 'qty' for editing
-    state.deliveryCart = (order.products || []).map(p => ({
-        product: p.name,
-        code: p.code,
-        planQty: p.qty, // Read-only
-        qty: p.qty,     // Editable (auto-fill with plan for convenience)
-        unit: p.unit,
-        density: p.density || 1,
-        isShell: false,
-        note: ''
-    }));
-
-    renderDeliveryCart();
-
-    const isCompleted = order.status === 'Đã thực hiện' || order.status === 'Đã giao hàng';
-    $('#del-modal-title').textContent = isCompleted
-        ? 'CHỈNH SỬA ĐƠN HÀNG (ĐÃ GIAO)'
-        : (order.type === 'IMPORT' ? 'XÁC NHẬN NHẬP KHO' : 'XÁC NHẬN GIAO HÀNG');
-
-    // Update Button Text
-    $('#btn-submit-delivery').innerHTML = isCompleted
-        ? '<i class="bi bi-save me-1"></i> CẬP NHẬT'
-        : '<i class="bi bi-check-lg me-1"></i> HOÀN THÀNH';
-
-    // Reset inputs
-    $('#inp-del-img').value = '';
-    $('#img-preview-area').innerHTML = '';
-    state.selectedImages = []; // Reset images
-    $('#inp-del-note').value = order.note || ''; // Pre-fill note if exists
-
-    $('#modal-delivery').classList.remove('hidden');
-}
-
-function closeDeliveryModal() {
-    $('#modal-delivery').classList.add('hidden');
-    state.currentDeliveryOrder = null;
-    state.deliveryCart = [];
-    state.selectedImages = [];
-}
-
-function renderDeliveryCart() {
-    const list = $('#delivery-cart-list');
-
-    if (!state.deliveryCart.length) {
-        list.innerHTML = '<div class="text-center text-muted small py-3">Giỏ hàng trống</div>';
-        return;
-    }
-
-    list.innerHTML = state.deliveryCart.map((item, idx) => {
-        // Only show delete button for extra items (isShell), not for main CRM products
-        const deleteBtn = item.isShell
-            ? `<button class="btn btn-sm text-danger py-0 px-2" onclick="removeCartItem(${idx})"><i class="bi bi-x-lg"></i></button>`
-            : `<span class="badge bg-success small"><i class="bi bi-lock"></i> CRM</span>`;
-
-        const itemClass = item.isShell ? 'border-warning' : 'border-primary';
-
-        return `
-        <div class="bg-white p-2 mb-2 rounded border ${itemClass} shadow-sm">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <div class="fw-bold text-primary text-truncate" style="max-width: 85%;">${item.product}</div>
-                ${deleteBtn}
-            </div>
-            
-            <div class="row g-2 align-items-center">
-                <!-- Planned (Static) -->
-                <div class="col-3">
-                    <div class="small text-muted mb-0">YC</div>
-                    <span class="badge bg-light text-dark border px-2 py-2 w-100">${item.planQty || 0} ${item.unit}</span>
-                </div>
-
-                <!-- Actual (Editable) -->
-                <div class="col-4">
-                    <div class="small text-muted mb-0">Thực tế</div>
-                    <input type="number" class="form-control text-center fw-bold text-primary px-1" 
-                        value="${item.qty}" 
-                        onchange="updateCartQty(${idx}, this.value)">
-                </div>
-
-                <!-- Note -->
-                <div class="col-5">
-                    <div class="small text-muted mb-0">Ghi chú</div>
-                    <input type="text" class="form-control small px-2" placeholder="..." 
-                        value="${item.note || ''}" 
-                        onchange="updateCartNote(${idx}, this.value)">
-                </div>
-            </div>
-        </div>
-    `;
-    }).join('');
-}
-
-function updateCartQty(idx, val) {
-    if (state.deliveryCart[idx]) state.deliveryCart[idx].qty = Number(val);
-}
-
-function updateCartNote(idx, val) {
-    if (state.deliveryCart[idx]) state.deliveryCart[idx].note = val;
-}
-
-function removeCartItem(idx) {
-    const item = state.deliveryCart[idx];
-
-    // Prevent deletion of CRM products (main items)
-    if (!item || !item.isShell) {
-        alert('Không thể xóa hàng chính từ CRM!');
-        return;
-    }
-
-    if (confirm('Xóa hàng phụ này?')) {
-        state.deliveryCart.splice(idx, 1);
-        renderDeliveryCart();
-    }
-}
+// ===============================================
+// EXTRA ITEM MANAGEMENT (Phụ kiện)
+// ===============================================
 
 function addExtraItem() {
-    const name = $('#extra-prod-name').value;
-    const qty = Number($('#extra-prod-qty').value);
+    const nameEl = window.$('#extra-prod-name');
+    const qtyEl = window.$('#extra-prod-qty');
 
-    if (!name || !qty) return alert('Vui lòng chọn hàng và nhập số lượng!');
+    const name = nameEl?.value;
+    const qty = Number(qtyEl?.value);
+
+    if (!name || !qty) {
+        alert('Vui lòng chọn hàng và nhập số lượng!');
+        return;
+    }
 
     state.deliveryCart.push({
         product: name,
         code: '',
-        planQty: 0, // Extra items have 0 planned
+        planQty: 0,
         qty: qty,
-        unit: 'Cái', // Default for shells
+        unit: 'Cái',
         density: 1,
         isShell: true,
         note: 'Bổ sung'
     });
 
-    $('#extra-prod-name').value = '';
-    $('#extra-prod-qty').value = '';
+    if (nameEl) nameEl.value = '';
+    if (qtyEl) qtyEl.value = '';
     renderDeliveryCart();
 }
 
-// === IMAGE HANDLING ===
-async function handleImageSelect(input) {
-    const files = Array.from(input.files);
-    if (files.length > 10) return alert('Tối đa 10 ảnh!');
+// ===============================================
+// ADMIN COMPLETE ORDER
+// ===============================================
 
-    $('#img-preview-area').innerHTML = ''; // Clear preview
-    state.selectedImages = []; // Clear old state
+async function adminCompleteOrder(orderId) {
+    // Find order from assigned
+    const order = (state.orders.assigned || []).find(o =>
+        o.id == orderId || o.soDon == orderId || o.sale_order_no == orderId
+    );
 
-    for (const file of files) {
-        // Compress image before saving
-        const compressed = await compressImage(file);
-        state.selectedImages.push(compressed);
-
-        // Add Preview (Clickable)
-        const img = document.createElement('img');
-        img.src = compressed;
-        img.className = 'rounded border shadow-sm cursor-pointer';
-        img.style = 'height:70px; width:auto; flex-shrink:0; cursor:pointer;';
-        img.title = 'Xem ảnh lớn';
-        img.onclick = () => {
-            const viewer = document.getElementById('modal-image-viewer');
-            const viewImg = document.getElementById('viewer-img');
-            viewImg.src = compressed;
-            viewer.classList.remove('hidden');
-        };
-        $('#img-preview-area').appendChild(img);
-    }
-}
-
-// Compress image to reduce file size
-async function compressImage(file, maxWidth = 1200, maxHeight = 1200, quality = 0.7) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const img = new Image();
-            img.onload = () => {
-                const canvas = document.createElement('canvas');
-                let width = img.width;
-                let height = img.height;
-
-                // Scale down if needed
-                if (width > maxWidth) {
-                    height = (maxWidth / width) * height;
-                    width = maxWidth;
-                }
-                if (height > maxHeight) {
-                    width = (maxHeight / height) * width;
-                    height = maxHeight;
-                }
-
-                canvas.width = width;
-                canvas.height = height;
-
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, width, height);
-
-                // Convert to compressed JPEG
-                const compressed = canvas.toDataURL('image/jpeg', quality);
-                resolve(compressed);
-            };
-            img.onerror = reject;
-            img.src = e.target.result;
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-    });
-}
-
-async function submitDelivery() {
-    if (!state.deliveryCart.length) return alert('Giỏ hàng trống!');
-
-    // Validation: Require Images
-    if (!state.selectedImages || !state.selectedImages.length) {
-        if (!confirm('Cảnh báo: Chưa có ảnh chứng minh. Tiếp tục?')) return;
+    if (!order) {
+        alert('Không tìm thấy đơn hàng!');
+        return;
     }
 
-    const warehouseGroup = document.getElementsByName('del-wh');
-    let warehouse = 'LT1';
-    for (const r of warehouseGroup) if (r.checked) warehouse = r.value;
-
-    const note = $('#inp-del-note').value;
-    const order = state.currentDeliveryOrder;
-
-    let driverName = order.taiXe;
-    let plate = order.bienSo;
-    if (!driverName && state.user.role === 'ADMIN') {
-        driverName = 'ADMIN_OVERRIDE';
+    if (!confirm(`ADMIN: Xác nhận hoàn thành đơn #${order.soDon || order.sale_order_no || order.id}?`)) {
+        return;
     }
 
-    const payload = {
-        type: order.type || 'EXPORT',
-        warehouse: warehouse,
-        partner: order.khach,
-        driver_name: driverName || state.user.name,
-        plate: plate || '',
-        note: note,
-        sender: state.user.name,
-        cart: state.deliveryCart.map(i => ({
-            product: { name: i.product, code: i.code },
-            weight_kg: i.qty, // Actual Qty
-            unit: i.unit,
-            density: i.density,
-            isShell: i.isShell,
-            note: i.note
-        })),
-        images: state.selectedImages || [] // Send Array
-    };
-
-    showLoading();
+    showLoading('Đang hoàn thành đơn...');
     try {
-        const res = await api.completeOrder(order.id, payload);
+        const res = await api.completeOrder(orderId, {
+            products: order.products || order.chiTiet || [],
+            delivery_note: 'Admin hoàn thành',
+            admin_completed: true
+        });
         hideLoading();
+
         if (res.error) {
-            alert('Lỗi: ' + res.msg);
-        } else {
-            alert(res.msg);
-            closeDeliveryModal();
-            // Refresh views
-            if ($('#view-driver-orders').classList.contains('hidden')) {
-                loadOrders();
-            } else {
-                loadMyOrders();
-            }
-            try {
-                const modalEl = document.getElementById('orderDetailModal');
-                const modal = bootstrap.Modal.getInstance(modalEl);
-                if (modal) modal.hide();
-            } catch (e) { }
-        }
-    } catch (e) {
-        hideLoading();
-        alert('Lỗi kết nối: ' + e.message);
-    }
-}
-
-// ===============================================
-// ORDER CHAT FUNCTIONS
-// ===============================================
-
-let currentChatOrderId = null;
-let chatRefreshInterval = null;
-let pendingChatImage = null; // Store pending image for sending
-
-async function loadOrderChat(orderId) {
-    currentChatOrderId = orderId;
-    const container = document.getElementById('chatMessages');
-    if (!container) return;
-
-    container.innerHTML = '<div class="text-center text-muted p-3"><i class="bi bi-chat-dots"></i> Đang tải...</div>';
-
-    try {
-        const chatRoomId = String(orderId); // We expect soDon to be passed now
-        const res = await fetch(`/api/chat/${encodeURIComponent(chatRoomId)}/messages`);
-        const data = await res.json();
-
-        if (data.error) {
-            container.innerHTML = '<div class="text-danger small p-2">Lỗi tải tin nhắn</div>';
+            alert('Lỗi: ' + (res.msg || 'Không thể hoàn thành đơn'));
             return;
         }
 
-        if (!data.messages || data.messages.length === 0) {
-            container.innerHTML = '<div class="text-center text-muted p-3"><i class="bi bi-chat-dots"></i> Chưa có tin nhắn</div>';
-            return;
-        }
-
-        container.innerHTML = data.messages.map(msg => {
-            const isMe = msg.sender_name === state.user?.name;
-            const time = new Date(msg.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-            const roleColor = msg.sender_role === 'DRIVER' ? 'bg-success' : 'bg-primary';
-
-            // Image display (if present)
-            const imageHtml = msg.image
-                ? `<img src="${msg.image}" class="rounded mt-1" style="max-width:150px; cursor:pointer" onclick="showChatImage('${msg.image.replace(/'/g, "\\'")}')">`
-                : '';
-
-            return `
-                <div class="chat-msg ${isMe ? 'chat-me' : 'chat-other'} mb-2">
-                    <div class="chat-sender small">
-                        <span class="badge ${roleColor} badge-sm">${msg.sender_role}</span>
-                        <span class="text-muted">${msg.sender_name}</span>
-                    </div>
-                    <div class="chat-bubble ${isMe ? 'bg-primary text-white' : 'bg-light'}">
-                        ${msg.message || ''}
-                        ${imageHtml}
-                    </div>
-                    <div class="chat-time text-muted small">${time}</div>
-                </div>
-            `;
-        }).join('');
-
-        // Scroll to bottom
-        container.scrollTop = container.scrollHeight;
-
-    } catch (e) {
-        container.innerHTML = '<div class="text-danger small p-2">Lỗi kết nối</div>';
-    }
-}
-
-async function sendChatMessage() {
-    if (!currentChatOrderId) return;
-
-    const input = document.getElementById('chatInput');
-    const message = input.value.trim();
-    const image = pendingChatImage;
-
-    if (!message && !image) return;
-
-    input.disabled = true;
-
-    try {
-        const chatRoomId = String(currentChatOrderId);
-        const res = await fetch(`/api/chat/${encodeURIComponent(chatRoomId)}/messages`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                sender_name: state.user?.name || 'Unknown',
-                sender_role: state.user?.role || 'ADMIN',
-                message: message,
-                image: image
-            })
-        });
-
-        const data = await res.json();
-        input.disabled = false;
-
-        if (!data.error) {
-            input.value = '';
-            clearChatImage();
-            loadOrderChat(currentChatOrderId);
-        } else {
-            alert('Lỗi gửi tin: ' + data.message);
-        }
-
-    } catch (e) {
-        input.disabled = false;
-        alert('Lỗi kết nối');
-    }
-}
-
-function previewChatImage(input) {
-    if (!input.files || !input.files[0]) return;
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        // Compress before sending
-        const img = new Image();
-        img.onload = () => {
-            const canvas = document.createElement('canvas');
-            const maxSize = 800;
-            let width = img.width;
-            let height = img.height;
-
-            if (width > maxSize || height > maxSize) {
-                if (width > height) {
-                    height = (maxSize / width) * height;
-                    width = maxSize;
-                } else {
-                    width = (maxSize / height) * width;
-                    height = maxSize;
-                }
-            }
-
-            canvas.width = width;
-            canvas.height = height;
-            canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-
-            pendingChatImage = canvas.toDataURL('image/jpeg', 0.7);
-
-            document.getElementById('chatImageThumb').src = pendingChatImage;
-            document.getElementById('chatImagePreview').classList.remove('d-none');
-        };
-        img.src = e.target.result;
-    };
-    reader.readAsDataURL(input.files[0]);
-}
-
-function clearChatImage() {
-    pendingChatImage = null;
-    document.getElementById('chatImageInput').value = '';
-    document.getElementById('chatImagePreview').classList.add('d-none');
-}
-
-function showChatImage(src) {
-    const viewer = document.getElementById('modal-image-viewer');
-    const viewImg = document.getElementById('viewer-img');
-    viewImg.src = src;
-    viewer.classList.remove('hidden');
-}
-
-function startChatRefresh() {
-    if (chatRefreshInterval) clearInterval(chatRefreshInterval);
-    chatRefreshInterval = setInterval(() => {
-        if (currentChatOrderId) {
-            loadOrderChat(currentChatOrderId);
-        }
-    }, 10000); // Refresh every 10 seconds
-}
-
-function stopChatRefresh() {
-    if (chatRefreshInterval) {
-        clearInterval(chatRefreshInterval);
-        chatRefreshInterval = null;
-    }
-    currentChatOrderId = null;
-    clearChatImage();
-}
-
-// ===============================================
-// IMPORT TICKETS FUNCTIONS
-// ===============================================
-
-let importProducts = [];
-
-async function loadImports() {
-    const container = $('#imports-list');
-    container.innerHTML = '<div class="loading-spinner mx-auto mt-5"></div>';
-
-    try {
-        const res = await fetch('/api/imports');
-        const data = await res.json();
-
-        if (data.error) {
-            container.innerHTML = `<div class="alert alert-danger">${data.msg}</div>`;
-            return;
-        }
-
-        if (!data.data || !data.data.length) {
-            container.innerHTML = '<div class="empty-state"><i class="bi bi-inbox"></i><div>Chưa có phiếu nhập</div></div>';
-            return;
-        }
-
-        container.innerHTML = data.data.map(imp => {
-            const statusBadge = {
-                'pending': '<span class="badge bg-warning text-dark">Chờ điều phối</span>',
-                'assigned': '<span class="badge bg-primary">Đã gán TX</span>',
-                'completed': '<span class="badge bg-success">Hoàn thành</span>',
-                'cancelled': '<span class="badge bg-secondary">Đã hủy</span>'
-            }[imp.status] || '';
-
-            const products = Array.isArray(imp.products) ? imp.products : [];
-            const summary = products.length > 0 ? `${products[0].name} ${products.length > 1 ? `(+${products.length - 1})` : ''}` : '';
-
-            return `
-                <div class="card-custom mb-2">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <span class="badge bg-light text-dark border">#${imp.ticket_no}</span>
-                        ${statusBadge}
-                    </div>
-                    <h6 class="fw-bold text-success mb-1">${imp.supplier_name}</h6>
-                    <div class="small text-muted mb-2">${summary} | ${imp.total_qty || 0} kg</div>
-                    ${imp.assigned_driver ? `<div class="small"><i class="bi bi-truck"></i> ${imp.assigned_driver}</div>` : ''}
-                </div>
-            `;
-        }).join('');
-
-    } catch (e) {
-        container.innerHTML = `<div class="alert alert-danger">${e.message}</div>`;
-    }
-}
-
-function toggleCreateImport() {
-    $('#form-create-import').classList.toggle('hidden');
-    importProducts = [];
-    renderImportProducts();
-}
-
-function addImportProduct() {
-    const name = $('#imp-prod-name').value.trim();
-    const qty = Number($('#imp-prod-qty').value);
-
-    if (!name || !qty) return alert('Nhập tên và số lượng!');
-
-    importProducts.push({ name, qty, unit: 'kg' });
-    $('#imp-prod-name').value = '';
-    $('#imp-prod-qty').value = '';
-    renderImportProducts();
-}
-
-function renderImportProducts() {
-    const container = $('#imp-products-list');
-    container.innerHTML = importProducts.map((p, i) => `
-        <div class="d-flex justify-content-between align-items-center bg-white p-2 rounded border mb-1">
-            <span>${p.name}: ${p.qty} ${p.unit}</span>
-            <button class="btn btn-sm text-danger" onclick="removeImportProduct(${i})"><i class="bi bi-x"></i></button>
-        </div>
-    `).join('');
-}
-
-function removeImportProduct(idx) {
-    importProducts.splice(idx, 1);
-    renderImportProducts();
-}
-
-async function submitImport() {
-    const supplier = $('#imp-supplier').value.trim();
-    if (!supplier) return alert('Nhập tên nhà cung cấp!');
-    if (!importProducts.length) return alert('Thêm ít nhất 1 sản phẩm!');
-
-    showLoading();
-
-    try {
-        const res = await fetch('/api/imports', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                supplier_name: supplier,
-                supplier_address: $('#imp-address').value,
-                products: importProducts,
-                expected_date: $('#imp-date').value || null,
-                warehouse: $('#imp-warehouse').value,
-                note: $('#imp-note').value,
-                created_by: state.user?.name || 'Admin'
-            })
-        });
-
-        const data = await res.json();
-        hideLoading();
-
-        if (data.error) {
-            alert('Lỗi: ' + data.msg);
-        } else {
-            alert(data.msg);
-            toggleCreateImport();
-            $('#imp-supplier').value = '';
-            $('#imp-address').value = '';
-            $('#imp-date').value = '';
-            $('#imp-note').value = '';
-            loadImports();
-        }
-
+        alert(res.msg || 'Đã hoàn thành đơn hàng!');
+        loadOrders();
     } catch (e) {
         hideLoading();
         alert('Lỗi: ' + e.message);
@@ -2064,419 +2016,447 @@ async function submitImport() {
 }
 
 // ===============================================
-// RENDER IMPORT/EXPORT TICKETS IN DISPATCH VIEW
+// EDIT ORDER
 // ===============================================
 
-function renderImportTickets(container, list) {
-    if (!list || !list.length) {
-        container.innerHTML = '<div class="empty-state"><i class="bi bi-box-arrow-in-down"></i><div>Chưa có phiếu nhập</div></div>';
-        return;
-    }
-
-    container.innerHTML = list.map(t => {
-        const statusBadge = {
-            'pending': '<span class="badge bg-warning text-dark">Chờ gán</span>',
-            'assigned': '<span class="badge bg-primary">Đang nhận</span>',
-            'completed': '<span class="badge bg-success">Hoàn thành</span>',
-            'cancelled': '<span class="badge bg-secondary">Đã hủy</span>'
-        }[t.status] || '';
-
-        const products = Array.isArray(t.products) ? t.products : [];
-        const productSummary = products.slice(0, 2).map(p => p.name).join(', ') + (products.length > 2 ? ` (+${products.length - 2})` : '');
-        const date = t.expected_date ? new Date(t.expected_date).toLocaleDateString('vi-VN') : '';
-
-        return `
-            <div class="card-custom mb-2 border-start border-success border-4" style="cursor:pointer" onclick="openImportDetail('${t.id}')">
-                <div class="d-flex justify-content-between align-items-start mb-2">
-                    <div>
-                        <span class="badge bg-success me-1">📥 NHẬP</span>
-                        <span class="text-muted small">#${t.ticket_no}</span>
-                    </div>
-                    ${statusBadge}
-                </div>
-                <h6 class="fw-bold mb-1 text-success">${t.supplier_name}</h6>
-                <div class="small text-muted mb-1">${productSummary}</div>
-                <div class="d-flex justify-content-between align-items-center">
-                    <span class="badge bg-light text-dark">${t.total_qty || 0} kg</span>
-                    <span class="small text-muted">${date}</span>
-                </div>
-                ${t.assigned_driver ? `<div class="mt-1 small text-primary"><i class="bi bi-truck"></i> ${t.assigned_driver} ${t.assigned_plate ? '(' + t.assigned_plate + ')' : ''}</div>` : '<div class="mt-1 small text-warning"><i class="bi bi-person-plus"></i> Click để gán tài xế</div>'}
-            </div>
-        `;
-    }).join('');
-}
-
-function renderExportTickets(container, list) {
-    if (!list || !list.length) {
-        container.innerHTML = '<div class="empty-state"><i class="bi bi-box-arrow-up"></i><div>Chưa có phiếu xuất</div></div>';
-        return;
-    }
-
-    container.innerHTML = list.map(t => {
-        const date = t.created_at ? new Date(t.created_at).toLocaleDateString('vi-VN') : '';
-        const time = t.created_at ? new Date(t.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '';
-        const products = Array.isArray(t.products) ? t.products : [];
-        const productSummary = products.slice(0, 2).map(p => `${p.name}: ${p.qty}kg`).join(', ') + (products.length > 2 ? ` (+${products.length - 2})` : '');
-
-        return `
-            <div class="card-custom mb-2 border-start border-primary border-4">
-                <div class="d-flex justify-content-between align-items-start mb-2">
-                    <div>
-                        <span class="badge bg-primary me-1">📤 XUẤT</span>
-                        <span class="text-muted small">#${t.ticket_no}</span>
-                    </div>
-                    <span class="badge bg-success">Hoàn thành</span>
-                </div>
-                <h6 class="fw-bold mb-1">${t.customer_name || 'N/A'}</h6>
-                <div class="small text-muted mb-1">${productSummary}</div>
-                <div class="d-flex justify-content-between align-items-center">
-                    <span class="badge bg-light text-dark">${t.total_qty || 0} kg</span>
-                    <span class="small text-muted">${date} ${time}</span>
-                </div>
-                <div class="mt-1 small"><i class="bi bi-truck"></i> ${t.driver_name || ''} ${t.plate ? `(${t.plate})` : ''}</div>
-            </div>
-        `;
-    }).join('');
-}
-
-// ===============================================
-// IMPORT TICKET DETAIL & DRIVER ASSIGNMENT
-// ===============================================
-
-let currentImportTicket = null;
-
-function openImportDetail(ticketId) {
-    // Find ticket from state
-    const allImports = [
-        ...(state.orders.imports_pending || []),
-        ...(state.orders.imports_assigned || []),
-        ...(state.orders.imports_completed || [])
+function editOrder(orderId) {
+    // Find order from any state
+    const allOrders = [
+        ...(state.orders.pending || []),
+        ...(state.orders.assigned || []),
+        ...(state.orders.completed || [])
     ];
+    const order = allOrders.find(o =>
+        o.id == orderId || o.soDon == orderId || o.sale_order_no == orderId
+    );
 
-    const ticket = allImports.find(t => t.id == ticketId);
-    if (!ticket) {
+    if (!order) {
+        alert('Không tìm thấy đơn hàng!');
+        return;
+    }
+
+    // Store current order for editing
+    state.currentEditOrderId = orderId;
+
+    const products = order.products || order.chiTiet || [];
+    const productsHtml = products.length > 0
+        ? products.map((p, idx) => `
+            <tr>
+                <td>${p.name || p.product || '-'}</td>
+                <td>
+                    <input type="number" class="form-control form-control-sm edit-product-qty" 
+                           data-idx="${idx}" value="${p.qty || p.quantity || 0}" style="width:80px;">
+                </td>
+                <td>${p.unit || '-'}</td>
+            </tr>
+        `).join('')
+        : '<tr><td colspan="3">Không có sản phẩm</td></tr>';
+
+    const modal = window.$('#modal-order-detail');
+    const modalBody = window.$('#modal-order-body');
+    const modalTitle = window.$('#modal-order-title');
+
+    if (modalTitle) modalTitle.textContent = `Chỉnh sửa đơn #${order.soDon || order.sale_order_no || order.id}`;
+
+    if (modalBody) {
+        modalBody.innerHTML = `
+            <div class="order-detail-grid" style="margin-bottom:24px;">
+                <div class="detail-row">
+                    <label>Khách hàng:</label>
+                    <input type="text" id="edit-customer" class="form-control" value="${order.khach || order.account_name || ''}">
+                </div>
+                <div class="detail-row">
+                    <label>Địa chỉ:</label>
+                    <input type="text" id="edit-address" class="form-control" value="${order.diaChi || order.shipping_address || ''}">
+                </div>
+                <div class="detail-row">
+                    <label>Ghi chú:</label>
+                    <textarea id="edit-note" class="form-control" rows="2">${order.note || order.description || ''}</textarea>
+                </div>
+            </div>
+            
+            <h4 style="margin: 16px 0 12px; font-size:14px; color:var(--text-secondary);">Danh sách sản phẩm</h4>
+            <table class="data-table" style="width:100%;">
+                <thead>
+                    <tr>
+                        <th>Sản phẩm</th>
+                        <th>Số lượng</th>
+                        <th>Đơn vị</th>
+                    </tr>
+                </thead>
+                <tbody id="edit-products-body">
+                    ${productsHtml}
+                </tbody>
+            </table>
+            
+            <div style="display:flex; gap:12px; margin-top:24px;">
+                <button class="btn btn-outline" onclick="closeOrderModal()">Hủy</button>
+                <button class="btn btn-primary" onclick="saveEditOrder()">
+                    <i class="bi bi-check"></i> Lưu thay đổi
+                </button>
+            </div>
+        `;
+    }
+
+    if (modal) modal.classList.remove('hidden');
+}
+
+async function saveEditOrder() {
+    const orderId = state.currentEditOrderId;
+    const customer = window.$('#edit-customer')?.value || '';
+    const address = window.$('#edit-address')?.value || '';
+    const note = window.$('#edit-note')?.value || '';
+
+    // Collect product quantities
+    const qtyInputs = window.$$('.edit-product-qty');
+    const productUpdates = [];
+    qtyInputs.forEach(input => {
+        productUpdates.push({
+            idx: parseInt(input.dataset.idx),
+            qty: parseFloat(input.value) || 0
+        });
+    });
+
+    showLoading('Đang lưu...');
+    try {
+        const res = await fetch(`/api/orders/${orderId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                customer,
+                address,
+                note,
+                productUpdates
+            })
+        });
+        const data = await res.json();
+        hideLoading();
+
+        if (data.error) {
+            alert('Lỗi: ' + data.msg);
+            return;
+        }
+
+        alert(data.msg || 'Đã lưu thay đổi!');
+        closeOrderModal();
+        loadOrders();
+    } catch (e) {
+        hideLoading();
+        alert('Lỗi: ' + e.message);
+    }
+}
+
+// ===============================================
+// IMPORT TICKET ACTIONS
+// ===============================================
+
+function viewImportDetail(importId) {
+    // Find import from state
+    const allImports = [...(state.imports?.pending || []), ...(state.imports?.assigned || []), ...(state.imports?.completed || [])];
+    const imp = allImports.find(i => i.id == importId);
+
+    if (!imp) {
         alert('Không tìm thấy phiếu nhập!');
         return;
     }
 
-    currentImportTicket = ticket;
+    const products = imp.products || [];
+    const productsHtml = products.length > 0
+        ? products.map(p => `
+            <tr>
+                <td>${p.name || p.product || '-'}</td>
+                <td>${p.qty || p.quantity || 0}</td>
+                <td>${p.unit || '-'}</td>
+            </tr>
+        `).join('')
+        : '<tr><td colspan="3" style="text-align:center; color:var(--text-muted);">Không có sản phẩm</td></tr>';
 
-    // Build driver options
-    const driverOptions = state.drivers.map(d =>
-        `<option value="${d.name}" data-plate="${d.plate}">${d.name} (${d.plate})</option>`
-    ).join('');
+    const modal = window.$('#modal-order-detail');
+    const modalBody = window.$('#modal-order-body');
+    const modalTitle = window.$('#modal-order-title');
 
-    // Build products list
-    const products = Array.isArray(ticket.products) ? ticket.products : [];
-    const productsList = products.map(p =>
-        `<div class="d-flex justify-content-between py-1 border-bottom">
-            <span>${p.name}</span>
-            <span class="fw-bold">${p.qty} kg</span>
-        </div>`
-    ).join('');
+    if (modalTitle) modalTitle.textContent = `Chi tiết phiếu nhập #${imp.ticket_no || imp.id}`;
 
-    const date = ticket.expected_date ? new Date(ticket.expected_date).toLocaleDateString('vi-VN') : 'Chưa xác định';
+    if (modalBody) {
+        modalBody.innerHTML = `
+            <div class="order-detail-grid">
+                <div class="detail-row">
+                    <label>Mã phiếu:</label>
+                    <span><strong>#${imp.ticket_no || imp.id}</strong></span>
+                </div>
+                <div class="detail-row">
+                    <label>Nhà cung cấp:</label>
+                    <span>${imp.supplier_name || 'Chưa có'}</span>
+                </div>
+                <div class="detail-row">
+                    <label>Ngày dự kiến:</label>
+                    <span>${formatDate(imp.expected_date || imp.created_at)}</span>
+                </div>
+                <div class="detail-row">
+                    <label>Địa chỉ:</label>
+                    <span>${imp.supplier_address || 'Chưa có địa chỉ'}</span>
+                </div>
+                <div class="detail-row">
+                    <label>Trạng thái:</label>
+                    <span class="badge badge-${getStatusBadge(imp.status)}">${getStatusText(imp.status)}</span>
+                </div>
+                <div class="detail-row">
+                    <label>Tài xế:</label>
+                    <span>${imp.driver_name || 'Chưa phân công'}</span>
+                </div>
+                <div class="detail-row">
+                    <label>Biển số xe:</label>
+                    <span>${imp.plate || 'Chưa có'}</span>
+                </div>
+            </div>
 
-    // Show in modal
-    const modalBody = $('#orderModal .modal-body');
-    const modalTitle = $('#orderModal .modal-title');
+            <h4 style="margin: 24px 0 12px; font-size:14px; color:var(--text-secondary);">Danh sách hàng nhập</h4>
+            <table class="data-table" style="width:100%;">
+                <thead>
+                    <tr>
+                        <th>Sản phẩm</th>
+                        <th>SL</th>
+                        <th>Đơn vị</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${productsHtml}
+                </tbody>
+            </table>
 
-    // Status badge
-    const statusBadge = {
-        'pending': '<span class="badge bg-warning text-dark">Chờ gán</span>',
-        'assigned': '<span class="badge bg-primary">Đang nhận</span>',
-        'in_transit': '<span class="badge bg-info">Đang vận chuyển</span>',
-        'completed': '<span class="badge bg-success">Hoàn thành</span>'
-    }[ticket.status] || '';
+            ${imp.note ? `<div style="margin-top:16px; padding:12px; background:var(--body-bg); border-radius:8px;"><strong>Ghi chú:</strong> ${imp.note}</div>` : ''}
 
-    modalTitle.innerHTML = `<span class="badge bg-success me-2">📥 NHẬP</span> ${ticket.ticket_no} ${statusBadge}`;
-
-    // Build action buttons based on status
-    let actionButtons = '';
-
-    if (ticket.status === 'pending') {
-        // Pending: Show driver assignment
-        actionButtons = `
-            <hr>
-            <div class="mb-3">
-                <label class="fw-bold mb-2"><i class="bi bi-truck"></i> Gán tài xế:</label>
-                <select class="form-select mb-2" id="import-driver-select">
-                    <option value="">-- Chọn tài xế --</option>
-                    ${driverOptions}
-                </select>
-                <button class="btn btn-success w-100" onclick="assignImportDriver()">
-                    <i class="bi bi-check-lg"></i> XÁC NHẬN GÁN TÀI XẾ
+            <!-- ACTION BUTTONS -->
+            <div style="margin-top:20px; padding-top:16px; border-top:1px solid var(--border); display:flex; gap:8px; flex-wrap:wrap;">
+                ${imp.status === 'pending' || imp.status === 'Chưa thực hiện' ? `
+                    <button class="btn btn-primary" onclick="closeOrderModal(); assignImportDriver('${imp.id}')">
+                        <i class="bi bi-person-plus"></i> Phân công tài xế
+                    </button>
+                ` : ''}
+                ${(imp.status === 'assigned' || imp.status === 'in_transit') && state.user?.role === 'ADMIN' ? `
+                    <button class="btn btn-success" onclick="adminCompleteImport('${imp.id}')">
+                        <i class="bi bi-check-circle"></i> Admin hoàn thành
+                    </button>
+                ` : ''}
+                <button class="btn btn-outline" onclick="closeOrderModal()">
+                    <i class="bi bi-x-lg"></i> Đóng
                 </button>
-            </div>
-        `;
-    } else if (ticket.status === 'assigned') {
-        // Assigned: Show start and complete buttons
-        actionButtons = `
-            <div class="alert alert-info mb-2">
-                <i class="bi bi-truck"></i> Tài xế: <b>${ticket.assigned_driver || 'N/A'}</b> 
-                ${ticket.assigned_plate ? `(${ticket.assigned_plate})` : ''}
-            </div>
-            <div class="d-grid gap-2">
-                <button class="btn btn-primary" onclick="startImportDelivery()">
-                    <i class="bi bi-play-fill"></i> BẮT ĐẦU VẬN CHUYỂN
-                </button>
-                <button class="btn btn-success" onclick="completeImportTicket()">
-                    <i class="bi bi-check-circle"></i> HOÀN THÀNH NHẬP KHO
-                </button>
-            </div>
-        `;
-    } else if (ticket.status === 'in_transit') {
-        // In transit: Show complete button
-        actionButtons = `
-            <div class="alert alert-info mb-2">
-                <i class="bi bi-truck"></i> Tài xế: <b>${ticket.assigned_driver || 'N/A'}</b> đang vận chuyển
-            </div>
-            <button class="btn btn-success w-100" onclick="completeImportTicket()">
-                <i class="bi bi-check-circle"></i> HOÀN THÀNH NHẬP KHO
-            </button>
-        `;
-    } else {
-        // Completed: View only
-        actionButtons = `
-            <div class="alert alert-success">
-                <i class="bi bi-check-circle"></i> Đã hoàn thành bởi: <b>${ticket.assigned_driver || 'N/A'}</b>
-                ${ticket.completed_at ? `<br><small>Lúc: ${new Date(ticket.completed_at).toLocaleString('vi-VN')}</small>` : ''}
             </div>
         `;
     }
 
-    modalBody.innerHTML = `
-        <div class="mb-3">
-            <div class="fw-bold text-success fs-5">${ticket.supplier_name}</div>
-            ${ticket.supplier_address ? `<div class="text-muted small"><i class="bi bi-geo-alt"></i> ${ticket.supplier_address}</div>` : ''}
-        </div>
-        
-        <div class="mb-3">
-            <label class="text-muted small">Sản phẩm nhập:</label>
-            <div class="bg-light p-2 rounded">${productsList}</div>
-            <div class="text-end fw-bold mt-1">Tổng: ${ticket.total_qty || 0} kg</div>
-        </div>
-        
-        <div class="mb-3">
-            <div class="small text-muted"><i class="bi bi-calendar"></i> Ngày dự kiến: <b>${date}</b></div>
-            ${ticket.note ? `<div class="small text-muted"><i class="bi bi-sticky"></i> Ghi chú: ${ticket.note}</div>` : ''}
-        </div>
-
-        <!-- Chat Button -->
-        <div class="mb-3">
-            <button class="btn btn-outline-primary w-100" onclick="openImportChat('${ticket.id}')">
-                <i class="bi bi-chat-dots"></i> CHAT / GHI CHÚ
-            </button>
-        </div>
-        
-        ${actionButtons}
-    `;
-
-    // Hide driver assignment section (it's inline now)
-    const driverSection = $('#modal-driver-section');
-    if (driverSection) driverSection.classList.add('d-none');
-
-    // Show modal
-    const modal = new bootstrap.Modal($('#orderModal'));
-    modal.show();
+    if (modal) modal.classList.remove('hidden');
 }
 
-async function assignImportDriver() {
-    const select = $('#import-driver-select');
-    const driverName = select.value;
-    const plate = select.selectedOptions[0]?.dataset.plate || '';
+async function assignImportDriver(importId) {
+    // Find import from pending
+    const imp = (state.imports?.pending || []).find(i => i.id == importId);
+
+    if (!imp) {
+        alert('Không tìm thấy phiếu nhập!');
+        return;
+    }
+
+    // Store current import ID for assignment
+    state.currentAssignImportId = importId;
+
+    // Build driver select options with plate data
+    const driverOptions = (state.drivers || []).map(d =>
+        `<option value="${d.name}" data-plate="${d.plate || ''}">${d.name}${d.plate ? ' - ' + d.plate : ''}</option>`
+    ).join('');
+
+    // Show modal
+    const modal = window.$('#modal-order-detail');
+    const modalBody = window.$('#modal-order-body');
+    const modalTitle = window.$('#modal-order-title');
+
+    if (modalTitle) modalTitle.textContent = `Gán tài xế - Phiếu nhập #${imp.ticket_no || imp.id}`;
+
+    if (modalBody) {
+        modalBody.innerHTML = `
+            <div class="order-detail-grid" style="margin-bottom:24px;">
+                <div class="detail-row">
+                    <label>Nhà cung cấp:</label>
+                    <span>${imp.supplier_name || 'Chưa có'}</span>
+                </div>
+                <div class="detail-row">
+                    <label>Địa chỉ:</label>
+                    <span>${imp.supplier_address || 'Chưa có'}</span>
+                </div>
+                <div class="detail-row">
+                    <label>Ngày dự kiến:</label>
+                    <span>${formatDate(imp.expected_date || imp.created_at)}</span>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Chọn tài xế *</label>
+                <select id="assign-driver-select" class="form-control" onchange="onDriverChange(this)">
+                    <option value="">-- Chọn tài xế --</option>
+                    ${driverOptions}
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Biển số xe</label>
+                <input type="text" id="assign-plate" class="form-control" placeholder="Tự động điền khi chọn tài xế">
+            </div>
+            
+            <div style="display:flex; gap:12px; margin-top:24px;">
+                <button class="btn btn-outline" onclick="closeOrderModal()">Hủy</button>
+                <button class="btn btn-primary" onclick="confirmAssignImportDriver()">
+                    <i class="bi bi-check"></i> Xác nhận gán
+                </button>
+            </div>
+        `;
+    }
+
+    if (modal) modal.classList.remove('hidden');
+}
+
+async function confirmAssignImportDriver() {
+    const importId = state.currentAssignImportId;
+    const driverSelect = window.$('#assign-driver-select');
+    const plateInput = window.$('#assign-plate');
+
+    const driverName = driverSelect?.value;
+    const plate = plateInput?.value || '';
 
     if (!driverName) {
         alert('Vui lòng chọn tài xế!');
         return;
     }
 
-    if (!currentImportTicket) {
-        alert('Lỗi: Không tìm thấy phiếu!');
-        return;
-    }
-
     showLoading('Đang gán tài xế...');
-
     try {
-        const res = await fetch(`/api/imports/${currentImportTicket.id}/assign`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ driver_name: driverName, plate })
-        });
-
-        const data = await res.json();
+        const res = await api.assignImportDriver(importId, driverName, plate);
         hideLoading();
 
-        if (data.error) {
-            alert('Lỗi: ' + data.msg);
+        if (res.error) {
+            alert(res.msg || 'Lỗi gán tài xế!');
             return;
         }
 
-        // Close modal and reload
-        bootstrap.Modal.getInstance($('#orderModal')).hide();
-        alert('✅ Đã gán tài xế thành công!');
-        loadOrders();
-
+        alert(res.msg || 'Đã gán tài xế!');
+        closeOrderModal();
+        loadImportTickets();
     } catch (e) {
         hideLoading();
         alert('Lỗi: ' + e.message);
     }
 }
 
-// Open chat for import ticket
-function openImportChat(ticketId) {
-    // Use existing chat modal
-    const chatModal = $('#modal-chat');
-    if (chatModal) {
-        $('#chat-modal-title').textContent = `Chat - Phiếu nhập #${currentImportTicket?.ticket_no || ticketId}`;
-        chatModal.classList.remove('hidden');
-        loadImportChatMessages(ticketId);
-    }
-}
+async function adminCompleteImport(importId) {
 
-async function loadImportChatMessages(ticketId) {
-    const container = document.getElementById('chatMessages');
-    if (!container) return;
-
-    container.innerHTML = '<div class="text-center text-muted py-3">Đang tải...</div>';
-
-    try {
-        const res = await fetch(`/api/chat/${ticketId}/messages?type=import`);
-        const data = await res.json();
-
-        if (data.error) {
-            container.innerHTML = '<div class="text-danger small">Lỗi tải tin nhắn</div>';
-            return;
-        }
-
-        const messages = data.messages || [];
-        if (!messages.length) {
-            container.innerHTML = '<div class="text-center text-muted py-3">Chưa có tin nhắn</div>';
-            return;
-        }
-
-        container.innerHTML = messages.map(m => {
-            const isMe = m.sender_name === state.user?.name;
-            const time = new Date(m.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-            const roleColor = m.sender_role === 'DRIVER' ? 'bg-success' : 'bg-primary';
-
-            return `
-                <div class="chat-msg ${isMe ? 'chat-me' : 'chat-other'} mb-2">
-                    <div class="chat-sender small">
-                        <span class="badge ${roleColor} badge-sm">${m.sender_role}</span>
-                        <span class="text-muted">${m.sender_name}</span>
-                    </div>
-                    <div class="chat-bubble ${isMe ? 'bg-primary text-white' : 'bg-light'}">
-                        ${m.message || ''}
-                        ${m.image ? `<img src="${m.image}" class="rounded mt-1" style="max-width:150px; cursor:pointer" onclick="showChatImage('${m.image.replace(/'/g, "\\'")}')">` : ''}
-                    </div>
-                    <div class="chat-time text-muted small">${time}</div>
-                </div>
-            `;
-        }).join('');
-
-        container.scrollTop = container.scrollHeight;
-    } catch (e) {
-        container.innerHTML = '<div class="text-danger small">Lỗi: ' + e.message + '</div>';
-    }
-}
-
-// Start import delivery (in transit)
-async function startImportDelivery() {
-    if (!currentImportTicket) return;
-
-    showLoading('Đang cập nhật...');
-
-    try {
-        const res = await fetch(`/api/imports/${currentImportTicket.id}/start`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' }
-        });
-
-        const data = await res.json();
-        hideLoading();
-
-        if (data.error) {
-            alert('Lỗi: ' + data.msg);
-            return;
-        }
-
-        bootstrap.Modal.getInstance($('#orderModal')).hide();
-        alert('✅ Đã bắt đầu vận chuyển!');
-        loadOrders();
-
-    } catch (e) {
-        hideLoading();
-        alert('Lỗi: ' + e.message);
-    }
-}
-
-// Complete import ticket
-async function completeImportTicket() {
-    if (!currentImportTicket) return;
-
-    if (!confirm('Xác nhận hoàn thành nhập kho?')) return;
+    if (!confirm('ADMIN: Xác nhận hoàn thành phiếu nhập này?')) return;
 
     showLoading('Đang hoàn thành...');
-
     try {
-        const res = await fetch(`/api/imports/${currentImportTicket.id}/complete`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                actual_products: currentImportTicket.products,
-                note: 'Hoàn thành từ webapp'
-            })
-        });
-
-        const data = await res.json();
+        const res = await api.completeImport(importId, {});
         hideLoading();
-
-        if (data.error) {
-            alert('Lỗi: ' + data.msg);
-            return;
-        }
-
-        bootstrap.Modal.getInstance($('#orderModal')).hide();
-        alert('✅ Đã hoàn thành nhập kho!');
-        loadOrders();
-
-    } catch (e) {
-        hideLoading();
-        alert('Lỗi: ' + e.message);
-    }
-}
-// Manual retry for a single order sync
-async function retryMisaSync(orderId) {
-    showLoading('Đang đẩy lại lên MISA...');
-    try {
-        const res = await fetch(`/api/sync`, { method: 'POST' }); // Using global sync for now as it handles failed ones
-        const data = await res.json();
-        hideLoading();
-
-        if (data.success) {
-            alert('✅ Đã nạp lại lệnh đồng bộ thành công!');
-            loadOrders();
-            // Close modal to refresh state
-            bootstrap.Modal.getInstance(document.getElementById('orderDetailModal')).hide();
-        } else {
-            alert('❌ Vẫn thất bại: ' + (data.error || 'Unknown error'));
-        }
+        alert(res.msg || 'Hoàn thành phiếu nhập!');
+        loadImportTickets();
+        closeOrderModal();
     } catch (e) {
         hideLoading();
         alert('Lỗi: ' + e.message);
     }
 }
 
-// Helper to render sync status badge
-function renderSyncBadge(order) {
-    if (!order.status || order.status === 'Mới') return '';
+// === INITIALIZATION ===
+document.addEventListener('DOMContentLoaded', () => {
+    // Check for existing session
+    const session = localStorage.getItem('LT_SESSION');
+    if (session) {
+        try {
+            const parsed = JSON.parse(session);
+            if (parsed.user) {
+                state = { ...state, ...parsed };
+                initApp();
+                return;
+            }
+        } catch (e) {
+            console.error('Session parse error:', e);
+        }
+    }
 
-    const status = order.crm_sync_status;
-    if (status === 'SYNCED') return '<span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 ms-1" title="Đã đồng bộ CRM"><i class="bi bi-check-circle-fill"></i> MISA</span>';
-    if (status === 'FAILED') return '<span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 ms-1" title="Lỗi đồng bộ CRM"><i class="bi bi-exclamation-triangle-fill"></i> Lỗi CRM</span>';
-    if (status === 'PUSHING') return '<span class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 ms-1"><i class="spinner-border spinner-border-sm py-0"></i> CRM</span>';
+    // Show login
+    show('view-login');
+    hide('view-app');
+});
 
-    return '<span class="badge bg-light text-muted border ms-1">? CRM</span>';
-}
+// Export for global access
+window.handleLogin = handleLogin;
+window.doLogout = doLogout;
+window.showSection = showSection;
+window.toggleSubmenu = toggleSubmenu;
+window.switchDispatchTab = switchDispatchTab;
+window.searchOrders = searchOrders;
+window.addOrderProduct = addOrderProduct;
+window.removeOrderProduct = removeOrderProduct;
+window.submitOrder = submitOrder;
+window.viewOrderDetail = viewOrderDetail;
+window.assignDriver = assignDriver;
+window.confirmAssignDriver = confirmAssignDriver;
+window.completeOrder = completeOrder;
+window.goToPage = goToPage;
+window.toggleUserMenu = toggleUserMenu;
+window.assignDriver = assignDriver;
+window.closeOrderModal = closeOrderModal;
+
+// Delivery modal exports
+window.openDeliveryModal = openDeliveryModal;
+window.closeDeliveryModal = closeDeliveryModal;
+window.renderDeliveryCart = renderDeliveryCart;
+window.updateCartQty = updateCartQty;
+window.updateCartNote = updateCartNote;
+window.removeCartItem = removeCartItem;
+window.handleImageSelect = handleImageSelect;
+window.submitDelivery = submitDelivery;
+window.startOrder = startOrder;
+// Sync exports
+window.forceSyncMisa = forceSyncMisa;
+// Driver select exports
+window.onDriverChange = onDriverChange;
+// Date filter exports
+window.filterByDate = filterByDate;
+window.clearDateFilter = clearDateFilter;
+// Chat exports
+window.loadOrderChat = loadOrderChat;
+window.sendChatMessage = sendChatMessage;
+window.previewChatImage = previewChatImage;
+window.clearChatImage = clearChatImage;
+window.showChatImage = showChatImage;
+window.closeChatImageViewer = closeChatImageViewer;
+window.startChatRefresh = startChatRefresh;
+window.stopChatRefresh = stopChatRefresh;
+// Multi-driver exports
+window.initDriverAssignments = initDriverAssignments;
+window.renderDriverAssignments = renderDriverAssignments;
+window.updateQtySummary = updateQtySummary;
+window.addDriverAssignment = addDriverAssignment;
+window.removeDriverAssignment = removeDriverAssignment;
+window.submitAllDriverAssignments = submitAllDriverAssignments;
+window.toggleExternalDriverInput = toggleExternalDriverInput;
+// Extra item exports
+window.addExtraItem = addExtraItem;
+// Admin exports
+window.adminCompleteOrder = adminCompleteOrder;
+// Import ticket exports
+window.switchOrderType = switchOrderType;
+window.loadImportTickets = loadImportTickets;
+window.renderImportList = renderImportList;
+window.viewImportDetail = viewImportDetail;
+window.assignImportDriver = assignImportDriver;
+window.confirmAssignImportDriver = confirmAssignImportDriver;
+window.adminCompleteImport = adminCompleteImport;
+// Edit order exports
+window.editOrder = editOrder;
+window.saveEditOrder = saveEditOrder;
+// New multi-driver exports
+window.onNewDriverChange = onNewDriverChange;
+window.addDriverAssignmentRow = addDriverAssignmentRow;
+window.removeDriverAssignmentRow = removeDriverAssignmentRow;
+window.renderDriverAssignmentsList = renderDriverAssignmentsList;
+window.updateQtySummaryDisplay = updateQtySummaryDisplay;
+window.submitMultiDriverAssignment = submitMultiDriverAssignment;

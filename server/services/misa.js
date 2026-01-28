@@ -250,7 +250,8 @@ export const syncMisaOrders = async () => {
     console.log('🔄 Starting MISA Sync...');
 
     try {
-        // ... (existing logic continues in try block)
+        await performSync();
+
     } catch (e) {
         console.error('❌ MISA Sync Fatal Error:', e.message);
     } finally {

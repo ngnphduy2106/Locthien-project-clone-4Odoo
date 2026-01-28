@@ -174,7 +174,38 @@ export const db = {
     getOrder: async (id) => {
         const { useSupabase, useFirebase } = getMode();
         if (useSupabase) {
-            const { data, error } = await supabase.from('orders').select('*').eq('id', sanitizeId(id)).single();
+            const safeId = sanitizeId(id);
+            // Try by id first
+            let { data, error } = await supabase.from('orders').select('*').eq('id', safeId).single();
+
+            // If not found, try by sale_order_no (with original id, might have dots)
+            if (!data || error) {
+                const { data: data2, error: error2 } = await supabase.from('orders').select('*').eq('sale_order_no', id).single();
+                data = data2;
+                error = error2;
+            }
+
+            // If still not found, try sale_order_no with sanitized id (underscores)
+            if (!data || error) {
+                const { data: data3, error: error3 } = await supabase.from('orders').select('*').ilike('sale_order_no', `%${safeId.replace(/_/g, '%')}%`).single();
+                data = data3;
+            }
+
+            if (data) {
+                // Parse products from JSONB
+                let products = [];
+                try {
+                    if (typeof data.sale_order_product_mappings === 'string') {
+                        products = JSON.parse(data.sale_order_product_mappings);
+                    } else if (Array.isArray(data.sale_order_product_mappings)) {
+                        products = data.sale_order_product_mappings;
+                    }
+                } catch (e) { }
+
+                data.products = products;
+                data.cart = products;
+            }
+
             return data;
         }
         if (useFirebase) {
@@ -183,6 +214,7 @@ export const db = {
         }
         return mockData.orders.find(o => o.id === id);
     },
+
 
     addOrder: async (order) => {
         const { useSupabase, useFirebase } = getMode();

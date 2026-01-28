@@ -22,7 +22,8 @@ import webhookRoutes from './routes/webhooks.js';
 import chatRoutes from './routes/chat.js';
 import importRoutes from './routes/imports.js';
 
-import { syncMisaOrders, syncMisaProducts } from './services/misa.js';
+import { syncMisaOrders, syncMisaProducts, getSyncStatus, updateMisaOrder } from './services/misa.js';
+import db from './db/index.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;

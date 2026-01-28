@@ -23,6 +23,7 @@ router.post('/login', async (req, res) => {
 
         const uInput = String(username).trim().toLowerCase().replace(/^0+/, '');
         const pInput = String(password).trim();
+        console.log(`🔍 Normalized: uInput=[${uInput}] pInput=[${pInput}]`);
 
         // Find matching user
         let userFound = null;

@@ -14,23 +14,28 @@ const supabase = createClient(
     process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY
 );
 
-// GET /api/orders/:id/messages - Get chat messages for an order or import ticket
-// Supports: ?type=import for import ticket messages
+// GET /api/chat/:id/messages - Get chat messages for an order or import ticket
+// Supports: ?type=import for import ticket messages, ?since=ISO_TIMESTAMP for incremental polling
 router.get('/:id/messages', async (req, res) => {
     try {
         const { id } = req.params;
-        const { type } = req.query;
+        const { type, since } = req.query;
 
         let query = supabase
             .from('order_messages')
             .select('*')
             .order('created_at', { ascending: true });
 
-        // Support import ticket messages
+        // Filter by specific ID context
         if (type === 'import') {
             query = query.eq('import_ticket_id', id);
         } else {
             query = query.eq('order_id', id);
+        }
+
+        // Incremental Polling: Only fetch messages created AFTER since timestamp
+        if (since) {
+            query = query.gt('created_at', since);
         }
 
         const { data, error } = await query;
@@ -42,7 +47,8 @@ router.get('/:id/messages', async (req, res) => {
 
         res.json({
             error: false,
-            messages: data || []
+            messages: data || [],
+            serverTime: new Date().toISOString() // Return server time for next polling
         });
 
     } catch (e) {

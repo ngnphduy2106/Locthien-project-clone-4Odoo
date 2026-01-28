@@ -159,64 +159,7 @@ const api = {
     getDashboard: async () => {
         const res = await fetch(`${API_BASE}/reports/dashboard`);
         return res.json();
-    },
-
-    // Alias for getDashboard (used by new UI)
-    getDashboardStats: async () => {
-        const res = await fetch(`${API_BASE}/reports/dashboard`);
-        return res.json();
-    },
-
-    // === COMPLETE ORDER ===
-    completeOrder: async (id, data) => {
-        const res = await fetch(`${API_BASE}/orders/${id}/complete`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-        });
-        return res.json();
-    },
-
-    // === ORDER HISTORY ===
-    getOrderHistory: async () => {
-        const res = await fetch(`${API_BASE}/orders/history`);
-        return res.json();
-    },
-
-
-    // === IMPORTS ===
-    createImport: async (data) => {
-        const res = await fetch(`${API_BASE}/imports`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-        });
-        return res.json();
-    },
-
-    getImports: async () => {
-        const res = await fetch(`${API_BASE}/imports`);
-        return res.json();
-    },
-
-    assignImportDriver: async (id, driverName, plate) => {
-        const res = await fetch(`${API_BASE}/imports/${id}/assign`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ driver_name: driverName, plate })
-        });
-        return res.json();
-    },
-
-    completeImport: async (id, data) => {
-        const res = await fetch(`${API_BASE}/imports/${id}/complete`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-        });
-        return res.json();
     }
 };
 
 window.api = api;
-

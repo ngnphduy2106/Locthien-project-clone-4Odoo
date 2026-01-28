@@ -25,18 +25,18 @@ export const sendTelegramMessage = async (text, type = 'NOTIFY') => {
             parse_mode: 'HTML'
         };
 
-        const response = await fetch(url, {
+        // Fire and forget - don't block the caller
+        fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body)
-        });
+        }).then(response => response.json())
+            .then(json => {
+                if (!json.ok) console.error(`❌ Telegram Error (${type}):`, json.description);
+                else console.log(`✅ Telegram Sent (${type}).`);
+            })
+            .catch(err => console.error(`❌ Telegram Fetch Error (${type}):`, err.message));
 
-        const json = await response.json();
-        if (!json.ok) {
-            console.error(`❌ Telegram Error (${type}):`, json.description);
-        } else {
-            console.log(`✅ Telegram Sent (${type}).`);
-        }
     } catch (e) {
         console.error(`❌ Telegram Exception (${type}):`, e.message);
     }

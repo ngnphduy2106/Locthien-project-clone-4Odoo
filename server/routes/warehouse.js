@@ -189,4 +189,47 @@ router.get('/history/:productName', async (req, res) => {
     }
 });
 
+// POST /api/warehouse/mixing
+router.post('/mixing', async (req, res) => {
+    try {
+        const { date, warehouse, ingredients, product, sender } = req.body;
+        const ts = getTimestamp();
+        const mixingId = 'PC' + ts.short;
+        const reportDate = date || ts.date;
+
+        for (let i = 0; i < ingredients.length; i++) {
+            const ing = ingredients[i];
+            await db.addDataXuat({
+                id: `${mixingId}-I${i + 1}`,
+                date: reportDate,
+                warehouse,
+                partner: 'NỘI BỘ (PHA CHẾ)',
+                driver: sender || 'SYSTEM',
+                product: standardizeData(ing.product, 'PRODUCT'),
+                density: ing.density,
+                qty: Number(ing.qty),
+                note: `Pha chế: ${mixingId}`
+            });
+        }
+
+        if (product && product.product) {
+            await db.addDataNhap({
+                id: `${mixingId}-P`,
+                date: reportDate,
+                warehouse,
+                partner: 'NỘI BỘ (PHA CHẾ)',
+                driver: sender || 'SYSTEM',
+                product: standardizeData(product.product, 'PRODUCT'),
+                density: product.density,
+                qty: Number(product.qty),
+                note: `Pha chế: ${mixingId}`
+            });
+        }
+
+        res.json(createResponse(false, 'Đã lưu phiếu pha chế!', { mixingId }));
+    } catch (e) {
+        res.json(createResponse(true, e.message));
+    }
+});
+
 export default router;

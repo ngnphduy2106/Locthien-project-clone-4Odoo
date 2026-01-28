@@ -158,7 +158,94 @@ router.post('/', async (req, res) => {
     }
 });
 
+// PUT /api/orders/:id - Edit order (customer, address, notes, products)
+router.put('/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { customer, address, note, notes, products, productUpdates } = req.body;
+
+        console.log(`📝 Edit Order Request for ${id}:`, JSON.stringify(req.body, null, 2));
+
+        // First, fetch existing order to get current products
+        const existingOrder = await db.getOrder(id);
+        if (!existingOrder) {
+            return res.json(createResponse(true, 'Không tìm thấy đơn hàng!'));
+        }
+
+        // Build update object
+        const updateData = {};
+        if (customer !== undefined) updateData.khach = customer;
+        if (address !== undefined) updateData.diaChi = address;
+        if (note !== undefined || notes !== undefined) updateData.ghiChu = note || notes;
+
+        // Handle productUpdates (from frontend - array of {idx, qty})
+        if (productUpdates && Array.isArray(productUpdates) && productUpdates.length > 0) {
+            const existingCart = existingOrder.cart || existingOrder.products || existingOrder.chiTiet || [];
+            const updatedCart = existingCart.map((p, idx) => {
+                const update = productUpdates.find(u => u.idx === idx);
+                return {
+                    code: p.code || p.product_code || '',
+                    name: p.name || p.product || '',
+                    qty: update ? Number(update.qty) : (Number(p.qty) || Number(p.quantity) || 0),
+                    unit: p.unit || 'Kg'
+                };
+            });
+            updateData.cart = updatedCart;
+            console.log(`📝 Updated Cart:`, JSON.stringify(updatedCart, null, 2));
+        }
+        // Handle full products array (if provided directly)
+        else if (products && Array.isArray(products)) {
+            updateData.cart = products.map(p => ({
+                code: p.code || '',
+                name: p.name || p.product || '',
+                qty: Number(p.qty) || 0,
+                unit: p.unit || 'Kg'
+            }));
+        }
+
+        const order = await db.updateOrder(id, updateData);
+
+        if (!order) {
+            return res.json(createResponse(true, 'Không thể cập nhật đơn hàng!'));
+        }
+
+
+        // Sync to MISA - preserve current order status
+        const fullOrder = await db.getOrder(id);
+        try {
+            console.log(`📤 Edit Order Sync - Order: ${fullOrder?.sale_order_no}, Status: ${fullOrder?.status}`);
+
+            // Map Supabase status to MISA status text
+            let misaStatusForEdit = undefined;
+            const currentStatus = fullOrder?.status;
+            if (currentStatus === 'COMPLETED' || currentStatus === 'Hoàn thành' || currentStatus === 'Đã thực hiện' || currentStatus === 'completed') {
+                misaStatusForEdit = 'Đã thực hiện';
+            } else if (currentStatus === 'DELIVERING' || currentStatus === 'Đang thực hiện' || currentStatus === 'Đang giao' || currentStatus === 'in_transit') {
+                misaStatusForEdit = 'Đang thực hiện';
+            }
+
+            console.log(`📤 Mapped MISA Status: ${misaStatusForEdit}`);
+
+            await updateMisaOrder(fullOrder?.sale_order_no || id, {
+                misa_id: fullOrder?.misa_id,
+                cart: updateData.cart || fullOrder?.cart || [],
+                status: misaStatusForEdit  // Pass explicitly mapped status
+            });
+
+        } catch (syncErr) {
+            console.error('MISA Sync Error on Edit:', syncErr.message);
+        }
+
+
+        res.json(createResponse(false, 'Đã cập nhật đơn hàng!'));
+
+    } catch (e) {
+        res.json(createResponse(true, e.message));
+    }
+});
+
 // PUT /api/orders/:id/assign - Assign driver
+
 router.put('/:id/assign', async (req, res) => {
     try {
         const { id } = req.params;
@@ -248,8 +335,6 @@ router.put('/:id/update-products', async (req, res) => {
             cart: mergedProducts
         });
 
-        res.json(createResponse(false, 'Đã cập nhật số lượng sản phẩm!', { products: mergedProducts }));
-
         // Sync to MISA (Synchronous - Wait for MISA before responding)
         const fullOrder = await db.getOrder(id);
         if (fullOrder?.misa_id) {
@@ -297,7 +382,57 @@ router.put('/:id/start', async (req, res) => {
     }
 });
 
+// POST /api/orders/:id/complete - Admin complete order
+router.post('/:id/complete', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { products, delivery_note, admin_completed } = req.body;
+
+        // Update order status to completed
+        const order = await db.updateOrder(id, {
+            status: CONFIG.STATUS.COMPLETED,
+            delivery_status: 'Hoàn thành',
+            completed_at: new Date().toISOString(),
+            delivery_note: delivery_note || '',
+            admin_completed: admin_completed || false
+        });
+
+        if (!order) {
+            return res.json(createResponse(true, 'Không tìm thấy đơn hàng!'));
+        }
+
+        // Sync to MISA
+        const fullOrder = await db.getOrder(id);
+        console.log(`📤 Complete Order Sync - Order: ${fullOrder?.sale_order_no}, Cart items: ${(products || fullOrder?.cart || []).length}`);
+        try {
+            const syncResult = await updateMisaOrder(fullOrder?.sale_order_no || id, {
+                misa_id: fullOrder?.misa_id,
+                delivery_status: 'Đã giao hàng',  // MISA recognizes this to set status = 'Đã thực hiện'
+                status: 'Đã thực hiện',  // Direct MISA status text
+                driver: fullOrder?.custom_field13 || fullOrder?.taiXe || fullOrder?.driver || '',
+                plate: fullOrder?.custom_field14 || fullOrder?.bienSo || fullOrder?.plate || '',
+                cart: products || fullOrder?.cart || fullOrder?.products || []
+            });
+
+
+
+
+            if (!syncResult.success) {
+                console.error('MISA Sync Failed during Complete:', syncResult.message);
+            }
+        } catch (syncErr) {
+            console.error('MISA Sync Error:', syncErr.message);
+        }
+
+        res.json(createResponse(false, 'Đã hoàn thành đơn hàng!'));
+
+    } catch (e) {
+        res.json(createResponse(true, e.message));
+    }
+});
+
 // POST /api/orders/:id/assign-multi - Multi-driver assignment
+
 router.post('/:id/assign-multi', async (req, res) => {
     try {
         const { id } = req.params;
@@ -533,6 +668,50 @@ router.post('/:id/complete', async (req, res) => {
         } else {
             console.error("❌ Error after response sent:", e.message);
         }
+    }
+});
+
+// GET /api/orders/:id/chat - Get chat messages
+router.get('/:id/chat', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { createClient } = await import('@supabase/supabase-js');
+        const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+        const { data, error } = await supabase
+            .from('order_messages')
+            .select('*')
+            .eq('order_id', id)
+            .order('created_at', { ascending: true });
+
+        if (error) return res.json(createResponse(true, error.message));
+        res.json({ error: false, messages: data || [] });
+    } catch (e) {
+        res.json(createResponse(true, e.message));
+    }
+});
+
+// POST /api/orders/:id/chat - Send chat message
+router.post('/:id/chat', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { sender_name, sender_role, message, image } = req.body;
+
+        const { createClient } = await import('@supabase/supabase-js');
+        const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+        const { error } = await supabase.from('order_messages').insert({
+            order_id: id,
+            sender_name,
+            sender_role,
+            message,
+            image
+        });
+
+        if (error) return res.json(createResponse(true, error.message));
+        res.json(createResponse(false, 'Đã gửi!'));
+    } catch (e) {
+        res.json(createResponse(true, e.message));
     }
 });
 
