@@ -486,6 +486,47 @@ const DispatchModule = {
                             </div>
                         </div>
 
+                        <!-- Mặt hàng phụ (Vỏ) - Local only, NOT synced to MISA -->
+                        <div class="detail-section">
+                            <h4 class="section-title"><i class="bi bi-box"></i> Mặt hàng phụ (Vỏ)</h4>
+                            <div class="local-items-section" id="local-items-section-${orderId}">
+                                <!-- Buttons cho các loại vỏ phổ biến -->
+                                <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px;">
+                                    <button class="local-item-btn" data-type="Vỏ can 30L" onclick="DispatchModule.addLocalItem('${orderId}', 'Vỏ can 30L')" style="padding: 8px 16px; border: 1px solid #e5e7eb; border-radius: 8px; background: #f9fafb; cursor: pointer; font-size: 13px;">
+                                        🧴 Vỏ can 30L
+                                    </button>
+                                    <button class="local-item-btn" data-type="Vỏ phuy" onclick="DispatchModule.addLocalItem('${orderId}', 'Vỏ phuy')" style="padding: 8px 16px; border: 1px solid #e5e7eb; border-radius: 8px; background: #f9fafb; cursor: pointer; font-size: 13px;">
+                                        🛢️ Vỏ phuy
+                                    </button>
+                                    <button class="local-item-btn" data-type="Vỏ tank" onclick="DispatchModule.addLocalItem('${orderId}', 'Vỏ tank')" style="padding: 8px 16px; border: 1px solid #e5e7eb; border-radius: 8px; background: #f9fafb; cursor: pointer; font-size: 13px;">
+                                        🏭 Vỏ tank
+                                    </button>
+                                    <button class="local-item-btn" data-type="Vỏ can 20L" onclick="DispatchModule.addLocalItem('${orderId}', 'Vỏ can 20L')" style="padding: 8px 16px; border: 1px solid #e5e7eb; border-radius: 8px; background: #f9fafb; cursor: pointer; font-size: 13px;">
+                                        🧴 Vỏ can 20L
+                                    </button>
+                                </div>
+                                
+                                <!-- Textbox gợi ý sản phẩm CRM -->
+                                <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+                                    <input type="text" id="local-item-name-${orderId}" class="form-control" placeholder="Hoặc nhập tên mặt hàng..." list="crm-products-list" style="flex: 1;">
+                                    <input type="number" id="local-item-qty-${orderId}" class="form-control" placeholder="SL" style="width: 80px;" value="1" min="1">
+                                    <button onclick="DispatchModule.addLocalItemManual('${orderId}')" style="padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 8px; cursor: pointer;">
+                                        <i class="bi bi-plus"></i> Thêm
+                                    </button>
+                                </div>
+                                
+                                <!-- Datalist gợi ý sản phẩm CRM -->
+                                <datalist id="crm-products-list">
+                                    ${(window.cachedMaterials || []).map(m => `<option value="${m.name || m.material_name}">`).join('')}
+                                </datalist>
+                                
+                                <!-- Bảng hiển thị mặt hàng phụ đã thêm -->
+                                <div id="local-items-table-${orderId}">
+                                    ${this.renderLocalItemsTable(order.local_items || [], orderId)}
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Thông tin vận chuyển -->
                         <div class="detail-section">
                             <h4 class="section-title"><i class="bi bi-truck"></i> Thông tin vận chuyển</h4>
@@ -908,8 +949,180 @@ const DispatchModule = {
         });
 
         this.renderOrdersList(filtered);
+    },
+
+    // ==========================================
+    // LOCAL ITEMS (Vỏ - NOT synced to MISA)
+    // ==========================================
+
+    // Render local items table
+    renderLocalItemsTable(localItems, orderId) {
+        if (!localItems || localItems.length === 0) {
+            return `<div style="text-align: center; color: #94a3b8; font-size: 13px; padding: 16px; background: #f8fafc; border-radius: 8px;">
+                <i class="bi bi-box" style="font-size: 20px; opacity: 0.5;"></i>
+                <div style="margin-top: 8px;">Chưa có mặt hàng phụ</div>
+            </div>`;
+        }
+
+        return `
+            <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                <thead>
+                    <tr style="background: #fef3c7; border-bottom: 1px solid #fcd34d;">
+                        <th style="padding: 8px; text-align: left;">Mặt hàng</th>
+                        <th style="padding: 8px; text-align: right; width: 80px;">SL</th>
+                        <th style="padding: 8px; text-align: center; width: 50px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${localItems.map((item, idx) => `
+                        <tr style="border-bottom: 1px solid #f1f5f9;">
+                            <td style="padding: 8px;">
+                                <span style="background: #fef3c7; color: #92400e; padding: 2px 6px; border-radius: 4px; font-size: 12px;">📦</span>
+                                ${item.name}
+                            </td>
+                            <td style="padding: 8px; text-align: right; font-weight: 600;">${item.qty}</td>
+                            <td style="padding: 8px; text-align: center;">
+                                <button onclick="DispatchModule.removeLocalItem('${orderId}', ${idx})" style="background: none; border: none; color: #dc2626; cursor: pointer; font-size: 14px;" title="Xóa">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+            <div style="margin-top: 8px; text-align: right;">
+                <small style="color: #6b7280;">⚠️ Mặt hàng này chỉ lưu local, không đẩy về CRM</small>
+            </div>
+        `;
+    },
+
+    // Add local item from button
+    async addLocalItem(orderId, itemName) {
+        // Get current order
+        const order = this.orders.find(o => (o.id || o.order_id) === orderId);
+        if (!order) {
+            alert('Không tìm thấy đơn hàng!');
+            return;
+        }
+
+        // Prompt for quantity
+        const qty = prompt(`Nhập số lượng ${itemName}:`, '1');
+        if (qty === null || qty.trim() === '') return;
+
+        const quantity = parseInt(qty);
+        if (isNaN(quantity) || quantity <= 0) {
+            alert('Số lượng không hợp lệ!');
+            return;
+        }
+
+        // Initialize local_items if needed
+        if (!order.local_items) order.local_items = [];
+
+        // Check if item already exists
+        const existing = order.local_items.find(i => i.name === itemName);
+        if (existing) {
+            existing.qty += quantity;
+        } else {
+            order.local_items.push({ name: itemName, qty: quantity });
+        }
+
+        // Save to database
+        await this.saveLocalItems(orderId, order.local_items);
+
+        // Update UI
+        const tableContainer = document.getElementById(`local-items-table-${orderId}`);
+        if (tableContainer) {
+            tableContainer.innerHTML = this.renderLocalItemsTable(order.local_items, orderId);
+        }
+    },
+
+    // Add local item manually from textbox
+    async addLocalItemManual(orderId) {
+        const nameInput = document.getElementById(`local-item-name-${orderId}`);
+        const qtyInput = document.getElementById(`local-item-qty-${orderId}`);
+
+        const itemName = nameInput.value.trim();
+        const quantity = parseInt(qtyInput.value) || 1;
+
+        if (!itemName) {
+            alert('Vui lòng nhập tên mặt hàng!');
+            return;
+        }
+
+        // Get current order
+        const order = this.orders.find(o => (o.id || o.order_id) === orderId);
+        if (!order) {
+            alert('Không tìm thấy đơn hàng!');
+            return;
+        }
+
+        // Initialize local_items if needed
+        if (!order.local_items) order.local_items = [];
+
+        // Check if item already exists
+        const existing = order.local_items.find(i => i.name === itemName);
+        if (existing) {
+            existing.qty += quantity;
+        } else {
+            order.local_items.push({ name: itemName, qty: quantity });
+        }
+
+        // Save to database
+        await this.saveLocalItems(orderId, order.local_items);
+
+        // Update UI
+        const tableContainer = document.getElementById(`local-items-table-${orderId}`);
+        if (tableContainer) {
+            tableContainer.innerHTML = this.renderLocalItemsTable(order.local_items, orderId);
+        }
+
+        // Clear input
+        nameInput.value = '';
+        qtyInput.value = '1';
+    },
+
+    // Remove local item
+    async removeLocalItem(orderId, index) {
+        if (!confirm('Xóa mặt hàng này?')) return;
+
+        const order = this.orders.find(o => (o.id || o.order_id) === orderId);
+        if (!order || !order.local_items) return;
+
+        order.local_items.splice(index, 1);
+
+        // Save to database
+        await this.saveLocalItems(orderId, order.local_items);
+
+        // Update UI
+        const tableContainer = document.getElementById(`local-items-table-${orderId}`);
+        if (tableContainer) {
+            tableContainer.innerHTML = this.renderLocalItemsTable(order.local_items, orderId);
+        }
+    },
+
+    // Save local items to database (NO MISA SYNC)
+    async saveLocalItems(orderId, localItems) {
+        try {
+            const response = await fetch(`/api/orders/${orderId}/local-items`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ local_items: localItems })
+            });
+
+            const data = await response.json();
+            if (data.error) {
+                console.error('Error saving local items:', data.msg);
+                alert('Lỗi lưu mặt hàng phụ: ' + data.msg);
+            } else {
+                console.log('📦 Local items saved successfully');
+            }
+        } catch (error) {
+            console.error('Error saving local items:', error);
+            alert('Có lỗi xảy ra khi lưu mặt hàng phụ!');
+        }
     }
 };
+
 
 // Đăng ký module
 AppRouter.registerModule('dispatch', DispatchModule);

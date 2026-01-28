@@ -128,41 +128,40 @@ router.get('/my/:driverName', async (req, res) => {
     }
 });
 
-// POST /api/orders - Create import order
-router.post('/', async (req, res) => {
+// PUT /api/orders/:id/local-items - Update local items (vỏ can, phuy, tank) - NO MISA SYNC
+router.put('/:id/local-items', async (req, res) => {
     try {
-        const { date, customer, address, products } = req.body;
+        const { id } = req.params;
+        const { local_items } = req.body;
 
-        const ts = getTimestamp();
-        const id = 'NK' + ts.short;
+        console.log(`📦 Updating local items for order ${id}:`, JSON.stringify(local_items, null, 2));
 
-        const order = await db.addOrder({
-            soDon: id,
-            ngay: formatDate(date),
-            khach: customer,
-            diaChi: address,
-            status: CONFIG.STATUS.WAITING,
-            type: 'IMPORT',
-            products: products.map(p => ({
-                name: p.name,
-                qty: Number(p.qty),
-                unit: p.unit || 'Kg',
-                density: p.density || ''
-            }))
-        });
+        // Validate local_items is array
+        if (!Array.isArray(local_items)) {
+            return res.json(createResponse(true, 'local_items phải là mảng!'));
+        }
 
-        res.json(createResponse(false, 'Đã tạo đơn nhập: ' + id, { orderId: id }));
+        // Update order with local_items only (NO MISA SYNC)
+        const order = await db.updateOrder(id, { local_items });
+
+        if (!order) {
+            return res.json(createResponse(true, 'Không tìm thấy đơn hàng!'));
+        }
+
+        res.json(createResponse(false, 'Đã lưu mặt hàng phụ!', { local_items: order.local_items }));
 
     } catch (e) {
+        console.error('Local items update error:', e.message);
         res.json(createResponse(true, e.message));
     }
 });
 
 // PUT /api/orders/:id - Edit order (customer, address, notes, products)
+
 router.put('/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const { customer, address, note, notes, products, productUpdates } = req.body;
+        const { customer, address, note, notes, products, productUpdates, local_items } = req.body;
 
         console.log(`📝 Edit Order Request for ${id}:`, JSON.stringify(req.body, null, 2));
 
@@ -177,6 +176,12 @@ router.put('/:id', async (req, res) => {
         if (customer !== undefined) updateData.khach = customer;
         if (address !== undefined) updateData.diaChi = address;
         if (note !== undefined || notes !== undefined) updateData.ghiChu = note || notes;
+
+        // Local items (vỏ can, phuy, tank) - NOT synced to MISA
+        if (local_items !== undefined && Array.isArray(local_items)) {
+            updateData.local_items = local_items;
+            console.log(`📦 Local items update:`, JSON.stringify(local_items, null, 2));
+        }
 
         // Handle productUpdates (from frontend - array of {idx, qty})
         if (productUpdates && Array.isArray(productUpdates) && productUpdates.length > 0) {

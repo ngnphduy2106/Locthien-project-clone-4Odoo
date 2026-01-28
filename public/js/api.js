@@ -179,17 +179,29 @@ const api = {
 
     // === ORDER HISTORY ===
     getOrderHistory: async () => {
-        const res = await fetch(`${API_BASE}/orders/history`);
+        const res = await fetch(`${API_BASE}/reports/order-history`);
         return res.json();
     },
 
+    // === SUPPLIERS ===
+    getSuppliers: async () => {
+        const res = await fetch(`${API_BASE}/suppliers`);
+        return res.json();
+    },
 
     // === IMPORTS ===
     createImport: async (data) => {
+        // Map keys to match server/routes/imports.js
+        const payload = {
+            supplier_name: data.supplier || data.customer || '',
+            supplier_address: data.address || '',
+            expected_date: data.date || '',
+            products: data.products || []
+        };
         const res = await fetch(`${API_BASE}/imports`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
+            body: JSON.stringify(payload)
         });
         return res.json();
     },

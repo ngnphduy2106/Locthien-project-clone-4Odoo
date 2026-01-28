@@ -128,7 +128,7 @@ export const db = {
     getOrders: async () => {
         const { useSupabase, useFirebase } = getMode();
         if (useSupabase) {
-            const { data, error } = await supabase.from('orders').select('*').order('sale_order_date', { ascending: false });
+            const { data, error } = await supabase.from('orders').select('*').order('sale_order_date', { ascending: false }).limit(100);
             if (error) console.error('Supabase getOrders error:', error);
             // Map to frontend field names for compatibility
             return (data || []).map(o => {
@@ -202,9 +202,21 @@ export const db = {
                     }
                 } catch (e) { }
 
+                // Parse local_items from JSONB (vỏ can, phuy, tank - NOT synced to MISA)
+                let localItems = [];
+                try {
+                    if (typeof data.local_items === 'string') {
+                        localItems = JSON.parse(data.local_items);
+                    } else if (Array.isArray(data.local_items)) {
+                        localItems = data.local_items;
+                    }
+                } catch (e) { }
+
                 data.products = products;
                 data.cart = products;
+                data.local_items = localItems;
             }
+
 
             return data;
         }
@@ -324,6 +336,13 @@ export const db = {
                 safeData.sale_order_product_mappings = typeof data.sale_order_product_mappings === 'string'
                     ? data.sale_order_product_mappings
                     : JSON.stringify(data.sale_order_product_mappings);
+            }
+
+            // Local Items (NOT synced to MISA - vỏ can, phuy, tank, etc.)
+            if (data.local_items !== undefined) {
+                safeData.local_items = typeof data.local_items === 'string'
+                    ? data.local_items
+                    : JSON.stringify(data.local_items);
             }
 
             console.log(`📝 Updating order ${safeId}:`, Object.keys(safeData));

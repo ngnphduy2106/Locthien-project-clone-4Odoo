@@ -143,4 +143,59 @@ router.get('/dashboard', async (req, res) => {
     }
 });
 
+// GET /api/reports/order-history - Get order history for reporting (completed/cancelled)
+router.get('/order-history', async (req, res) => {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 20;
+        const offset = (page - 1) * limit;
+
+        const orders = await db.getOrders();
+
+        // Filter completed/cancelled orders
+        const historyStatuses = ['Đã thực hiện', 'Đã hủy bỏ', 'completed', 'Hoàn thành', 'Đã giao hàng', 'cancelled'];
+        const historyOrders = orders.filter(o => {
+            const s = String(o.status || '').trim().toLowerCase();
+            return historyStatuses.some(hs => hs.toLowerCase() === s);
+        });
+
+        // Sort by date descending (newest first)
+        historyOrders.sort((a, b) => {
+            const dateA = new Date(a.ngay || a.sale_order_date || a.created_at || 0);
+            const dateB = new Date(b.ngay || b.sale_order_date || b.created_at || 0);
+            return dateB - dateA;
+        });
+
+        const total = historyOrders.length;
+        const totalPages = Math.ceil(total / limit);
+        const paginatedOrders = historyOrders.slice(offset, offset + limit);
+
+        // Map to consistent format (CamelCase for app.js)
+        const mappedOrders = paginatedOrders.map(o => ({
+            id: o.soDon || o.sale_order_no || o.id,
+            orderCode: o.soDon || o.sale_order_no || o.id,
+            customerName: o.khach || o.account_name || '',
+            orderDate: o.ngay || o.sale_order_date,
+            totalAmount: o.amount || o.sale_order_amount || 0,
+            status: o.status,
+            driverName: o.taiXe || o.driver || '',
+            completedAt: o.completed_at || o.updated_at,
+            address: o.diaChi || o.shipping_address || '',
+            products: o.cart || o.products || []
+        }));
+
+        res.json({
+            error: false,
+            data: mappedOrders,
+            total,
+            totalPages,
+            currentPage: page
+        });
+
+    } catch (e) {
+        console.error('Order history error:', e.message);
+        res.json(createResponse(true, 'Lỗi server: ' + e.message));
+    }
+});
+
 export default router;

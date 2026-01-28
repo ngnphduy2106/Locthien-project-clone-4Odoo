@@ -143,11 +143,15 @@ function initApp() {
     hide('view-login');
     show('view-app');
 
-    // Set user info
+    // UI Updates
     if (state.user) {
-        const initial = (state.user.name || state.user.phone || 'A').charAt(0).toUpperCase();
-        const userInitial = window.$('#user-initial');
-        if (userInitial) userInitial.textContent = initial;
+        const avatar = window.$('.user-avatar');
+        if (avatar) avatar.textContent = state.user.fullName ? state.user.fullName.charAt(0).toUpperCase() : 'U';
+
+        const menuName = window.$('#menu-user-name');
+        const menuRole = window.$('#menu-user-role');
+        if (menuName) menuName.textContent = state.user.fullName;
+        if (menuRole) menuRole.textContent = state.user.role;
     }
 
     // Show dashboard
@@ -540,15 +544,89 @@ function renderDispatchOrders() {
 
 // === CREATE ORDER ===
 
-function initCreateOrder() {
+async function initCreateOrder() {
     // Set default date
     const dateInput = window.$('#order-date');
     if (dateInput) {
         dateInput.value = new Date().toISOString().split('T')[0];
     }
 
+    // Load suggestions
+    loadSupplierSuggestions();
+    loadProductSuggestions();
+
     state.orderProducts = [];
     renderOrderProducts();
+}
+
+async function loadSupplierSuggestions() {
+    try {
+        console.log('🔍 Fetching supplier suggestions...');
+        const res = await api.getSuppliers();
+        const suppliers = res.data || [];
+
+        if (!Array.isArray(suppliers)) {
+            console.error('❌ Suppliers is not an array:', suppliers);
+            return;
+        }
+
+        // Ensure datalist exists in the DOM
+        let datalist = window.$('#supplier-list');
+        if (!datalist) {
+            datalist = document.createElement('datalist');
+            datalist.id = 'supplier-list';
+            document.body.appendChild(datalist);
+        }
+
+        const customerInput = window.$('#order-customer');
+        if (customerInput) {
+            customerInput.setAttribute('list', 'supplier-list');
+            customerInput.setAttribute('autocomplete', 'off');
+        }
+
+        datalist.innerHTML = suppliers.map(s =>
+            `<option value="${s.name}">${s.name}</option>`
+        ).join('');
+
+        console.log(`✅ Loaded ${suppliers.length} supplier suggestions into #supplier-list`);
+    } catch (e) {
+        console.error('❌ Failed to load supplier suggestions:', e);
+    }
+}
+
+async function loadProductSuggestions() {
+    try {
+        console.log('🔍 Fetching MISA product suggestions...');
+        const res = await api.getMaterials();
+        const products = res.data || [];
+
+        if (!Array.isArray(products)) {
+            console.error('❌ Products is not an array:', products);
+            return;
+        }
+
+        // Ensure datalist exists in the DOM
+        let datalist = window.$('#product-misa-list');
+        if (!datalist) {
+            datalist = document.createElement('datalist');
+            datalist.id = 'product-misa-list';
+            document.body.appendChild(datalist);
+        }
+
+        const prodInput = window.$('#prod-name');
+        if (prodInput) {
+            prodInput.setAttribute('list', 'product-misa-list');
+            prodInput.setAttribute('autocomplete', 'off');
+        }
+
+        datalist.innerHTML = products.map(p =>
+            `<option value="${p.name}">${p.code ? p.code + ' - ' : ''}${p.name}</option>`
+        ).join('');
+
+        console.log(`✅ Loaded ${products.length} MISA product suggestions`);
+    } catch (e) {
+        console.error('❌ Failed to load products suggestions:', e);
+    }
 }
 
 function addOrderProduct() {
@@ -710,8 +788,16 @@ async function loadOrderHistory() {
     tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:40px;">Đang tải...</td></tr>';
 
     try {
+        console.log('🔍 Loading order history...');
         const res = await api.getOrderHistory();
-        const orders = res.data || res || [];
+
+        // Defensive check: handle both {data:[]} and directly []
+        let orders = res.data || res.orders || res.history || (Array.isArray(res) ? res : null);
+
+        if (!orders || !Array.isArray(orders)) {
+            console.error('❌ Invalid history data format:', res);
+            throw new Error('Định dạng dữ liệu không hợp lệ');
+        }
 
         if (orders.length === 0) {
             tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:40px; color:var(--text-muted);">Chưa có đơn hàng nào</td></tr>';
@@ -720,21 +806,29 @@ async function loadOrderHistory() {
 
         tbody.innerHTML = orders.map(order => `
             <tr>
-                <td><strong>${order.orderCode || order.id}</strong></td>
-                <td>${order.customerName || '-'}</td>
-                <td>${formatDate(order.orderDate || order.createdAt)}</td>
-                <td>${formatCurrency(order.totalAmount || 0)}</td>
+                <td><strong>${order.orderCode || order.id || '-'}</strong></td>
+                <td>${order.customerName || order.accountName || order.khach || '-'}</td>
+                <td>${formatDate(order.orderDate || order.order_date || order.createdAt)}</td>
+                <td>${formatCurrency(order.totalAmount || order.total_amount || 0)}</td>
                 <td><span class="badge badge-${getStatusBadge(order.status)}">${getStatusText(order.status)}</span></td>
-                <td>${order.driverName || '-'}</td>
-                <td>${order.completedAt ? formatDate(order.completedAt) : '-'}</td>
+                <td>${order.driverName || order.driver_name || '-'}</td>
+                <td>${(order.completedAt || order.completed_at) ? formatDate(order.completedAt || order.completed_at) : '-'}</td>
             </tr>
         `).join('');
 
         // Update pagination
-        const totalPages = Math.ceil(orders.length / state.historyPerPage) || 1;
-        window.$('#pagination-info').textContent = `Trang ${state.historyPage} / ${totalPages}`;
+        const total = res.total || orders.length;
+        const totalPages = res.totalPages || Math.ceil(total / state.historyPerPage) || 1;
+        const paginationInfo = window.$('#pagination-info');
+        if (paginationInfo) {
+            paginationInfo.textContent = `Trang ${state.historyPage} / ${totalPages}`;
+        }
+        console.log(`✅ Rendered ${orders.length} history items`);
     } catch (e) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:var(--danger);">Lỗi tải dữ liệu</td></tr>';
+        console.error('❌ Order history error:', e);
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--danger); padding:20px;">
+            Lỗi tải dữ liệu<br><small style="font-weight:normal; color:#666;">${e.message}</small>
+        </td></tr>`;
     }
 }
 
@@ -879,6 +973,39 @@ function viewOrderDetail(orderId) {
                 </tbody>
             </table>
             
+            ${(() => {
+                // Safe parse local_items - might be JSON string from DB
+                let localItems = order.local_items || [];
+                if (typeof localItems === 'string') {
+                    try { localItems = JSON.parse(localItems); } catch (e) { localItems = []; }
+                }
+                if (!Array.isArray(localItems)) localItems = [];
+
+                return localItems.length > 0 ? `
+            <!-- MẶT HÀNG PHỤ (Local only - NOT in CRM) -->
+            <h4 style="margin: 24px 0 12px; font-size:14px; color:var(--warning);">
+                <i class="bi bi-box" style="margin-right:6px;"></i> Mặt hàng phụ (Vỏ)
+                <span style="font-weight:normal; font-size:12px; color:var(--text-muted);"> - Chỉ lưu nội bộ</span>
+            </h4>
+            <table class="data-table" style="width:100%; background:#fefce8; border:1px solid #fef08a;">
+                <thead>
+                    <tr style="background:#fef08a;">
+                        <th style="text-align:left;">Mặt hàng</th>
+                        <th style="text-align:right; width:80px;">Số lượng</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${localItems.map(item => `
+                        <tr>
+                            <td>📦 ${item.name || item.product || '-'}</td>
+                            <td style="text-align:right; font-weight:600;">${item.qty || item.quantity || 0}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+            ` : '';
+            })()}
+            
             ${order.note ? `<div style="margin-top:16px; padding:12px; background:var(--body-bg); border-radius:8px;"><strong>Ghi chú:</strong> ${order.note}</div>` : ''}
             
             <!-- CHAT SECTION -->
@@ -914,29 +1041,29 @@ function viewOrderDetail(orderId) {
                 </div>
             </div>
             
-            <!-- ACTION BUTTONS -->
-            <div style="margin-top:20px; padding-top:16px; border-top:1px solid var(--border); display:flex; gap:8px; flex-wrap:wrap;">
-                ${order.status === 'Mới' || order.status === 'Chưa thực hiện' ? `
+            <!--ACTION BUTTONS-- >
+        <div style="margin-top:20px; padding-top:16px; border-top:1px solid var(--border); display:flex; gap:8px; flex-wrap:wrap;">
+            ${order.status === 'Mới' || order.status === 'Chưa thực hiện' ? `
                     <button class="btn btn-primary" onclick="closeOrderModal(); assignDriver('${order.id}')">
                         <i class="bi bi-person-plus"></i> Phân công tài xế
                     </button>
                 ` : ''}
-                ${(order.status === 'Đang thực hiện' || order.status === 'Chờ giao' || order.status === 'assigned') && state.user?.role === 'ADMIN' ? `
+            ${(order.status === 'Đang thực hiện' || order.status === 'Chờ giao' || order.status === 'assigned') && state.user?.role === 'ADMIN' ? `
                     <button class="btn btn-success" onclick="adminCompleteOrder('${order.id}')">
                         <i class="bi bi-check-circle"></i> Admin hoàn thành
                     </button>
                 ` : ''}
-                ${state.user?.role === 'ADMIN' ? `
+            ${state.user?.role === 'ADMIN' ? `
                     <button class="btn btn-warning" onclick="closeOrderModal(); editOrder('${order.id}')">
                         <i class="bi bi-pencil"></i> Chỉnh sửa
                     </button>
                 ` : ''}
-                <button class="btn btn-outline" onclick="closeOrderModal()">
-                    <i class="bi bi-x-lg"></i> Đóng
-                </button>
-            </div>
+            <button class="btn btn-outline" onclick="closeOrderModal()">
+                <i class="bi bi-x-lg"></i> Đóng
+            </button>
+        </div>
 
-        `;
+    `;
 
         // Initialize chat auto-refresh
         currentChatOrderId = order.soDon || order.sale_order_no || order.id;
@@ -1000,7 +1127,7 @@ function assignDriver(orderId) {
 
     // Build driver select options with plate data
     const driverOptions = (state.drivers || []).map(d =>
-        `<option value="${d.name}" data-plate="${d.plate || ''}">${d.name}${d.plate ? ' - ' + d.plate : ''}</option>`
+        `< option value = "${d.name}" data - plate="${d.plate || ''}" > ${d.name}${d.plate ? ' - ' + d.plate : ''}</option > `
     ).join('');
 
     // Show modal
@@ -1008,11 +1135,11 @@ function assignDriver(orderId) {
     const modalBody = window.$('#modal-order-body');
     const modalTitle = window.$('#modal-order-title');
 
-    if (modalTitle) modalTitle.textContent = `Phân công tài xế - Đơn #${order.soDon || order.sale_order_no || order.id}`;
+    if (modalTitle) modalTitle.textContent = `Phân công tài xế - Đơn #${order.soDon || order.sale_order_no || order.id} `;
 
     if (modalBody) {
         modalBody.innerHTML = `
-            <div class="order-detail-grid" style="margin-bottom:16px;">
+        < div class="order-detail-grid" style = "margin-bottom:16px;" >
                 <div class="detail-row">
                     <label>Khách hàng:</label>
                     <span>${order.khach || order.account_name || 'Chưa có'}</span>
@@ -1025,9 +1152,9 @@ function assignDriver(orderId) {
                     <label>Tổng SL:</label>
                     <span style="color:var(--primary); font-weight:600;">${formatNumber(totalQty)} kg</span>
                 </div>
-            </div>
+            </div >
             
-            <!-- Multi-Driver Assignment Section -->
+            < !--Multi - Driver Assignment Section-- >
             <div style="background:var(--body-bg); padding:16px; border-radius:8px; margin-bottom:16px;">
                 <h4 style="margin:0 0 12px; font-size:14px;">Phân công tài xế</h4>
                 
@@ -1075,7 +1202,7 @@ function assignDriver(orderId) {
                     <i class="bi bi-check-all"></i> Xác nhận phân công
                 </button>
             </div>
-        `;
+    `;
 
         // Render summary
         updateQtySummaryDisplay();
@@ -1171,7 +1298,7 @@ function renderDriverAssignmentsList() {
     }
 
     container.innerHTML = state.driverAssignments.map((a, idx) => `
-        <div style="display:flex; align-items:center; gap:12px; padding:10px; background:var(--card-bg); border-radius:6px; margin-bottom:8px; border-left:3px solid ${a.is_external ? 'var(--warning)' : 'var(--primary)'};">
+        < div style = "display:flex; align-items:center; gap:12px; padding:10px; background:var(--card-bg); border-radius:6px; margin-bottom:8px; border-left:3px solid ${a.is_external ? 'var(--warning)' : 'var(--primary)'};" >
             <div style="flex:1;">
                 <strong>${a.driver_name}</strong>
                 ${a.is_external ? '<span style="font-size:11px; background:var(--warning); color:#000; padding:2px 6px; border-radius:4px; margin-left:6px;">Tài xế ngoài</span>' : ''}
@@ -1181,8 +1308,8 @@ function renderDriverAssignmentsList() {
             <button onclick="removeDriverAssignmentRow(${idx})" style="background:var(--danger); color:white; border:none; border-radius:4px; width:28px; height:28px; cursor:pointer;">
                 <i class="bi bi-x"></i>
             </button>
-        </div>
-    `).join('');
+        </div >
+        `).join('');
 }
 
 // Update qty summary
@@ -1197,10 +1324,10 @@ function updateQtySummaryDisplay() {
     const color = remaining === 0 ? 'var(--success)' : (remaining < 0 ? 'var(--danger)' : 'var(--warning)');
 
     container.innerHTML = `
-        <div style="display:flex; justify-content:space-between;">
+        < div style = "display:flex; justify-content:space-between;" >
             <span>Tổng đơn hàng:</span>
             <strong>${formatNumber(totalOrder)} kg</strong>
-        </div>
+        </div >
         <div style="display:flex; justify-content:space-between;">
             <span>Đã phân công:</span>
             <strong>${formatNumber(totalAssigned)} kg</strong>
@@ -1223,7 +1350,7 @@ async function submitMultiDriverAssignment() {
     const totalOrder = state.currentOrderTotalQty || 0;
 
     if (Math.abs(totalAssigned - totalOrder) > 0.5) {
-        if (!confirm(`Tổng số lượng phân (${formatNumber(totalAssigned)} kg) khác tổng đơn (${formatNumber(totalOrder)} kg). Tiếp tục?`)) {
+        if (!confirm(`Tổng số lượng phân(${formatNumber(totalAssigned)} kg) khác tổng đơn(${formatNumber(totalOrder)} kg).Tiếp tục ? `)) {
             return;
         }
     }
@@ -1232,7 +1359,7 @@ async function submitMultiDriverAssignment() {
 
     try {
         const orderId = state.currentAssignOrderId;
-        const res = await fetch(`/api/orders/${orderId}/assign-multi`, {
+        const res = await fetch(`/ api / orders / ${orderId}/assign-multi`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ assignments: state.driverAssignments })
@@ -1307,10 +1434,27 @@ function completeOrder(orderId) {
     openDeliveryModal(orderId);
 }
 
-function toggleUserMenu() {
-    // TODO: Toggle user dropdown menu
-    console.log('Toggle user menu');
+function toggleUserMenu(event) {
+    if (event) event.stopPropagation();
+    const menu = window.$('#user-menu');
+    if (!menu) return;
+
+    if (menu.classList.contains('hidden')) {
+        menu.classList.remove('hidden');
+        // Close menu when clicking outside
+        const closeMenu = (e) => {
+            if (!menu.contains(e.target)) {
+                menu.classList.add('hidden');
+                document.removeEventListener('click', closeMenu);
+            }
+        };
+        document.addEventListener('click', closeMenu);
+    } else {
+        menu.classList.add('hidden');
+    }
 }
+
+window.toggleUserMenu = toggleUserMenu;
 
 // === DELIVERY MODAL (HOÀN THÀNH ĐƠN) ===
 
@@ -2089,6 +2233,41 @@ function editOrder(orderId) {
                 </tbody>
             </table>
             
+            <!-- MẶT HÀNG PHỤ (VỎ) - Local only, NOT synced to MISA -->
+            <h4 style="margin: 24px 0 12px; font-size:14px; color:var(--warning);">
+                <i class="bi bi-box"></i> Mặt hàng phụ (Vỏ) 
+                <small style="font-weight:normal; color:var(--text-muted);">- Chỉ lưu local</small>
+            </h4>
+            
+            <!-- Quick buttons for common containers -->
+            <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px;">
+                <button type="button" class="btn btn-sm" style="background:#fef3c7; border:1px solid #fcd34d; color:#92400e;" 
+                    onclick="addLocalItemEdit('Vỏ can 30L')">🧴 Vỏ can 30L</button>
+                <button type="button" class="btn btn-sm" style="background:#fef3c7; border:1px solid #fcd34d; color:#92400e;" 
+                    onclick="addLocalItemEdit('Vỏ phuy')">🛢️ Vỏ phuy</button>
+                <button type="button" class="btn btn-sm" style="background:#fef3c7; border:1px solid #fcd34d; color:#92400e;" 
+                    onclick="addLocalItemEdit('Vỏ tank')">🏭 Vỏ tank</button>
+                <button type="button" class="btn btn-sm" style="background:#fef3c7; border:1px solid #fcd34d; color:#92400e;" 
+                    onclick="addLocalItemEdit('Vỏ can 20L')">🧴 Vỏ can 20L</button>
+            </div>
+            
+            <!-- Manual input with suggestions -->
+            <div style="display:flex; gap:8px; margin-bottom:12px;">
+                <input type="text" id="edit-local-item-name" class="form-control" placeholder="Hoặc nhập tên mặt hàng..." list="edit-crm-products-list" style="flex:1;">
+                <input type="number" id="edit-local-item-qty" class="form-control" value="1" min="1" style="width:80px;">
+                <button type="button" class="btn btn-primary btn-sm" onclick="addLocalItemEditManual()">
+                    <i class="bi bi-plus"></i> Thêm
+                </button>
+            </div>
+            <datalist id="edit-crm-products-list">
+                ${(window.cachedMaterials || []).map(m => '<option value="' + (m.name || m.material_name) + '">').join('')}
+            </datalist>
+            
+            <!-- Local items table -->
+            <div id="edit-local-items-table">
+                ${renderLocalItemsTableEdit(order.local_items || [], orderId)}
+            </div>
+            
             <div style="display:flex; gap:12px; margin-top:24px;">
                 <button class="btn btn-outline" onclick="closeOrderModal()">Hủy</button>
                 <button class="btn btn-primary" onclick="saveEditOrder()">
@@ -2126,7 +2305,8 @@ async function saveEditOrder() {
                 customer,
                 address,
                 note,
-                productUpdates
+                productUpdates,
+                local_items: editLocalItems  // Save local items (NOT synced to MISA)
             })
         });
         const data = await res.json();
@@ -2143,6 +2323,180 @@ async function saveEditOrder() {
     } catch (e) {
         hideLoading();
         alert('Lỗi: ' + e.message);
+    }
+}
+
+// ===============================================
+// LOCAL ITEMS HELPERS FOR EDIT ORDER
+// ===============================================
+
+// Temporary storage for local items during edit
+let editLocalItems = [];
+
+function renderLocalItemsTableEdit(localItems, orderId) {
+    editLocalItems = localItems || [];
+
+    if (!editLocalItems || editLocalItems.length === 0) {
+        return `<div style="text-align:center; color:var(--text-muted); padding:16px; background:var(--body-bg); border-radius:8px;">
+            <i class="bi bi-box" style="font-size:20px; opacity:0.5;"></i>
+            <div style="margin-top:8px;">Chưa có mặt hàng phụ</div>
+        </div>`;
+    }
+
+    return `
+        <table class="data-table" style="width:100%; font-size:13px;">
+            <thead>
+                <tr style="background:#fef3c7;">
+                    <th style="text-align:left;">Mặt hàng</th>
+                    <th style="text-align:right; width:80px;">SL</th>
+                    <th style="width:50px;"></th>
+                </tr>
+            </thead>
+            <tbody>
+                ${editLocalItems.map((item, idx) => `
+                    <tr>
+                        <td>
+                            <span style="background:#fef3c7; color:#92400e; padding:2px 6px; border-radius:4px; font-size:12px;">📦</span>
+                            ${item.name}
+                        </td>
+                        <td style="text-align:right; font-weight:600;">${item.qty}</td>
+                        <td style="text-align:center;">
+                            <button type="button" onclick="removeLocalItemEdit(${idx})" 
+                                style="background:none; border:none; color:var(--danger); cursor:pointer;" title="Xóa">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+        <div style="margin-top:8px; text-align:right;">
+            <small style="color:var(--text-muted);">⚠️ Mặt hàng này chỉ lưu local, không đẩy về CRM</small>
+        </div>
+    `;
+}
+
+function addLocalItemEdit(itemName) {
+    // Show inline quantity input instead of ugly browser prompt
+    const existingModal = document.getElementById('qty-input-modal');
+    if (existingModal) existingModal.remove();
+
+    const modalHTML = `
+        <div id="qty-input-modal" style="position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:10000; display:flex; align-items:center; justify-content:center;">
+            <div style="background:white; border-radius:12px; padding:24px; min-width:320px; box-shadow:0 10px 40px rgba(0,0,0,0.3);">
+                <h4 style="margin:0 0 16px; color:var(--primary); display:flex; align-items:center; gap:8px;">
+                    <span style="background:#fef3c7; padding:8px; border-radius:8px; font-size:20px;">📦</span>
+                    ${itemName}
+                </h4>
+                <div style="margin-bottom:16px;">
+                    <label style="display:block; margin-bottom:8px; font-weight:600; color:#374151; font-size:14px;">Số lượng</label>
+                    <input type="number" id="qty-input-value" value="1" min="1" 
+                        style="width:100%; padding:12px 16px; border:2px solid #e5e7eb; border-radius:8px; font-size:18px; font-weight:600; text-align:center;"
+                        autofocus>
+                </div>
+                <div style="display:flex; gap:12px;">
+                    <button onclick="document.getElementById('qty-input-modal').remove()" 
+                        style="flex:1; padding:12px; border:1px solid #d1d5db; background:white; border-radius:8px; cursor:pointer; font-weight:500;">
+                        Hủy
+                    </button>
+                    <button onclick="confirmAddLocalItem('${itemName}')" 
+                        style="flex:1; padding:12px; border:none; background:linear-gradient(135deg, #667eea, #764ba2); color:white; border-radius:8px; cursor:pointer; font-weight:600;">
+                        <i class="bi bi-check-lg"></i> Thêm
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+    // Focus and select input
+    setTimeout(() => {
+        const input = document.getElementById('qty-input-value');
+        if (input) {
+            input.focus();
+            input.select();
+            // Handle Enter key
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') confirmAddLocalItem(itemName);
+                if (e.key === 'Escape') document.getElementById('qty-input-modal')?.remove();
+            });
+        }
+    }, 100);
+}
+
+function confirmAddLocalItem(itemName) {
+    const input = document.getElementById('qty-input-value');
+    const quantity = parseInt(input?.value) || 0;
+
+    // Close modal
+    document.getElementById('qty-input-modal')?.remove();
+
+    if (quantity <= 0) {
+        alert('Số lượng không hợp lệ!');
+        return;
+    }
+
+    // Check if item exists
+    const existing = editLocalItems.find(i => i.name === itemName);
+    if (existing) {
+        existing.qty += quantity;
+    } else {
+        editLocalItems.push({ name: itemName, qty: quantity });
+    }
+
+    // Re-render table
+    const container = document.getElementById('edit-local-items-table');
+    if (container) {
+        container.innerHTML = renderLocalItemsTableEdit(editLocalItems, state.currentEditOrderId);
+    }
+}
+
+function addLocalItemEditManual() {
+    const nameInput = document.getElementById('edit-local-item-name');
+    const qtyInput = document.getElementById('edit-local-item-qty');
+
+    const itemName = nameInput?.value?.trim();
+    const quantity = parseInt(qtyInput?.value) || 1;
+
+    if (!itemName) {
+        alert('Vui lòng nhập tên mặt hàng!');
+        return;
+    }
+
+    if (quantity <= 0) {
+        alert('Số lượng không hợp lệ!');
+        return;
+    }
+
+    // Check if item exists
+    const existing = editLocalItems.find(i => i.name === itemName);
+    if (existing) {
+        existing.qty += quantity;
+    } else {
+        editLocalItems.push({ name: itemName, qty: quantity });
+    }
+
+    // Re-render table
+    const container = document.getElementById('edit-local-items-table');
+    if (container) {
+        container.innerHTML = renderLocalItemsTableEdit(editLocalItems, state.currentEditOrderId);
+    }
+
+    // Clear inputs
+    if (nameInput) nameInput.value = '';
+    if (qtyInput) qtyInput.value = '1';
+}
+
+function removeLocalItemEdit(idx) {
+    if (!confirm('Xóa mặt hàng này?')) return;
+
+    editLocalItems.splice(idx, 1);
+
+    // Re-render table
+    const container = document.getElementById('edit-local-items-table');
+    if (container) {
+        container.innerHTML = renderLocalItemsTableEdit(editLocalItems, state.currentEditOrderId);
     }
 }
 

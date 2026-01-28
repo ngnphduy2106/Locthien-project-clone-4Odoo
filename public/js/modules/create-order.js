@@ -4,12 +4,39 @@
 
 const CreateOrderModule = {
     orderProducts: [],
+    suppliers: [],
 
     // Khởi tạo module
     init() {
         console.log('Create Order Module initialized');
+        this.loadSuppliers();
         this.resetForm();
         this.renderForm();
+    },
+
+    // Load suppliers from API
+    async loadSuppliers() {
+        try {
+            const response = await fetch('/api/suppliers');
+            const data = await response.json();
+            if (!data.error && data.data) {
+                this.suppliers = data.data;
+                this.updateSupplierDatalist();
+                console.log(`📦 Loaded ${this.suppliers.length} suppliers`);
+            }
+        } catch (e) {
+            console.error('Failed to load suppliers:', e);
+        }
+    },
+
+    // Update supplier datalist
+    updateSupplierDatalist() {
+        const datalist = document.getElementById('supplier-list');
+        if (!datalist) return;
+
+        datalist.innerHTML = this.suppliers.map(s =>
+            `<option value="${s.name}">${s.name}</option>`
+        ).join('');
     },
 
     // Reset form
@@ -221,7 +248,10 @@ const CreateOrderModule = {
                                 Nhà cung cấp / Khách hàng
                             </label>
                             <input type="text" id="order-customer" class="form-control form-input-modern" 
-                                placeholder="Tên nhà cung cấp hoặc khách hàng">
+                                placeholder="Tên nhà cung cấp hoặc khách hàng"
+                                list="supplier-list"
+                                autocomplete="off">
+                            <datalist id="supplier-list"></datalist>
                         </div>
 
                         <div class="form-group-modern">

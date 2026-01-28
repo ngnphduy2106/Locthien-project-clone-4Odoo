@@ -137,8 +137,21 @@
                     <button class="header-btn" title="Thông báo">
                         <i class="bi bi-bell"></i>
                     </button>
-                    <div class="user-avatar" id="user-avatar" onclick="toggleUserMenu()">
-                        <span id="user-initial">A</span>
+                    <div style="position:relative;">
+                        <div class="user-avatar" id="user-avatar" onclick="toggleUserMenu(event)">
+                            <span id="user-initial">A</span>
+                        </div>
+                        <div id="user-menu" class="user-menu-dropdown hidden">
+                            <div class="user-menu-item">
+                                <i class="bi bi-person"></i>
+                                <span>Trang cá nhân</span>
+                            </div>
+                            <div class="user-menu-divider"></div>
+                            <button class="user-menu-item danger" onclick="doLogout()">
+                                <i class="bi bi-box-arrow-right"></i>
+                                <span>Đăng xuất</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </header>

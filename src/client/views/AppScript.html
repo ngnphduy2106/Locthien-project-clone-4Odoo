@@ -124,9 +124,26 @@
         location.reload();
     }
 
+    function toggleUserMenu(event) {
+        if (event) event.stopPropagation();
+        const menu = $('#user-menu');
+        menu.toggleClass('hidden');
+
+        // Close menu when clicking outside
+        if (!menu.hasClass('hidden')) {
+            const closeMenu = (e) => {
+                if (!$(e.target).closest('#user-avatar, #user-menu').length) {
+                    menu.addClass('hidden');
+                    document.removeEventListener('click', closeMenu);
+                }
+            };
+            document.addEventListener('click', closeMenu);
+        }
+    }
+
     function initApp() {
-        $('#txt-user-name').text(state.user.name);
-        $('#txt-user-role').text(state.user.role);
+        $('#txt-user-name, #menu-user-name').text(state.user.name);
+        $('#txt-user-role, #menu-user-role').text(state.user.role);
 
         hide('area-admin');
         hide('area-driver');
@@ -793,6 +810,26 @@
         const c = $('#imp-grid-cat');
         c.empty();
         PRODS.forEach(p => c.append($(`<div class="group-item">${p.name}</div>`).click(function () { clickImpProd(p, this); })));
+
+        loadProductSuggestions();
+    }
+
+    function loadProductSuggestions() {
+        google.script.run
+            .withSuccessHandler(res => {
+                if (res.error) return console.error('Lỗi tải vật tư:', res.msg);
+                const list = $('#product-misa-list');
+                list.empty();
+                if (res.data && res.data.length > 0) {
+                    res.data.forEach(m => {
+                        const opt = document.createElement('option');
+                        opt.value = m.name;
+                        opt.textContent = m.code ? `[${m.code}] ${m.name}` : m.name;
+                        list.append(opt);
+                    });
+                }
+            })
+            .adminGetMaterials();
     }
 
     function clickImpProd(p, el) {
