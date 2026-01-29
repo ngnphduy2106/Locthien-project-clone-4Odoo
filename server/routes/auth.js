@@ -122,4 +122,61 @@ router.post('/register', async (req, res) => {
     }
 });
 
+// ===============================================
+// USER MANAGEMENT (ADMIN ONLY)
+// ===============================================
+
+// GET /api/auth/users - List all users
+router.get('/users', async (req, res) => {
+    try {
+        const users = await db.getUsers();
+
+        // Return users without passwords for security
+        const safeUsers = users.map(u => ({
+            id: u.id,
+            username: u.username,
+            fullName: u.fullName,
+            role: u.role,
+            plate: u.plate || '',
+            status: u.status || 'ACTIVE',
+            createdAt: u.createdAt || u.created_at
+        }));
+
+        res.json({ error: false, users: safeUsers });
+    } catch (e) {
+        res.json(createResponse(true, 'Lỗi: ' + e.message));
+    }
+});
+
+// PUT /api/auth/users/:id - Update user
+router.put('/users/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { fullName, role, plate, status, password } = req.body;
+
+        const updateData = {};
+        if (fullName !== undefined) updateData.fullName = fullName;
+        if (role !== undefined) updateData.role = role;
+        if (plate !== undefined) updateData.plate = plate.toUpperCase();
+        if (status !== undefined) updateData.status = status;
+        if (password !== undefined && password.trim()) updateData.password = password;
+
+        const updated = await db.updateUser(id, updateData);
+        res.json(createResponse(false, 'Đã cập nhật tài khoản!', { user: updated }));
+    } catch (e) {
+        res.json(createResponse(true, 'Lỗi: ' + e.message));
+    }
+});
+
+// DELETE /api/auth/users/:id - Deactivate user (soft delete)
+router.delete('/users/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        await db.updateUser(id, { status: 'INACTIVE' });
+        res.json(createResponse(false, 'Đã vô hiệu hóa tài khoản!'));
+    } catch (e) {
+        res.json(createResponse(true, 'Lỗi: ' + e.message));
+    }
+});
+
 export default router;

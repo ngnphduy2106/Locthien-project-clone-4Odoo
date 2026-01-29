@@ -8,11 +8,18 @@ import { createClient } from '@supabase/supabase-js';
 
 const router = Router();
 
-// Initialize Supabase client for chat
-const supabase = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY
-);
+// Lazy Supabase client initialization (env vars may not exist at import time)
+let _supabase = null;
+function getSupabase() {
+    if (!_supabase) {
+        const url = process.env.SUPABASE_URL;
+        const key = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY;
+        if (url && key) {
+            _supabase = createClient(url, key);
+        }
+    }
+    return _supabase;
+}
 
 // GET /api/chat/:id/messages - Get chat messages for an order or import ticket
 // Supports: ?type=import for import ticket messages, ?since=ISO_TIMESTAMP for incremental polling
@@ -21,7 +28,7 @@ router.get('/:id/messages', async (req, res) => {
         const { id } = req.params;
         const { type, since } = req.query;
 
-        let query = supabase
+        let query = getSupabase()
             .from('order_messages')
             .select('*')
             .order('created_at', { ascending: true });
@@ -85,7 +92,7 @@ router.post('/:id/messages', async (req, res) => {
             insertData.order_id = safeId;
         }
 
-        const { data, error } = await supabase
+        const { data, error } = await getSupabase()
             .from('order_messages')
             .insert(insertData)
             .select()

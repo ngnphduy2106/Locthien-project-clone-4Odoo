@@ -90,20 +90,26 @@ router.get('/my/:driverName', async (req, res) => {
         const orders = await db.getOrders();
         const users = await db.getUsers();
 
-        const completedStatuses = ['Đã thực hiện', 'Đã hủy bỏ']; // MISA status values
+        const completedStatuses = ['Đã thực hiện', 'Đã hủy bỏ', 'completed', 'COMPLETED']; // MISA + internal statuses
         const myName = String(driverName).trim().toUpperCase();
+
+        console.log(`🔍 My Orders Search: driverName="${driverName}" -> normalized="${myName}"`);
 
         const internalDrivers = users
             .filter(u => u.role === CONFIG.ROLES.DRIVER)
-            .map(u => u.fullName.toUpperCase());
+            .map(u => (u.fullName || '').toUpperCase());
 
         let myOrders = orders.filter(o => {
             if (!o.taiXe) return false;
 
             const tName = String(o.taiXe).trim().toUpperCase();
-            const match = (tName === myName);
 
-            if (match) console.log(`DEBUG: Found match for ${driverName}: ${o.soDon}`);
+            // More flexible matching: includes or exact match
+            const match = (tName === myName) ||
+                tName.includes(myName) ||
+                myName.includes(tName);
+
+            if (match) console.log(`✅ Found match: "${o.taiXe}" ~ "${driverName}" for order ${o.soDon}`);
 
             if (role === 'ADMIN' || role === 'TESTER') {
                 const isMe = match;
@@ -114,12 +120,25 @@ router.get('/my/:driverName', async (req, res) => {
             return match;
         });
 
-        console.log(`DEBUG: Driver ${driverName} (${role}) | Total DB Orders: ${orders.length} | Matches: ${myOrders.length}`);
+        console.log(`📋 Driver ${driverName} (${role}) | Total DB Orders: ${orders.length} | Matches: ${myOrders.length}`);
 
-        myOrders = myOrders.map(o => ({
-            ...o,
-            statusCode: o.status === CONFIG.STATUS.DELIVERING ? 'DANG_GIAO' : 'CHO_GIAO'
-        }));
+        // Map status codes for frontend
+        myOrders = myOrders.map(o => {
+            const s = String(o.status || '').toLowerCase();
+            let statusCode = 'CHO_GIAO';
+
+            // Defining status arrays for flexible matching
+            const deliveringStatuses = ['in_transit', 'delivering', 'đang thực hiện', 'đang giao'];
+            const pendingStatuses = ['assigned', 'chưa thực hiện'];
+
+            if (pendingStatuses.some(ps => s.includes(ps))) statusCode = 'CHO_NHAN';
+            else if (deliveringStatuses.some(ds => s.includes(ds))) statusCode = 'DANG_GIAO';
+            else if (completedStatuses.some(cs => cs.toLowerCase() === s)) statusCode = 'HOAN_THANH';
+
+            console.log(`   Order ${o.soDon}: status="${o.status}" -> statusCode="${statusCode}"`);
+
+            return { ...o, statusCode };
+        });
 
         res.json({ error: false, data: myOrders });
 

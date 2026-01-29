@@ -227,6 +227,15 @@ const api = {
             body: JSON.stringify(data)
         });
         return res.json();
+    },
+
+    updateImport: async (id, data) => {
+        const res = await fetch(`${API_BASE}/imports/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        return res.json();
     }
 };
 

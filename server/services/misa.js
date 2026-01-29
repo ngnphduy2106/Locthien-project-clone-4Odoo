@@ -314,12 +314,18 @@ const performSync = async () => {
                 const hasProducts = existingOrder.products && existingOrder.products.length > 0;
                 const hasZeroQty = hasProducts && existingOrder.products.some(p => p.qty === 0);
                 const hasMisaId = !!existingOrder.misa_id;
+                
+                // 2. Check if products are missing price data (force update to get prices)
+                const hasMissingPrice = hasProducts && existingOrder.products.some(p => 
+                    (p.price === undefined || p.price === null || p.price === 0) &&
+                    (p.total === undefined || p.total === null || p.total === 0)
+                );
 
-                // 2. Status Change Check (Optimize: Only update if different and local is 'Mới')
+                // 3. Status Change Check (Optimize: Only update if different and local is 'Mới')
                 const statusChanged = existingOrder.status !== newStatus && existingOrder.status === 'Mới';
 
-                if (!hasProducts || hasZeroQty || statusChanged || !hasMisaId) {
-                    // console.log(`♻️ Updating ${saleOrderNo} (Diff detected)...`);
+                if (!hasProducts || hasZeroQty || statusChanged || !hasMisaId || hasMissingPrice) {
+                    if (hasMissingPrice) console.log(`💰 Updating ${saleOrderNo} (Missing price data)...`);
                     shouldFetchDetail = true;
                 }
             }
@@ -341,7 +347,10 @@ const performSync = async () => {
                 name: p.product_name || p.description || p.product_code,
                 // User Request: Correct Quantity (usage_unit_amount is Physical Qty)
                 qty: Number(p.usage_unit_amount || p.amount || 0),
-                unit: p.unit || ''
+                unit: p.unit || '',
+                // Price data for display
+                price: Number(p.price || 0),
+                total: Number(p.total || p.to_currency || 0)
             }));
             // If address is missing in List item, we might still want Detail? 
             // Usually List has shipping_address too.
@@ -363,7 +372,10 @@ const performSync = async () => {
                     code: p.product_code,
                     name: p.product_name || p.description || p.product_code,
                     qty: Number(p.amount || 0),
-                    unit: p.unit || ''
+                    unit: p.unit || '',
+                    // Price data for display
+                    price: Number(p.price || 0),
+                    total: Number(p.total || p.to_currency || 0)
                 }));
                 shippingAddress = detail.shipping_address || detail.description || '';
             } else {

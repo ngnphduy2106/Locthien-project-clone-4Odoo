@@ -8,17 +8,25 @@ import { createClient } from '@supabase/supabase-js';
 
 const router = Router();
 
-const supabase = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_KEY
-);
+// Lazy Supabase client initialization (env vars may not exist at import time)
+let _supabase = null;
+function getSupabase() {
+    if (!_supabase) {
+        const url = process.env.SUPABASE_URL;
+        const key = process.env.SUPABASE_KEY;
+        if (url && key) {
+            _supabase = createClient(url, key);
+        }
+    }
+    return _supabase;
+}
 
 // GET /api/imports - List all import tickets
 router.get('/', async (req, res) => {
     try {
         const { status } = req.query;
 
-        let query = supabase
+        let query = getSupabase()
             .from('import_tickets')
             .select('*')
             .order('created_at', { ascending: false });
@@ -57,7 +65,7 @@ router.post('/', async (req, res) => {
 
         const totalQty = products.reduce((sum, p) => sum + Number(p.qty || 0), 0);
 
-        const { data, error } = await supabase
+        const { data, error } = await getSupabase()
             .from('import_tickets')
             .insert({
                 ticket_no: ticketNo,
@@ -104,13 +112,53 @@ router.post('/', async (req, res) => {
     }
 });
 
+// PUT /api/imports/:id - Update import ticket basic info
+router.put('/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { supplier_name, supplier_address, expected_date, note, products } = req.body;
+
+        const updateData = {};
+        if (supplier_name) updateData.supplier_name = supplier_name;
+        if (supplier_address !== undefined) updateData.supplier_address = supplier_address;
+        if (expected_date !== undefined) updateData.expected_date = expected_date || null;
+        if (note !== undefined) updateData.note = note;
+
+        // Update products and recalculate total qty
+        if (products && Array.isArray(products)) {
+            updateData.products = products;
+            updateData.total_qty = products.reduce((sum, p) => sum + Number(p.qty || 0), 0);
+        }
+
+        const { data, error } = await getSupabase()
+            .from('import_tickets')
+            .update(updateData)
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) {
+            return res.json(createResponse(true, 'Lỗi cập nhật: ' + error.message));
+        }
+
+        res.json({
+            error: false,
+            msg: 'Đã cập nhật phiếu nhập!',
+            data
+        });
+
+    } catch (e) {
+        res.json(createResponse(true, e.message));
+    }
+});
+
 // PUT /api/imports/:id/assign - Assign driver to import ticket
 router.put('/:id/assign', async (req, res) => {
     try {
         const { id } = req.params;
         const { driver_name, plate } = req.body;
 
-        const { data, error } = await supabase
+        const { data, error } = await getSupabase()
             .from('import_tickets')
             .update({
                 status: 'assigned',
@@ -141,7 +189,7 @@ router.put('/:id/start', async (req, res) => {
     try {
         const { id } = req.params;
 
-        const { data, error } = await supabase
+        const { data, error } = await getSupabase()
             .from('import_tickets')
             .update({
                 status: 'in_transit',
@@ -173,7 +221,7 @@ router.put('/:id/complete', async (req, res) => {
         const { actual_products, note } = req.body;
 
         // Fetch original to merge (No-Delete logic)
-        const { data: original } = await supabase.from('import_tickets').select('*').eq('id', id).single();
+        const { data: original } = await getSupabase().from('import_tickets').select('*').eq('id', id).single();
         if (!original) return res.json(createResponse(true, 'Không tìm thấy phiếu nhập'));
 
         const originalProducts = original.products || [];
@@ -200,7 +248,7 @@ router.put('/:id/complete', async (req, res) => {
             qty: m.actual_qty || m.qty // Use actual if provided, else keep original
         }));
 
-        const { data, error } = await supabase
+        const { data, error } = await getSupabase()
             .from('import_tickets')
             .update({
                 status: 'completed',
@@ -249,7 +297,7 @@ router.delete('/:id', async (req, res) => {
     try {
         const { id } = req.params;
 
-        const { error } = await supabase
+        const { error } = await getSupabase()
             .from('import_tickets')
             .update({ status: 'cancelled' })
             .eq('id', id);

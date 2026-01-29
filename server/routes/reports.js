@@ -148,16 +148,27 @@ router.get('/order-history', async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 20;
+        const driverFilter = req.query.driver || ''; // Driver name filter
         const offset = (page - 1) * limit;
 
         const orders = await db.getOrders();
 
         // Filter completed/cancelled orders
         const historyStatuses = ['Đã thực hiện', 'Đã hủy bỏ', 'completed', 'Hoàn thành', 'Đã giao hàng', 'cancelled'];
-        const historyOrders = orders.filter(o => {
+        let historyOrders = orders.filter(o => {
             const s = String(o.status || '').trim().toLowerCase();
             return historyStatuses.some(hs => hs.toLowerCase() === s);
         });
+
+        // Apply driver filter if specified
+        if (driverFilter) {
+            const driverLower = driverFilter.toLowerCase();
+            historyOrders = historyOrders.filter(o => {
+                const orderDriver = String(o.taiXe || o.driver || '').toLowerCase();
+                return orderDriver.includes(driverLower);
+            });
+            console.log(`📋 Filtered order history for driver "${driverFilter}": ${historyOrders.length} orders`);
+        }
 
         // Sort by date descending (newest first)
         historyOrders.sort((a, b) => {

@@ -17,7 +17,19 @@ const OrderHistoryModule = {
     // Load lịch sử
     async loadHistory(page = 1) {
         try {
-            const response = await fetch(`/api/orders/history?page=${page}&limit=${this.itemsPerPage}`);
+            // Check if current user is driver - filter by their name
+            const isDriver = (state.user?.role || '').toLowerCase() === 'driver';
+            const driverName = state.user?.name || '';
+
+            let url = `/api/reports/order-history?page=${page}&limit=${this.itemsPerPage}`;
+
+            // Add driver filter for driver role
+            if (isDriver && driverName) {
+                url += `&driver=${encodeURIComponent(driverName)}`;
+                console.log(`📋 Loading order history for driver: ${driverName}`);
+            }
+
+            const response = await fetch(url);
             const data = await response.json();
 
             if (data.error) {
@@ -26,7 +38,7 @@ const OrderHistoryModule = {
                 return;
             }
 
-            this.history = data.orders || data.history || [];
+            this.history = data.data || data.orders || data.history || [];
             this.totalPages = data.totalPages || Math.ceil((data.total || this.history.length) / this.itemsPerPage);
             this.currentPage = page;
             this.renderHistory();
@@ -107,17 +119,17 @@ const OrderHistoryModule = {
         }
 
         container.innerHTML = this.history.map(order => `
-            <tr onclick="OrderHistoryModule.viewDetail('${order.id || order.order_id}')">
-                <td>${order.id || order.order_id || 'N/A'}</td>
-                <td>${order.customer || order.customer_name || 'N/A'}</td>
-                <td>${order.date || order.order_date ? new Date(order.date || order.order_date).toLocaleDateString('vi-VN') : 'N/A'}</td>
-                <td>${(order.total || order.total_amount || 0).toLocaleString('vi-VN')} VNĐ</td>
+            <tr onclick="OrderHistoryModule.viewDetail('${order.id || order.order_id}')" style="cursor:pointer;" class="history-row">
+                <td>${order.soDon || order.sale_order_no || order.id || order.order_id || 'N/A'}</td>
+                <td>${order.khach || order.account_name || order.customer || order.customer_name || 'N/A'}</td>
+                <td>${order.ngay || order.sale_order_date || order.date || order.order_date ? new Date(order.ngay || order.sale_order_date || order.date || order.order_date).toLocaleDateString('vi-VN') : 'N/A'}</td>
+                <td>${(order.amount || order.sale_order_amount || order.tongTien || order.total || order.total_amount || 0).toLocaleString('vi-VN')} VNĐ</td>
                 <td>
                     <span class="status-badge ${this.getStatusClass(order.status)}">
                         ${this.getStatusText(order.status)}
                     </span>
                 </td>
-                <td>${order.driver || order.driver_name || '-'}</td>
+                <td>${order.taiXe || order.driver || order.driver_name || '-'}</td>
                 <td>${order.completedDate || order.completed_at ? new Date(order.completedDate || order.completed_at).toLocaleString('vi-VN') : '-'}</td>
             </tr>
         `).join('');
@@ -173,21 +185,41 @@ const OrderHistoryModule = {
 
     // View detail
     viewDetail(orderId) {
-        const order = this.history.find(o => (o.id || o.order_id) === orderId);
-        if (!order) return;
+        const order = this.history.find(o =>
+            (o.id || o.order_id) === orderId ||
+            o.soDon === orderId ||
+            o.sale_order_no === orderId
+        );
+        if (!order) {
+            console.warn('Order not found in history:', orderId);
+            return;
+        }
 
-        // TODO: Show detail modal
-        console.log('View order history:', order);
-        let details = `Chi tiết đơn hàng ${orderId}\n\n`;
-        details += `Khách hàng: ${order.customer || order.customer_name}\n`;
-        details += `Ngày đặt: ${order.date || order.order_date}\n`;
-        details += `Tổng tiền: ${(order.total || order.total_amount || 0).toLocaleString('vi-VN')} VNĐ\n`;
-        details += `Trạng thái: ${order.status}\n`;
-        if (order.driver || order.driver_name) details += `Tài xế: ${order.driver || order.driver_name}\n`;
-        if (order.completedDate || order.completed_at) details += `Hoàn thành: ${order.completedDate || order.completed_at}\n`;
-        if (order.cancelReason || order.cancel_reason) details += `Lý do hủy: ${order.cancelReason || order.cancel_reason}\n`;
+        console.log('Opening order detail from history:', order);
 
-        alert(details);
+        // Use the global viewOrderDetail function if available
+        if (typeof viewOrderDetail === 'function') {
+            // Store order in state.orders for viewOrderDetail to find
+            if (!state.orders) state.orders = {};
+            if (!state.orders.completed) state.orders.completed = [];
+
+            // Add to completed orders if not already there
+            const exists = state.orders.completed.find(o => o.id === order.id);
+            if (!exists) {
+                state.orders.completed.push(order);
+            }
+
+            viewOrderDetail(order.id);
+        } else {
+            // Fallback: simple alert
+            let details = `Chi tiết đơn hàng ${order.soDon || orderId}\n\n`;
+            details += `Khách hàng: ${order.khach || order.account_name || order.customer || 'N/A'}\n`;
+            details += `Ngày đặt: ${order.ngay || order.sale_order_date || order.date || 'N/A'}\n`;
+            details += `Địa chỉ: ${order.diaChi || order.shipping_address || 'N/A'}\n`;
+            details += `Tài xế: ${order.taiXe || order.driver || 'N/A'}\n`;
+            details += `Trạng thái: ${order.status}\n`;
+            alert(details);
+        }
     },
 
     // Search history

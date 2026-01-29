@@ -8,8 +8,8 @@ import { fileURLToPath } from 'url';
 import { dirname, join, resolve } from 'path';
 import dotenv from 'dotenv';
 
-// Load environment variables
-dotenv.config();
+// Load environment variables from project root
+dotenv.config({ path: resolve(dirname(fileURLToPath(import.meta.url)), '../.env') });
 
 // Import routes
 import authRoutes from './routes/auth.js';
@@ -36,7 +36,10 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Serve static files using Absolute Path (Critical for Render/Local)
-const publicPath = resolve(process.cwd(), 'public');
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const publicPath = resolve(__dirname, '../public');
+console.log('📁 Static files path:', publicPath);
 if (!IS_NETLIFY) {
     app.use(express.static(publicPath));
 }
@@ -124,7 +127,7 @@ app.get('*', (req, res) => {
     if (IS_NETLIFY) {
         return res.status(404).json({ error: true, msg: 'API Endpoint not found' });
     }
-    const indexPath = resolve(process.cwd(), 'public/index.html');
+    const indexPath = resolve(publicPath, 'index.html');
     res.sendFile(indexPath);
 });
 
