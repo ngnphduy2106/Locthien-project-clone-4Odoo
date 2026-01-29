@@ -44,6 +44,9 @@ function hideLoading() {
 
 // === SECTION NAVIGATION ===
 function showSection(sectionId) {
+    // Close mobile menu when navigating
+    if (window.closeMobileMenu) window.closeMobileMenu();
+
     // Hide all sections
     window.$$('[id^="section-"]').forEach(el => el.classList.add('hidden'));
 
@@ -243,7 +246,7 @@ async function loadDashboard() {
         const elUpdateTime = window.$('#dashboard-update-time');
 
         if (elOrderCount) elOrderCount.textContent = orderCount.toLocaleString('vi-VN');
-        if (elOrderValue) elOrderValue.textContent = formatCurrency(orderValue);
+        if (elOrderValue) elOrderValue.textContent = formatCurrencyBillion(orderValue);
         if (elPendingCount) elPendingCount.textContent = pendingCount;
         if (elCompletedCount) elCompletedCount.textContent = completedCount;
         if (elCompletedRate) elCompletedRate.textContent = `${completedRate}% tỷ lệ hoàn thành`;
@@ -376,10 +379,12 @@ function loadTopProducts(orders) {
     }
 
     container.innerHTML = sorted.map(([name, count], i) => `
-        <div style="display:flex; align-items:center; padding:8px 0; border-bottom:1px solid var(--border);">
-            <span style="width:24px; height:24px; background:var(--primary); color:#fff; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:600;">${i + 1}</span>
-            <span style="flex:1; margin-left:12px; font-weight:500;">${name}</span>
-            <span style="color:var(--text-muted);">${count} đơn vị</span>
+        <div class="analytics-list-item">
+            <span class="analytics-rank" style="background:var(--primary);">${i + 1}</span>
+            <div class="analytics-content">
+                <div class="analytics-name">${name}</div>
+            </div>
+            <span class="analytics-value" style="color:var(--text-muted);">${count} đơn vị</span>
         </div>
     `).join('');
 }
@@ -405,13 +410,13 @@ function loadTopCustomers(orders) {
     }
 
     container.innerHTML = sorted.map(([name, stats], i) => `
-        <div style="display:flex; align-items:center; padding:8px 0; border-bottom:1px solid var(--border);">
-            <span style="width:24px; height:24px; background:#51cf66; color:#fff; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:600;">${i + 1}</span>
-            <div style="flex:1; margin-left:12px;">
-                <div style="font-weight:500;">${name}</div>
-                <div style="font-size:12px; color:var(--text-muted);">${stats.count} đơn</div>
+        <div class="analytics-list-item">
+            <span class="analytics-rank" style="background:#51cf66;">${i + 1}</span>
+            <div class="analytics-content">
+                <div class="analytics-name">${name}</div>
+                <div class="analytics-meta">${stats.count} đơn</div>
             </div>
-            <span style="font-weight:600; color:var(--success);">${formatCurrency(stats.value)}</span>
+            <span class="analytics-value" style="color:var(--success);">${formatCurrencyBillion(stats.value)}</span>
         </div>
     `).join('');
 }
@@ -438,13 +443,13 @@ function loadTopDrivers(completedOrders) {
     }
 
     container.innerHTML = sorted.map(([name, stats], i) => `
-        <div style="display:flex; align-items:center; padding:8px 0; border-bottom:1px solid var(--border);">
-            <span style="width:24px; height:24px; background:#845ef7; color:#fff; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:600;">${i + 1}</span>
-            <div style="flex:1; margin-left:12px;">
-                <div style="font-weight:500;">${name}</div>
-                <div style="font-size:12px; color:var(--text-muted);">${formatCurrency(stats.value)}</div>
+        <div class="analytics-list-item">
+            <span class="analytics-rank" style="background:#845ef7;">${i + 1}</span>
+            <div class="analytics-content">
+                <div class="analytics-name">${name}</div>
+                <div class="analytics-meta">${stats.count} chuyến</div>
             </div>
-            <span style="font-weight:600;">${stats.count} đơn</span>
+            <span class="analytics-value" style="color:var(--text-muted);">${formatCurrency(stats.value)}</span>
         </div>
     `).join('');
 }
@@ -1030,6 +1035,12 @@ function goToPage(direction) {
 // === HELPERS ===
 function formatCurrency(amount) {
     return new Intl.NumberFormat('vi-VN').format(amount) + ' VNĐ';
+}
+
+function formatCurrencyBillion(amount) {
+    if (!amount || isNaN(amount)) return '0 tỷ VNĐ';
+    const billions = amount / 1000000000;
+    return billions.toFixed(2) + ' tỷ VNĐ';
 }
 
 function formatDate(dateStr) {

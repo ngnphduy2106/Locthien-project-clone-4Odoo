@@ -55,6 +55,25 @@ function formatNumber(num) {
     return Number(num).toLocaleString('vi-VN');
 }
 
+// === Mobile Menu Functions ===
+function toggleMobileMenu() {
+    const sidebar = $('.sidebar');
+    const overlay = $('.sidebar-overlay');
+    if (sidebar && overlay) {
+        sidebar.classList.toggle('active');
+        overlay.classList.toggle('active');
+    }
+}
+
+function closeMobileMenu() {
+    const sidebar = $('.sidebar');
+    const overlay = $('.sidebar-overlay');
+    if (sidebar && overlay) {
+        sidebar.classList.remove('active');
+        overlay.classList.remove('active');
+    }
+}
+
 // === Export to Window ===
 window.$ = $;
 window.$$ = $$;
@@ -64,6 +83,8 @@ window.showLoading = showLoading;
 window.hideLoading = hideLoading;
 window.showToast = showToast;
 window.formatNumber = formatNumber;
+window.toggleMobileMenu = toggleMobileMenu;
+window.closeMobileMenu = closeMobileMenu;
 
 
 console.log('✅ Core.js loaded');

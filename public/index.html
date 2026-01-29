@@ -125,10 +125,16 @@
             </nav>
         </aside>
 
+        <!-- Sidebar Overlay for Mobile -->
+        <div class="sidebar-overlay" onclick="closeMobileMenu()"></div>
+
         <!-- Main Content -->
         <main class="main-content">
             <!-- Header -->
             <header class="main-header">
+                <button class="mobile-menu-toggle" onclick="toggleMobileMenu()">
+                    <i class="bi bi-list"></i>
+                </button>
                 <div class="page-title">
                     <i class="bi bi-grid-1x2"></i>
                     <span id="header-title">Tổng quan</span>
@@ -235,7 +241,7 @@
                                 <h3 class="chart-card-title">Số lượng đơn hàng theo thời gian</h3>
                                 <p class="chart-card-subtitle" id="chart-orders-subtitle">Dữ liệu tháng này</p>
                             </div>
-                            <div style="height:250px; position:relative;">
+                            <div style="height: 300px; position: relative;">
                                 <canvas id="ordersTimeChart"></canvas>
                             </div>
                         </div>
@@ -245,14 +251,15 @@
                                 <h3 class="chart-card-title">Giá trị đơn hàng theo thời gian</h3>
                                 <p class="chart-card-subtitle" id="chart-value-subtitle">Dữ liệu tháng này</p>
                             </div>
-                            <div style="height:250px; position:relative;">
+                            <div style="height: 300px; position: relative;">
                                 <canvas id="valueTimeChart"></canvas>
                             </div>
                         </div>
                     </div>
 
                     <!-- Analytics Row -->
-                    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:20px; margin-top:20px;">
+                    <div class="analytics-row"
+                        style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:20px; margin-top:20px;">
                         <div class="chart-card">
                             <div class="chart-card-header">
                                 <h3 class="chart-card-title">Top sản phẩm bán chạy</h3>
