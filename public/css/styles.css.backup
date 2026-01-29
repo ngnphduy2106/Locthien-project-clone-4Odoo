@@ -1,5 +1,5 @@
-﻿/* ===============================================
-   Lá»˜C THIÃŠN ERP - DESIGN SYSTEM V3
+/* ===============================================
+   LỘC THIÊN ERP - DESIGN SYSTEM V3
    Based on reference UI screenshots
    =============================================== */
 
@@ -757,13 +757,9 @@ body {
     align-items: center;
     padding: 10px 0;
     border-bottom: 1px solid var(--border-color);
-    gap: 12px;
+    gap: 10px;
     min-width: 0;
     /* Critical for flex truncation */
-}
-
-.analytics-list-item:last-child {
-    border-bottom: none;
 }
 
 .analytics-rank {
@@ -792,7 +788,7 @@ body {
     text-overflow: ellipsis;
     white-space: nowrap;
     font-size: 14px;
-    line-height: 1.4;
+    line-height: 1.5;
     color: var(--text-primary);
 }
 
@@ -800,7 +796,7 @@ body {
     font-size: 12px;
     color: var(--text-muted);
     white-space: nowrap;
-    margin-top: 2px;
+    margin-top: 4px;
     overflow: hidden;
     text-overflow: ellipsis;
 }
@@ -810,8 +806,7 @@ body {
     white-space: nowrap;
     font-size: 13px;
     font-weight: 600;
-    margin-left: 8px;
-    text-align: right;
+    margin-left: auto;
 }
 
 /* === Loading Overlay === */
@@ -980,7 +975,7 @@ body {
 }
 
 /* ===============================================
-   BREAKPOINT 1: LARGE DESKTOP (â‰¥1400px)
+   BREAKPOINT 1: LARGE DESKTOP (≥1400px)
    =============================================== */
 @media (min-width: 1400px) {
     .page-content {
@@ -999,7 +994,7 @@ body {
         --sidebar-width: 200px;
     }
 
-    /* === Stat Cards: 4 â†’ 2 columns === */
+    /* === Stat Cards: 4 → 2 columns === */
     .stat-cards {
         grid-template-columns: repeat(2, 1fr) !important;
         gap: 16px;
@@ -1012,7 +1007,7 @@ body {
         gap: 16px;
     }
 
-    /* === Analytics Row: 3 â†’ 1 column === */
+    /* === Analytics Row: 3 → 1 column === */
     .analytics-row {
         grid-template-columns: 1fr !important;
         gap: 16px;
@@ -1050,16 +1045,10 @@ body {
     .data-table td {
         padding: 12px;
     }
-
-    /* Override inline styles on dashboard analytics row for responsive layout */
-    #section-dashboard>div[style*="grid-template-columns:1fr 1fr 1fr"] {
-        grid-template-columns: 1fr !important;
-        gap: 16px !important;
-    }
 }
 
 /* ===============================================
-   BREAKPOINT 3: MOBILE (â‰¤767px)
+   BREAKPOINT 3: MOBILE (≤767px)
    =============================================== */
 @media (max-width: 767px) {
 
@@ -1099,7 +1088,7 @@ body {
         /* Hide title text on small screens */
     }
 
-    .header-btn[title="ThÃ´ng bÃ¡o"] {
+    .header-btn[title="Thông báo"] {
         display: none;
         /* Hide notification button */
     }
@@ -1172,67 +1161,29 @@ body {
         gap: 12px;
     }
 
-    /* Override inline styles on dashboard analytics row */
-    #section-dashboard .analytics-row,
-    #section-dashboard>div.analytics-row {
-        grid-template-columns: 1fr !important;
-        gap: 12px !important;
-    }
-
-    /* === Analytics Cards === */
-    .analytics-card {
-        padding: 16px;
-    }
-
-    .analytics-card-title {
-        font-size: 14px;
-        margin-bottom: 12px;
-    }
-
-    /* === Analytics List Items === */
     .analytics-list-item {
-        padding: 10px 0;
-        gap: 10px;
-        flex-wrap: nowrap;
-        /* Prevent wrapping */
+        padding: 8px 0;
+        gap: 8px;
     }
 
     .analytics-rank {
         width: 24px;
         height: 24px;
-        font-size: 11px;
-        flex-shrink: 0;
-    }
-
-    .analytics-content {
-        flex: 1;
-        min-width: 0;
-        overflow: hidden;
+        font-size: 12px;
     }
 
     .analytics-name {
         font-size: 13px;
-        line-height: 1.3;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        max-width: 100%;
+        line-height: 1.4;
     }
 
     .analytics-meta {
         font-size: 11px;
-        margin-top: 3px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
+        margin-top: 2px;
     }
 
     .analytics-value {
         font-size: 12px;
-        flex-shrink: 0;
-        white-space: nowrap;
-        text-align: right;
-        min-width: 60px;
     }
 
     /* === Forms: Stack to 1 Column === */
@@ -1439,18 +1390,11 @@ body {
     /* === Dashboard Specific === */
     #section-dashboard>div[style*="grid-template-columns:1fr 1fr 1fr"] {
         grid-template-columns: 1fr !important;
-        gap: 12px !important;
+        gap: 16px !important;
     }
 
     #section-dashboard>div[style*="grid-template-columns:1fr 1fr"] {
         grid-template-columns: 1fr !important;
-        gap: 12px !important;
-    }
-
-    /* Ensure analytics row cards are full width */
-    #section-dashboard .analytics-row .chart-card {
-        width: 100% !important;
-        min-width: 100% !important;
     }
 
     /* === Dispatch Section === */
@@ -1471,7 +1415,7 @@ body {
 }
 
 /* ===============================================
-   BREAKPOINT 4: SMALL MOBILE (â‰¤480px)
+   BREAKPOINT 4: SMALL MOBILE (≤480px)
    =============================================== */
 @media (max-width: 480px) {
 
@@ -1498,31 +1442,6 @@ body {
         width: 36px;
         height: 36px;
         font-size: 16px;
-    }
-
-    /* === Analytics: Even More Compact === */
-    .analytics-list-item {
-        padding: 8px 0;
-        gap: 8px;
-    }
-
-    .analytics-rank {
-        width: 20px;
-        height: 20px;
-        font-size: 10px;
-    }
-
-    .analytics-name {
-        font-size: 12px;
-    }
-
-    .analytics-meta {
-        font-size: 10px;
-    }
-
-    .analytics-value {
-        font-size: 11px;
-        min-width: 50px;
     }
 
     /* === Buttons: More Compact === */
@@ -1827,5 +1746,855 @@ body {
 @media (max-width: 767px) {
     .full-width-mobile {
         width: 100% !important;
+    }
+
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(4px);
+}
+
+.modal-content {
+    background: var(--card-bg);
+    border-radius: var(--card-radius);
+    width: 100%;
+    max-width: 600px;
+    max-height: 90vh;
+    overflow: hidden;
+    box-shadow: var(--shadow-lg);
+    animation: modalSlideIn 0.3s ease;
+}
+
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.modal-header h3 {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.modal-close {
+    width: 36px;
+    height: 36px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    transition: all 0.2s ease;
+}
+
+.modal-close:hover {
+    background: var(--body-bg);
+    color: var(--text-primary);
+}
+
+.modal-body {
+    padding: 24px;
+    overflow-y: auto;
+    max-height: calc(90vh - 140px);
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 20px 24px;
+    border-top: 1px solid var(--border-color);
+}
+
+/* === Toast Notifications === */
+.toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 2000;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.toast {
+    padding: 16px 20px;
+    border-radius: var(--btn-radius);
+    background: white;
+    box-shadow: var(--shadow-lg);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    animation: toastSlideIn 0.3s ease;
+    min-width: 300px;
+}
+
+@keyframes toastSlideIn {
+    from {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.toast.success {
+    border-left: 4px solid var(--success);
+}
+
+.toast.error {
+    border-left: 4px solid var(--danger);
+}
+
+.toast.info {
+    border-left: 4px solid var(--info);
+}
+
+.toast-icon {
+    font-size: 20px;
+}
+
+.toast.success .toast-icon {
+    color: var(--success);
+}
+
+.toast.error .toast-icon {
+    color: var(--danger);
+}
+
+.toast.info .toast-icon {
+    color: var(--info);
+}
+
+.toast-message {
+    flex: 1;
+    font-size: 14px;
+    color: var(--text-primary);
+}
+
+/* === User Menu Dropdown === */
+.user-menu-dropdown {
+    position: absolute;
+    top: 50px;
+    right: 0;
+    background: white;
+    border-radius: var(--card-radius);
+    box-shadow: var(--shadow-lg);
+    min-width: 200px;
+    padding: 8px;
+    z-index: 100;
+}
+
+.user-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    color: var(--text-secondary);
+    font-size: 14px;
+    border-radius: var(--btn-radius);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: none;
+    background: transparent;
+    width: 100%;
+    text-align: left;
+}
+
+.user-menu-item:hover {
+    background: var(--body-bg);
+    color: var(--text-primary);
+}
+
+.user-menu-item.danger:hover {
+    background: var(--danger-light);
+    color: var(--danger);
+}
+
+.user-menu-divider {
+    height: 1px;
+    background: var(--border-color);
+    margin: 8px 0;
+}
+
+/* === Order Detail Grid === */
+.order-detail-grid {
+    display: grid;
+    gap: 12px;
+}
+
+.detail-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.detail-row:last-child {
+    border-bottom: none;
+}
+
+.detail-row label {
+    font-size: 13px;
+    color: var(--text-muted);
+    min-width: 120px;
+    font-weight: 500;
+}
+
+.detail-row span {
+    flex: 1;
+    font-size: 14px;
+    color: var(--text-primary);
+}
+
+/* === Driver Select Styling === */
+.driver-select-area {
+    background: var(--body-bg);
+    border-radius: var(--btn-radius);
+    padding: 16px;
+    margin-top: 16px;
+}
+
+/* === Empty Order List === */
+.order-list-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    text-align: center;
+    color: var(--text-muted);
+}
+
+.order-list-empty i {
+    font-size: 64px;
+    opacity: 0.3;
+    margin-bottom: 16px;
+}
+
+.order-list-empty p {
+    font-size: 14px;
+}
+
+/* === Spinning Animation === */
+.spinning {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* ===============================================
+   RESPONSIVE DESIGN - MOBILE & TABLET
+   =============================================== */
+
+/* === Mobile Menu Toggle Button === */
+.mobile-menu-toggle {
+    display: none;
+    width: 40px;
+    height: 40px;
+    border: none;
+    background: transparent;
+    color: var(--text-primary);
+    font-size: 24px;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+    margin-right: 12px;
+}
+
+/* === Sidebar Overlay for Mobile === */
+.sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 99;
+    backdrop-filter: blur(2px);
+}
+
+/* ===============================================
+   TABLET (768px - 991px)
+   =============================================== */
+@media (max-width: 991px) {
+
+    /* Reduce sidebar width */
+    :root {
+        --sidebar-width: 200px;
+    }
+
+    /* Adjust stat cards to 2 columns */
+    .stat-cards {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px;
+    }
+
+    /* Stack charts vertically */
+    .page-content>div[style*="grid-template-columns:1fr 1fr"] {
+        grid-template-columns: 1fr !important;
+    }
+
+    /* Two column layout becomes single column */
+    .two-col-layout {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+
+    /* Analytics row becomes single column on tablet */
+    .analytics-row {
+        grid-template-columns: 1fr !important;
+        gap: 16px;
+    }
+
+    /* Reduce padding */
+    .page-content {
+        padding: 20px;
+    }
+
+    .card-body {
+        padding: 16px;
+    }
+
+    /* Smaller headings */
+    .page-heading {
+        font-size: 20px;
+    }
+
+    /* Adjust table for smaller screens */
+    .data-table {
+        font-size: 13px;
+    }
+
+    .data-table th,
+    .data-table td {
+        padding: 12px;
+    }
+}
+
+/* ===============================================
+   MOBILE (max-width: 767px)
+   =============================================== */
+@media (max-width: 767px) {
+
+    /* Show mobile menu toggle */
+    .mobile-menu-toggle {
+        display: flex;
+    }
+
+    /* Hide sidebar by default on mobile */
+    .sidebar {
+        transform: translateX(-100%);
+        z-index: 100;
+    }
+
+    /* Show sidebar when active */
+    .sidebar.active {
+        transform: translateX(0);
+    }
+
+    /* Show overlay when sidebar is active */
+    .sidebar-overlay.active {
+        display: block;
+    }
+
+    /* Remove left margin from main content */
+    .main-content {
+        margin-left: 0;
+        width: 100%;
+    }
+
+    /* Adjust header for mobile */
+    .main-header {
+        padding: 0 16px;
+    }
+
+    .page-title {
+        font-size: 14px;
+    }
+
+    .page-title span {
+        display: none;
+        /* Hide title text on very small screens */
+    }
+
+    /* Stack stat cards to single column */
+    .stat-cards {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    /* Reduce stat card padding */
+    .stat-card {
+        padding: 16px;
+    }
+
+    .stat-card-value {
+        font-size: 20px;
+        line-height: 1.3;
+    }
+
+    .stat-card-label {
+        font-size: 13px;
+    }
+
+    /* Page content padding */
+    .page-content {
+        padding: 16px;
+    }
+
+    /* Page heading */
+    .page-heading {
+        font-size: 18px;
+        margin-bottom: 16px;
+    }
+
+    /* Card adjustments */
+    .card {
+        border-radius: 8px;
+    }
+
+    .card-header {
+        padding: 12px 16px;
+        font-size: 14px;
+    }
+
+    .card-body {
+        padding: 16px;
+    }
+
+    /* Analytics row - single column on mobile */
+    .analytics-row {
+        grid-template-columns: 1fr !important;
+        gap: 12px;
+    }
+
+    .analytics-row .chart-card {
+        padding: 16px;
+    }
+
+    /* Two column layout becomes single column */
+    .two-col-layout {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
+    /* Form controls */
+    .form-control {
+        font-size: 16px;
+        /* Prevent zoom on iOS */
+        padding: 12px 14px;
+    }
+
+    .form-label {
+        font-size: 12px;
+    }
+
+    /* Buttons */
+    .btn {
+        padding: 10px 16px;
+        font-size: 13px;
+    }
+
+    .tab-btn {
+        padding: 10px 16px;
+        font-size: 13px;
+    }
+
+    /* Tab navigation - allow wrapping */
+    .tab-nav {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    /* Search and filters - stack vertically */
+    .page-content>section>div[style*="display:flex"] {
+        flex-direction: column !important;
+        align-items: stretch !important;
+    }
+
+    .search-input {
+        width: 100% !important;
+        min-width: 100% !important;
+        flex: none !important;
+    }
+
+    /* Order cards */
+    .order-card {
+        padding: 16px;
+    }
+
+    .order-card-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .order-card-footer {
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .order-card-footer .btn {
+        width: 100%;
+    }
+
+    /* Table - make scrollable */
+    .card-body:has(.data-table) {
+        padding: 0;
+        overflow-x: auto;
+    }
+
+    .data-table {
+        min-width: 600px;
+        font-size: 12px;
+    }
+
+    .data-table th,
+    .data-table td {
+        padding: 10px 12px;
+        white-space: nowrap;
+    }
+
+    /* Analytics lists - compact on mobile */
+    .analytics-list-item {
+        padding: 8px 0;
+        gap: 8px;
+    }
+
+    .analytics-rank {
+        width: 24px;
+        height: 24px;
+        font-size: 12px;
+    }
+
+    .analytics-name {
+        font-size: 13px;
+        line-height: 1.4;
+    }
+
+    .analytics-meta {
+        font-size: 11px;
+        margin-top: 2px;
+    }
+
+    .analytics-value {
+        font-size: 12px;
+    }
+
+    /* Modal adjustments */
+    .modal-content {
+        max-width: 95%;
+        margin: 0 10px;
+    }
+
+    .modal-header {
+        padding: 16px;
+    }
+
+    .modal-body {
+        padding: 16px;
+    }
+
+    .modal-footer {
+        padding: 16px;
+        flex-direction: column;
+    }
+
+    .modal-footer .btn {
+        width: 100%;
+    }
+
+    /* Login card */
+    .login-card {
+        padding: 32px 24px;
+        margin: 0 16px;
+    }
+
+    .login-title {
+        font-size: 20px;
+    }
+
+    /* Chart cards */
+    .chart-card {
+        padding: 16px;
+    }
+
+    .chart-card-title {
+        font-size: 14px;
+    }
+
+    /* Dashboard specific - stack analytics */
+    #section-dashboard>div[style*="grid-template-columns:1fr 1fr 1fr"] {
+        grid-template-columns: 1fr !important;
+        gap: 16px !important;
+    }
+
+    /* Dashboard charts - stack vertically */
+    #section-dashboard>div[style*="grid-template-columns:1fr 1fr"] {
+        grid-template-columns: 1fr !important;
+    }
+
+    /* Dispatch section filters */
+    #section-dispatch>div[style*="display:flex"] {
+        flex-wrap: wrap;
+    }
+
+    /* User menu dropdown */
+    .user-menu-dropdown {
+        right: -10px;
+        min-width: 180px;
+    }
+
+    /* Hide some header actions on very small screens */
+    .header-btn[title="Thông báo"] {
+        display: none;
+    }
+
+    /* Adjust badge sizes */
+    .badge {
+        font-size: 11px;
+        padding: 3px 10px;
+    }
+
+    /* Product list in create order */
+    .product-list-empty {
+        padding: 40px 16px;
+    }
+
+    .product-list-empty i {
+        font-size: 36px;
+    }
+
+    .product-list-empty h4 {
+        font-size: 14px;
+    }
+
+    .product-list-empty p {
+        font-size: 12px;
+    }
+
+    /* Form hint */
+    .form-hint {
+        padding: 10px 12px;
+        font-size: 12px;
+    }
+
+    /* Pagination */
+    .pagination {
+        padding: 16px;
+    }
+
+    .pagination-info {
+        font-size: 12px;
+    }
+}
+
+/* ===============================================
+   SMALL MOBILE (max-width: 480px)
+   =============================================== */
+@media (max-width: 480px) {
+
+    /* Further reduce spacing */
+    .page-content {
+        padding: 12px;
+    }
+
+    /* Smaller stat cards */
+    .stat-card {
+        padding: 12px;
+    }
+
+    .stat-card-value {
+        font-size: 18px;
+        line-height: 1.2;
+    }
+
+    .stat-card-label {
+        font-size: 11px;
+    }
+
+    /* Compact buttons */
+    .btn {
+        padding: 8px 12px;
+        font-size: 12px;
+    }
+
+    /* Smaller page heading */
+    .page-heading {
+        font-size: 16px;
+    }
+
+    /* Compact cards */
+    .card-header {
+        padding: 10px 12px;
+        font-size: 13px;
+    }
+
+    .card-body {
+        padding: 12px;
+    }
+
+    /* Order cards */
+    .order-card {
+        padding: 12px;
+    }
+
+    .order-id {
+        font-size: 13px;
+    }
+
+    .order-customer {
+        font-size: 14px;
+    }
+
+    .order-meta {
+        font-size: 12px;
+    }
+
+    /* Login */
+    .login-card {
+        padding: 24px 20px;
+    }
+
+    .login-logo i {
+        font-size: 36px;
+    }
+
+    .login-title {
+        font-size: 18px;
+    }
+
+    /* Sidebar brand */
+    .sidebar-brand {
+        padding: 16px;
+    }
+
+    .sidebar-brand-text {
+        font-size: 14px;
+    }
+
+    /* Modal */
+    .modal-content {
+        max-width: 100%;
+        margin: 0;
+        border-radius: 12px 12px 0 0;
+        max-height: 95vh;
+    }
+}
+
+/* ===============================================
+   LANDSCAPE MOBILE (max-height: 500px)
+   =============================================== */
+@media (max-height: 500px) and (orientation: landscape) {
+
+    /* Reduce header height */
+    :root {
+        --header-height: 50px;
+    }
+
+    .main-header {
+        height: 50px;
+    }
+
+    /* Compact sidebar */
+    .sidebar-brand {
+        padding: 12px 16px;
+    }
+
+    .sidebar-brand-icon {
+        width: 32px;
+        height: 32px;
+        font-size: 16px;
+    }
+
+    .sidebar-brand-text {
+        font-size: 14px;
+    }
+
+    .nav-link {
+        padding: 8px 12px;
+    }
+
+    /* Reduce page content padding */
+    .page-content {
+        padding: 16px;
+    }
+
+    /* Compact stat cards */
+    .stat-card {
+        padding: 12px;
+    }
+
+    .stat-card-value {
+        font-size: 20px;
+    }
+}
+
+/* ===============================================
+   PRINT STYLES
+   =============================================== */
+@media print {
+
+    .sidebar,
+    .main-header,
+    .btn,
+    .pagination,
+    .modal-overlay {
+        display: none !important;
+    }
+
+    .main-content {
+        margin-left: 0;
+    }
+
+    .page-content {
+        padding: 0;
+    }
+
+    .card {
+        box-shadow: none;
+        border: 1px solid #ddd;
+        page-break-inside: avoid;
     }
 }
