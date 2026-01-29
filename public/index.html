@@ -361,84 +361,181 @@
 
                 <!-- ==================== CREATE ORDER SECTION ==================== -->
                 <section id="section-create-order" class="hidden">
-                    <h2 class="page-heading">Tạo Đơn Nhập</h2>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
+                        <h2 class="page-heading" style="margin-bottom:0;">Tạo Đơn Nhập</h2>
+                        <div style="display:flex; gap:8px;">
+                            <button class="btn btn-outline" onclick="showSection('dispatch')">
+                                <i class="bi bi-arrow-left"></i> Quay lại
+                            </button>
+                        </div>
+                    </div>
 
-                    <div class="two-col-layout">
-                        <!-- Left: Order Info -->
-                        <div class="card">
-                            <div class="card-header">
-                                <i class="bi bi-clipboard-data" style="color: var(--primary);"></i>
-                                Thông tin đơn hàng
-                            </div>
-                            <div class="card-body">
-                                <div class="form-group">
-                                    <label class="form-label">
-                                        <i class="bi bi-calendar3"></i>
-                                        Ngày
-                                    </label>
+                    <!-- Order Info Row -->
+                    <div class="card" style="margin-bottom:20px;">
+                        <div class="card-header"
+                            style="background:linear-gradient(135deg, var(--primary), #764ba2); color:white;">
+                            <i class="bi bi-clipboard-data"></i>
+                            Thông tin đơn hàng
+                        </div>
+                        <div class="card-body">
+                            <div style="display:grid; grid-template-columns:1fr 2fr 2fr; gap:16px;">
+                                <div class="form-group" style="margin:0;">
+                                    <label class="form-label"><i class="bi bi-calendar3"></i> Ngày</label>
                                     <input type="date" id="order-date" class="form-control">
                                 </div>
-
-                                <div class="form-group">
-                                    <label class="form-label">
-                                        <i class="bi bi-building"></i>
-                                        Nhà cung cấp / Khách hàng
-                                    </label>
+                                <div class="form-group" style="margin:0;">
+                                    <label class="form-label"><i class="bi bi-building"></i> Nhà cung cấp</label>
                                     <input type="text" id="order-customer" class="form-control"
                                         placeholder="Tên nhà cung cấp hoặc khách hàng">
                                 </div>
-
-                                <div class="form-group">
-                                    <label class="form-label">
-                                        <i class="bi bi-geo-alt"></i>
-                                        Địa chỉ giao hàng
-                                    </label>
+                                <div class="form-group" style="margin:0;">
+                                    <label class="form-label"><i class="bi bi-geo-alt"></i> Địa chỉ</label>
                                     <input type="text" id="order-address" class="form-control"
                                         placeholder="Địa chỉ giao hàng">
-                                </div>
-
-                                <div class="form-hint">
-                                    <i class="bi bi-info-circle"></i>
-                                    <div>
-                                        <strong>Hướng dẫn:</strong> Nhập thông tin đơn hàng và thêm các sản phẩm cần
-                                        nhập kho.
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Right: Products -->
-                        <div class="card">
-                            <div class="card-header">
-                                <i class="bi bi-box2" style="color: var(--primary);"></i>
-                                Sản phẩm
-                            </div>
-                            <div class="card-body">
-                                <div id="order-products-list" class="product-list-empty">
-                                    <i class="bi bi-inbox"></i>
-                                    <h4>Chưa có sản phẩm nào</h4>
-                                    <p>Nhập thông tin sản phẩm bên dưới để thêm vào đơn hàng</p>
-                                </div>
-
-                                <div style="display: flex; gap: 12px; margin-top: 20px;">
-                                    <input type="text" id="prod-name" class="form-control" placeholder="Tên sản phẩm"
-                                        style="flex: 2;">
-                                    <input type="number" id="prod-qty" class="form-control" placeholder="Số lượng"
-                                        style="flex: 1;">
-                                    <button class="btn btn-primary" onclick="addOrderProduct()">
-                                        <i class="bi bi-plus"></i>
-                                        Thêm
-                                    </button>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <button class="btn btn-primary" style="margin-top: 24px; padding: 16px 32px;"
-                        onclick="submitOrder()">
-                        <i class="bi bi-check-circle"></i>
-                        TẠO ĐƠN NHẬP
-                    </button>
+                    <!-- Products Section -->
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
+                        <!-- Left: Add Product Form -->
+                        <div class="card">
+                            <div class="card-header"
+                                style="background:linear-gradient(135deg, #f59e0b, #d97706); color:white;">
+                                <i class="bi bi-plus-circle"></i>
+                                Thêm sản phẩm mới
+                            </div>
+                            <div class="card-body">
+                                <!-- Product Name -->
+                                <div class="form-group">
+                                    <label class="form-label">Tên sản phẩm <span
+                                            style="color:var(--danger);">*</span></label>
+                                    <input type="text" id="prod-name" class="form-control"
+                                        placeholder="VD: Acid Sulfuric H2SO4">
+                                </div>
+
+                                <!-- Quantity & Unit Row -->
+                                <div style="display:grid; grid-template-columns:2fr 1fr; gap:12px;">
+                                    <div class="form-group">
+                                        <label class="form-label">Số lượng <span
+                                                style="color:var(--danger);">*</span></label>
+                                        <input type="number" id="prod-qty" class="form-control" placeholder="0" min="0"
+                                            oninput="calculateProductPrice()" style="font-size:18px; font-weight:600;">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Đơn vị</label>
+                                        <select id="prod-unit" class="form-select" style="font-size:16px;">
+                                            <option value="Kg">Kg</option>
+                                            <option value="Lít">Lít</option>
+                                            <option value="Can">Can</option>
+                                            <option value="Phuy">Phuy</option>
+                                            <option value="Tank">Tank</option>
+                                            <option value="Tấn">Tấn</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <!-- Price Row -->
+                                <div style="display:grid; grid-template-columns:2fr 1fr; gap:12px;">
+                                    <div class="form-group">
+                                        <label class="form-label">Đơn giá (VND)</label>
+                                        <input type="number" id="prod-price" class="form-control" placeholder="0"
+                                            min="0" oninput="calculateProductPrice()"
+                                            style="font-size:18px; font-weight:600;">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">VAT</label>
+                                        <select id="prod-vat" class="form-select" onchange="calculateProductPrice()"
+                                            style="font-size:16px;">
+                                            <option value="0">0%</option>
+                                            <option value="5">5%</option>
+                                            <option value="8">8%</option>
+                                            <option value="10" selected>10%</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <!-- Calculation Display -->
+                                <div
+                                    style="background:linear-gradient(135deg, #f0fdf4, #dcfce7); padding:16px; border-radius:12px; margin-top:16px;">
+                                    <div
+                                        style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                                        <span style="color:var(--text-secondary);">Thành tiền:</span>
+                                        <span id="calc-subtotal" style="font-weight:600;">0đ</span>
+                                    </div>
+                                    <div
+                                        style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                                        <span style="color:var(--text-secondary);">Tiền VAT:</span>
+                                        <span id="calc-vat-amount" style="font-weight:600; color:var(--info);">0đ</span>
+                                    </div>
+                                    <div
+                                        style="display:flex; justify-content:space-between; align-items:center; padding-top:8px; border-top:2px dashed #86efac;">
+                                        <span style="font-weight:600; color:var(--text-primary);">Tổng tiền:</span>
+                                        <span id="calc-total"
+                                            style="font-weight:700; color:var(--success); font-size:20px;">0đ</span>
+                                    </div>
+                                </div>
+
+                                <!-- Add Button -->
+                                <button class="btn btn-primary" onclick="addOrderProduct()"
+                                    style="width:100%; margin-top:16px; padding:14px; font-size:16px;">
+                                    <i class="bi bi-plus-lg"></i> THÊM SẢN PHẨM
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Right: Product List -->
+                        <div class="card">
+                            <div class="card-header"
+                                style="background:linear-gradient(135deg, #10b981, #059669); color:white; display:flex; justify-content:space-between; align-items:center;">
+                                <span><i class="bi bi-box-seam"></i> Danh sách sản phẩm</span>
+                                <span class="badge"
+                                    style="background:rgba(255,255,255,0.2); padding:4px 12px; border-radius:20px;"
+                                    id="product-count-badge">0 sản phẩm</span>
+                            </div>
+                            <div class="card-body" style="min-height:300px; max-height:450px; overflow-y:auto;">
+                                <div id="order-products-list" class="product-list-empty">
+                                    <div style="text-align:center; padding:40px 20px; color:var(--text-muted);">
+                                        <i class="bi bi-inbox" style="font-size:48px; opacity:0.5;"></i>
+                                        <h4 style="margin-top:16px; font-weight:500;">Chưa có sản phẩm nào</h4>
+                                        <p style="font-size:14px;">Thêm sản phẩm từ form bên trái</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Order Summary Footer -->
+                            <div id="order-summary"
+                                style="display:none; background:linear-gradient(135deg, #eef2ff, #e0e7ff); padding:16px; border-top:1px solid var(--border);">
+                                <div
+                                    style="display:flex; justify-content:space-between; margin-bottom:6px; font-size:14px;">
+                                    <span>Tạm tính:</span>
+                                    <span id="summary-subtotal" style="font-weight:600;">0đ</span>
+                                </div>
+                                <div
+                                    style="display:flex; justify-content:space-between; margin-bottom:6px; font-size:14px;">
+                                    <span>Tổng VAT:</span>
+                                    <span id="summary-vat" style="font-weight:600; color:var(--info);">0đ</span>
+                                </div>
+                                <div
+                                    style="display:flex; justify-content:space-between; padding-top:10px; border-top:1px dashed var(--border);">
+                                    <span style="font-weight:700; font-size:16px;">TỔNG CỘNG:</span>
+                                    <span id="summary-total"
+                                        style="font-weight:700; color:var(--success); font-size:22px;">0đ</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <div style="margin-top:24px; display:flex; justify-content:center;">
+                        <button class="btn btn-primary"
+                            style="padding:16px 48px; font-size:18px; background:linear-gradient(135deg, #667eea, #764ba2);"
+                            onclick="submitOrder()">
+                            <i class="bi bi-check-circle"></i>
+                            TẠO ĐƠN NHẬP
+                        </button>
+                    </div>
                 </section>
 
                 <!-- ==================== MY ORDERS SECTION ==================== -->
