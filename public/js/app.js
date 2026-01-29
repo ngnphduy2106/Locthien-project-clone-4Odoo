@@ -1398,29 +1398,50 @@ function getStatusText(status) {
     return map[status] || status;
 }
 
-function viewOrderDetail(orderId) {
+
+async function viewOrderDetail(orderId) {
     console.log('viewOrderDetail called with:', orderId);
     console.log('state.orders:', state.orders);
 
-    // Find order from state - try multiple matching approaches
-    const allOrders = [...(state.orders.pending || []), ...(state.orders.assigned || []), ...(state.orders.completed || [])];
+    // Find order from state - try multiple matching approaches including exports
+    const allOrders = [
+        ...(state.orders.pending || []),
+        ...(state.orders.assigned || []),
+        ...(state.orders.completed || []),
+        ...(state.orders.exports || [])
+    ];
     console.log('allOrders count:', allOrders.length);
 
-    // More robust matching: try id, soDon, sale_order_no
-    const order = allOrders.find(o => {
-        const oIdStr = String(o.id);
-        const searchIdStr = String(orderId);
-        return oIdStr === searchIdStr ||
-            o.id === orderId ||
-            o.id === parseInt(orderId) ||
-            o.soDon === orderId ||
-            o.sale_order_no === orderId;
+    // More robust matching: try id, soDon, sale_order_no with case-insensitive comparison
+    const searchId = String(orderId).toLowerCase().trim();
+    let order = allOrders.find(o => {
+        const oId = String(o.id || '').toLowerCase().trim();
+        const oSoDon = String(o.soDon || '').toLowerCase().trim();
+        const oSaleOrderNo = String(o.sale_order_no || '').toLowerCase().trim();
+        return oId === searchId || oSoDon === searchId || oSaleOrderNo === searchId;
     });
 
-    console.log('Found order:', order);
+    console.log('Found order in state:', order);
+
+    // If not found in state, try to fetch from API
+    if (!order) {
+        console.log('Order not in state, fetching from API...');
+        try {
+            showLoading('Đang tải chi tiết đơn hàng...');
+            const res = await api.getOrderDetail(orderId);
+            hideLoading();
+            if (res && res.data) {
+                order = res.data;
+                console.log('Fetched order from API:', order);
+            }
+        } catch (e) {
+            hideLoading();
+            console.error('Failed to fetch order from API:', e);
+        }
+    }
 
     if (!order) {
-        console.error('Order not found! Available IDs:', allOrders.map(o => o.id));
+        console.error('Order not found! ID:', orderId);
         alert('Không tìm thấy đơn hàng! ID: ' + orderId);
         return;
     }

@@ -147,6 +147,43 @@ router.get('/my/:driverName', async (req, res) => {
     }
 });
 
+// GET /api/orders/:id - Get single order detail by ID
+router.get('/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        console.log(`📄 Get Order Detail: ${id}`);
+
+        // Try to get order from database
+        const order = await db.getOrder(id);
+
+        if (!order) {
+            // Try to find by sale_order_no if not found by id
+            const orders = await db.getOrders();
+            const searchId = String(id).toLowerCase().trim();
+            const foundOrder = orders.find(o => {
+                const oId = String(o.id || '').toLowerCase().trim();
+                const oSoDon = String(o.soDon || '').toLowerCase().trim();
+                const oSaleOrderNo = String(o.sale_order_no || '').toLowerCase().trim();
+                return oId === searchId || oSoDon === searchId || oSaleOrderNo === searchId;
+            });
+
+            if (foundOrder) {
+                console.log(`✅ Found order by search: ${foundOrder.id}`);
+                return res.json({ error: false, data: foundOrder });
+            }
+
+            console.log(`❌ Order not found: ${id}`);
+            return res.json(createResponse(true, 'Không tìm thấy đơn hàng!'));
+        }
+
+        console.log(`✅ Found order: ${order.id}, soDon: ${order.soDon}`);
+        res.json({ error: false, data: order });
+    } catch (e) {
+        console.error('Get order detail error:', e.message);
+        res.json(createResponse(true, 'Lỗi: ' + e.message));
+    }
+});
+
 // PUT /api/orders/:id/local-items - Update local items (vỏ can, phuy, tank) - NO MISA SYNC
 router.put('/:id/local-items', async (req, res) => {
     try {

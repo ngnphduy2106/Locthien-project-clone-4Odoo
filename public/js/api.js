@@ -46,6 +46,11 @@ const api = {
         return res.json();
     },
 
+    getOrderDetail: async (orderId) => {
+        const res = await fetch(`${API_BASE}/orders/${encodeURIComponent(orderId)}`);
+        return res.json();
+    },
+
     getMyOrders: async (driverName, role) => {
         const res = await fetch(`${API_BASE}/orders/my/${encodeURIComponent(driverName)}?role=${role}`);
         return res.json();
