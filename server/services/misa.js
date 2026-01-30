@@ -454,46 +454,20 @@ const performSync = async () => {
     }
 
     // ============================================
-    // PHASE 2: Soft Delete - Mark orders that no longer exist in MISA as 'Đã hủy bỏ'
+    // NOTE: Soft Delete Logic REMOVED
     // ============================================
-    console.log('🗑️ Checking for deleted orders...');
+    // The previous soft delete logic was buggy: it marked orders as 'Đã hủy bỏ' 
+    // when they didn't appear in MISA API response. However, MISA API pagination
+    // only returns ~1000-3000 recent orders, so older orders were incorrectly
+    // flagged as deleted even though they still exist in MISA.
+    // 
+    // If you need to detect truly deleted orders from MISA, you must:
+    // 1. Call MISA API's /code endpoint for each DB order to verify existence
+    // 2. Or use MISA webhooks if available
+    // 3. Or compare against a full MISA export periodically
+    // ============================================
 
-    // Build set of MISA order IDs for fast lookup
-    const misaOrderIds = new Set(misaOrders.map(o => o.sale_order_no || o.SaleOrderNo));
-
-    let softDeletedCount = 0;
-    for (const dbOrder of dbOrders) {
-        const orderId = dbOrder.soDon || dbOrder.sale_order_no || dbOrder.id;
-
-        // Skip orders without proper ID
-        if (!orderId) continue;
-
-        // Skip orders that are NOT from MISA (local orders don't have misa_id)
-        if (!dbOrder.misa_id) continue;
-
-        // Skip orders already marked as cancelled
-        if (dbOrder.status === 'Đã hủy bỏ') continue;
-
-        // If order exists in DB but NOT in MISA -> it was deleted on MISA
-        if (!misaOrderIds.has(orderId)) {
-            console.log(`🗑️ Soft deleting order ${orderId} (removed from MISA)...`);
-            try {
-                await db.updateOrder(orderId, {
-                    status: 'Đã hủy bỏ',
-                    delivery_status: 'Đã hủy bỏ'
-                });
-                softDeletedCount++;
-            } catch (e) {
-                console.error(`❌ Failed to soft delete ${orderId}:`, e.message);
-            }
-        }
-    }
-
-    if (softDeletedCount > 0) {
-        console.log(`🗑️ Soft deleted ${softDeletedCount} orders that were removed from MISA.`);
-    }
-
-    console.log(`✨ Sync Complete. New: ${newCount}, Soft Deleted: ${softDeletedCount}`);
+    console.log(`✨ Sync Complete. New orders synced: ${newCount}`);
 };
 
 // ============================================================

@@ -179,4 +179,27 @@ router.delete('/users/:id', async (req, res) => {
     }
 });
 
+// POST /api/auth/register-fcm-token - Register FCM token for push notifications
+router.post('/register-fcm-token', async (req, res) => {
+    try {
+        const { userId, fcmToken } = req.body;
+
+        if (!userId || !fcmToken) {
+            return res.json(createResponse(true, 'userId và fcmToken là bắt buộc'));
+        }
+
+        // Update user's FCM token
+        await db.updateUser(userId, {
+            fcm_token: fcmToken,
+            fcm_token_updated_at: new Date().toISOString()
+        });
+
+        console.log(`📱 FCM token registered for user ${userId}`);
+        res.json(createResponse(false, 'Đã đăng ký token thông báo!'));
+    } catch (e) {
+        console.error('FCM token registration error:', e);
+        res.json(createResponse(true, 'Lỗi: ' + e.message));
+    }
+});
+
 export default router;

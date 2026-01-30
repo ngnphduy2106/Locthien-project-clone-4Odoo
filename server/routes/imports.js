@@ -173,6 +173,30 @@ router.put('/:id/assign', async (req, res) => {
             return res.json(createResponse(true, 'Lỗi gán tài xế: ' + error.message));
         }
 
+        // Send push notification to driver (async, don't block response)
+        try {
+            const { notifyDriverOrderAssigned } = await import('../services/firebase.js');
+            const db = await import('../db/index.js');
+            const users = await db.default.getUsers();
+            const driver = users.find(u =>
+                u.fullName?.toLowerCase() === driver_name?.toLowerCase() ||
+                u.username?.toLowerCase() === driver_name?.toLowerCase()
+            );
+
+            if (driver?.fcm_token) {
+                notifyDriverOrderAssigned(driver.fcm_token, {
+                    orderId: id,
+                    orderNo: data?.ticket_no || id,
+                    customerName: data?.supplier_name,
+                    address: data?.supplier_address,
+                    type: 'import'
+                });
+                console.log(`📬 Push notification sent to driver ${driver_name} for import`);
+            }
+        } catch (notifyErr) {
+            console.error('Push notification error:', notifyErr.message);
+        }
+
         res.json({
             error: false,
             msg: 'Đã gán tài xế!',

@@ -241,6 +241,32 @@ const api = {
             body: JSON.stringify(data)
         });
         return res.json();
+    },
+
+    // === CHAT ===
+    getUnreadCounts: async (userId) => {
+        const res = await fetch(`${API_BASE}/chat/unread-counts?userId=${encodeURIComponent(userId)}`);
+        return res.json();
+    },
+
+    markMessagesRead: async (id, userId, type = 'export') => {
+        const typeParam = type === 'import' ? '?type=import' : '';
+        const res = await fetch(`${API_BASE}/chat/${id}/mark-read${typeParam}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId })
+        });
+        return res.json();
+    },
+
+    // === NOTIFICATIONS ===
+    registerFcmToken: async (userId, fcmToken) => {
+        const res = await fetch(`${API_BASE}/auth/register-fcm-token`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId, fcmToken })
+        });
+        return res.json();
     }
 };
 

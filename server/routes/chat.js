@@ -63,6 +63,126 @@ router.get('/:id/messages', async (req, res) => {
     }
 });
 
+// GET /api/chat/unread-counts - Get unread message counts for all orders/imports
+// Query params: ?userId=xxx (required) - the current user identifier
+router.get('/unread-counts', async (req, res) => {
+    try {
+        const { userId } = req.query;
+
+        if (!userId) {
+            return res.json(createResponse(true, 'userId is required'));
+        }
+
+        const supabase = getSupabase();
+        if (!supabase) {
+            return res.json({ error: false, counts: {} });
+        }
+
+        // Get all messages where userId is NOT in read_by array
+        // For orders (export)
+        const { data: orderMessages, error: orderErr } = await supabase
+            .from('order_messages')
+            .select('order_id')
+            .not('order_id', 'is', null)
+            .not('read_by', 'cs', `{${userId}}`);
+
+        // For import tickets
+        const { data: importMessages, error: importErr } = await supabase
+            .from('order_messages')
+            .select('import_ticket_id')
+            .not('import_ticket_id', 'is', null)
+            .not('read_by', 'cs', `{${userId}}`);
+
+        if (orderErr || importErr) {
+            console.error('Unread counts error:', orderErr || importErr);
+            return res.json({ error: false, counts: {} });
+        }
+
+        // Count by order_id
+        const counts = {};
+
+        (orderMessages || []).forEach(msg => {
+            if (msg.order_id) {
+                counts[msg.order_id] = (counts[msg.order_id] || 0) + 1;
+            }
+        });
+
+        // Count by import_ticket_id (prefix with 'import_' to distinguish)
+        (importMessages || []).forEach(msg => {
+            if (msg.import_ticket_id) {
+                const key = `import_${msg.import_ticket_id}`;
+                counts[key] = (counts[key] || 0) + 1;
+            }
+        });
+
+        res.json({
+            error: false,
+            counts: counts
+        });
+
+    } catch (e) {
+        console.error('Unread counts exception:', e);
+        res.json({ error: false, counts: {} });
+    }
+});
+
+// POST /api/chat/:id/mark-read - Mark messages as read for a user
+router.post('/:id/mark-read', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { type } = req.query;
+        const { userId } = req.body;
+
+        if (!userId) {
+            return res.json(createResponse(true, 'userId is required'));
+        }
+
+        const supabase = getSupabase();
+        if (!supabase) {
+            return res.json(createResponse(true, 'Supabase not configured'));
+        }
+
+        // Build filter based on type
+        let query = supabase
+            .from('order_messages')
+            .select('id, read_by');
+
+        if (type === 'import') {
+            query = query.eq('import_ticket_id', id);
+        } else {
+            query = query.eq('order_id', id);
+        }
+
+        const { data: messages, error: fetchErr } = await query;
+
+        if (fetchErr) {
+            console.error('Mark read fetch error:', fetchErr);
+            return res.json(createResponse(true, 'Lỗi đánh dấu đã đọc'));
+        }
+
+        // Update each message to add userId to read_by array
+        for (const msg of (messages || [])) {
+            const readBy = msg.read_by || [];
+            if (!readBy.includes(userId)) {
+                readBy.push(userId);
+                await supabase
+                    .from('order_messages')
+                    .update({ read_by: readBy })
+                    .eq('id', msg.id);
+            }
+        }
+
+        res.json({
+            error: false,
+            message: 'Đã đánh dấu đã đọc'
+        });
+
+    } catch (e) {
+        console.error('Mark read exception:', e);
+        res.json(createResponse(true, e.message));
+    }
+});
+
 // POST /api/orders/:id/messages - Send a chat message (supports import tickets with ?type=import)
 router.post('/:id/messages', async (req, res) => {
     try {

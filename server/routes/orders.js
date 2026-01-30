@@ -335,6 +335,31 @@ router.put('/:id/assign', async (req, res) => {
             cart: fullOrder?.cart || fullOrder?.products || []
         });
 
+        // Send push notification to driver (async, don't block response)
+        try {
+            const { notifyDriverOrderAssigned } = await import('../services/firebase.js');
+            const users = await db.getUsers();
+            const driver = users.find(u =>
+                u.fullName?.toLowerCase() === driverName?.toLowerCase() ||
+                u.username?.toLowerCase() === driverName?.toLowerCase()
+            );
+
+            if (driver?.fcm_token) {
+                notifyDriverOrderAssigned(driver.fcm_token, {
+                    orderId: id,
+                    orderNo: fullOrder?.soDon || fullOrder?.sale_order_no || id,
+                    customerName: fullOrder?.khach || fullOrder?.account_name,
+                    address: fullOrder?.diaChi || fullOrder?.shipping_address,
+                    type: 'export'
+                });
+                console.log(`📬 Push notification sent to driver ${driverName}`);
+            } else {
+                console.log(`⚠️ No FCM token for driver ${driverName}`);
+            }
+        } catch (notifyErr) {
+            console.error('Push notification error:', notifyErr.message);
+        }
+
         if (!syncResult.success) {
             console.error('MISA Sync Failed during Assign:', syncResult.message);
             // We don't block assignment, but we notify

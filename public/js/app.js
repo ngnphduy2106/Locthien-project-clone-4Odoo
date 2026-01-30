@@ -14,7 +14,8 @@ let state = {
     currentOrderType: 'export',
     orderProducts: [],
     historyPage: 1,
-    historyPerPage: 10
+    historyPerPage: 10,
+    unreadCounts: {} // { orderId: count, import_ticketId: count }
 };
 
 
@@ -628,6 +629,9 @@ async function loadOrders() {
         state.orders.completed = res.completed || [];
         state.drivers = res.drivers || [];
 
+        // Load unread counts for badges
+        await loadUnreadCounts();
+
         renderDispatchOrders();
     } catch (e) {
         container.innerHTML = '<p style="text-align:center; color:var(--danger);">Lỗi tải đơn hàng</p>';
@@ -691,6 +695,9 @@ async function loadImportTickets() {
             completed: imports.filter(i => i.status === 'completed')
         };
 
+        // Load unread counts for badges
+        await loadUnreadCounts();
+
         renderImportList();
     } catch (e) {
         container.innerHTML = '<p style="text-align:center; color:var(--danger);">Lỗi tải phiếu nhập</p>';
@@ -736,7 +743,8 @@ function renderImportList() {
     }
 
     container.innerHTML = imports.map(imp => `
-        <div class="order-card">
+        <div class="order-card" style="position:relative;">
+            ${getUnreadBadgeHtml(imp.id, 'import')}
             <div class="order-card-header">
                 <div>
                     <div class="order-id">#${imp.ticket_no || imp.id}</div>
@@ -787,6 +795,29 @@ function renderImportList() {
 // Store filters for dispatch
 let currentSearchKeyword = '';
 let currentDateFilter = '';
+
+// === CHAT BADGE HELPERS ===
+async function loadUnreadCounts() {
+    try {
+        const userId = state.user?.name || state.user?.phone || '';
+        if (!userId) return;
+
+        const res = await api.getUnreadCounts(userId);
+        if (!res.error && res.counts) {
+            state.unreadCounts = res.counts;
+            console.log('💬 Loaded unread counts:', state.unreadCounts);
+        }
+    } catch (e) {
+        console.error('Load unread counts error:', e);
+    }
+}
+
+function getUnreadBadgeHtml(orderId, type = 'export') {
+    const key = type === 'import' ? `import_${orderId}` : orderId;
+    const count = state.unreadCounts[key] || 0;
+    if (count === 0) return '';
+    return `<span class="chat-badge">${count > 99 ? '99+' : count}</span>`;
+}
 
 function searchOrders(keyword) {
     currentSearchKeyword = (keyword || '').toLowerCase().trim();
@@ -853,7 +884,8 @@ function renderDispatchOrders() {
     }
 
     container.innerHTML = orders.map(order => `
-        <div class="order-card">
+        <div class="order-card" style="position:relative;">
+            ${getUnreadBadgeHtml(order.id, 'export')}
             <div class="order-card-header">
                 <div>
                     <div class="order-id">#${order.soDon || order.sale_order_no || order.id}</div>

@@ -5,7 +5,7 @@
 // If Firebase is not configured, the app will use mock data.
 
 import dotenv from 'dotenv';
-import { join, dirname } from 'path';
+import { join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 
