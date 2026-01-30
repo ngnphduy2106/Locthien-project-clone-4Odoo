@@ -624,6 +624,28 @@ body {
     }
 }
 
+/* Nav Badge for sidebar menu items */
+.nav-badge {
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    background: linear-gradient(135deg, #ff4757, #ff6b81);
+    color: white;
+    border-radius: 9px;
+    font-size: 10px;
+    font-weight: 600;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    margin-left: auto;
+    box-shadow: 0 2px 6px rgba(255, 71, 87, 0.3);
+    animation: pulse-badge 2s infinite;
+}
+
+.nav-badge.show {
+    display: inline-flex;
+}
+
 /* ===== TOAST NOTIFICATIONS ===== */
 .notification-container {
     position: fixed;

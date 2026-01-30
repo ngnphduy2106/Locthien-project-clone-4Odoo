@@ -902,16 +902,33 @@ const DispatchModule = {
         }
 
         try {
-            // Call API to complete order
-            // const response = await fetch(`/api/orders/${orderId}/complete`, {
-            //     method: 'POST'
-            // });
-
-            // Mock update
+            // Get order details first
             const order = this.orders.find(o => (o.id || o.order_id) === orderId);
-            if (order) {
-                order.status = 'Hoàn thành';
-                order.completed_at = new Date().toISOString();
+            if (!order) {
+                alert('Không tìm thấy đơn hàng!');
+                return;
+            }
+
+            // Get driver info
+            const driverName = order.driver_name || order.driver || localStorage.getItem('userName') || 'Driver';
+            const plate = order.vehicle_plate || order.plate || '';
+
+            // Call API to complete order
+            const response = await fetch(`/api/orders/${orderId}/complete`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    // Use admin_completed flag for dispatch module
+                    admin_completed: true,
+                    delivery_note: 'Hoàn thành từ màn hình điều phối'
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.error) {
+                alert('Lỗi: ' + data.msg);
+                return;
             }
 
             alert('✅ Đã hoàn thành đơn hàng thành công!');

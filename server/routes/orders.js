@@ -13,18 +13,29 @@ const router = Router();
 router.get('/', async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     try {
-        const orders = await db.getOrders();
+        // Support query param to include deleted/cancelled orders
+        const includeDeleted = req.query.includeDeleted === 'true';
+        const orders = await db.getOrders(includeDeleted);
         const users = await db.getUsers();
 
-        const completedStatuses = ['Đã thực hiện', 'Đã hủy bỏ']; // MISA status values
+        const completedStatuses = ['Đã thực hiện']; // Only completed, not cancelled
+        const cancelledStatuses = ['Đã hủy bỏ'];
 
         const pending = [];
         const assigned = [];
         const completed = [];
+        const cancelled = [];
 
         for (const order of orders) {
             const s = String(order.status || '').trim();
-            // Check if status is in the completed list (Case Insensitive for foreign keys)
+
+            // Check for cancelled first
+            if (cancelledStatuses.some(cs => cs.toLowerCase() === s.toLowerCase())) {
+                cancelled.push(order);
+                continue;
+            }
+
+            // Check if status is completed
             if (completedStatuses.some(cs => cs.toLowerCase() === s.toLowerCase())) {
                 completed.push(order);
                 continue;
@@ -41,13 +52,15 @@ router.get('/', async (req, res) => {
             .filter(u => u.status === 'ACTIVE' && u.role === CONFIG.ROLES.DRIVER)
             .map(u => ({ name: u.fullName, plate: u.plate }));
 
-        console.log('DEBUG: Sending response. Pending:', pending.length, 'Completed:', completed.length);
+        console.log('DEBUG: Sending response. Pending:', pending.length, 'Assigned:', assigned.length, 'Completed:', completed.length, 'Cancelled:', cancelled.length);
 
         res.json({
             error: false,
             pending,
             assigned,
             completed,
+            cancelled,
+            cancelledCount: cancelled.length,
             drivers
         });
 
@@ -360,6 +373,26 @@ router.put('/:id/assign', async (req, res) => {
             console.error('Push notification error:', notifyErr.message);
         }
 
+        // Send Telegram notification (async, don't block response)
+        try {
+            const { sendTelegramMessage } = await import('../services/telegram.js');
+            const orderInfo = await db.getOrder(id);
+
+            let msg = `🚛 <b>PHÂN CÔNG TÀI XẾ</b>\n`;
+            msg += `#${orderInfo?.soDon || orderInfo?.sale_order_no || id}\n`;
+            msg += `👤 KH: ${orderInfo?.khach || orderInfo?.account_name || ''}\n`;
+            msg += `📍 ${orderInfo?.diaChi || orderInfo?.shipping_address || ''}\n`;
+            msg += `──────────────\n`;
+            msg += `🚗 Tài xế: <b>${driverName}</b>\n`;
+            msg += `🔢 Biển số: ${plate || 'Chưa có'}\n`;
+            if (note) msg += `📝 Ghi chú: ${note}\n`;
+
+            await sendTelegramMessage(msg, 'XUAT');
+            console.log(`📬 Telegram notification sent for order ${id}`);
+        } catch (tgErr) {
+            console.error('Telegram notification error:', tgErr.message);
+        }
+
         if (!syncResult.success) {
             console.error('MISA Sync Failed during Assign:', syncResult.message);
             // We don't block assignment, but we notify
@@ -468,11 +501,151 @@ router.put('/:id/start', async (req, res) => {
     }
 });
 
-// POST /api/orders/:id/complete - Admin complete order
+// POST /api/orders/:id/complete - Unified complete order handler (Admin & Driver)
 router.post('/:id/complete', async (req, res) => {
     try {
         const { id } = req.params;
-        const { products, delivery_note, admin_completed } = req.body;
+        const {
+            // Admin complete fields
+            products, delivery_note, admin_completed,
+            // Driver complete fields
+            type, warehouse, partner, driver_name, plate, cart, note, sender, images
+        } = req.body;
+
+        // ============================================================
+        // DRIVER COMPLETE FLOW: Has cart with actual delivered products
+        // ============================================================
+        if (cart && Array.isArray(cart) && cart.length > 0) {
+            console.log(`🚚 Driver Complete Flow - Order: ${id}, Cart items: ${cart.length}`);
+
+            const ts = getTimestamp();
+            const prefix = type === 'NHAP' ? 'N' : 'X';
+            const ticketId = prefix + ts.short;
+
+            // Prepare actual delivered products for DB update
+            const updatedProducts = cart.filter(c => !c.isShell).map(item => ({
+                code: item.product?.code || item.product?.id || item.code || '',
+                name: item.product?.name || item.name || item.product || '',
+                qty: Number(item.weight_kg || item.qty || 0),
+                unit: item.unit || 'Kg'
+            }));
+
+            // Update order status AND products + Set initial sync status
+            await db.updateOrder(id, {
+                status: CONFIG.STATUS.DELIVERED,
+                delivery_status: 'Đã giao hàng',
+                taiXe: driver_name,
+                bienSo: plate,
+                cart: updatedProducts,
+                crm_sync_status: 'PUSHING'
+            });
+
+            // Create warehouse tickets
+            for (const item of cart) {
+                if (item.isShell) continue;
+
+                const data = {
+                    id: ticketId,
+                    date: ts.date,
+                    warehouse,
+                    partner,
+                    driver: driver_name,
+                    plate,
+                    product: standardizeData(item.product, 'PRODUCT'),
+                    density: item.density,
+                    qty: Number(item.weight_kg),
+                    note,
+                    sender
+                };
+
+                if (type === 'NHAP') {
+                    await db.addDataNhap(data);
+                } else {
+                    await db.addDataXuat(data);
+                }
+            }
+
+            // Sync to MISA & Supabase
+            let syncStatusMsg = '';
+            let crmSyncStatus = 'SYNCED';
+
+            // 1. Create Export Ticket in Supabase
+            try {
+                const { createClient } = await import('@supabase/supabase-js');
+                const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+                const orderInfo = await db.getOrder(id);
+                const totalQty = cart.reduce((sum, c) => sum + Number(c.weight_kg || c.qty || 0), 0);
+
+                await supabase.from('export_tickets').insert({
+                    ticket_no: ticketId,
+                    order_id: id,
+                    order_no: orderInfo?.soDon || id,
+                    customer_name: partner,
+                    customer_address: orderInfo?.diaChi || '',
+                    driver_name: driver_name,
+                    plate: plate,
+                    warehouse: warehouse,
+                    products: cart.map(c => ({
+                        code: c.product?.code || c.code || '',
+                        name: c.product?.name || c.product || c.name || '',
+                        qty: Number(c.weight_kg || c.qty || 0),
+                        unit: c.unit || 'kg',
+                        isShell: c.isShell || false
+                    })),
+                    total_qty: totalQty,
+                    note: note,
+                    images: images || [],
+                    created_by: sender || driver_name
+                });
+            } catch (err) {
+                console.error('Supabase Export Ticket Error:', err.message);
+            }
+
+            // 2. Sync to MISA CRM
+            try {
+                const orderInfo = await db.getOrder(id);
+                const misaCart = cart.filter(item => !item.isShell).map(item => ({
+                    product_code: item.product?.code || item.product?.id || item.code || item.product || '',
+                    warehouse,
+                    unit: item.unit || 'kg',
+                    qty: Number(item.weight_kg || item.qty || 0)
+                }));
+
+                const syncResult = await updateMisaOrder(orderInfo.sale_order_no || id, {
+                    misa_id: orderInfo.misa_id,
+                    delivery_status: 'Đã giao hàng',
+                    status: 'Đã thực hiện',
+                    driver: driver_name,
+                    plate,
+                    cart: misaCart
+                });
+
+                if (syncResult.success) {
+                    crmSyncStatus = 'SYNCED';
+                } else {
+                    crmSyncStatus = 'FAILED';
+                    syncStatusMsg = ` (⚠️ CRM Lỗi: ${syncResult.message})`;
+                }
+
+                // Update Database with Final Sync Result
+                await db.updateOrder(id, {
+                    crm_sync_status: crmSyncStatus,
+                    sync_error: syncResult.success ? null : syncResult.message
+                });
+
+                // Final response
+                return res.json(createResponse(!syncResult.success, syncResult.success ? 'Hoàn thành!' : 'Đã lưu cục bộ nhưng CRM lỗi' + syncStatusMsg, { ticketId, crmStatus: crmSyncStatus }));
+
+            } catch (syncErr) {
+                await db.updateOrder(id, { crm_sync_status: 'FAILED', sync_error: syncErr.message });
+                return res.json(createResponse(true, 'Hoàn thành locally nhưng lỗi hệ thống CRM: ' + syncErr.message));
+            }
+        }
+
+        // ============================================================
+        // ADMIN COMPLETE FLOW: Quick complete without detailed cart
+        // ============================================================
+        console.log(`👔 Admin Complete Flow - Order: ${id}`);
 
         // Update order status to completed
         const order = await db.updateOrder(id, {
@@ -493,15 +666,12 @@ router.post('/:id/complete', async (req, res) => {
         try {
             const syncResult = await updateMisaOrder(fullOrder?.sale_order_no || id, {
                 misa_id: fullOrder?.misa_id,
-                delivery_status: 'Đã giao hàng',  // MISA recognizes this to set status = 'Đã thực hiện'
-                status: 'Đã thực hiện',  // Direct MISA status text
+                delivery_status: 'Đã giao hàng',
+                status: 'Đã thực hiện',
                 driver: fullOrder?.custom_field13 || fullOrder?.taiXe || fullOrder?.driver || '',
                 plate: fullOrder?.custom_field14 || fullOrder?.bienSo || fullOrder?.plate || '',
                 cart: products || fullOrder?.cart || fullOrder?.products || []
             });
-
-
-
 
             if (!syncResult.success) {
                 console.error('MISA Sync Failed during Complete:', syncResult.message);
@@ -590,172 +760,6 @@ router.post('/:id/assign-multi', async (req, res) => {
     }
 });
 
-// POST /api/orders/:id/complete - Complete delivery
-router.post('/:id/complete', async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { type, warehouse, partner, driver_name, plate, cart, note, sender, images } = req.body;
-
-        const ts = getTimestamp();
-        const prefix = type === 'NHAP' ? 'N' : 'X';
-        const ticketId = prefix + ts.short;
-
-        // Prepare actual delivered products for DB update
-        const updatedProducts = cart.filter(c => !c.isShell).map(item => ({
-            code: item.product?.code || item.product?.id || item.code || '',
-            name: item.product?.name || item.name || item.product || '',
-            qty: Number(item.weight_kg || item.qty || 0),
-            unit: item.unit || 'Kg'
-            // density: item.density
-        }));
-
-        // Update order status AND products + Set initial sync status
-        await db.updateOrder(id, {
-            status: CONFIG.STATUS.DELIVERED,
-            delivery_status: 'Đã giao hàng',
-            taiXe: driver_name,
-            bienSo: plate,
-            cart: updatedProducts,
-            crm_sync_status: 'PUSHING' // Mark as in progress
-        });
-
-        // Create warehouse tickets
-        for (const item of cart) {
-            if (item.isShell) continue;
-
-            const data = {
-                id: ticketId,
-                date: ts.date,
-                warehouse,
-                partner,
-                driver: driver_name,
-                plate,
-                product: standardizeData(item.product, 'PRODUCT'),
-                density: item.density,
-                qty: Number(item.weight_kg),
-                note,
-                sender
-            };
-
-            if (type === 'NHAP') {
-                await db.addDataNhap(data);
-            } else {
-                await db.addDataXuat(data);
-            }
-        }
-
-        // Sync to MISA & Supabase (Synchronous for critical flow)
-        let syncStatusMsg = '';
-        let crmSyncStatus = 'SYNCED';
-
-        // 1. Create Export Ticket in Supabase
-        try {
-            const { createClient } = await import('@supabase/supabase-js');
-            const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
-            const orderInfo = await db.getOrder(id);
-            const totalQty = cart.reduce((sum, c) => sum + Number(c.weight_kg || c.qty || 0), 0);
-
-            await supabase.from('export_tickets').insert({
-                ticket_no: ticketId,
-                order_id: id,
-                order_no: orderInfo?.soDon || id,
-                customer_name: partner,
-                customer_address: orderInfo?.diaChi || '',
-                driver_name: driver_name,
-                plate: plate,
-                warehouse: warehouse,
-                products: cart.map(c => ({
-                    code: c.product?.code || c.code || '',
-                    name: c.product?.name || c.product || c.name || '',
-                    qty: Number(c.weight_kg || c.qty || 0),
-                    unit: c.unit || 'kg',
-                    isShell: c.isShell || false
-                })),
-                total_qty: totalQty,
-                note: note,
-                images: images || [],
-                created_by: sender || driver_name
-            });
-        } catch (err) {
-            console.error('Supabase Export Ticket Error:', err.message);
-        }
-
-        // 2. Sync to MISA CRM
-        try {
-            const orderInfo = await db.getOrder(id);
-            const originalProducts = orderInfo.products || [];
-            const originalMap = {};
-            originalProducts.forEach(p => {
-                const code = p.code || p.product_code || '';
-                originalMap[p.name || code] = { ...p, qty_planned: p.qty, actual_qty: 0 };
-            });
-
-            cart.filter(c => !c.isShell).forEach(item => {
-                const name = item.product?.name || item.name || '';
-                const code = item.product?.code || item.product?.id || item.code || '';
-                const key = name || code;
-                if (originalMap[key]) {
-                    originalMap[key].actual_qty += Number(item.weight_kg || item.qty || 0);
-                } else {
-                    originalMap[key] = {
-                        name, code, qty_planned: 0,
-                        actual_qty: Number(item.weight_kg || item.qty || 0),
-                        unit: item.unit || 'Kg'
-                    };
-                }
-            });
-
-            const mergedProducts = Object.values(originalMap).map(m => ({
-                ...m,
-                qty: m.actual_qty
-            }));
-
-            // Prepare MISA Payload
-            const misaCart = cart.filter(item => !item.isShell).map(item => ({
-                product_code: item.product?.code || item.product?.id || item.code || item.product || '',
-                warehouse,
-                unit: item.unit || 'kg',
-                qty: Number(item.weight_kg || item.qty || 0)
-            }));
-
-            const syncResult = await updateMisaOrder(orderInfo.sale_order_no || id, {
-                misa_id: orderInfo.misa_id,
-                delivery_status: 'Đã giao hàng',
-                status: 'Đã thực hiện',
-                driver: driver_name,
-                plate,
-                cart: misaCart
-            });
-
-            if (syncResult.success) {
-                crmSyncStatus = 'SYNCED';
-            } else {
-                crmSyncStatus = 'FAILED';
-                syncStatusMsg = ` (⚠️ CRM Lỗi: ${syncResult.message})`;
-            }
-
-            // Update Database with Final Sync Result
-            await db.updateOrder(id, {
-                crm_sync_status: crmSyncStatus,
-                sync_error: syncResult.success ? null : syncResult.message
-            });
-
-            // Final response
-            res.json(createResponse(!syncResult.success, syncResult.success ? 'Hoàn thành!' : 'Đã lưu cục bộ nhưng CRM lỗi' + syncStatusMsg, { ticketId, crmStatus: crmSyncStatus }));
-
-        } catch (syncErr) {
-            await db.updateOrder(id, { crm_sync_status: 'FAILED', sync_error: syncErr.message });
-            res.json(createResponse(true, 'Hoàn thành locally nhưng lỗi hệ thống CRM: ' + syncErr.message));
-        }
-
-    } catch (e) {
-        if (!res.headersSent) {
-            res.json(createResponse(true, e.message));
-        } else {
-            console.error("❌ Error after response sent:", e.message);
-        }
-    }
-});
 
 // GET /api/orders/:id/chat - Get chat messages
 router.get('/:id/chat', async (req, res) => {

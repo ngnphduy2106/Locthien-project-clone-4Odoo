@@ -66,7 +66,7 @@
 
             <nav class="sidebar-nav">
                 <!-- Tổng quan -->
-                <div class="nav-item">
+                <div class="nav-item" id="nav-dashboard">
                     <button class="nav-link active" onclick="showSection('dashboard')">
                         <i class="bi bi-grid-1x2"></i>
                         Tổng quan
@@ -74,33 +74,42 @@
                 </div>
 
                 <!-- Quản lý đơn hàng -->
-                <div class="nav-item">
+                <div class="nav-item" id="nav-orders-group">
                     <button class="nav-link nav-group-toggle expanded" onclick="toggleSubmenu(this)">
                         <i class="bi bi-clipboard-data"></i>
                         Quản lý đơn hàng
                     </button>
                     <div class="nav-submenu" id="submenu-orders">
-                        <button class="nav-link" onclick="showSection('dispatch')">
-                            <i class="bi bi-send"></i>
-                            Điều phối
-                        </button>
-                        <button class="nav-link" onclick="showSection('create-order')">
-                            <i class="bi bi-plus-circle"></i>
-                            Tạo đơn nhập
-                        </button>
-                        <button class="nav-link" onclick="showSection('my-orders')">
-                            <i class="bi bi-person-badge"></i>
-                            Đơn của tôi
-                        </button>
-                        <button class="nav-link" onclick="showSection('order-history')">
-                            <i class="bi bi-clock-history"></i>
-                            Lịch sử đơn hàng
-                        </button>
+                        <div id="nav-dispatch">
+                            <button class="nav-link" onclick="showSection('dispatch')">
+                                <i class="bi bi-send"></i>
+                                Điều phối
+                            </button>
+                        </div>
+                        <div id="nav-create-order">
+                            <button class="nav-link" onclick="showSection('create-order')">
+                                <i class="bi bi-plus-circle"></i>
+                                Tạo đơn nhập
+                            </button>
+                        </div>
+                        <div id="nav-my-orders">
+                            <button class="nav-link" onclick="showSection('my-orders')">
+                                <i class="bi bi-person-badge"></i>
+                                Đơn của tôi
+                                <span id="my-orders-nav-badge" class="nav-badge">0</span>
+                            </button>
+                        </div>
+                        <div id="nav-order-history">
+                            <button class="nav-link" onclick="showSection('order-history')">
+                                <i class="bi bi-clock-history"></i>
+                                Lịch sử đơn hàng
+                            </button>
+                        </div>
                     </div>
                 </div>
 
                 <!-- Nhân sự -->
-                <div class="nav-item">
+                <div class="nav-item" id="nav-hr">
                     <button class="nav-link" onclick="showSection('hr')">
                         <i class="bi bi-people"></i>
                         Nhân sự
@@ -108,7 +117,7 @@
                 </div>
 
                 <!-- Vật tư -->
-                <div class="nav-item">
+                <div class="nav-item" id="nav-materials">
                     <button class="nav-link" onclick="showSection('materials')">
                         <i class="bi bi-box2"></i>
                         Vật tư
@@ -116,7 +125,7 @@
                 </div>
 
                 <!-- Kho hàng -->
-                <div class="nav-item">
+                <div class="nav-item" id="nav-warehouse">
                     <button class="nav-link" onclick="showSection('warehouse')">
                         <i class="bi bi-building"></i>
                         Kho hàng
@@ -180,6 +189,7 @@
                         <div style="display:flex; gap:8px; align-items:center;">
                             <select id="dashboard-period" class="form-select" style="width:auto;"
                                 onchange="loadDashboard()">
+                                <option value="all">Tất cả</option>
                                 <option value="today">Hôm nay</option>
                                 <option value="week">Tuần này</option>
                                 <option value="month" selected>Tháng này</option>

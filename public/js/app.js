@@ -289,8 +289,9 @@ function applyRoleBasedUI(role) {
     // Normalize role to lowercase for comparison
     const normalizedRole = (role || '').toLowerCase();
     const isAdmin = normalizedRole === 'admin';
+    const isDriver = normalizedRole === 'driver';
 
-    console.log('🔐 Applying role-based UI:', { role, normalizedRole, isAdmin });
+    console.log('🔐 Applying role-based UI:', { role, normalizedRole, isAdmin, isDriver });
 
     // Hide/show elements with data-role="admin"
     document.querySelectorAll('[data-role="admin"]').forEach(el => {
@@ -300,6 +301,34 @@ function applyRoleBasedUI(role) {
     // Show nav-users for admin
     const navUsers = window.$('#nav-users');
     if (navUsers) navUsers.style.display = isAdmin ? 'block' : 'none';
+
+    // Driver restrictions - hide all menus except "Đơn của tôi"
+    if (isDriver) {
+        console.log('🚚 Driver mode: Hiding admin menus');
+
+        // Hide dashboard
+        const navDashboard = window.$('#nav-dashboard');
+        if (navDashboard) navDashboard.style.display = 'none';
+
+        // Hide order management items (keep only my-orders)
+        const navDispatch = window.$('#nav-dispatch');
+        const navCreateOrder = window.$('#nav-create-order');
+        const navOrderHistory = window.$('#nav-order-history');
+        if (navDispatch) navDispatch.style.display = 'none';
+        if (navCreateOrder) navCreateOrder.style.display = 'none';
+        if (navOrderHistory) navOrderHistory.style.display = 'none';
+
+        // Hide HR, Materials, Warehouse
+        const navHr = window.$('#nav-hr');
+        const navMaterials = window.$('#nav-materials');
+        const navWarehouse = window.$('#nav-warehouse');
+        if (navHr) navHr.style.display = 'none';
+        if (navMaterials) navMaterials.style.display = 'none';
+        if (navWarehouse) navWarehouse.style.display = 'none';
+    }
+
+    // Update my-orders badge for all roles
+    updateMyOrdersNavBadge();
 }
 
 // Load drivers from HR employees
@@ -362,17 +391,28 @@ async function forceSyncMisa() {
 // === DASHBOARD ===
 async function loadDashboard() {
     try {
-        // Get orders data
-        const res = await api.getOrders();
-        const allOrders = [...(res.pending || []), ...(res.assigned || []), ...(res.completed || [])];
-
         // Get period filter
         const periodSelect = window.$('#dashboard-period');
         const period = periodSelect?.value || 'month';
 
+        // Get orders data - include deleted/cancelled when viewing all
+        const includeDeleted = (period === 'all');
+        const res = await api.getOrders(includeDeleted);
+
+        // Combine all orders (pending + assigned + completed + cancelled if available)
+        const allOrders = [
+            ...(res.pending || []),
+            ...(res.assigned || []),
+            ...(res.completed || []),
+            ...(res.cancelled || [])
+        ];
+
         // Filter orders by period
         const now = new Date();
         const filteredOrders = allOrders.filter(order => {
+            // For 'all' period, include every order regardless of date
+            if (period === 'all') return true;
+
             const orderDate = new Date(order.ngay || order.sale_order_date || order.created_at);
             if (isNaN(orderDate.getTime())) return false;
 
@@ -391,11 +431,17 @@ async function loadDashboard() {
             }
         });
 
-        // Calculate stats
+        // Calculate stats from filtered orders
         const orderCount = filteredOrders.length;
         const orderValue = filteredOrders.reduce((sum, o) => sum + (parseFloat(o.amount || o.sale_order_amount) || 0), 0);
-        const pendingCount = (res.pending || []).length;
-        const completedCount = (res.completed || []).length;
+
+        // Calculate pending and completed from filtered orders
+        const pendingFromFiltered = filteredOrders.filter(o => !o.taiXe && o.status !== 'Đã hủy bỏ' && o.status !== 'Đã thực hiện').length;
+        const completedFromFiltered = filteredOrders.filter(o => o.status === 'Đã thực hiện').length;
+
+        // Use API counts for quick stats (not affected by period filter)
+        const pendingCount = pendingFromFiltered || (res.pending || []).length;
+        const completedCount = completedFromFiltered || (res.completed || []).length;
         const completedRate = orderCount > 0 ? Math.round((completedCount / orderCount) * 100) : 0;
 
         // Update stat cards
@@ -819,6 +865,49 @@ function getUnreadBadgeHtml(orderId, type = 'export') {
     return `<span class="chat-badge">${count > 99 ? '99+' : count}</span>`;
 }
 
+// Update My Orders nav badge with pending order count
+async function updateMyOrdersNavBadge() {
+    const badge = window.$('#my-orders-nav-badge');
+    if (!badge) return;
+
+    try {
+        // Get orders assigned to current driver
+        const res = await api.getOrders();
+        const driverName = state.user?.name || state.user?.fullName || '';
+
+        // Count orders assigned to this driver that are pending or in transit
+        let pendingCount = 0;
+
+        // Check assigned orders
+        if (res.assigned) {
+            pendingCount += res.assigned.filter(o => {
+                const orderDriver = o.taiXe || o.driver || o.custom_field13 || '';
+                return orderDriver.toLowerCase().includes(driverName.toLowerCase());
+            }).length;
+        }
+
+        // Also check pending orders if driver role
+        const normalizedRole = (state.user?.role || '').toLowerCase();
+        if (normalizedRole === 'driver' && res.pending) {
+            pendingCount += res.pending.filter(o => {
+                const orderDriver = o.taiXe || o.driver || o.custom_field13 || '';
+                return orderDriver.toLowerCase().includes(driverName.toLowerCase());
+            }).length;
+        }
+
+        console.log('📊 My Orders badge count:', pendingCount);
+
+        if (pendingCount > 0) {
+            badge.textContent = pendingCount > 99 ? '99+' : pendingCount;
+            badge.classList.add('show');
+        } else {
+            badge.classList.remove('show');
+        }
+    } catch (e) {
+        console.error('Update nav badge error:', e);
+    }
+}
+
 function searchOrders(keyword) {
     currentSearchKeyword = (keyword || '').toLowerCase().trim();
     renderDispatchOrders();
@@ -1211,6 +1300,9 @@ async function loadMyOrders() {
 
         console.log(`📦 Received ${orders.length} orders:`, orders.map(o => ({ id: o.soDon, status: o.status, statusCode: o.statusCode })));
 
+        // Load unread counts BEFORE rendering for chat badges
+        await loadUnreadCounts();
+
         // Separate into 3 categories using statusCode from backend
         const pending = orders.filter(o => o.statusCode === 'CHO_NHAN' || o.status === 'assigned');
         const delivering = orders.filter(o => o.statusCode === 'DANG_GIAO' || o.status === 'in_transit' || o.status === 'DELIVERING');
@@ -1267,11 +1359,15 @@ function renderMyOrdersList(containerId, orders, type) {
     };
     const badgeTexts = { pending: 'Chờ nhận', delivering: 'Đang giao', completed: 'Hoàn thành' };
 
-    container.innerHTML = orders.map(order => `
-        <div class="order-card" style="margin-bottom:12px; border-left:4px solid ${type === 'pending' ? 'var(--warning)' : type === 'delivering' ? 'var(--info)' : 'var(--success)'};">
+    container.innerHTML = orders.map(order => {
+        const orderId = order.soDon || order.orderCode || order.id;
+        const chatBadge = getUnreadBadgeHtml(orderId, 'export');
+        return `
+        <div class="order-card" style="margin-bottom:12px; border-left:4px solid ${type === 'pending' ? 'var(--warning)' : type === 'delivering' ? 'var(--info)' : 'var(--success)'}; position:relative;">
+            ${chatBadge}
             <div class="order-card-header">
                 <div>
-                    <div class="order-id" style="font-size:16px; font-weight:700;">#${order.soDon || order.orderCode || order.id}</div>
+                    <div class="order-id" style="font-size:16px; font-weight:700;">#${orderId}</div>
                     <div class="order-customer" style="font-size:14px; color:var(--text-secondary);">${order.khach || order.customerName || order.accountName || 'Khách hàng'}</div>
                 </div>
                 <span class="badge" style="${badgeStyles[type]}">${badgeTexts[type]}</span>
@@ -1315,7 +1411,8 @@ function renderMyOrdersList(containerId, orders, type) {
                 </div>
             </div>
         </div>
-    `).join('');
+    `;
+    }).join('');
 }
 
 // Switch tabs in My Orders section
@@ -1673,12 +1770,15 @@ async function viewOrderDetail(orderId) {
             
             <!--ACTION BUTTONS-->
         <div style="margin-top:20px; padding-top:16px; border-top:1px solid var(--border); display:flex; gap:8px; flex-wrap:wrap;">
-            ${order.status === 'Mới' || order.status === 'Chưa thực hiện' ? `
+            ${isAdminRole() && (order.status === 'Mới' || order.status === 'Chưa thực hiện') ? `
                     <button class="btn btn-primary" onclick="closeOrderModal(); assignDriver('${order.id}')">
                         <i class="bi bi-person-plus"></i> Phân công tài xế
                     </button>
                 ` : ''}
             ${(order.status === 'Đang thực hiện' || order.status === 'Chờ giao' || order.status === 'assigned') && isAdminRole() ? `
+                    <button class="btn btn-info" onclick="closeOrderModal(); assignDriver('${order.id}')" style="background:var(--info); color:white;">
+                        <i class="bi bi-person-gear"></i> Đổi tài xế
+                    </button>
                     <button class="btn btn-success" onclick="showDriverCompletionModal('${order.id}')">
                         <i class="bi bi-check-circle"></i> Hoàn thành
                     </button>
@@ -1726,8 +1826,13 @@ function assignDriver(orderId) {
 
     console.log('assignDriver called with:', orderId);
 
-    // Find order from pending - robust matching
-    const order = (state.orders.pending || []).find(o => {
+    // Find order from pending OR assigned - admin can reassign drivers
+    const allOrdersForAssign = [
+        ...(state.orders.pending || []),
+        ...(state.orders.assigned || [])
+    ];
+
+    const order = allOrdersForAssign.find(o => {
         const oIdStr = String(o.id);
         const searchIdStr = String(orderId);
         return oIdStr === searchIdStr ||

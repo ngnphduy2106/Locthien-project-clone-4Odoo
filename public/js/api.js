@@ -41,8 +41,9 @@ const api = {
     },
 
     // === ORDERS ===
-    getOrders: async () => {
-        const res = await fetch(`${API_BASE}/orders`);
+    getOrders: async (includeDeleted = false) => {
+        const url = includeDeleted ? `${API_BASE}/orders?includeDeleted=true` : `${API_BASE}/orders`;
+        const res = await fetch(url);
         return res.json();
     },
 

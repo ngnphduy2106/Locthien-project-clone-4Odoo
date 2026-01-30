@@ -5,11 +5,41 @@
 const MyOrdersModule = {
     orders: [],
     currentUser: null,
+    unreadCounts: {}, // Store unread message counts per order
 
     // Khởi tạo module
     init() {
         console.log('My Orders Module initialized');
         this.loadMyOrders();
+    },
+
+    // Load unread message counts for orders
+    async loadUnreadCounts() {
+        try {
+            const userStr = localStorage.getItem('user');
+            if (!userStr) return;
+
+            const user = JSON.parse(userStr);
+            const userId = user.name || user.phone || '';
+            if (!userId) return;
+
+            const response = await fetch(`/api/chat/unread-counts?userId=${encodeURIComponent(userId)}`);
+            const data = await response.json();
+
+            if (!data.error && data.counts) {
+                this.unreadCounts = data.counts;
+                console.log('💬 My Orders: Loaded unread counts:', this.unreadCounts);
+            }
+        } catch (e) {
+            console.error('Load unread counts error:', e);
+        }
+    },
+
+    // Get HTML for unread badge on order card
+    getUnreadBadgeHtml(orderId) {
+        const count = this.unreadCounts[orderId] || 0;
+        if (count === 0) return '';
+        return `<span class="chat-badge">${count > 99 ? '99+' : count}</span>`;
     },
 
     // Load đơn hàng của tôi
@@ -31,6 +61,10 @@ const MyOrdersModule = {
             }
 
             this.orders = data.orders || [];
+
+            // Load unread counts before rendering
+            await this.loadUnreadCounts();
+
             this.renderOrders();
         } catch (error) {
             console.error('Error loading my orders:', error);
@@ -118,9 +152,11 @@ const MyOrdersModule = {
     // Render order card
     renderOrderCard(order) {
         const isDelivering = order.status === 'Đang giao' || order.status === 'DELIVERING';
+        const orderId = order.id || order.order_id;
 
         return `
-            <div class="order-card">
+            <div class="order-card" style="position:relative;">
+                ${this.getUnreadBadgeHtml(orderId)}
                 <div class="order-header">
                     <div>
                         <div class="order-id">#${order.id || order.order_id}</div>
@@ -156,20 +192,41 @@ const MyOrdersModule = {
         }
 
         try {
+            // Get order details
+            const order = this.orders.find(o => (o.id || o.order_id) === orderId);
+            const products = order?.products || order?.items || [];
+
+            // Build cart from order products (driver flow)
+            const cart = products.map(p => ({
+                product: {
+                    code: p.code || p.material_code || '',
+                    name: p.name || p.material_name || ''
+                },
+                weight_kg: p.qty || p.quantity || 0,
+                unit: p.unit || 'kg'
+            }));
+
+            // Get driver info from localStorage
+            const userStr = localStorage.getItem('user');
+            const user = userStr ? JSON.parse(userStr) : {};
+            const driverName = user.name || user.fullName || localStorage.getItem('userName') || 'Driver';
+            const plate = user.plate || '';
+
+            // Call API with proper driver complete payload
             const response = await fetch(`/api/orders/${orderId}/complete`, {
-                method: 'POST',  // Changed from PUT to POST
+                method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    type: 'NHAP',
+                    type: 'XUAT',  // Export order
                     warehouse: 'LT1',
-                    partner: 'Khách hàng',
-                    driver_name: localStorage.getItem('userName') || 'Driver',
-                    plate: '',
-                    cart: [],
+                    partner: order?.customer || order?.customer_name || 'Khách hàng',
+                    driver_name: driverName,
+                    plate: plate,
+                    cart: cart,  // Actual products
                     note: '',
-                    sender: ''
+                    sender: driverName
                 })
             });
 
@@ -180,7 +237,7 @@ const MyOrdersModule = {
                 return;
             }
 
-            alert('Đã hoàn thành đơn hàng!');
+            alert('✅ Đã hoàn thành đơn hàng!');
             this.loadMyOrders(); // Reload
 
         } catch (error) {
