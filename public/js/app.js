@@ -1735,6 +1735,28 @@ async function viewOrderDetail(orderId) {
             
             ${order.note ? `<div style="margin-top:16px; padding:12px; background:var(--body-bg); border-radius:8px;"><strong>Ghi chú:</strong> ${order.note}</div>` : ''}
             
+            <!-- PROOF IMAGES SECTION -->
+            <div style="margin-top:24px; border-top:1px solid var(--border); padding-top:16px;">
+                <h4 style="margin: 0 0 12px; font-size:14px; color:var(--text-secondary); display:flex; justify-content:space-between; align-items:center;">
+                    <span><i class="bi bi-images" style="margin-right:6px;"></i> Ảnh chứng minh</span>
+                    <span id="proofImagesCount" style="font-size:12px; color:var(--text-muted);"></span>
+                </h4>
+                <div id="proofImagesGallery" style="display:flex; flex-wrap:wrap; gap:8px; min-height:80px; padding:12px; background:var(--body-bg); border-radius:8px; border:1px dashed var(--border);">
+                    <div style="text-align:center; width:100%; color:var(--text-muted); padding:20px;">
+                        <i class="bi bi-hourglass-split"></i> Đang tải ảnh...
+                    </div>
+                </div>
+                ${isAdminRole() ? `
+                <div style="margin-top:12px;">
+                    <label style="display:inline-flex; align-items:center; gap:8px; padding:8px 16px; background:var(--success); color:white; border-radius:8px; cursor:pointer; font-size:13px;">
+                        <i class="bi bi-plus-circle"></i> Bổ sung ảnh
+                        <input type="file" accept="image/*" multiple onchange="handleAddProofImages(this, '${order.id}')" style="display:none;">
+                    </label>
+                    <span style="margin-left:8px; font-size:12px; color:var(--text-muted);">Tối đa 10 ảnh</span>
+                </div>
+                ` : ''}
+            </div>
+            
             <!-- CHAT SECTION -->
             <div style="margin-top:24px; border-top:1px solid var(--border); padding-top:16px;">
                 <h4 style="margin: 0 0 12px; font-size:14px; color:var(--text-secondary); display:flex; justify-content:space-between; align-items:center;">
@@ -1799,6 +1821,9 @@ async function viewOrderDetail(orderId) {
         currentChatOrderId = order.soDon || order.sale_order_no || order.id;
         loadOrderChat(currentChatOrderId); // Load messages immediately
         startChatRefresh();
+
+        // Load proof images
+        loadProofImages(order.id);
     }
 
     if (modal) modal.classList.remove('hidden');
@@ -4801,3 +4826,183 @@ window.startOrder = startOrder;
 window.completeOrder = completeOrder;
 window.loadMyOrders = loadMyOrders;
 window.viewOrderDetail = viewOrderDetail;
+
+// ===============================================
+// PROOF IMAGES VIEWING & ADDING
+// ===============================================
+
+// Load proof images for order detail modal
+async function loadProofImages(orderId) {
+    const gallery = window.$('#proofImagesGallery');
+    const counter = window.$('#proofImagesCount');
+
+    if (!gallery) return;
+
+    try {
+        const res = await fetch(`/api/orders/${orderId}/proof-images`);
+        const data = await res.json();
+
+        const images = data.images || [];
+
+        if (counter) {
+            counter.textContent = images.length > 0 ? `${images.length}/10 ảnh` : '';
+        }
+
+        if (images.length === 0) {
+            gallery.innerHTML = `
+                <div style="text-align:center; width:100%; color:var(--text-muted); padding:20px;">
+                    <i class="bi bi-camera-slash" style="font-size:24px;"></i>
+                    <p style="margin-top:8px;">Chưa có ảnh chứng minh</p>
+                </div>
+            `;
+            return;
+        }
+
+        gallery.innerHTML = images.map((src, idx) => `
+            <div style="position:relative;">
+                <img src="${src}" 
+                     style="width:80px; height:80px; object-fit:cover; border-radius:8px; cursor:pointer; border:2px solid var(--border); transition:transform 0.2s;"
+                     onclick="viewProofImage(${idx})"
+                     onmouseover="this.style.transform='scale(1.05)'"
+                     onmouseout="this.style.transform='scale(1)'"
+                     title="Click để xem lớn">
+            </div>
+        `).join('');
+
+        // Store images globally for viewer
+        window._currentProofImages = images;
+
+    } catch (e) {
+        console.error('Load proof images error:', e);
+        gallery.innerHTML = `
+            <div style="text-align:center; width:100%; color:var(--text-muted); padding:20px;">
+                <i class="bi bi-exclamation-triangle" style="color:var(--warning);"></i> Lỗi tải ảnh
+            </div>
+        `;
+    }
+}
+
+// View proof image in full size lightbox
+function viewProofImage(idx) {
+    const images = window._currentProofImages || [];
+    if (!images[idx]) return;
+
+    const existingViewer = document.getElementById('proof-image-viewer');
+    if (existingViewer) existingViewer.remove();
+
+    const viewer = document.createElement('div');
+    viewer.id = 'proof-image-viewer';
+    viewer.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:10001; display:flex; align-items:center; justify-content:center; flex-direction:column;';
+
+    const hasMultiple = images.length > 1;
+
+    viewer.innerHTML = `
+        <div style="position:absolute; top:20px; right:20px; display:flex; gap:12px;">
+            <span style="color:white; font-size:14px; padding:8px 16px; background:rgba(255,255,255,0.2); border-radius:20px;">${idx + 1} / ${images.length}</span>
+            <button onclick="document.getElementById('proof-image-viewer').remove()" 
+                style="width:40px; height:40px; border-radius:50%; background:rgba(255,255,255,0.2); color:white; border:none; cursor:pointer; font-size:20px;">×</button>
+        </div>
+        
+        ${hasMultiple ? `
+        <button onclick="navigateProofImage(-1, ${idx}, ${images.length})" 
+            style="position:absolute; left:20px; top:50%; transform:translateY(-50%); width:50px; height:50px; border-radius:50%; background:rgba(255,255,255,0.2); color:white; border:none; cursor:pointer; font-size:24px;">
+            ‹
+        </button>
+        <button onclick="navigateProofImage(1, ${idx}, ${images.length})" 
+            style="position:absolute; right:20px; top:50%; transform:translateY(-50%); width:50px; height:50px; border-radius:50%; background:rgba(255,255,255,0.2); color:white; border:none; cursor:pointer; font-size:24px;">
+            ›
+        </button>
+        ` : ''}
+        
+        <img id="proof-image-main" src="${images[idx]}" style="max-width:90%; max-height:85%; border-radius:8px; box-shadow:0 4px 30px rgba(0,0,0,0.5);">
+    `;
+
+    viewer.onclick = (e) => {
+        if (e.target === viewer) viewer.remove();
+    };
+
+    document.body.appendChild(viewer);
+}
+
+// Navigate between proof images
+function navigateProofImage(direction, currentIdx, total) {
+    const images = window._currentProofImages || [];
+    let newIdx = currentIdx + direction;
+    if (newIdx < 0) newIdx = total - 1;
+    if (newIdx >= total) newIdx = 0;
+
+    const mainImg = document.getElementById('proof-image-main');
+    const viewer = document.getElementById('proof-image-viewer');
+
+    if (mainImg && images[newIdx]) {
+        mainImg.src = images[newIdx];
+
+        // Update counter
+        const counterSpan = viewer.querySelector('span');
+        if (counterSpan) counterSpan.textContent = `${newIdx + 1} / ${total}`;
+
+        // Update navigation buttons
+        const leftBtn = viewer.querySelector('button:nth-of-type(2)');
+        const rightBtn = viewer.querySelector('button:nth-of-type(3)');
+        if (leftBtn) leftBtn.setAttribute('onclick', `navigateProofImage(-1, ${newIdx}, ${total})`);
+        if (rightBtn) rightBtn.setAttribute('onclick', `navigateProofImage(1, ${newIdx}, ${total})`);
+    }
+}
+
+// Handle adding more proof images
+async function handleAddProofImages(input, orderId) {
+    const files = Array.from(input.files || []);
+    if (!files.length) return;
+
+    showLoading('Đang xử lý ảnh...');
+
+    const images = [];
+    for (const file of files.slice(0, 10)) {
+        try {
+            const compressed = await compressImage(file, 1200, 0.8);
+            images.push(compressed);
+        } catch (err) {
+            console.error('Image compression error:', err);
+        }
+    }
+
+    if (images.length === 0) {
+        hideLoading();
+        alert('Không thể xử lý ảnh!');
+        return;
+    }
+
+    try {
+        const res = await fetch(`/api/orders/${orderId}/add-proof-images`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ images })
+        });
+
+        const data = await res.json();
+        hideLoading();
+
+        if (data.error) {
+            alert('Lỗi: ' + data.msg);
+            return;
+        }
+
+        alert(data.msg || 'Đã thêm ảnh thành công!');
+
+        // Reload proof images
+        loadProofImages(orderId);
+
+    } catch (e) {
+        hideLoading();
+        alert('Lỗi kết nối: ' + e.message);
+    }
+
+    // Clear input
+    input.value = '';
+}
+
+// Export proof images functions
+window.loadProofImages = loadProofImages;
+window.viewProofImage = viewProofImage;
+window.navigateProofImage = navigateProofImage;
+window.handleAddProofImages = handleAddProofImages;

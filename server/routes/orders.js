@@ -660,6 +660,49 @@ router.post('/:id/complete', async (req, res) => {
             return res.json(createResponse(true, 'Không tìm thấy đơn hàng!'));
         }
 
+        // Create export ticket for Admin Complete (so images can be added later)
+        try {
+            const { createClient } = await import('@supabase/supabase-js');
+            const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+            const fullOrderForTicket = await db.getOrder(id);
+
+            const ts = new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14);
+            const ticketNo = 'X' + ts;
+
+            // Check if export ticket already exists
+            const { data: existingTicket } = await supabase
+                .from('export_tickets')
+                .select('id')
+                .eq('order_id', id)
+                .limit(1)
+                .single();
+
+            if (!existingTicket) {
+                const orderProducts = products || fullOrderForTicket?.cart || fullOrderForTicket?.products || [];
+                const totalQty = orderProducts.reduce((sum, p) => sum + Number(p.qty || p.quantity || 0), 0);
+
+                await supabase.from('export_tickets').insert({
+                    ticket_no: ticketNo,
+                    order_id: id,
+                    order_no: fullOrderForTicket?.soDon || fullOrderForTicket?.sale_order_no || id,
+                    customer_name: fullOrderForTicket?.khach || fullOrderForTicket?.account_name || '',
+                    customer_address: fullOrderForTicket?.diaChi || fullOrderForTicket?.shipping_address || '',
+                    driver_name: fullOrderForTicket?.taiXe || fullOrderForTicket?.driver || 'Admin',
+                    plate: fullOrderForTicket?.bienSo || fullOrderForTicket?.plate || '',
+                    warehouse: 'LT1',
+                    products: orderProducts,
+                    total_qty: totalQty,
+                    note: delivery_note || '',
+                    images: images || [], // Store images if provided
+                    created_by: 'Admin Complete'
+                });
+                console.log(`📦 Export ticket created for Admin Complete: ${ticketNo}`);
+            }
+        } catch (ticketErr) {
+            console.error('Export ticket creation error:', ticketErr.message);
+            // Don't fail the completion - just log the error
+        }
+
         // Sync to MISA
         const fullOrder = await db.getOrder(id);
         console.log(`📤 Complete Order Sync - Order: ${fullOrder?.sale_order_no}, Cart items: ${(products || fullOrder?.cart || []).length}`);
@@ -760,6 +803,143 @@ router.post('/:id/assign-multi', async (req, res) => {
     }
 });
 
+
+// GET /api/orders/:id/proof-images - Get proof images from export ticket
+router.get('/:id/proof-images', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { createClient } = await import('@supabase/supabase-js');
+        const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+        // Try to find by order_id or order_no
+        let { data, error } = await supabase
+            .from('export_tickets')
+            .select('ticket_no, images, created_at, driver_name')
+            .eq('order_id', id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+
+        // If not found by order_id, try by order_no
+        if (error || !data) {
+            const orderInfo = await db.getOrder(id);
+            if (orderInfo?.soDon) {
+                const result = await supabase
+                    .from('export_tickets')
+                    .select('ticket_no, images, created_at, driver_name')
+                    .eq('order_no', orderInfo.soDon)
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .single();
+
+                if (!result.error) data = result.data;
+            }
+        }
+
+        res.json({
+            error: false,
+            images: data?.images || [],
+            ticket_no: data?.ticket_no || null,
+            created_at: data?.created_at || null,
+            driver_name: data?.driver_name || null
+        });
+    } catch (e) {
+        console.error('Get proof images error:', e.message);
+        res.json({ error: false, images: [] }); // Return empty array on error
+    }
+});
+
+// POST /api/orders/:id/add-proof-images - Add more proof images to completed order
+router.post('/:id/add-proof-images', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { images } = req.body;
+
+        if (!images || !Array.isArray(images) || images.length === 0) {
+            return res.json(createResponse(true, 'Vui lòng chọn ít nhất 1 ảnh!'));
+        }
+
+        const { createClient } = await import('@supabase/supabase-js');
+        const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+        // Find existing export ticket
+        let { data: ticket, error } = await supabase
+            .from('export_tickets')
+            .select('id, images')
+            .eq('order_id', id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+
+        // If not found by order_id, try by order_no
+        if (error || !ticket) {
+            const orderInfo = await db.getOrder(id);
+            if (orderInfo?.soDon) {
+                const result = await supabase
+                    .from('export_tickets')
+                    .select('id, images')
+                    .eq('order_no', orderInfo.soDon)
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .single();
+
+                if (!result.error) ticket = result.data;
+            }
+        }
+
+        if (!ticket) {
+            // No export ticket exists - create one with just images
+            const orderInfo = await db.getOrder(id);
+            const ts = new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14);
+
+            const { error: insertError } = await supabase.from('export_tickets').insert({
+                ticket_no: 'X' + ts,
+                order_id: id,
+                order_no: orderInfo?.soDon || id,
+                customer_name: orderInfo?.khach || orderInfo?.account_name || '',
+                customer_address: orderInfo?.diaChi || '',
+                driver_name: orderInfo?.taiXe || 'Admin',
+                plate: orderInfo?.bienSo || '',
+                warehouse: 'LT1',
+                products: orderInfo?.cart || [],
+                images: images.slice(0, 10), // Max 10 images
+                created_by: 'Admin (bổ sung)'
+            });
+
+            if (insertError) {
+                return res.json(createResponse(true, 'Lỗi tạo phiếu: ' + insertError.message));
+            }
+
+            return res.json(createResponse(false, `Đã thêm ${images.length} ảnh chứng minh!`));
+        }
+
+        // Ticket exists - append new images
+        const existingImages = ticket.images || [];
+        const totalAllowed = 10 - existingImages.length;
+
+        if (totalAllowed <= 0) {
+            return res.json(createResponse(true, 'Đã đạt giới hạn 10 ảnh!'));
+        }
+
+        const newImages = images.slice(0, totalAllowed);
+        const updatedImages = [...existingImages, ...newImages];
+
+        const { error: updateError } = await supabase
+            .from('export_tickets')
+            .update({ images: updatedImages })
+            .eq('id', ticket.id);
+
+        if (updateError) {
+            return res.json(createResponse(true, 'Lỗi cập nhật: ' + updateError.message));
+        }
+
+        res.json(createResponse(false, `Đã thêm ${newImages.length} ảnh (${updatedImages.length}/10)!`));
+
+    } catch (e) {
+        console.error('Add proof images error:', e.message);
+        res.json(createResponse(true, 'Lỗi: ' + e.message));
+    }
+});
 
 // GET /api/orders/:id/chat - Get chat messages
 router.get('/:id/chat', async (req, res) => {
