@@ -269,10 +269,8 @@ const performSync = async () => {
     }
 
     // 2. Get Existing Orders from DB to check for duplicates
-    // Optimization: In a huge DB we wouldn't fetch all, but for now it matches the n8n logic
-    // We can optimize by fetching IDs only if possible, or simple cache. 
-    // Since db.getOrders() returns all, we use it.
-    const dbOrders = await db.getOrders();
+    // Include deleted orders so we can compare against MISA for sync
+    const dbOrders = await db.getOrders(true); // true = includeDeleted
     const existingIds = new Set(dbOrders.map(o => o.soDon || o.id));
 
     let newCount = 0;
@@ -314,9 +312,9 @@ const performSync = async () => {
                 const hasProducts = existingOrder.products && existingOrder.products.length > 0;
                 const hasZeroQty = hasProducts && existingOrder.products.some(p => p.qty === 0);
                 const hasMisaId = !!existingOrder.misa_id;
-                
+
                 // 2. Check if products are missing price data (force update to get prices)
-                const hasMissingPrice = hasProducts && existingOrder.products.some(p => 
+                const hasMissingPrice = hasProducts && existingOrder.products.some(p =>
                     (p.price === undefined || p.price === null || p.price === 0) &&
                     (p.total === undefined || p.total === null || p.total === 0)
                 );
@@ -455,7 +453,47 @@ const performSync = async () => {
         console.log(`✅ Synced/Updated Order: ${saleOrderNo}`);
     }
 
-    console.log(`✨ Sync Complete. New Orders: ${newCount}`);
+    // ============================================
+    // PHASE 2: Soft Delete - Mark orders that no longer exist in MISA as 'Đã hủy bỏ'
+    // ============================================
+    console.log('🗑️ Checking for deleted orders...');
+
+    // Build set of MISA order IDs for fast lookup
+    const misaOrderIds = new Set(misaOrders.map(o => o.sale_order_no || o.SaleOrderNo));
+
+    let softDeletedCount = 0;
+    for (const dbOrder of dbOrders) {
+        const orderId = dbOrder.soDon || dbOrder.sale_order_no || dbOrder.id;
+
+        // Skip orders without proper ID
+        if (!orderId) continue;
+
+        // Skip orders that are NOT from MISA (local orders don't have misa_id)
+        if (!dbOrder.misa_id) continue;
+
+        // Skip orders already marked as cancelled
+        if (dbOrder.status === 'Đã hủy bỏ') continue;
+
+        // If order exists in DB but NOT in MISA -> it was deleted on MISA
+        if (!misaOrderIds.has(orderId)) {
+            console.log(`🗑️ Soft deleting order ${orderId} (removed from MISA)...`);
+            try {
+                await db.updateOrder(orderId, {
+                    status: 'Đã hủy bỏ',
+                    delivery_status: 'Đã hủy bỏ'
+                });
+                softDeletedCount++;
+            } catch (e) {
+                console.error(`❌ Failed to soft delete ${orderId}:`, e.message);
+            }
+        }
+    }
+
+    if (softDeletedCount > 0) {
+        console.log(`🗑️ Soft deleted ${softDeletedCount} orders that were removed from MISA.`);
+    }
+
+    console.log(`✨ Sync Complete. New: ${newCount}, Soft Deleted: ${softDeletedCount}`);
 };
 
 // ============================================================

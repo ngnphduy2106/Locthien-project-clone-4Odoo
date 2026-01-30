@@ -15,7 +15,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
 
     <!-- Custom Styles -->
-    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="/css/styles.css?v=19">
 </head>
 
 <body>
@@ -120,6 +120,14 @@
                     <button class="nav-link" onclick="showSection('warehouse')">
                         <i class="bi bi-building"></i>
                         Kho hàng
+                    </button>
+                </div>
+
+                <!-- Quản lý tài khoản (Admin Only) -->
+                <div class="nav-item" id="nav-users" style="display:none;">
+                    <button class="nav-link" onclick="showSection('users')">
+                        <i class="bi bi-person-gear"></i>
+                        Quản lý tài khoản
                     </button>
                 </div>
             </nav>
@@ -542,46 +550,77 @@
                 <section id="section-my-orders" class="hidden">
                     <h2 class="page-heading">Đơn Của Tôi</h2>
 
-                    <!-- Stat Cards -->
-                    <div class="stat-cards" style="grid-template-columns: repeat(2, 1fr);">
-                        <div class="stat-card">
+                    <!-- Stat Cards - 3 columns -->
+                    <div class="stat-cards" style="grid-template-columns: repeat(3, 1fr); margin-bottom:20px;">
+                        <div class="stat-card" style="background: linear-gradient(135deg, #ffa94d, #fd7e14);">
                             <div class="stat-card-content">
-                                <div class="stat-card-label">Đang giao</div>
-                                <div class="stat-card-value" id="my-orders-delivering">0</div>
+                                <div class="stat-card-label" style="color:#fff; opacity:0.9;">Chờ nhận</div>
+                                <div class="stat-card-value" id="my-orders-pending" style="color:#fff; font-size:2rem;">
+                                    0</div>
                             </div>
-                            <div class="stat-card-icon blue">
-                                <i class="bi bi-truck"></i>
+                            <div class="stat-card-icon" style="background:rgba(255,255,255,0.2);">
+                                <i class="bi bi-inbox" style="color:white;"></i>
                             </div>
                         </div>
 
-                        <div class="stat-card">
+                        <div class="stat-card" style="background: linear-gradient(135deg, #4dabf7, #339af0);">
                             <div class="stat-card-content">
-                                <div class="stat-card-label">Đã hoàn thành</div>
-                                <div class="stat-card-value" id="my-orders-completed">0</div>
+                                <div class="stat-card-label" style="color:#fff; opacity:0.9;">Đang giao</div>
+                                <div class="stat-card-value" id="my-orders-delivering"
+                                    style="color:#fff; font-size:2rem;">0</div>
                             </div>
-                            <div class="stat-card-icon purple">
-                                <i class="bi bi-check-circle"></i>
+                            <div class="stat-card-icon" style="background:rgba(255,255,255,0.2);">
+                                <i class="bi bi-truck" style="color:white;"></i>
+                            </div>
+                        </div>
+
+                        <div class="stat-card" style="background: linear-gradient(135deg, #51cf66, #40c057);">
+                            <div class="stat-card-content">
+                                <div class="stat-card-label" style="color:#fff; opacity:0.9;">Đã giao</div>
+                                <div class="stat-card-value" id="my-orders-completed"
+                                    style="color:#fff; font-size:2rem;">0</div>
+                            </div>
+                            <div class="stat-card-icon" style="background:rgba(255,255,255,0.2);">
+                                <i class="bi bi-check-circle" style="color:white;"></i>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Delivering Orders -->
-                    <div style="margin-top: 24px;">
-                        <h4 style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px; font-size: 16px;">
-                            <i class="bi bi-truck" style="color: var(--info);"></i>
-                            Đơn đang giao
-                        </h4>
+                    <!-- Tab Navigation -->
+                    <div class="tab-nav" style="margin-bottom:20px;">
+                        <button class="tab-btn active" onclick="switchMyOrdersTab('pending')" id="my-tab-pending">
+                            <i class="bi bi-inbox"></i> Chờ nhận
+                            <span class="badge" id="pending-badge"
+                                style="margin-left:6px; background:var(--warning); color:white; border-radius:12px; padding:2px 8px; font-size:11px;">0</span>
+                        </button>
+                        <button class="tab-btn" onclick="switchMyOrdersTab('delivering')" id="my-tab-delivering">
+                            <i class="bi bi-truck"></i> Đang giao
+                            <span class="badge" id="delivering-badge"
+                                style="margin-left:6px; background:var(--info); color:white; border-radius:12px; padding:2px 8px; font-size:11px;">0</span>
+                        </button>
+                        <button class="tab-btn" onclick="switchMyOrdersTab('completed')" id="my-tab-completed">
+                            <i class="bi bi-check-circle"></i> Đã giao
+                            <span class="badge" id="completed-badge"
+                                style="margin-left:6px; background:var(--success); color:white; border-radius:12px; padding:2px 8px; font-size:11px;">0</span>
+                        </button>
+                    </div>
+
+                    <!-- Tab Content: Pending Orders -->
+                    <div id="my-orders-tab-pending">
+                        <div id="my-orders-pending-list">
+                            <!-- Orders will be rendered here -->
+                        </div>
+                    </div>
+
+                    <!-- Tab Content: Delivering Orders -->
+                    <div id="my-orders-tab-delivering" class="hidden">
                         <div id="my-orders-delivering-list">
                             <!-- Orders will be rendered here -->
                         </div>
                     </div>
 
-                    <!-- Completed Orders -->
-                    <div style="margin-top: 32px;">
-                        <h4 style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px; font-size: 16px;">
-                            <i class="bi bi-check-circle" style="color: var(--success);"></i>
-                            Đơn đã hoàn thành
-                        </h4>
+                    <!-- Tab Content: Completed Orders -->
+                    <div id="my-orders-tab-completed" class="hidden">
                         <div id="my-orders-completed-list">
                             <!-- Orders will be rendered here -->
                         </div>
@@ -648,6 +687,69 @@
                     </div>
                 </section>
 
+                <!-- ==================== USERS MANAGEMENT SECTION (ADMIN ONLY) ==================== -->
+                <section id="section-users" class="hidden">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                        <h2 class="page-heading" style="margin-bottom:0;">Quản lý Tài khoản</h2>
+                        <button class="btn btn-primary" onclick="showCreateUserModal()">
+                            <i class="bi bi-person-plus"></i> Tạo tài khoản
+                        </button>
+                    </div>
+
+                    <!-- User Stats Cards -->
+                    <div class="stat-cards" style="grid-template-columns: repeat(4, 1fr); margin-bottom:24px;">
+                        <div class="stat-card" style="background: linear-gradient(135deg, #667eea, #764ba2);">
+                            <div class="stat-card-content">
+                                <div class="stat-card-label" style="color:#fff; opacity:0.9;">Tổng tài khoản</div>
+                                <div class="stat-card-value" id="stat-total-users" style="color:#fff; font-size:2rem;">0
+                                </div>
+                            </div>
+                        </div>
+                        <div class="stat-card" style="background: linear-gradient(135deg, #51cf66, #40c057);">
+                            <div class="stat-card-content">
+                                <div class="stat-card-label" style="color:#fff; opacity:0.9;">Đang hoạt động</div>
+                                <div class="stat-card-value" id="stat-active-users" style="color:#fff; font-size:2rem;">
+                                    0</div>
+                            </div>
+                        </div>
+                        <div class="stat-card" style="background: linear-gradient(135deg, #ffa94d, #fd7e14);">
+                            <div class="stat-card-content">
+                                <div class="stat-card-label" style="color:#fff; opacity:0.9;">Tài xế</div>
+                                <div class="stat-card-value" id="stat-driver-users" style="color:#fff; font-size:2rem;">
+                                    0</div>
+                            </div>
+                        </div>
+                        <div class="stat-card" style="background: linear-gradient(135deg, #845ef7, #7950f2);">
+                            <div class="stat-card-content">
+                                <div class="stat-card-label" style="color:#fff; opacity:0.9;">Admin</div>
+                                <div class="stat-card-value" id="stat-admin-users" style="color:#fff; font-size:2rem;">0
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Users Table -->
+                    <div class="card">
+                        <div class="card-body" style="padding: 0;">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Họ tên</th>
+                                        <th>Tài khoản</th>
+                                        <th>Vai trò</th>
+                                        <th>Biển số</th>
+                                        <th>Trạng thái</th>
+                                        <th>Thao tác</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="users-table-body">
+                                    <!-- Rows will be rendered here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
             </div>
         </main>
     </div>
@@ -679,12 +781,142 @@
         </div>
     </div>
 
+    <!-- Create User Modal -->
+    <div id="modal-create-user" class="modal-overlay hidden" onclick="closeCreateUserModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()" style="max-width:500px;">
+            <div class="modal-header" style="background:linear-gradient(135deg, #667eea, #764ba2); color:white;">
+                <h3><i class="bi bi-person-plus"></i> Tạo tài khoản mới</h3>
+                <button class="modal-close" onclick="closeCreateUserModal()" style="color:white;">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+            <div class="modal-body" style="padding:24px;">
+                <div class="form-group">
+                    <label class="form-label"><i class="bi bi-person"></i> Họ tên <span
+                            style="color:var(--danger);">*</span></label>
+                    <input type="text" id="new-user-fullname" class="form-control" placeholder="Nhập họ tên đầy đủ">
+                </div>
+                <div class="form-group">
+                    <label class="form-label"><i class="bi bi-phone"></i> Số điện thoại <span
+                            style="color:var(--danger);">*</span></label>
+                    <input type="text" id="new-user-phone" class="form-control" placeholder="VD: 0901234567">
+                </div>
+                <div class="form-group">
+                    <label class="form-label"><i class="bi bi-key"></i> Mật khẩu</label>
+                    <input type="password" id="new-user-password" class="form-control"
+                        placeholder="Để trống sẽ dùng 6 số cuối SĐT">
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+                    <div class="form-group" style="margin:0;">
+                        <label class="form-label"><i class="bi bi-shield"></i> Vai trò</label>
+                        <select id="new-user-role" class="form-select">
+                            <option value="DRIVER">Tài xế</option>
+                            <option value="STAFF">Nhân viên</option>
+                            <option value="ADMIN">Admin</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin:0;">
+                        <label class="form-label"><i class="bi bi-truck"></i> Biển số xe</label>
+                        <input type="text" id="new-user-plate" class="form-control" placeholder="VD: 51D-123.45">
+                    </div>
+                </div>
+                <div style="display:flex; gap:12px; margin-top:24px;">
+                    <button class="btn btn-outline" onclick="closeCreateUserModal()" style="flex:1;">
+                        <i class="bi bi-x"></i> Hủy
+                    </button>
+                    <button class="btn btn-primary" onclick="submitCreateUser()"
+                        style="flex:2; background:linear-gradient(135deg, #667eea, #764ba2);">
+                        <i class="bi bi-check-lg"></i> Tạo tài khoản
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit User Modal -->
+    <div id="modal-edit-user" class="modal-overlay hidden" onclick="closeEditUserModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()" style="max-width:500px;">
+            <div class="modal-header" style="background:linear-gradient(135deg, #f59e0b, #d97706); color:white;">
+                <h3><i class="bi bi-pencil-square"></i> Chỉnh sửa tài khoản</h3>
+                <button class="modal-close" onclick="closeEditUserModal()" style="color:white;">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+            <div class="modal-body" style="padding:24px;">
+                <input type="hidden" id="edit-user-id">
+
+                <!-- User Info Badge -->
+                <div
+                    style="background:linear-gradient(135deg, #fef3c7, #fde68a); padding:16px; border-radius:12px; margin-bottom:20px; display:flex; align-items:center; gap:12px;">
+                    <div style="width:48px; height:48px; border-radius:50%; background:linear-gradient(135deg, #f59e0b, #d97706); color:white; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:18px;"
+                        id="edit-user-avatar">A</div>
+                    <div>
+                        <div style="font-weight:600; font-size:16px;" id="edit-user-display-name">Tên người dùng</div>
+                        <div style="color:#92400e; font-size:13px;" id="edit-user-display-phone">0901234567</div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label"><i class="bi bi-person"></i> Họ tên <span
+                            style="color:var(--danger);">*</span></label>
+                    <input type="text" id="edit-user-fullname" class="form-control" placeholder="Nhập họ tên đầy đủ">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label"><i class="bi bi-phone"></i> Số điện thoại</label>
+                    <input type="text" id="edit-user-phone" class="form-control" disabled
+                        style="background:#f1f5f9; cursor:not-allowed;">
+                    <small style="color:var(--text-muted); font-size:12px;">Không thể thay đổi số điện thoại</small>
+                </div>
+
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+                    <div class="form-group" style="margin:0;">
+                        <label class="form-label"><i class="bi bi-shield"></i> Vai trò</label>
+                        <select id="edit-user-role" class="form-select">
+                            <option value="DRIVER">Tài xế</option>
+                            <option value="STAFF">Nhân viên</option>
+                            <option value="ADMIN">Admin</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin:0;">
+                        <label class="form-label"><i class="bi bi-truck"></i> Biển số xe</label>
+                        <input type="text" id="edit-user-plate" class="form-control" placeholder="VD: 51D-123.45">
+                    </div>
+                </div>
+
+                <!-- Password Change Section -->
+                <div style="margin-top:20px; padding-top:20px; border-top:1px dashed var(--border);">
+                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+                        <i class="bi bi-key" style="color:var(--warning);"></i>
+                        <span style="font-weight:600; color:var(--text-secondary);">Đổi mật khẩu (tùy chọn)</span>
+                    </div>
+                    <div class="form-group" style="margin:0;">
+                        <input type="password" id="edit-user-password" class="form-control"
+                            placeholder="Nhập mật khẩu mới (để trống nếu không đổi)">
+                    </div>
+                    <small style="color:var(--text-muted); font-size:12px;">Để trống nếu không muốn thay đổi mật
+                        khẩu</small>
+                </div>
+
+                <div style="display:flex; gap:12px; margin-top:24px;">
+                    <button class="btn btn-outline" onclick="closeEditUserModal()" style="flex:1;">
+                        <i class="bi bi-x"></i> Hủy
+                    </button>
+                    <button class="btn btn-primary" onclick="submitEditUser()"
+                        style="flex:2; background:linear-gradient(135deg, #f59e0b, #d97706);">
+                        <i class="bi bi-check-lg"></i> Lưu thay đổi
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- ==================== SCRIPTS ==================== -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="/js/core.js?v=15"></script>
     <script src="/js/app-router.js?v=4"></script>
     <script src="/js/api.js?v=15"></script>
-    <script src="/js/app.js?v=15"></script>
+    <script src="/js/app.js?v=17"></script>
 
 
 

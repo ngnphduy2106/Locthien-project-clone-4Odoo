@@ -125,10 +125,17 @@ export const db = {
     },
 
     // === ORDERS ===
-    getOrders: async () => {
+    getOrders: async (includeDeleted = false) => {
         const { useSupabase, useFirebase } = getMode();
         if (useSupabase) {
-            const { data, error } = await supabase.from('orders').select('*').order('sale_order_date', { ascending: false });
+            let query = supabase.from('orders').select('*').order('sale_order_date', { ascending: false });
+            
+            // Filter out cancelled orders by default (soft-deleted from MISA)
+            if (!includeDeleted) {
+                query = query.neq('status', 'Đã hủy bỏ');
+            }
+            
+            const { data, error } = await query;
             if (error) console.error('Supabase getOrders error:', error);
             // Map to frontend field names for compatibility
             return (data || []).map(o => {
@@ -374,6 +381,34 @@ export const db = {
             return;
         }
         mockData.orders = [];
+    },
+
+    deleteOrder: async (id) => {
+        const { useSupabase, useFirebase } = getMode();
+        const safeId = sanitizeId(id);
+        if (useSupabase) {
+            // Try delete by id first
+            let { error } = await supabase.from('orders').delete().eq('id', safeId);
+
+            // If no match, try by sale_order_no
+            if (error) {
+                const { error: error2 } = await supabase.from('orders').delete().eq('sale_order_no', id);
+                error = error2;
+            }
+
+            if (error) console.error('Supabase deleteOrder error:', error);
+            return !error;
+        }
+        if (useFirebase) {
+            await firebaseDb.ref(`orders/${safeId}`).remove();
+            return true;
+        }
+        const index = mockData.orders.findIndex(o => o.id === id);
+        if (index !== -1) {
+            mockData.orders.splice(index, 1);
+            return true;
+        }
+        return false;
     },
 
     // === MATERIALS ===

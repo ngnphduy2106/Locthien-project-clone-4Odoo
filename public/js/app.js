@@ -1286,6 +1286,35 @@ function renderMyOrdersList(containerId, orders, type) {
     `).join('');
 }
 
+// Switch tabs in My Orders section
+function switchMyOrdersTab(tab) {
+    // Hide all tab contents
+    const tabContents = ['my-orders-tab-pending', 'my-orders-tab-delivering', 'my-orders-tab-completed'];
+    tabContents.forEach(id => {
+        const el = window.$(`#${id}`);
+        if (el) el.classList.add('hidden');
+    });
+
+    // Show selected tab content
+    const selectedContent = window.$(`#my-orders-tab-${tab}`);
+    if (selectedContent) selectedContent.classList.remove('hidden');
+
+    // Update tab button states
+    const tabBtns = ['my-tab-pending', 'my-tab-delivering', 'my-tab-completed'];
+    tabBtns.forEach(id => {
+        const btn = window.$(`#${id}`);
+        if (btn) btn.classList.remove('active');
+    });
+
+    const activeBtn = window.$(`#my-tab-${tab}`);
+    if (activeBtn) activeBtn.classList.add('active');
+
+    console.log(`📑 Switched to My Orders tab: ${tab}`);
+}
+
+// Export switchMyOrdersTab
+window.switchMyOrdersTab = switchMyOrdersTab;
+
 // === ORDER HISTORY ===
 async function loadOrderHistory() {
     const tbody = window.$('#history-table-body');
@@ -3981,26 +4010,79 @@ async function editUser(userId) {
         return;
     }
 
-    const newName = prompt('Họ tên:', user.fullName);
-    if (newName === null) return;
+    // Populate form with user data
+    const modal = window.$('#modal-edit-user');
+    const idInput = window.$('#edit-user-id');
+    const fullnameInput = window.$('#edit-user-fullname');
+    const phoneInput = window.$('#edit-user-phone');
+    const roleSelect = window.$('#edit-user-role');
+    const plateInput = window.$('#edit-user-plate');
+    const passwordInput = window.$('#edit-user-password');
+    const avatarEl = window.$('#edit-user-avatar');
+    const displayNameEl = window.$('#edit-user-display-name');
+    const displayPhoneEl = window.$('#edit-user-display-phone');
 
-    const newRole = prompt('Vai trò (ADMIN/DRIVER/STAFF):', user.role);
-    if (newRole === null) return;
+    if (idInput) idInput.value = user.id;
+    if (fullnameInput) fullnameInput.value = user.fullName || '';
+    if (phoneInput) phoneInput.value = user.username || '';
+    if (roleSelect) roleSelect.value = user.role || 'DRIVER';
+    if (plateInput) plateInput.value = user.plate || '';
+    if (passwordInput) passwordInput.value = '';
 
-    const newPlate = prompt('Biển số xe:', user.plate || '');
-    if (newPlate === null) return;
+    // Update display elements
+    if (avatarEl) avatarEl.textContent = (user.fullName || 'U').charAt(0).toUpperCase();
+    if (displayNameEl) displayNameEl.textContent = user.fullName || 'Chưa có tên';
+    if (displayPhoneEl) displayPhoneEl.textContent = user.username || '';
 
-    showLoading('Đang cập nhật...');
+    // Show modal
+    if (modal) modal.classList.remove('hidden');
+}
+
+// Close edit user modal
+function closeEditUserModal(event) {
+    if (event && event.target && !event.target.classList.contains('modal-overlay')) {
+        return;
+    }
+    const modal = window.$('#modal-edit-user');
+    if (modal) modal.classList.add('hidden');
+}
+
+// Submit edit user form
+async function submitEditUser() {
+    const userId = window.$('#edit-user-id')?.value;
+    const fullName = window.$('#edit-user-fullname')?.value?.trim();
+    const role = window.$('#edit-user-role')?.value;
+    const plate = window.$('#edit-user-plate')?.value?.trim();
+    const password = window.$('#edit-user-password')?.value?.trim();
+
+    if (!userId) {
+        alert('Lỗi: Không tìm thấy ID tài khoản!');
+        return;
+    }
+
+    if (!fullName) {
+        alert('Vui lòng nhập họ tên!');
+        return;
+    }
+
+    showLoading('Đang cập nhật tài khoản...');
 
     try {
+        const updateData = {
+            fullName: fullName,
+            role: role.toUpperCase(),
+            plate: plate
+        };
+
+        // Only include password if provided
+        if (password) {
+            updateData.password = password;
+        }
+
         const res = await fetch(`/api/auth/users/${userId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                fullName: newName,
-                role: newRole.toUpperCase(),
-                plate: newPlate
-            })
+            body: JSON.stringify(updateData)
         });
 
         const data = await res.json();
@@ -4011,7 +4093,8 @@ async function editUser(userId) {
             return;
         }
 
-        alert('Đã cập nhật tài khoản!');
+        alert('Đã cập nhật tài khoản thành công!');
+        closeEditUserModal();
         loadUsers();
 
     } catch (e) {
@@ -4073,6 +4156,8 @@ window.closeCreateUserModal = closeCreateUserModal;
 window.submitCreateUser = submitCreateUser;
 window.editUser = editUser;
 window.updateUserStatus = updateUserStatus;
+window.closeEditUserModal = closeEditUserModal;
+window.submitEditUser = submitEditUser;
 
 // ===============================================
 // DRIVER COMPLETION FORM WITH IMAGE UPLOAD
