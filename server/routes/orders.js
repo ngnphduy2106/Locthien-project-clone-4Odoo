@@ -819,7 +819,9 @@ router.get('/:id/proof-images', async (req, res) => {
         const { createClient } = await import('@supabase/supabase-js');
         const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
-        // Try to find by order_id or order_no
+        console.log(`📸 Loading proof images for order: ${id}`);
+
+        // Try to find by order_id first
         let { data, error } = await supabase
             .from('export_tickets')
             .select('ticket_no, images, created_at, driver_name')
@@ -828,8 +830,26 @@ router.get('/:id/proof-images', async (req, res) => {
             .limit(1)
             .single();
 
-        // If not found by order_id, try by order_no
+        console.log(`   Search by order_id="${id}": ${data ? 'FOUND' : 'NOT FOUND'}`);
+
+        // If not found by order_id, try by order_no directly (frontend might pass soDon)
         if (error || !data) {
+            const result = await supabase
+                .from('export_tickets')
+                .select('ticket_no, images, created_at, driver_name')
+                .eq('order_no', id)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .single();
+
+            if (!result.error && result.data) {
+                data = result.data;
+                console.log(`   Search by order_no="${id}": FOUND`);
+            }
+        }
+
+        // If still not found, try to get soDon from order and search by that
+        if (!data) {
             const orderInfo = await db.getOrder(id);
             if (orderInfo?.soDon) {
                 const result = await supabase
@@ -840,9 +860,15 @@ router.get('/:id/proof-images', async (req, res) => {
                     .limit(1)
                     .single();
 
-                if (!result.error) data = result.data;
+                if (!result.error) {
+                    data = result.data;
+                    console.log(`   Search by soDon="${orderInfo.soDon}": FOUND`);
+                }
             }
         }
+
+        console.log(`📸 Result: ${data?.images?.length || 0} images found`);
+
 
         res.json({
             error: false,
