@@ -124,7 +124,9 @@ router.get('/my/:driverName', async (req, res) => {
 
             if (match) console.log(`✅ Found match: "${o.taiXe}" ~ "${driverName}" for order ${o.soDon}`);
 
-            if (role === 'ADMIN' || role === 'TESTER') {
+            // Case-insensitive role check
+            const normalizedRole = (role || '').toUpperCase();
+            if (normalizedRole === 'ADMIN' || normalizedRole === 'TESTER') {
                 const isMe = match;
                 const isExternal = tName && !internalDrivers.includes(tName);
                 return isMe || isExternal;
@@ -134,6 +136,14 @@ router.get('/my/:driverName', async (req, res) => {
         });
 
         console.log(`📋 Driver ${driverName} (${role}) | Total DB Orders: ${orders.length} | Matches: ${myOrders.length}`);
+
+        // Debug: Show sample of orders with taiXe for non-matching scenarios
+        if (myOrders.length === 0 && orders.length > 0) {
+            const assignedOrders = orders.filter(o => o.taiXe);
+            console.log('⚠️ No matches found. Sample assigned orders:',
+                assignedOrders.slice(0, 5).map(o => ({ soDon: o.soDon, taiXe: o.taiXe }))
+            );
+        }
 
         // Map status codes for frontend
         myOrders = myOrders.map(o => {
