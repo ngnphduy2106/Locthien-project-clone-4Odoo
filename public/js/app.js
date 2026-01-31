@@ -47,8 +47,7 @@ function hideLoading() {
 function isAdminRole() {
     const role = (state.user?.role || '').toLowerCase().trim();
     console.log('🔍 DEBUG isAdminRole - role:', role, '| user:', state.user);
-    // Accept various admin role names (temporarily return true for all logged in users)
-    if (state.user) return true; // DEBUG: Show buttons for all users
+    // Only return true for actual admin roles
     const adminRoles = ['admin', 'quản lý', 'manager', 'quan ly', 'administrator', 'nhanvien', 'nhân viên', 'staff'];
     return adminRoles.includes(role) || role.includes('admin') || role.includes('quản') || role.includes('quan');
 }

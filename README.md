@@ -1,19 +1,200 @@
-# LỘC THIÊN ERP - Modern Web App
+# 🏭 LỘC THIÊN ERP - Hệ Thống Quản Lý Kho Vận Hóa Chất
 
-Hệ thống ERP quản lý kho vận cho công ty hóa chất, chuyển đổi từ Google Apps Script sang Node.js + Express + Vanilla JS.
+> **Version 2.0** | Node.js + Express + Supabase + MISA CRM Integration
 
-## 🚀 Quick Start
+Hệ thống ERP toàn diện quản lý kho vận cho công ty kinh doanh hóa chất công nghiệp Lộc Thiên.
+
+---
+
+## 📋 Mục Lục
+
+- [Tổng Quan Hệ Thống](#-tổng-quan-hệ-thống)
+- [Danh Sách Chức Năng](#-danh-sách-chức-năng)
+- [Tech Stack](#️-tech-stack)
+- [Cài Đặt & Khởi Động](#-cài-đặt--khởi-động)
+- [Cấu Trúc Dự Án](#-cấu-trúc-dự-án)
+- [API Endpoints](#-api-endpoints)
+- [Tài Khoản Demo](#-tài-khoản-demo)
+
+---
+
+## 🎯 Tổng Quan Hệ Thống
+
+Lộc Thiên ERP là giải pháp quản lý toàn diện cho ngành kinh doanh hóa chất, với các module chính:
+
+| Module | Mô tả |
+|--------|-------|
+| **Dashboard** | Tổng quan thương mại, biểu đồ thống kê, Top sản phẩm/khách hàng |
+| **Điều phối đơn hàng** | Quản lý đơn xuất/nhập, gán tài xế, theo dõi trạng thái |
+| **Tài xế** | App mobile-first cho tài xế, nhận/giao đơn |
+| **Chat & Thông báo** | Chat realtime theo đơn hàng, push notifications |
+| **Nhân sự** | Quản lý nhân viên, tài khoản hệ thống |
+| **Kho hàng** | Quản lý vật tư, tồn kho |
+| **Tích hợp MISA** | Đồng bộ 2 chiều với MISA CRM |
+
+---
+
+## 🚀 Danh Sách Chức Năng
+
+### 1. 📊 Dashboard (Tổng Quan)
+- ✅ Thống kê số lượng đơn hàng theo thời gian (hôm nay, tuần, tháng, năm, tất cả)
+- ✅ Biểu đồ số lượng đơn hàng theo thời gian
+- ✅ Biểu đồ giá trị đơn hàng theo thời gian
+- ✅ Top 5 sản phẩm bán chạy
+- ✅ Top 5 khách hàng
+- ✅ Top 5 tài xế
+- ✅ Thống kê đơn chờ xử lý, đang giao, hoàn thành
+
+### 2. 📦 Quản Lý Đơn Hàng Xuất (Export Orders)
+- ✅ **Đồng bộ MISA CRM**: Tự động sync đơn hàng từ MISA
+- ✅ **Danh sách đơn hàng**: Filter theo trạng thái (Chờ xử lý, Đang giao, Hoàn thành)
+- ✅ **Tìm kiếm đơn hàng**: Theo mã đơn, tên khách hàng, địa chỉ
+- ✅ **Lọc theo ngày**: Filter đơn hàng theo ngày cụ thể
+- ✅ **Chi tiết đơn hàng**: Xem thông tin khách hàng, sản phẩm, giá trị
+- ✅ **Gán tài xế**: Chọn tài xế giao hàng cho đơn
+- ✅ **Chỉnh sửa số lượng**: Điều chỉnh số lượng sản phẩm thực tế
+- ✅ **Vật phẩm cục bộ**: Thêm vỏ can/phuy/tank (không sync MISA)
+- ✅ **Hủy đơn**: Đánh dấu đơn hàng bị hủy (soft delete)
+- ✅ **Ảnh chứng minh giao hàng**: Upload và xem ảnh proof delivery
+- ✅ **Xóa ảnh chứng minh**: Admin có thể xóa ảnh đã upload
+
+### 3. 📥 Quản Lý Đơn Hàng Nhập (Import Tickets)
+- ✅ **Tạo phiếu nhập**: Nhập hàng từ nhà cung cấp
+- ✅ **Danh sách phiếu nhập**: Xem tất cả phiếu theo trạng thái
+- ✅ **Gán tài xế**: Phân công tài xế lấy hàng
+- ✅ **Bắt đầu vận chuyển**: Tài xế bắt đầu lấy hàng
+- ✅ **Hoàn thành phiếu**: Xác nhận đã nhận hàng với số lượng thực tế
+- ✅ **Tính giá/VAT**: Tự động tính thành tiền và thuế VAT
+- ✅ **Ảnh chứng minh**: Upload ảnh xác nhận nhận hàng
+- ✅ **Xóa ảnh chứng minh**: Admin xóa ảnh (có xác nhận)
+
+### 4. 🚚 Tài Xế (Driver App)
+- ✅ **Đơn của tôi**: Xem danh sách đơn được gán
+- ✅ **Nhận đơn**: Xác nhận bắt đầu giao hàng
+- ✅ **Hoàn thành đơn**: Xác nhận giao hàng thành công với số lượng thực tế
+- ✅ **Upload ảnh**: Chụp ảnh chứng minh giao hàng
+- ✅ **Badge đơn mới**: Thông báo số đơn chờ nhận
+- ✅ **Giới hạn menu**: Chỉ hiển thị menu cần thiết cho tài xế
+
+### 5. 💬 Chat & Thông Báo
+- ✅ **Chat theo đơn hàng**: Nhắn tin realtime trong từng đơn
+- ✅ **Chat phiếu nhập**: Nhắn tin cho phiếu nhập
+- ✅ **Gửi hình ảnh**: Upload ảnh trong chat
+- ✅ **Badge tin chưa đọc**: Hiển thị số tin nhắn mới
+- ✅ **Đánh dấu đã đọc**: Tự động đánh dấu khi xem chat
+- ✅ **Push Notifications**: Thông báo đẩy cho tài xế khi có đơn mới (Firebase)
+- ✅ **Telegram Alerts**: Thông báo tự động qua Telegram Bot
+
+### 6. 📜 Lịch Sử Đơn Hàng
+- ✅ **Xem lịch sử**: Danh sách tất cả đơn hàng đã hoàn thành/hủy
+- ✅ **Toggle View**: Chuyển đổi giữa Card view và Table view
+- ✅ **Phân trang**: Pagination cho danh sách dài
+- ✅ **Tìm kiếm**: Tìm kiếm trong lịch sử
+- ✅ **Lọc theo ngày**: Filter theo ngày cụ thể
+- ✅ **Chi tiết đơn**: Xem chi tiết đơn hàng cũ
+
+### 7. 👥 Quản Lý Tài Khoản (Admin Only)
+- ✅ **Danh sách tài khoản**: Xem tất cả user trong hệ thống
+- ✅ **Tạo tài khoản**: Thêm nhân viên/tài xế mới
+- ✅ **Chỉnh sửa tài khoản**: Cập nhật thông tin, role, biển số xe
+- ✅ **Đổi mật khẩu**: Reset password cho user
+- ✅ **Thống kê**: Số lượng theo vai trò (Admin, Driver, Staff)
+
+### 8. 🏢 Quản Lý Nhân Sự
+- ✅ **Danh sách nhân viên**: Xem tất cả nhân viên
+- ✅ **Thêm nhân viên**: Tạo hồ sơ nhân viên mới
+- ✅ **Cập nhật nhân viên**: Chỉnh sửa thông tin
+
+### 9. 📦 Quản Lý Vật Tư
+- ✅ **Danh sách vật tư**: Xem tất cả sản phẩm/vật tư
+- ✅ **Thêm vật tư**: Tạo sản phẩm mới
+- ✅ **Cập nhật vật tư**: Chỉnh sửa thông tin sản phẩm
+- ✅ **Đơn vị tính**: Hỗ trợ Kg, Lít, Can, Phuy, Tank, Tấn
+
+### 10. 🏭 Quản Lý Kho Hàng
+- ✅ **Danh sách kho**: Xem các kho hàng
+- ✅ **Tồn kho**: Xem số lượng tồn theo kho
+- ✅ **Cảnh báo**: Thông báo sản phẩm sắp hết
+- ✅ **Chuyển kho**: Chuyển hàng giữa các kho
+
+### 11. 📊 Báo Cáo
+- ✅ **Báo cáo tồn kho**: Thống kê tồn kho
+- ✅ **Báo cáo tổng hợp**: Summary các chỉ số
+- ✅ **Dashboard stats**: Dữ liệu cho dashboard
+
+### 12. 🔗 Tích Hợp
+- ✅ **MISA CRM**: Đồng bộ 2 chiều đơn hàng, cập nhật trạng thái
+- ✅ **Supabase**: Database realtime
+- ✅ **Firebase**: Push notifications
+- ✅ **Telegram Bot**: Thông báo tự động
+- ✅ **Netlify Functions**: Serverless deployment
+
+---
+
+## 🛠️ Tech Stack
+
+| Layer | Technology |
+|-------|------------|
+| **Frontend** | HTML5, CSS3, Vanilla JavaScript, Bootstrap Icons |
+| **Backend** | Node.js, Express.js |
+| **Database** | Supabase (PostgreSQL) |
+| **Auth** | Custom authentication với phone number |
+| **CRM** | MISA CRM API Integration |
+| **Notifications** | Firebase Cloud Messaging, Telegram Bot |
+| **Hosting** | Netlify (Serverless Functions) |
+
+---
+
+## 📦 Cài Đặt & Khởi Động
+
+### Prerequisites
+- Node.js v18+
+- npm hoặc yarn
+- Supabase account
+- MISA CRM API credentials (optional)
+
+### Installation
 
 ```bash
+# Clone repository
+git clone https://gitlab.com/locthien-group/Locthien-project.git
+cd Locthien-project
+
 # Cài đặt dependencies
 npm install
 
-# Chạy server development
+# Copy environment file
+cp .env.example .env
+# Chỉnh sửa .env với credentials của bạn
+
+# Chạy development server
 npm run dev
 
-# Mở browser
-# http://localhost:3000
+# Mở browser: http://localhost:3000
 ```
+
+### Environment Variables
+
+```env
+# Supabase
+SUPABASE_URL=your_supabase_url
+SUPABASE_KEY=your_supabase_key
+SUPABASE_SERVICE_KEY=your_service_key
+
+# MISA CRM
+MISA_API_URL=your_misa_api_url
+MISA_ACCESS_CODE=your_access_code
+MISA_COMPANY_CODE=your_company_code
+
+# Telegram
+TELEGRAM_BOT_TOKEN=your_bot_token
+TELEGRAM_CHAT_ID=your_chat_id
+
+# Firebase
+FIREBASE_PROJECT_ID=your_project_id
+```
+
+---
 
 ## 📁 Cấu Trúc Dự Án
 
@@ -21,188 +202,136 @@ npm run dev
 loc-thien-scm/
 ├── package.json                    # Dependencies
 ├── .env.example                    # Environment template
-├── server/                         # Backend (Express.js)
+├── server/                         # ⚙️ Backend (Express.js)
 │   ├── index.js                    # Server entry point
 │   ├── config.js                   # Configuration
 │   ├── db/
-│   │   └── sheets.js               # Mock database (thay Google Sheets)
-│   └── routes/
-│       ├── auth.js                 # Authentication API
-│       ├── orders.js               # Orders API
-│       ├── hr.js                   # HR API
-│       ├── materials.js            # Materials API
-│       ├── warehouse.js            # Warehouse API
-│       └── reports.js              # Reports API
-├── public/                         # Frontend (Static files)
+│   │   ├── index.js                # Database abstraction
+│   │   ├── supabase.js             # Supabase client
+│   │   └── firebase.js             # Firebase config
+│   ├── routes/
+│   │   ├── auth.js                 # Authentication API
+│   │   ├── orders.js               # Orders (Export) API
+│   │   ├── imports.js              # Import Tickets API
+│   │   ├── chat.js                 # Chat/Messaging API
+│   │   ├── hr.js                   # HR API
+│   │   ├── materials.js            # Materials API
+│   │   ├── warehouse.js            # Warehouse API
+│   │   ├── reports.js              # Reports API
+│   │   └── webhooks.js             # Webhook handlers
+│   ├── services/
+│   │   ├── misa.js                 # MISA CRM integration
+│   │   ├── telegram.js             # Telegram notifications
+│   │   └── firebase.js             # Push notifications
+│   └── migrations/                 # SQL migrations
+├── public/                         # 🎨 Frontend (Static files)
 │   ├── index.html                  # Single-page app
 │   ├── css/
-│   │   └── app.css                 # Custom styles
+│   │   └── styles.css              # Custom styles
 │   └── js/
+│       ├── core.js                 # Core utilities
 │       ├── api.js                  # API client
-│       └── app.js                  # Main application
-└── src/server/                     # (Legacy) Apps Script code
+│       ├── app.js                  # Main application
+│       ├── app-router.js           # SPA router
+│       ├── notifications.js        # Push notification handler
+│       └── modules/
+│           ├── dispatch.js         # Order dispatch module
+│           ├── my-orders.js        # Driver orders module
+│           └── order-history.js    # Order history module
+├── functions/                      # Netlify serverless functions
+└── src/                            # (Legacy) Google Apps Script code
 ```
-
-## 🔑 Tài Khoản Demo
-
-| Username | Password | Role |
-|----------|----------|------|
-| 0901234567 | 234567 | ADMIN |
-| 0909876543 | 876543 | DRIVER |
-| 0905555555 | 555555 | WAREHOUSE |
-
-## 🛠️ API Endpoints
-
-### Authentication
-```
-POST /api/auth/login          - Đăng nhập
-POST /api/auth/register       - Tạo tài khoản
-```
-
-### Orders
-```
-GET  /api/orders              - Danh sách đơn hàng
-GET  /api/orders/my/:driver   - Đơn của tài xế
-POST /api/orders              - Tạo đơn mới
-PUT  /api/orders/:id/assign   - Gán tài xế
-PUT  /api/orders/:id/start    - Bắt đầu giao
-POST /api/orders/:id/complete - Hoàn thành
-```
-
-### HR
-```
-GET  /api/hr/employees        - Danh sách nhân viên
-POST /api/hr/employees        - Thêm nhân viên
-PUT  /api/hr/employees/:id    - Cập nhật nhân viên
-```
-
-### Materials
-```
-GET  /api/materials           - Danh sách vật tư
-POST /api/materials           - Thêm vật tư
-PUT  /api/materials/:code     - Cập nhật vật tư
-```
-
-### Warehouse
-```
-GET  /api/warehouse           - Danh sách kho
-GET  /api/warehouse/inventory - Tồn kho
-GET  /api/warehouse/alerts    - Cảnh báo
-POST /api/warehouse/transfer  - Chuyển kho
-```
-
-### Reports
-```
-GET /api/reports/inventory    - Báo cáo tồn kho
-GET /api/reports/summary      - Báo cáo tổng hợp
-GET /api/reports/dashboard    - Dashboard stats
-```
-
-## 📝 Ghi Chú
-
-- **Mock Database**: Hiện tại sử dụng in-memory mock data. Để kết nối Google Sheets thật, cấu hình Service Account trong `server/db/sheets.js`.
-- **No Authentication Middleware**: Demo mode không yêu cầu JWT/session. Production cần thêm middleware.
-
-## 📦 Dependencies
-
-- **express** - Web framework
-- **cors** - Cross-origin requests
-- **dotenv** - Environment variables
-- **googleapis** - Google Sheets API (optional)
 
 ---
 
-*Lộc Thiên Dev Team - 2026*
-# Locthien-project
+## 🔌 API Endpoints
 
+### Authentication
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/auth/login` | Đăng nhập |
+| POST | `/api/auth/register` | Tạo tài khoản |
+| GET | `/api/auth/users` | Danh sách tài khoản |
+| PUT | `/api/auth/users/:id` | Cập nhật tài khoản |
 
+### Orders (Export)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/orders` | Danh sách đơn hàng |
+| GET | `/api/orders/:id` | Chi tiết đơn hàng |
+| GET | `/api/orders/my/:driverName` | Đơn của tài xế |
+| PUT | `/api/orders/:id` | Cập nhật đơn hàng |
+| PUT | `/api/orders/:id/assign` | Gán tài xế |
+| PUT | `/api/orders/:id/start` | Bắt đầu giao |
+| PUT | `/api/orders/:id/complete` | Hoàn thành đơn |
+| PUT | `/api/orders/:id/cancel` | Hủy đơn |
+| POST | `/api/orders/:id/proof-images` | Upload ảnh chứng minh |
+| DELETE | `/api/orders/:id/proof-images/:imgId` | Xóa ảnh |
+| POST | `/api/orders/sync-misa` | Force sync MISA |
 
-## Getting started
+### Import Tickets
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/imports` | Danh sách phiếu nhập |
+| POST | `/api/imports` | Tạo phiếu nhập |
+| PUT | `/api/imports/:id` | Cập nhật phiếu |
+| PUT | `/api/imports/:id/assign` | Gán tài xế |
+| PUT | `/api/imports/:id/start` | Bắt đầu lấy hàng |
+| PUT | `/api/imports/:id/complete` | Hoàn thành phiếu |
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+### Chat
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/chat/:id/messages` | Lấy tin nhắn |
+| POST | `/api/chat/:id/messages` | Gửi tin nhắn |
+| GET | `/api/chat/unread-counts` | Số tin chưa đọc |
+| POST | `/api/chat/:id/mark-read` | Đánh dấu đã đọc |
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+### Reports
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/reports/dashboard` | Dashboard stats |
+| GET | `/api/reports/inventory` | Báo cáo tồn kho |
+| GET | `/api/reports/summary` | Báo cáo tổng hợp |
 
-## Add your files
+---
 
-* [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+## 🔑 Tài Khoản Demo
 
-```
-cd existing_repo
-git remote add origin https://gitlab.com/locthien-group/Locthien-project.git
-git branch -M main
-git push -uf origin main
-```
+| Username | Password | Role | Mô tả |
+|----------|----------|------|-------|
+| 0901234567 | 234567 | ADMIN | Quản trị viên |
+| 0909876543 | 876543 | DRIVER | Tài xế |
+| 0905555555 | 555555 | STAFF | Nhân viên |
 
-## Integrate with your tools
+---
 
-* [Set up project integrations](https://gitlab.com/locthien-group/Locthien-project/-/settings/integrations)
+## 📝 Changelog
 
-## Collaborate with your team
+### v2.1.0 (2026-01-31)
+- ✨ Thêm toggle Card/Table view cho Lịch sử đơn hàng
+- ✨ Thêm chức năng xóa ảnh chứng minh
+- ✨ Thêm ảnh chứng minh cho Phiếu nhập
+- 🐛 Fix hiển thị user trong quản lý tài khoản
 
-* [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+### v2.0.0 (2026-01)
+- 🚀 Chuyển đổi từ Google Apps Script sang Node.js
+- ✨ Thêm Push Notifications (Firebase)
+- ✨ Thêm Telegram alerts
+- ✨ Tích hợp MISA CRM 2 chiều
+- ✨ Thêm Chat realtime
 
-## Test and Deploy
+### v1.0.0 (2025)
+- 🎉 Initial release với Google Apps Script
 
-Use the built-in continuous integration in GitLab.
+---
 
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
+## 👥 Team
 
-***
+**Lộc Thiên Dev Team** - 2025-2026
 
-# Editing this README
+---
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+## 📄 License
 
-## Suggestions for a good README
-
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
-
-## Name
-Choose a self-explaining name for your project.
-
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
-
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
-
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
-
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
-
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
-
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
-
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
-
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
-
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
-
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
-
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
-
-## License
-For open source projects, say how it is licensed.
-
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+MIT License - Copyright © 2026 Lộc Thiên Chemical Company
