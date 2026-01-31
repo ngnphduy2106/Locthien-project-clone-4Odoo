@@ -340,4 +340,129 @@ router.delete('/:id', async (req, res) => {
     }
 });
 
+// ===============================================
+// PROOF IMAGES FOR IMPORT TICKETS
+// ===============================================
+
+// GET /api/imports/:id/proof-images - Get proof images
+router.get('/:id/proof-images', async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const { data, error } = await getSupabase()
+            .from('import_tickets')
+            .select('images, driver_name:assigned_driver, created_at')
+            .eq('id', id)
+            .single();
+
+        if (error) {
+            return res.json({ error: false, images: [] });
+        }
+
+        res.json({
+            error: false,
+            images: data?.images || [],
+            driver_name: data?.driver_name || null,
+            created_at: data?.created_at || null
+        });
+
+    } catch (e) {
+        console.error('Get import proof images error:', e.message);
+        res.json({ error: false, images: [] });
+    }
+});
+
+// POST /api/imports/:id/proof-images - Add proof images to import ticket
+router.post('/:id/proof-images', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { images } = req.body;
+
+        if (!images || !Array.isArray(images) || images.length === 0) {
+            return res.json(createResponse(true, 'Vui lòng chọn ít nhất 1 ảnh!'));
+        }
+
+        // Get existing images
+        const { data: ticket, error: fetchError } = await getSupabase()
+            .from('import_tickets')
+            .select('images')
+            .eq('id', id)
+            .single();
+
+        if (fetchError) {
+            return res.json(createResponse(true, 'Không tìm thấy phiếu nhập!'));
+        }
+
+        const existingImages = ticket?.images || [];
+        const totalAllowed = 10 - existingImages.length;
+
+        if (totalAllowed <= 0) {
+            return res.json(createResponse(true, 'Đã đạt giới hạn 10 ảnh!'));
+        }
+
+        const newImages = images.slice(0, totalAllowed);
+        const updatedImages = [...existingImages, ...newImages];
+
+        const { error: updateError } = await getSupabase()
+            .from('import_tickets')
+            .update({ images: updatedImages })
+            .eq('id', id);
+
+        if (updateError) {
+            return res.json(createResponse(true, 'Lỗi lưu ảnh: ' + updateError.message));
+        }
+
+        res.json(createResponse(false, `Đã thêm ${newImages.length} ảnh (${updatedImages.length}/10)!`));
+
+    } catch (e) {
+        console.error('Add import proof images error:', e.message);
+        res.json(createResponse(true, 'Lỗi: ' + e.message));
+    }
+});
+
+// DELETE /api/imports/:id/proof-images/:imageIndex - Remove specific proof image
+router.delete('/:id/proof-images/:imageIndex', async (req, res) => {
+    try {
+        const { id, imageIndex } = req.params;
+        const idx = parseInt(imageIndex);
+
+        if (isNaN(idx) || idx < 0) {
+            return res.json(createResponse(true, 'Chỉ số ảnh không hợp lệ!'));
+        }
+
+        const { data: ticket, error: fetchError } = await getSupabase()
+            .from('import_tickets')
+            .select('images')
+            .eq('id', id)
+            .single();
+
+        if (fetchError || !ticket) {
+            return res.json(createResponse(true, 'Không tìm thấy phiếu nhập!'));
+        }
+
+        const images = ticket.images || [];
+        if (idx >= images.length) {
+            return res.json(createResponse(true, 'Ảnh không tồn tại!'));
+        }
+
+        // Remove image at index
+        images.splice(idx, 1);
+
+        const { error: updateError } = await getSupabase()
+            .from('import_tickets')
+            .update({ images })
+            .eq('id', id);
+
+        if (updateError) {
+            return res.json(createResponse(true, 'Lỗi xóa ảnh: ' + updateError.message));
+        }
+
+        res.json(createResponse(false, `Đã xóa ảnh (còn ${images.length}/10)!`));
+
+    } catch (e) {
+        console.error('Delete import proof image error:', e.message);
+        res.json(createResponse(true, 'Lỗi: ' + e.message));
+    }
+});
+
 export default router;

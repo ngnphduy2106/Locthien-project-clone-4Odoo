@@ -3489,6 +3489,25 @@ function viewImportDetail(importId) {
 
             ${imp.note ? `<div style="margin-top:16px; padding:12px; background:var(--body-bg); border-radius:8px;"><strong>Ghi chú:</strong> ${imp.note}</div>` : ''}
 
+            <!-- PROOF IMAGES SECTION -->
+            <div style="margin-top:24px; border-top:1px solid var(--border); padding-top:16px;">
+                <h4 style="margin: 0 0 12px; font-size:14px; color:var(--text-secondary); display:flex; justify-content:space-between; align-items:center;">
+                    <span><i class="bi bi-camera" style="margin-right:6px;"></i> Ảnh minh chứng</span>
+                    <span id="importProofImagesCount" style="font-size:12px; color:var(--text-muted);"></span>
+                </h4>
+                <div id="importProofImagesGallery" style="display:flex; flex-wrap:wrap; gap:8px; min-height:80px; padding:12px; background:var(--body-bg); border-radius:8px; border:1px dashed var(--border);">
+                    <div style="text-align:center; width:100%; color:var(--text-muted); padding:20px;">
+                        <i class="bi bi-arrow-repeat spin"></i> Đang tải ảnh...
+                    </div>
+                </div>
+                ${isAdminRole() || imp.status === 'completed' ? `
+                <label style="display:inline-flex; align-items:center; gap:8px; margin-top:12px; padding:8px 16px; background:var(--primary); color:white; border-radius:8px; cursor:pointer; font-weight:500; font-size:13px;">
+                    <i class="bi bi-plus-circle"></i> Thêm ảnh
+                    <input type="file" accept="image/*" multiple onchange="handleAddImportProofImages(this, '${imp.id}')" style="display:none;">
+                </label>
+                ` : ''}
+            </div>
+
             <!-- CHAT SECTION -->
             <div style="margin-top:24px; border-top:1px solid var(--border); padding-top:16px;">
                 <h4 style="margin: 0 0 12px; font-size:14px; color:var(--text-secondary); display:flex; justify-content:space-between; align-items:center;">
@@ -3547,6 +3566,9 @@ function viewImportDetail(importId) {
 
         // Initialize chat for import
         currentChatOrderId = imp.ticket_no || imp.id;
+
+        // Load proof images
+        loadImportProofImages(imp.id);
     }
 
     if (modal) modal.classList.remove('hidden');
@@ -4866,6 +4888,11 @@ async function loadProofImages(orderId) {
                      onmouseover="this.style.transform='scale(1.05)'"
                      onmouseout="this.style.transform='scale(1)'"
                      title="Click để xem lớn">
+                ${isAdminRole() ? `
+                <button onclick="deleteProofImage('${orderId}', ${idx})" 
+                        style="position:absolute; top:-6px; right:-6px; width:20px; height:20px; border-radius:50%; background:var(--danger); color:white; border:none; cursor:pointer; font-size:12px; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.3);"
+                        title="Xóa ảnh này">×</button>
+                ` : ''}
             </div>
         `).join('');
 
@@ -5001,8 +5028,190 @@ async function handleAddProofImages(input, orderId) {
     input.value = '';
 }
 
+// Delete proof image from export order
+async function deleteProofImage(orderId, imageIndex) {
+    if (!confirm('Xác nhận xóa ảnh này?')) return;
+
+    showLoading('Đang xóa ảnh...');
+
+    try {
+        const res = await fetch(`/api/orders/${orderId}/proof-images/${imageIndex}`, {
+            method: 'DELETE'
+        });
+
+        const data = await res.json();
+        hideLoading();
+
+        if (data.error) {
+            alert('Lỗi: ' + data.msg);
+            return;
+        }
+
+        alert(data.msg || 'Đã xóa ảnh!');
+        loadProofImages(orderId);
+
+    } catch (e) {
+        hideLoading();
+        alert('Lỗi kết nối: ' + e.message);
+    }
+}
+
+// ===============================================
+// IMPORT TICKET PROOF IMAGES
+// ===============================================
+
+// Load proof images for import ticket detail modal
+async function loadImportProofImages(importId) {
+    const gallery = window.$('#importProofImagesGallery');
+    const counter = window.$('#importProofImagesCount');
+
+    if (!gallery) return;
+
+    try {
+        const res = await fetch(`/api/imports/${importId}/proof-images`);
+        const data = await res.json();
+
+        const images = data.images || [];
+
+        if (counter) {
+            counter.textContent = images.length > 0 ? `${images.length}/10 ảnh` : '';
+        }
+
+        if (images.length === 0) {
+            gallery.innerHTML = `
+                <div style="text-align:center; width:100%; color:var(--text-muted); padding:20px;">
+                    <i class="bi bi-camera-slash" style="font-size:24px;"></i>
+                    <p style="margin-top:8px;">Chưa có ảnh minh chứng</p>
+                </div>
+            `;
+            return;
+        }
+
+        gallery.innerHTML = images.map((src, idx) => `
+            <div style="position:relative;">
+                <img src="${src}" 
+                     style="width:80px; height:80px; object-fit:cover; border-radius:8px; cursor:pointer; border:2px solid var(--border); transition:transform 0.2s;"
+                     onclick="viewImportProofImage(${idx})"
+                     onmouseover="this.style.transform='scale(1.05)'"
+                     onmouseout="this.style.transform='scale(1)'"
+                     title="Click để xem lớn">
+                ${isAdminRole() ? `
+                <button onclick="deleteImportProofImage('${importId}', ${idx})" 
+                        style="position:absolute; top:-6px; right:-6px; width:20px; height:20px; border-radius:50%; background:var(--danger); color:white; border:none; cursor:pointer; font-size:12px; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.3);"
+                        title="Xóa ảnh này">×</button>
+                ` : ''}
+            </div>
+        `).join('');
+
+        // Store images globally for viewer
+        window._currentImportProofImages = images;
+
+    } catch (e) {
+        console.error('Load import proof images error:', e);
+        gallery.innerHTML = `
+            <div style="text-align:center; width:100%; color:var(--text-muted); padding:20px;">
+                <i class="bi bi-exclamation-triangle" style="color:var(--warning);"></i> Lỗi tải ảnh
+            </div>
+        `;
+    }
+}
+
+// View import proof image in full size lightbox
+function viewImportProofImage(idx) {
+    const images = window._currentImportProofImages || [];
+    if (!images[idx]) return;
+
+    // Reuse existing proof image viewer
+    viewProofImage(idx);
+    window._currentProofImages = images; // Override for navigation
+}
+
+// Handle adding proof images to import ticket
+async function handleAddImportProofImages(input, importId) {
+    const files = Array.from(input.files || []);
+    if (!files.length) return;
+
+    showLoading('Đang xử lý ảnh...');
+
+    const images = [];
+    for (const file of files.slice(0, 10)) {
+        try {
+            const compressed = await compressImage(file, 1200, 0.8);
+            images.push(compressed);
+        } catch (err) {
+            console.error('Image compression error:', err);
+        }
+    }
+
+    if (images.length === 0) {
+        hideLoading();
+        alert('Không thể xử lý ảnh!');
+        return;
+    }
+
+    try {
+        const res = await fetch(`/api/imports/${importId}/proof-images`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ images })
+        });
+
+        const data = await res.json();
+        hideLoading();
+
+        if (data.error) {
+            alert('Lỗi: ' + data.msg);
+            return;
+        }
+
+        alert(data.msg || 'Đã thêm ảnh thành công!');
+        loadImportProofImages(importId);
+
+    } catch (e) {
+        hideLoading();
+        alert('Lỗi kết nối: ' + e.message);
+    }
+
+    input.value = '';
+}
+
+// Delete proof image from import ticket
+async function deleteImportProofImage(importId, imageIndex) {
+    if (!confirm('Xác nhận xóa ảnh này?')) return;
+
+    showLoading('Đang xóa ảnh...');
+
+    try {
+        const res = await fetch(`/api/imports/${importId}/proof-images/${imageIndex}`, {
+            method: 'DELETE'
+        });
+
+        const data = await res.json();
+        hideLoading();
+
+        if (data.error) {
+            alert('Lỗi: ' + data.msg);
+            return;
+        }
+
+        alert(data.msg || 'Đã xóa ảnh!');
+        loadImportProofImages(importId);
+
+    } catch (e) {
+        hideLoading();
+        alert('Lỗi kết nối: ' + e.message);
+    }
+}
+
 // Export proof images functions
 window.loadProofImages = loadProofImages;
 window.viewProofImage = viewProofImage;
 window.navigateProofImage = navigateProofImage;
 window.handleAddProofImages = handleAddProofImages;
+window.deleteProofImage = deleteProofImage;
+
+// Export import proof images functions
+window.loadImportProofImages = loadImportProofImages;
+window.viewImportProofImage = viewImportProofImage;
+window.handleAddImportProofImages = handleAddImportProofImages;
+window.deleteImportProofImage = deleteImportProofImage;

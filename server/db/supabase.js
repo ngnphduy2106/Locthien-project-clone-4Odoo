@@ -3,7 +3,13 @@
 // ===============================================
 
 import dotenv from 'dotenv';
-dotenv.config();
+import { fileURLToPath } from 'url';
+import { dirname, resolve } from 'path';
+
+// Load .env from project root (one level up from server/db/)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+dotenv.config({ path: resolve(__dirname, '../../.env') });
 
 import { createClient } from '@supabase/supabase-js';
 

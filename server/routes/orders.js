@@ -593,9 +593,8 @@ router.post('/:id/complete', async (req, res) => {
                         isShell: c.isShell || false
                     })),
                     total_qty: totalQty,
-                    note: note,
-                    images: images || [],
-                    created_by: sender || driver_name
+                    note: note || `Tạo bởi: ${sender || driver_name}`,
+                    images: images || []
                 });
             } catch (err) {
                 console.error('Supabase Export Ticket Error:', err.message);
@@ -692,9 +691,8 @@ router.post('/:id/complete', async (req, res) => {
                     warehouse: 'LT1',
                     products: orderProducts,
                     total_qty: totalQty,
-                    note: delivery_note || '',
-                    images: images || [], // Store images if provided
-                    created_by: 'Admin Complete'
+                    note: delivery_note || 'Admin Complete',
+                    images: images || [] // Store images if provided
                 });
                 console.log(`📦 Export ticket created for Admin Complete: ${ticketNo}`);
             }
@@ -897,13 +895,12 @@ router.post('/:id/add-proof-images', async (req, res) => {
                 order_id: id,
                 order_no: orderInfo?.soDon || id,
                 customer_name: orderInfo?.khach || orderInfo?.account_name || '',
-                customer_address: orderInfo?.diaChi || '',
                 driver_name: orderInfo?.taiXe || 'Admin',
                 plate: orderInfo?.bienSo || '',
                 warehouse: 'LT1',
                 products: orderInfo?.cart || [],
                 images: images.slice(0, 10), // Max 10 images
-                created_by: 'Admin (bổ sung)'
+                note: 'Ảnh bổ sung bởi Admin'
             });
 
             if (insertError) {
@@ -937,6 +934,74 @@ router.post('/:id/add-proof-images', async (req, res) => {
 
     } catch (e) {
         console.error('Add proof images error:', e.message);
+        res.json(createResponse(true, 'Lỗi: ' + e.message));
+    }
+});
+
+// DELETE /api/orders/:id/proof-images/:imageIndex - Remove specific proof image
+router.delete('/:id/proof-images/:imageIndex', async (req, res) => {
+    try {
+        const { id, imageIndex } = req.params;
+        const idx = parseInt(imageIndex);
+
+        if (isNaN(idx) || idx < 0) {
+            return res.json(createResponse(true, 'Chỉ số ảnh không hợp lệ!'));
+        }
+
+        const { createClient } = await import('@supabase/supabase-js');
+        const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+        // Find export ticket
+        let { data: ticket, error } = await supabase
+            .from('export_tickets')
+            .select('id, images')
+            .eq('order_id', id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+
+        // If not found by order_id, try by order_no
+        if (error || !ticket) {
+            const orderInfo = await db.getOrder(id);
+            if (orderInfo?.soDon) {
+                const result = await supabase
+                    .from('export_tickets')
+                    .select('id, images')
+                    .eq('order_no', orderInfo.soDon)
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .single();
+
+                if (!result.error) ticket = result.data;
+            }
+        }
+
+        if (!ticket) {
+            return res.json(createResponse(true, 'Không tìm thấy phiếu xuất!'));
+        }
+
+        const images = ticket.images || [];
+        if (idx >= images.length) {
+            return res.json(createResponse(true, 'Ảnh không tồn tại!'));
+        }
+
+        // Remove image at index
+        images.splice(idx, 1);
+
+        // Update database
+        const { error: updateError } = await supabase
+            .from('export_tickets')
+            .update({ images })
+            .eq('id', ticket.id);
+
+        if (updateError) {
+            return res.json(createResponse(true, 'Lỗi xóa ảnh: ' + updateError.message));
+        }
+
+        res.json(createResponse(false, `Đã xóa ảnh (còn ${images.length}/10)!`));
+
+    } catch (e) {
+        console.error('Delete proof image error:', e.message);
         res.json(createResponse(true, 'Lỗi: ' + e.message));
     }
 });
