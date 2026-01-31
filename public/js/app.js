@@ -102,7 +102,7 @@ function showSection(sectionId) {
             loadMyOrders();
             break;
         case 'order-history':
-            loadOrderHistory();
+            // loadOrderHistory(); // DISABLED - Now using OrderHistoryModule
             break;
         case 'users':
             loadUsers();
@@ -1514,7 +1514,7 @@ function goToPage(direction) {
     } else if (direction === 'next') {
         state.historyPage++;
     }
-    loadOrderHistory();
+    // loadOrderHistory(); // DISABLED - OrderHistoryModule handles pagination
 }
 
 // === HELPERS ===

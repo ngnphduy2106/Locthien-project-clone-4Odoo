@@ -7,11 +7,41 @@ const OrderHistoryModule = {
     currentPage: 1,
     itemsPerPage: 20,
     totalPages: 1,
+    useCardLayout: true, // Cards by default - toggle with button group
+    searchQuery: '',
+    dateFilter: null,
 
     // Khởi tạo module
     init() {
-        console.log('Order History Module initialized');
+        console.log('📋 Order History Module initialized');
+        console.log('🎨 Layout mode:', this.useCardLayout ? 'CARDS' : 'TABLE');
+
+        // Attach button event listeners
+        this.setupToggleButtons();
+
         this.loadHistory();
+    },
+
+    // Setup toggle button event listeners
+    setupToggleButtons() {
+        const cardsBtn = document.getElementById('btn-cards-view');
+        const tableBtn = document.getElementById('btn-table-view');
+
+        if (cardsBtn) {
+            cardsBtn.addEventListener('click', () => {
+                console.log('🔘 Cards button clicked');
+                this.setView('cards');
+            });
+        }
+
+        if (tableBtn) {
+            tableBtn.addEventListener('click', () => {
+                console.log('🔘 Table button clicked');
+                this.setView('table');
+            });
+        }
+
+        console.log('✅ Toggle buttons attached');
     },
 
     // Load lịch sử
@@ -101,10 +131,104 @@ const OrderHistoryModule = {
         this.renderHistory();
     },
 
-    // Render lịch sử
+    // Render lịch sử (Router)
     renderHistory() {
+        console.log('🎨 Layout:', this.useCardLayout ? 'CARDS' : 'TABLE', '| Data:', this.history.length);
+        if (this.useCardLayout) {
+            this.renderCards();
+        } else {
+            this.renderTable();
+        }
+        this.renderPagination();
+    },
+
+    // NEW: Render as cards
+    renderCards() {
+        const container = document.getElementById('history-cards-container');
+        const tableContainer = document.getElementById('history-table-container');
+
+        if (!container) {
+            console.error('❌ Cards container not found! Falling back to table.');
+            this.useCardLayout = false;
+            this.renderTable();
+            return;
+        }
+
+        container.classList.remove('hidden');
+        if (tableContainer) tableContainer.classList.add('hidden');
+
+        if (this.history.length === 0) {
+            console.log('⚠️ No history data to display');
+            container.innerHTML = '<div class="history-empty-state"><i class="bi bi-inbox"></i><h4>Chưa có lịch sử đơn hàng</h4></div>';
+            return;
+        }
+
+        console.log('🎴 Rendering', this.history.length, 'cards...');
+        console.log('📦 Sample data:', this.history[0]);
+
+        container.innerHTML = this.history.map(order => {
+            const orderId = order.orderCode || order.id || 'N/A';
+            const customer = order.customerName || order.accountName || 'N/A';
+            const date = order.orderDate || order.order_date || order.createdAt;
+            const amount = order.totalAmount || order.total_amount || 0;
+            const status = order.status || 'N/A';
+            const driver = order.driverName || order.driver_name || '-';
+            const completedDate = order.completedAt || order.completed_at;
+            const statusClass = this.getStatusClass(status);
+            const statusText = this.getStatusText(status);
+
+            return `
+                <div class="history-order-card status-${statusClass}" 
+                     onclick="OrderHistoryModule.viewDetail('${orderId}')"
+                     data-order-id="${orderId}">
+                    <div class="order-card-header">
+                        <div>
+                            <div class="order-id">#${orderId}</div>
+                            <div class="order-customer">${customer}</div>
+                        </div>
+                        <span class="badge badge-${statusClass}">${statusText}</span>
+                    </div>
+                    <div class="order-meta">
+                        <div class="order-meta-item">
+                            <i class="bi bi-calendar3"></i>
+                            <span>${date ? new Date(date).toLocaleDateString('vi-VN') : 'N/A'}</span>
+                        </div>
+                        <div class="order-meta-item">
+                            <i class="bi bi-person"></i>
+                            <span>Tài xế: ${driver}</span>
+                        </div>
+                        <div class="order-meta-item">
+                            <i class="bi bi-check-circle"></i>
+                            <span>Hoàn thành: ${completedDate ? new Date(completedDate).toLocaleString('vi-VN') : '-'}</span>
+                        </div>
+                    </div>
+                    <div class="order-card-footer">
+                        <div class="order-total">${amount.toLocaleString('vi-VN')} VNĐ</div>
+                        <button class="btn-view-detail" 
+                                onclick="event.stopPropagation(); OrderHistoryModule.viewDetail('${orderId}')">
+                            <i class="bi bi-eye"></i> Chi tiết
+                        </button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        console.log('✅ Rendered', this.history.length, 'cards');
+    },
+
+    // OLD: Render as table
+    renderTable() {
         const container = document.getElementById('history-table-body');
-        if (!container) return;
+        const cardsContainer = document.getElementById('history-cards-container');
+        const tableContainer = document.getElementById('history-table-container');
+
+        if (!container) {
+            console.error('❌ Table container not found!');
+            return;
+        }
+
+        if (cardsContainer) cardsContainer.classList.add('hidden');
+        if (tableContainer) tableContainer.classList.remove('hidden');
 
         if (this.history.length === 0) {
             container.innerHTML = `
@@ -118,23 +242,88 @@ const OrderHistoryModule = {
             return;
         }
 
-        container.innerHTML = this.history.map(order => `
-            <tr onclick="OrderHistoryModule.viewDetail('${order.id || order.order_id}')" style="cursor:pointer;" class="history-row">
-                <td>${order.soDon || order.sale_order_no || order.id || order.order_id || 'N/A'}</td>
-                <td>${order.khach || order.account_name || order.customer || order.customer_name || 'N/A'}</td>
-                <td>${order.ngay || order.sale_order_date || order.date || order.order_date ? new Date(order.ngay || order.sale_order_date || order.date || order.order_date).toLocaleDateString('vi-VN') : 'N/A'}</td>
-                <td>${(order.amount || order.sale_order_amount || order.tongTien || order.total || order.total_amount || 0).toLocaleString('vi-VN')} VNĐ</td>
+        container.innerHTML = this.history.map(order => {
+            const orderId = order.orderCode || order.id || 'N/A';
+            const customer = order.customerName || order.accountName || 'N/A';
+            const date = order.orderDate || order.order_date || order.createdAt;
+            const amount = order.totalAmount || order.total_amount || 0;
+            const status = order.status || 'N/A';
+            const driver = order.driverName || order.driver_name || '-';
+            const completedDate = order.completedAt || order.completed_at;
+
+            return `
+            <tr onclick="OrderHistoryModule.viewDetail('${orderId}')" style="cursor:pointer;" class="history-row">
+                <td><strong>${orderId}</strong></td>
+                <td>${customer}</td>
+                <td>${date ? new Date(date).toLocaleDateString('vi-VN') : 'N/A'}</td>
+                <td>${amount.toLocaleString('vi-VN')} VNĐ</td>
                 <td>
-                    <span class="status-badge ${this.getStatusClass(order.status)}">
-                        ${this.getStatusText(order.status)}
+                    <span class="status-badge ${this.getStatusClass(status)}">
+                        ${this.getStatusText(status)}
                     </span>
                 </td>
-                <td>${order.taiXe || order.driver || order.driver_name || '-'}</td>
-                <td>${order.completedDate || order.completed_at ? new Date(order.completedDate || order.completed_at).toLocaleString('vi-VN') : '-'}</td>
-            </tr>
-        `).join('');
+                <td>${driver}</td>
+                <td>${completedDate ? new Date(completedDate).toLocaleString('vi-VN') : '-'}</td>
+            </tr>`;
+        }).join('');
 
-        this.renderPagination();
+        console.log('✅ Rendered', this.history.length, 'table rows');
+    },
+
+    // Toggle between card/table views
+    toggleView() {
+        this.useCardLayout = !this.useCardLayout;
+        console.log('🔄 Toggled to:', this.useCardLayout ? 'CARDS' : 'TABLE');
+
+        // Update button text and icon
+        const toggleText = document.getElementById('toggle-text');
+        const toggleIcon = document.getElementById('toggle-icon');
+
+        if (toggleText) {
+            toggleText.textContent = this.useCardLayout ? 'Chuyển sang Table' : 'Chuyển sang Cards';
+        }
+
+        if (toggleIcon) {
+            toggleIcon.className = this.useCardLayout ? 'bi bi-table' : 'bi bi-grid-3x3-gap';
+        }
+
+        this.renderHistory();
+    },
+
+    // Set specific view (for button group)
+    setView(viewType) {
+        this.useCardLayout = viewType === 'cards';
+        console.log('🎯 Set view to:', viewType.toUpperCase());
+
+        // Update button group active state
+        const cardsBtn = document.getElementById('btn-cards-view');
+        const tableBtn = document.getElementById('btn-table-view');
+
+        if (cardsBtn && tableBtn) {
+            if (this.useCardLayout) {
+                cardsBtn.classList.add('active');
+                tableBtn.classList.remove('active');
+            } else {
+                cardsBtn.classList.remove('active');
+                tableBtn.classList.add('active');
+            }
+        }
+
+        this.renderHistory();
+    },
+
+    // Search handler
+    handleSearch(query) {
+        this.searchQuery = query;
+        console.log('🔍 Search:', query);
+        this.renderHistory();
+    },
+
+    // Date filter handler
+    handleDateFilter(date) {
+        this.dateFilter = date;
+        console.log('📅 Date filter:', date);
+        this.renderHistory();
     },
 
     // Get status class
@@ -165,13 +354,11 @@ const OrderHistoryModule = {
         if (!container) return;
 
         container.innerHTML = `
-            <button class="btn-page" ${this.currentPage === 1 ? 'disabled' : ''} 
-                    onclick="OrderHistoryModule.goToPage(${this.currentPage - 1})">
+            <button class="pagination-btn" ${this.currentPage === 1 ? 'disabled' : ''} onclick="OrderHistoryModule.goToPage(${this.currentPage - 1})">
                 <i class="bi bi-chevron-left"></i>
             </button>
-            <span class="page-info">Trang ${this.currentPage} / ${this.totalPages}</span>
-            <button class="btn-page" ${this.currentPage === this.totalPages ? 'disabled' : ''} 
-                    onclick="OrderHistoryModule.goToPage(${this.currentPage + 1})">
+            <span class="pagination-info">Trang ${this.currentPage} / ${this.totalPages}</span>
+            <button class="pagination-btn" ${this.currentPage === this.totalPages ? 'disabled' : ''} onclick="OrderHistoryModule.goToPage(${this.currentPage + 1})">
                 <i class="bi bi-chevron-right"></i>
             </button>
         `;
@@ -212,12 +399,12 @@ const OrderHistoryModule = {
             viewOrderDetail(order.id);
         } else {
             // Fallback: simple alert
-            let details = `Chi tiết đơn hàng ${order.soDon || orderId}\n\n`;
-            details += `Khách hàng: ${order.khach || order.account_name || order.customer || 'N/A'}\n`;
-            details += `Ngày đặt: ${order.ngay || order.sale_order_date || order.date || 'N/A'}\n`;
-            details += `Địa chỉ: ${order.diaChi || order.shipping_address || 'N/A'}\n`;
-            details += `Tài xế: ${order.taiXe || order.driver || 'N/A'}\n`;
-            details += `Trạng thái: ${order.status}\n`;
+            let details = `Chi tiết đơn hàng ${order.soDon || orderId} \n\n`;
+            details += `Khách hàng: ${order.khach || order.account_name || order.customer || 'N/A'} \n`;
+            details += `Ngày đặt: ${order.ngay || order.sale_order_date || order.date || 'N/A'} \n`;
+            details += `Địa chỉ: ${order.diaChi || order.shipping_address || 'N/A'} \n`;
+            details += `Tài xế: ${order.taiXe || order.driver || 'N/A'} \n`;
+            details += `Trạng thái: ${order.status} \n`;
             alert(details);
         }
     },
@@ -237,3 +424,12 @@ const OrderHistoryModule = {
 
 // Đăng ký module
 AppRouter.registerModule('order-history', OrderHistoryModule);
+
+// Expose to global scope for button onclick handlers
+window.OrderHistoryModule = OrderHistoryModule;
+
+// Auto-init if section is visible
+if (document.getElementById('section-order-history') && !document.getElementById('section-order-history').classList.contains('hidden')) {
+    console.log('🚀 Auto-initializing Order History Module...');
+    OrderHistoryModule.init();
+}

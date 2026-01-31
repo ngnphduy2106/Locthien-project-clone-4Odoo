@@ -438,6 +438,7 @@ body {
     box-shadow: 0 0 0 3px var(--primary-light);
 }
 
+
 /* === Order Cards === */
 .order-card {
     background: var(--card-bg);
@@ -449,6 +450,39 @@ body {
     border-left: 4px solid var(--info);
     width: 100%;
     position: relative;
+}
+
+/* === History Cards Container === */
+#history-cards-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 16px;
+}
+
+/* === History Order Card === */
+.history-order-card {
+    background: var(--card-bg);
+    border-radius: var(--card-radius);
+    padding: 20px;
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--border-color);
+    border-left: 4px solid var(--info);
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.history-order-card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+    border-left-color: var(--primary);
+}
+
+.history-order-card.status-completed {
+    border-left-color: var(--success);
+}
+
+.history-order-card.status-cancelled {
+    border-left-color: var(--danger);
 }
 
 .order-card-header {
@@ -506,6 +540,27 @@ body {
     padding-top: 16px;
     border-top: 1px solid var(--border-color);
 }
+
+.btn-view-detail {
+    padding: 6px 16px;
+    background: var(--info);
+    color: white;
+    border: none;
+    border-radius: var(--btn-radius);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.btn-view-detail:hover {
+    background: #3b9ae1;
+    transform: scale(1.05);
+}
+
 
 /* === Buttons === */
 .btn {
@@ -2091,6 +2146,7 @@ body {
     border-bottom: none;
 }
 
+
 .detail-row label {
     font-size: 13px;
     color: var(--text-secondary);
@@ -2150,6 +2206,23 @@ body {
 
     .detail-row span {
         text-align: left;
+    }
+
+    /* History Cards Responsive */
+    #history-cards-container {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    .history-order-card {
+        padding: 16px;
+    }
+}
+
+/* Tablet Responsive */
+@media (min-width: 768px) and (max-width: 1024px) {
+    #history-cards-container {
+        grid-template-columns: repeat(2, 1fr);
     }
 }
 

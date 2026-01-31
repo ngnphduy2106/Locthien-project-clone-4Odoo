@@ -638,38 +638,62 @@
                 </section>
 
                 <!-- ==================== ORDER HISTORY SECTION ==================== -->
-                <section id="section-order-history" class="hidden">
-                    <h2 class="page-heading">Lịch Sử Đơn Hàng</h2>
+                <section id="section-order-history">
+                    <div
+                        style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; flex-wrap:wrap; gap:12px;">
+                        <h2 class="page-heading" style="margin:0;">Lịch Sử Đơn Hàng</h2>
+                        <!-- View Toggle Button Group -->
+                        <div class="view-toggle-group"
+                            style="display:flex; border:1px solid #D1D5DB; border-radius:8px; overflow:hidden; background:#FFFFFF;">
+                            <button id="btn-cards-view" class="view-toggle-btn active" title="Card View"
+                                data-view="cards"
+                                style="padding:8px 12px; border:none; background:#FFFFFF; cursor:pointer; transition:all 0.2s; display:flex; align-items:center; justify-content:center; width:44px; height:40px;">
+                                <i class="bi bi-grid-3x3-gap" style="font-size:18px; color:#6B7280;"></i>
+                            </button>
+                            <button id="btn-table-view" class="view-toggle-btn" title="Table View" data-view="table"
+                                style="padding:8px 12px; border:none; background:#FFFFFF; cursor:pointer; transition:all 0.2s; display:flex; align-items:center; justify-content:center; width:44px; height:40px;">
+                                <i class="bi bi-list-ul" style="font-size:18px; color:#6B7280;"></i>
+                            </button>
+                        </div>
+                    </div>
 
-                    <div class="card">
-                        <div class="card-body" style="padding: 0;">
-                            <table class="data-table">
-                                <thead>
-                                    <tr>
-                                        <th>Mã Đơn</th>
-                                        <th>Khách Hàng</th>
-                                        <th>Ngày</th>
-                                        <th>Tổng Tiền</th>
-                                        <th>Trạng Thái</th>
-                                        <th>Tài Xế</th>
-                                        <th>Hoàn Thành</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="history-table-body">
-                                    <!-- Rows will be rendered here -->
-                                </tbody>
-                            </table>
+                    <!-- Cards Container -->
+                    <div id="history-cards-container" class="history-card-grid"></div>
 
-                            <div class="pagination">
-                                <button class="pagination-btn" onclick="goToPage('prev')">
-                                    <i class="bi bi-chevron-left"></i>
-                                </button>
-                                <span class="pagination-info" id="pagination-info">Trang 1 / 1</span>
-                                <button class="pagination-btn" onclick="goToPage('next')">
-                                    <i class="bi bi-chevron-right"></i>
-                                </button>
+                    <!-- Table Container (Fallback) -->
+                    <div id="history-table-container">
+
+                        <div class="card">
+                            <div class="card-body" style="padding: 0;">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Mã Đơn</th>
+                                            <th>Khách Hàng</th>
+                                            <th>Ngày</th>
+                                            <th>Tổng Tiền</th>
+                                            <th>Trạng Thái</th>
+                                            <th>Tài Xế</th>
+                                            <th>Hoàn Thành</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="history-table-body">
+                                        <!-- Rows will be rendered here -->
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
+                    </div>
+
+                    <!-- Pagination (Shared) -->
+                    <div id="history-pagination" class="pagination" style="margin-top:20px;">
+                        <button class="pagination-btn" onclick="goToPage('prev')">
+                            <i class="bi bi-chevron-left"></i>
+                        </button>
+                        <span class="pagination-info" id="pagination-info">Trang 1 / 1</span>
+                        <button class="pagination-btn" onclick="goToPage('next')">
+                            <i class="bi bi-chevron-right"></i>
+                        </button>
                     </div>
                 </section>
 
@@ -925,9 +949,10 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="/js/core.js?v=15"></script>
     <script src="/js/app-router.js?v=4"></script>
-    <script src="/js/api.js?v=16"></script>
+    <script src="/js/api.js?v=17"></script>
     <script src="/js/notifications.js?v=1"></script>
-    <script src="/js/app.js?v=18"></script>
+    <script src="/js/app.js?v=19"></script>
+    <script src="/js/modules/order-history.js?v=101"></script>
 
 
 
