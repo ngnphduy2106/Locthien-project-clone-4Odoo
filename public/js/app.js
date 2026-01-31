@@ -8,6 +8,7 @@ let state = {
     user: null,
     orders: { pending: [], assigned: [], completed: [], imports: [] },
     imports: { pending: [], assigned: [], completed: [] },
+    myOrders: [],  // Driver's orders for My Orders section
     drivers: [],
     currentSection: 'dashboard',
     currentDispatchTab: 'pending',
@@ -1297,6 +1298,9 @@ async function loadMyOrders() {
         const res = await api.getMyOrders(driverName, role);
         const orders = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
 
+        // Save to state for use in viewOrderDetail
+        state.myOrders = orders;
+
         console.log(`📦 Received ${orders.length} orders:`, orders.map(o => ({ id: o.soDon, status: o.status, statusCode: o.statusCode })));
 
         // Load unread counts BEFORE rendering for chat badges
@@ -1560,12 +1564,13 @@ async function viewOrderDetail(orderId) {
     console.log('viewOrderDetail called with:', orderId);
     console.log('state.orders:', state.orders);
 
-    // Find order from state - try multiple matching approaches including exports
+    // Find order from state - try multiple matching approaches including exports and myOrders
     const allOrders = [
         ...(state.orders.pending || []),
         ...(state.orders.assigned || []),
         ...(state.orders.completed || []),
-        ...(state.orders.exports || [])
+        ...(state.orders.exports || []),
+        ...(state.myOrders || [])  // Include driver's orders
     ];
     console.log('allOrders count:', allOrders.length);
 
