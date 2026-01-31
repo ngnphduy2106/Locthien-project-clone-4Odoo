@@ -2251,12 +2251,32 @@ function openDeliveryModal(orderId) {
 
     state.currentDeliveryOrder = order;
 
-    // Initialize Cart from Order Products
-    state.deliveryCart = (order.products || []).map(p => ({
-        product: p.name || p.productName,
-        code: p.code || '',
-        planQty: p.qty || p.quantity,
-        qty: p.qty || p.quantity,
+    // Initialize Cart from Order Products - handle ALL formats including JSON strings
+    let orderProducts = order.products || order.cart || order.chiTiet || order.sale_order_product_mappings || [];
+
+    // Parse JSON string if needed (database might return string)
+    if (typeof orderProducts === 'string') {
+        try {
+            orderProducts = JSON.parse(orderProducts);
+        } catch (e) {
+            console.error('Failed to parse products JSON:', e, orderProducts);
+            orderProducts = [];
+        }
+    }
+
+    // Ensure it's an array
+    if (!Array.isArray(orderProducts)) {
+        console.warn('Products is not an array:', orderProducts);
+        orderProducts = [];
+    }
+
+    console.log(`📦 Delivery modal: Order ${order.soDon || order.id} has ${orderProducts.length} products:`, orderProducts);
+
+    state.deliveryCart = orderProducts.map(p => ({
+        product: p.name || p.productName || p.product_name || '',
+        code: p.code || p.product_code || '',
+        planQty: p.qty || p.quantity || p.amount || 0,
+        qty: p.qty || p.quantity || p.amount || 0,
         unit: p.unit || 'Kg',
         density: p.density || 1,
         isShell: false,
