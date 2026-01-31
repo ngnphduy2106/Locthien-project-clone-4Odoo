@@ -2326,10 +2326,21 @@ function openDeliveryModal(orderId) {
             </div>
             
             <div class="form-group">
-                <label class="form-label">Ảnh giao hàng</label>
-                <input type="file" id="inp-del-img" accept="image/*" multiple 
-                    onchange="handleImageSelect(this)" class="form-control">
-                <div id="img-preview-area" style="display:flex; flex-wrap:wrap; gap:8px; margin-top:12px;"></div>
+                <label class="form-label" style="display:flex; align-items:center; gap:6px;">
+                    <i class="bi bi-images"></i> Ảnh chứng minh giao hàng
+                    <span id="delivery-images-count" style="font-size:12px; color:var(--text-muted);"></span>
+                </label>
+                <div id="img-preview-area" style="display:flex; flex-wrap:wrap; gap:8px; min-height:80px; padding:12px; background:var(--body-bg); border-radius:8px; border:1px dashed var(--border); margin-bottom:12px;">
+                    <div style="text-align:center; width:100%; color:var(--text-muted); padding:20px;">
+                        <i class="bi bi-camera" style="font-size:24px;"></i>
+                        <p style="margin-top:8px;">Chưa có ảnh</p>
+                    </div>
+                </div>
+                <label style="display:inline-flex; align-items:center; gap:8px; padding:8px 16px; background:var(--success); color:white; border-radius:8px; cursor:pointer; font-size:13px;">
+                    <i class="bi bi-plus-circle"></i> Thêm ảnh
+                    <input type="file" id="inp-del-img" accept="image/*" multiple onchange="handleImageSelect(this)" style="display:none;">
+                </label>
+                <span style="margin-left:8px; font-size:12px; color:var(--text-muted);">Tối đa 10 ảnh</span>
             </div>
             
             <div class="form-group">
@@ -2417,32 +2428,84 @@ function removeCartItem(idx) {
     renderDeliveryCart();
 }
 
+
 function handleImageSelect(input) {
     const files = input.files;
     if (!files || !files.length) return;
 
     const previewArea = window.$('#img-preview-area');
+    const counter = window.$('#delivery-images-count');
     if (!previewArea) return;
 
     state.selectedImages = state.selectedImages || [];
 
+    // Check if we're at the limit
+    if (state.selectedImages.length >= 10) {
+        alert('Đã đạt giới hạn 10 ảnh!');
+        return;
+    }
+
+    // Clear empty state message on first image
+    if (state.selectedImages.length === 0) {
+        previewArea.innerHTML = '';
+    }
+
     for (const file of files) {
+        if (state.selectedImages.length >= 10) break;
+
         const reader = new FileReader();
         reader.onload = (e) => {
+            const imgIndex = state.selectedImages.length;
             state.selectedImages.push(e.target.result);
 
             const imgWrapper = document.createElement('div');
             imgWrapper.style.cssText = 'position:relative; width:80px; height:80px;';
+            imgWrapper.setAttribute('data-img-idx', imgIndex);
             imgWrapper.innerHTML = `
-                <img src="${e.target.result}" style="width:100%; height:100%; object-fit:cover; border-radius:8px;">
-                <button type="button" onclick="this.parentElement.remove()" 
-                    style="position:absolute; top:-6px; right:-6px; width:20px; height:20px; border-radius:50%; background:var(--danger); color:white; border:none; cursor:pointer; font-size:12px;">×</button>
+                <img src="${e.target.result}" style="width:100%; height:100%; object-fit:cover; border-radius:8px; border:2px solid var(--border);">
+                <button type="button" onclick="removeDeliveryImage(this.parentElement, ${imgIndex})" 
+                    style="position:absolute; top:-6px; right:-6px; width:20px; height:20px; border-radius:50%; background:var(--danger); color:white; border:none; cursor:pointer; font-size:12px; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.2);">×</button>
             `;
             previewArea.appendChild(imgWrapper);
+
+            // Update counter
+            if (counter) {
+                counter.textContent = `${state.selectedImages.length}/10 ảnh`;
+            }
         };
         reader.readAsDataURL(file);
     }
 }
+
+// Remove delivery image from preview
+function removeDeliveryImage(element, idx) {
+    if (element) element.remove();
+    // Note: We mark as null instead of splice to preserve indices for other images
+    if (state.selectedImages && state.selectedImages[idx]) {
+        state.selectedImages[idx] = null;
+    }
+
+    // Update counter
+    const counter = window.$('#delivery-images-count');
+    const validCount = (state.selectedImages || []).filter(img => img !== null).length;
+    if (counter) {
+        counter.textContent = validCount > 0 ? `${validCount}/10 ảnh` : '';
+    }
+
+    // Show empty state if no images left
+    const previewArea = window.$('#img-preview-area');
+    if (validCount === 0 && previewArea) {
+        previewArea.innerHTML = `
+            <div style="text-align:center; width:100%; color:var(--text-muted); padding:20px;">
+                <i class="bi bi-camera" style="font-size:24px;"></i>
+                <p style="margin-top:8px;">Chưa có ảnh</p>
+            </div>
+        `;
+    }
+}
+
+window.removeDeliveryImage = removeDeliveryImage;
+
 
 async function submitDelivery() {
     if (!state.deliveryCart || !state.deliveryCart.length) {
@@ -2483,7 +2546,7 @@ async function submitDelivery() {
             isShell: i.isShell,
             note: i.note
         })),
-        images: state.selectedImages || []
+        images: (state.selectedImages || []).filter(img => img !== null)
     };
 
     showLoading('Đang xử lý...');
