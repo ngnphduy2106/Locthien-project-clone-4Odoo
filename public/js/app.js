@@ -1047,6 +1047,11 @@ function renderImportList() {
                         <i class="bi bi-check-circle"></i> Hoàn thành
                     </button>
                 ` : ''}
+                ${(state.currentDispatchTab === 'pending' || state.currentDispatchTab === 'assigned') && isAdminRole() ? `
+                    <button class="btn btn-danger btn-sm" onclick="deleteImportTicket('${imp.id}')" title="Xóa đơn nhập">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                ` : ''}
             </div>
         </div>
     `).join('');
@@ -4475,6 +4480,36 @@ window.removeDriverAssignmentRow = removeDriverAssignmentRow;
 window.renderDriverAssignmentsList = renderDriverAssignmentsList;
 window.updateQtySummaryDisplay = updateQtySummaryDisplay;
 window.submitMultiDriverAssignment = submitMultiDriverAssignment;
+
+// Delete Import Ticket
+async function deleteImportTicket(importId) {
+    if (!confirm('Bạn có chắc muốn HỦY đơn nhập này?\n\nĐơn sẽ được chuyển sang trạng thái "Đã hủy".')) {
+        return;
+    }
+
+    try {
+        showLoading('Đang hủy đơn nhập...');
+        const res = await fetch(`/api/imports/${importId}`, {
+            method: 'DELETE'
+        });
+        const data = await res.json();
+        hideLoading();
+
+        if (!data.error) {
+            toastSuccess('Đã hủy đơn nhập thành công!');
+            // Reload the import list
+            await loadImportTickets();
+        } else {
+            toastError('Lỗi: ' + (data.msg || 'Không thể hủy đơn nhập'));
+        }
+    } catch (e) {
+        hideLoading();
+        console.error('Delete import ticket error:', e);
+        toastError('Lỗi kết nối: ' + e.message);
+    }
+}
+
+window.deleteImportTicket = deleteImportTicket;
 
 // ===============================================
 // USER ACCOUNT MANAGEMENT (ADMIN ONLY)
