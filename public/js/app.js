@@ -440,9 +440,10 @@ async function loadDashboard() {
         const completedFromFiltered = filteredOrders.filter(o => o.status === 'Đã thực hiện').length;
 
         // Use API counts for quick stats (not affected by period filter)
-        const pendingCount = pendingFromFiltered || (res.pending || []).length;
-        const completedCount = completedFromFiltered || (res.completed || []).length;
-        const completedRate = orderCount > 0 ? Math.round((completedCount / orderCount) * 100) : 0;
+        const pendingCount = pendingFromFiltered;
+        const completedCount = completedFromFiltered;
+        // Completion rate should be based on the filtered order count
+        const completedRate = orderCount > 0 ? Math.round((completedFromFiltered / orderCount) * 100) : 0;
 
         // Update stat cards
         const elOrderCount = window.$('#stat-order-count');
