@@ -2061,7 +2061,7 @@ async function viewOrderDetail(orderId, options = {}) {
                 <div style="margin-top:12px;">
                     <label style="display:inline-flex; align-items:center; gap:8px; padding:8px 16px; background:var(--success); color:white; border-radius:8px; cursor:pointer; font-size:13px;">
                         <i class="bi bi-plus-circle"></i> Bổ sung ảnh
-                        <input type="file" accept="image/*" multiple onchange="handleAddProofImages(this, '${order.id}')" style="display:none;">
+                        <input type="file" accept="image/*" multiple onchange="handleAddProofImages(this, '${order.soDon || order.sale_order_no || order.id}')" style="display:none;">
                     </label>
                     <span style="margin-left:8px; font-size:12px; color:var(--text-muted);">Tối đa 10 ảnh</span>
                 </div>
@@ -2133,8 +2133,10 @@ async function viewOrderDetail(orderId, options = {}) {
         loadOrderChat(currentChatOrderId); // Load messages immediately
         startChatRefresh();
 
-        // Load proof images
-        loadProofImages(order.id);
+        // Load proof images - use soDon first (matches order_no in export_tickets)
+        const proofOrderId = order.soDon || order.sale_order_no || order.id;
+        console.log('📸 Loading proof images for:', proofOrderId);
+        loadProofImages(proofOrderId);
     }
 
     if (modal) modal.classList.remove('hidden');
