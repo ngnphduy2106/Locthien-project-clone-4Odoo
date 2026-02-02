@@ -2815,4 +2815,22 @@ body {
     .modal-overlay .modal-footer .btn {
         width: 100%;
     }
+
+    /* Create Order Form - Stack grids on mobile */
+    .card-body>div[style*="grid-template-columns"] {
+        display: block !important;
+    }
+
+    .card-body>div[style*="grid-template-columns"]>.form-group {
+        margin-bottom: 12px !important;
+    }
+
+    /* Page content grids */
+    .page-content>section div[style*="grid-template-columns: 1fr 1fr"] {
+        display: block !important;
+    }
+
+    .page-content>section div[style*="grid-template-columns: 1fr 1fr"]>.card {
+        margin-bottom: 16px;
+    }
 }
