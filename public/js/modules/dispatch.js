@@ -730,6 +730,73 @@ const DispatchModule = {
                     background: #fee2e2;
                     border-color: #fca5a5;
                 }
+
+                /* Mobile responsive for products table */
+                @media (max-width: 767px) {
+                    .order-detail-modal .products-table {
+                        overflow-x: auto;
+                    }
+                    
+                    .order-detail-modal .products-table table {
+                        min-width: 100%;
+                    }
+                    
+                    .order-detail-modal .products-table th,
+                    .order-detail-modal .products-table td {
+                        padding: 8px !important;
+                        font-size: 12px !important;
+                    }
+                    
+                    .order-detail-modal .products-table th:first-child,
+                    .order-detail-modal .products-table td:first-child {
+                        display: none; /* Hide code column on mobile */
+                    }
+                    
+                    .order-detail-modal .product-code {
+                        font-size: 10px !important;
+                        padding: 2px 6px !important;
+                    }
+                    
+                    .order-detail-modal .modal-content {
+                        margin: 10px;
+                        max-height: calc(100vh - 20px);
+                    }
+                    
+                    .order-detail-modal .modal-header {
+                        padding: 14px !important;
+                    }
+                    
+                    .order-detail-modal .modal-header h3 {
+                        font-size: 16px !important;
+                    }
+                    
+                    .order-detail-modal .modal-body {
+                        padding: 14px !important;
+                    }
+                    
+                    .order-detail-modal .section-title {
+                        font-size: 13px !important;
+                    }
+                    
+                    /* Stack assign driver form on mobile */
+                    .order-detail-modal .assign-driver-form > div[style*="grid-template-columns: 1fr 1fr"] {
+                        display: block !important;
+                    }
+                    
+                    .order-detail-modal .assign-driver-form > div[style*="grid-template-columns: 1fr 1fr"] > div {
+                        margin-bottom: 12px;
+                    }
+                    
+                    /* Local items buttons wrap */
+                    .local-items-section > div[style*="flex-wrap: wrap"] {
+                        gap: 6px !important;
+                    }
+                    
+                    .local-items-section .local-item-btn {
+                        padding: 6px 10px !important;
+                        font-size: 11px !important;
+                    }
+                }
             </style>
         `;
 

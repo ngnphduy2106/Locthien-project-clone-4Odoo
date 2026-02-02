@@ -2590,3 +2590,71 @@ body {
         font-size: 14px;
     }
 }
+
+/* Order Detail Modal - Mobile Responsive Product Table */
+@media (max-width: 767px) {
+    #modal-order-detail .modal-content {
+        margin: 8px;
+        max-height: calc(100vh - 16px);
+        width: calc(100% - 16px);
+    }
+
+    #modal-order-detail .modal-body {
+        padding: 12px !important;
+    }
+
+    #modal-order-detail .order-detail-grid .detail-row {
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    #modal-order-detail .order-detail-grid .detail-row label {
+        font-size: 11px;
+        color: var(--text-muted);
+    }
+
+    #modal-order-detail .data-table {
+        display: block;
+        overflow-x: auto;
+    }
+
+    #modal-order-detail .data-table th,
+    #modal-order-detail .data-table td {
+        padding: 8px 6px !important;
+        font-size: 12px !important;
+        white-space: nowrap;
+    }
+
+    #modal-order-detail .data-table th:first-child,
+    #modal-order-detail .data-table td:first-child {
+        max-width: 150px;
+        white-space: normal;
+        word-break: break-word;
+    }
+
+    /* Proof images gallery */
+    #modal-order-detail .proof-gallery {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    #modal-order-detail .proof-gallery img {
+        width: 60px;
+        height: 60px;
+    }
+
+    /* Chat section */
+    #modal-order-detail .chat-messages-container {
+        max-height: 200px;
+    }
+
+    #modal-order-detail .modal-footer {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    #modal-order-detail .modal-footer .btn {
+        width: 100%;
+    }
+}
