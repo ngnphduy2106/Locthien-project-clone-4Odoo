@@ -158,9 +158,200 @@ const NotificationModule = {
     }
 };
 
+// ===============================================
+// IN-APP NOTIFICATION PANEL
+// ===============================================
+
+let notificationPollingInterval = null;
+
+// Toggle notification panel visibility
+function toggleNotificationPanel(event) {
+    event?.stopPropagation();
+    const panel = document.getElementById('notification-panel');
+    const isHidden = panel.classList.contains('hidden');
+
+    // Close user menu if open
+    const userMenu = document.getElementById('user-menu');
+    if (userMenu) userMenu.classList.add('hidden');
+
+    if (isHidden) {
+        panel.classList.remove('hidden');
+        loadNotifications();
+    } else {
+        panel.classList.add('hidden');
+    }
+}
+
+// Load notifications from API
+async function loadNotifications() {
+    const user = JSON.parse(localStorage.getItem('LT_USER') || '{}');
+    const userId = user.fullName || user.name || user.phone;
+
+    if (!userId) return;
+
+    try {
+        const res = await fetch(`/api/notifications/${encodeURIComponent(userId)}`);
+        const data = await res.json();
+
+        if (!data.error) {
+            renderNotifications(data.data || []);
+            updateNotificationBadge(data.unreadCount || 0);
+        }
+    } catch (e) {
+        console.error('Load notifications error:', e);
+    }
+}
+
+// Render notifications in panel
+function renderNotifications(notifications) {
+    const list = document.getElementById('notification-list');
+    if (!list) return;
+
+    if (!notifications.length) {
+        list.innerHTML = `
+            <div class="notification-empty">
+                <i class="bi bi-bell-slash"></i>
+                <span>Không có thông báo mới</span>
+            </div>
+        `;
+        return;
+    }
+
+    const iconMap = {
+        'message': '💬',
+        'order_assigned': '🚛',
+        'order_completed': '✅',
+        'misa_new_order': '📦'
+    };
+
+    const typeClassMap = {
+        'message': 'message',
+        'order_assigned': 'order',
+        'order_completed': 'complete',
+        'misa_new_order': 'misa'
+    };
+
+    list.innerHTML = notifications.map(n => {
+        const icon = iconMap[n.type] || '🔔';
+        const typeClass = typeClassMap[n.type] || 'order';
+        const unreadClass = n.is_read ? '' : 'unread';
+        const time = formatNotificationTime(n.created_at);
+
+        return `
+            <div class="notification-item ${unreadClass}" onclick="handleNotificationClick('${n.id}', '${n.order_id || ''}')">
+                <div class="notification-icon ${typeClass}">${icon}</div>
+                <div class="notification-content">
+                    <div class="notification-title">${escapeHtml(n.title)}</div>
+                    <div class="notification-body">${escapeHtml(n.body)}</div>
+                    <div class="notification-time">${time}</div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+// Handle notification click
+async function handleNotificationClick(notificationId, orderId) {
+    // Mark as read
+    try {
+        await fetch(`/api/notifications/${notificationId}/read`, { method: 'PUT' });
+    } catch (e) { }
+
+    // Close panel
+    document.getElementById('notification-panel')?.classList.add('hidden');
+
+    // Navigate to order if available
+    if (orderId && window.viewOrderDetail) {
+        window.viewOrderDetail(orderId);
+    }
+
+    // Reload notifications
+    loadNotifications();
+}
+
+// Mark all notifications as read
+async function markAllNotificationsRead() {
+    const user = JSON.parse(localStorage.getItem('LT_USER') || '{}');
+    const userId = user.fullName || user.name || user.phone;
+
+    if (!userId) return;
+
+    try {
+        await fetch(`/api/notifications/mark-all-read/${encodeURIComponent(userId)}`, { method: 'PUT' });
+        loadNotifications();
+    } catch (e) {
+        console.error('Mark all read error:', e);
+    }
+}
+
+// Update badge count
+function updateNotificationBadge(count) {
+    const badge = document.getElementById('notification-badge');
+    if (!badge) return;
+
+    if (count > 0) {
+        badge.textContent = count > 99 ? '99+' : count;
+        badge.classList.remove('hidden');
+    } else {
+        badge.classList.add('hidden');
+    }
+}
+
+// Format notification time
+function formatNotificationTime(isoString) {
+    if (!isoString) return '';
+    const date = new Date(isoString);
+    const now = new Date();
+    const diff = now - date;
+
+    if (diff < 60000) return 'Vừa xong';
+    if (diff < 3600000) return `${Math.floor(diff / 60000)} phút trước`;
+    if (diff < 86400000) return `${Math.floor(diff / 3600000)} giờ trước`;
+    if (diff < 604800000) return `${Math.floor(diff / 86400000)} ngày trước`;
+
+    return date.toLocaleDateString('vi-VN');
+}
+
+// Escape HTML
+function escapeHtml(text) {
+    if (!text) return '';
+    return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// Start polling for notifications
+function startNotificationPolling() {
+    if (notificationPollingInterval) return;
+
+    // Initial load
+    loadNotifications();
+
+    // Poll every 30 seconds
+    notificationPollingInterval = setInterval(() => {
+        loadNotifications();
+    }, 30000);
+}
+
+// Close panel when clicking outside
+document.addEventListener('click', (e) => {
+    const panel = document.getElementById('notification-panel');
+    const wrapper = document.querySelector('.notification-wrapper');
+
+    if (panel && wrapper && !wrapper.contains(e.target)) {
+        panel.classList.add('hidden');
+    }
+});
+
 // Auto-init when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
     NotificationModule.init();
+
+    // Start polling after login
+    setTimeout(() => {
+        const user = localStorage.getItem('LT_USER');
+        if (user) {
+            startNotificationPolling();
+        }
+    }, 2000);
 });
 
 // Listen for messages from service worker
@@ -174,4 +365,10 @@ navigator.serviceWorker?.addEventListener('message', (event) => {
     }
 });
 
+// Export functions globally
 window.NotificationModule = NotificationModule;
+window.toggleNotificationPanel = toggleNotificationPanel;
+window.loadNotifications = loadNotifications;
+window.markAllNotificationsRead = markAllNotificationsRead;
+window.handleNotificationClick = handleNotificationClick;
+window.startNotificationPolling = startNotificationPolling;

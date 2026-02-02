@@ -22,6 +22,7 @@ import webhookRoutes from './routes/webhooks.js';
 import chatRoutes from './routes/chat.js';
 import importRoutes from './routes/imports.js';
 import supplierRoutes from './routes/suppliers.js';
+import notificationRoutes from './routes/notifications.js';
 
 import { syncMisaOrders, syncMisaProducts, getSyncStatus, updateMisaOrder } from './services/misa.js';
 import db from './db/index.js';
@@ -56,6 +57,7 @@ apiRouter.use('/reports', reportRoutes);
 apiRouter.use('/webhooks', webhookRoutes);
 apiRouter.use('/imports', importRoutes);
 apiRouter.use('/suppliers', supplierRoutes);
+apiRouter.use('/notifications', notificationRoutes);
 
 // Manual Sync Endpoint (Two-way: Pull New & Push Pending)
 apiRouter.post('/sync', async (req, res) => {

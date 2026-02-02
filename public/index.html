@@ -157,9 +157,26 @@
                     <span id="header-title">Tổng quan</span>
                 </div>
                 <div class="header-actions">
-                    <button class="header-btn" title="Thông báo">
-                        <i class="bi bi-bell"></i>
-                    </button>
+                    <!-- Notification Bell with Dropdown -->
+                    <div class="notification-wrapper" style="position:relative;">
+                        <button class="header-btn notification-bell" title="Thông báo"
+                            onclick="toggleNotificationPanel(event)">
+                            <i class="bi bi-bell"></i>
+                            <span id="notification-badge" class="notification-count hidden">0</span>
+                        </button>
+                        <div id="notification-panel" class="notification-panel hidden">
+                            <div class="notification-header">
+                                <span>Thông báo</span>
+                                <button class="btn-mark-all" onclick="markAllNotificationsRead()">Đọc tất cả</button>
+                            </div>
+                            <div id="notification-list" class="notification-list">
+                                <div class="notification-empty">
+                                    <i class="bi bi-bell-slash"></i>
+                                    <span>Không có thông báo mới</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                     <div style="position:relative;">
                         <div class="user-avatar" id="user-avatar" onclick="toggleUserMenu(event)">
                             <span id="user-initial">A</span>

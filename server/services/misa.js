@@ -448,6 +448,21 @@ const performSync = async () => {
             msg += `\n🔔 @sales (Vào Điều Phối gán tài xế)`;
 
             await sendTelegramMessage(msg);
+
+            // Create in-app notification for ADMIN
+            try {
+                const { createNotification } = await import('../routes/notifications.js');
+                await createNotification(
+                    'ADMIN',
+                    'misa_new_order',
+                    '📦 Đơn hàng mới từ MISA',
+                    `Đơn #${saleOrderNo} - ${item.account_name || 'Khách hàng'}`,
+                    saleOrderNo,
+                    saleOrderNo
+                );
+            } catch (notifyErr) {
+                console.error('In-app notification error:', notifyErr.message);
+            }
         }
 
         console.log(`✅ Synced/Updated Order: ${saleOrderNo}`);

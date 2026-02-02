@@ -6,6 +6,7 @@ import { Router } from 'express';
 import { CONFIG, createResponse, formatDate, getTimestamp, standardizeData } from '../config.js';
 import db from '../db/index.js';
 import { updateMisaOrder } from '../services/misa.js';
+import { createNotification } from './notifications.js';
 
 const router = Router();
 
@@ -403,6 +404,21 @@ router.put('/:id/assign', async (req, res) => {
             console.error('Telegram notification error:', tgErr.message);
         }
 
+        // Create in-app notification for driver
+        try {
+            const orderNo = fullOrder?.soDon || fullOrder?.sale_order_no || id;
+            await createNotification(
+                driverName,
+                'order_assigned',
+                '🚛 Đơn hàng mới',
+                `Bạn được phân công đơn #${orderNo}`,
+                id,
+                orderNo
+            );
+        } catch (notifyErr) {
+            console.error('In-app notification error:', notifyErr.message);
+        }
+
         if (!syncResult.success) {
             console.error('MISA Sync Failed during Assign:', syncResult.message);
             // We don't block assignment, but we notify
@@ -643,6 +659,21 @@ router.post('/:id/complete', async (req, res) => {
                 });
 
                 // Final response
+                // Create notification for ADMIN about completed order
+                try {
+                    const orderNo = orderInfo?.soDon || orderInfo?.sale_order_no || id;
+                    await createNotification(
+                        'ADMIN',
+                        'order_completed',
+                        '✅ Đơn hoàn thành',
+                        `Đơn #${orderNo} đã được giao bởi ${driver_name}`,
+                        id,
+                        orderNo
+                    );
+                } catch (notifyErr) {
+                    console.error('Admin notification error:', notifyErr.message);
+                }
+
                 return res.json(createResponse(!syncResult.success, syncResult.success ? 'Hoàn thành!' : 'Đã lưu cục bộ nhưng CRM lỗi' + syncStatusMsg, { ticketId, crmStatus: crmSyncStatus }));
 
             } catch (syncErr) {

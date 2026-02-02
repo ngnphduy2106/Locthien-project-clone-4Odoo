@@ -5,6 +5,7 @@
 import { Router } from 'express';
 import { createResponse } from '../config.js';
 import { createClient } from '@supabase/supabase-js';
+import { createNotification } from './notifications.js';
 
 const router = Router();
 
@@ -221,6 +222,51 @@ router.post('/:id/messages', async (req, res) => {
         if (error) {
             console.error('Chat insert error:', error);
             return res.json(createResponse(true, 'Lỗi gửi tin nhắn'));
+        }
+
+        // Create notification for message recipient
+        try {
+            const senderRoleUpper = (sender_role || '').toUpperCase();
+            const orderNo = safeId;
+
+            if (senderRoleUpper === 'DRIVER') {
+                // Driver sent message -> notify ADMIN
+                await createNotification(
+                    'ADMIN',
+                    'message',
+                    '💬 Tin nhắn mới',
+                    `${sender_name} nhắn trên đơn #${orderNo}`,
+                    safeId,
+                    orderNo
+                );
+            } else {
+                // Admin/Manager sent -> Need to find driver to notify (we don't have driver info in this context)
+                // For now, we'll create a generic notification that the driver can see when they check
+                // In a full implementation, we'd query the order to get the assigned driver
+                // Let's query the order to get driver name
+                const supabase = getSupabase();
+                if (supabase && type !== 'import') {
+                    const { data: orderData } = await supabase
+                        .from('orders')
+                        .select('taiXe')
+                        .eq('id', safeId)
+                        .single();
+
+                    // Also try by sale_order_no if not found by id
+                    if (orderData?.taiXe) {
+                        await createNotification(
+                            orderData.taiXe,
+                            'message',
+                            '💬 Tin nhắn mới',
+                            `Bạn có tin nhắn mới ở đơn #${orderNo}`,
+                            safeId,
+                            orderNo
+                        );
+                    }
+                }
+            }
+        } catch (notifyErr) {
+            console.error('Message notification error:', notifyErr.message);
         }
 
         res.json({
