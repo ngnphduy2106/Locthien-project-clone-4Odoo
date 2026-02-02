@@ -649,7 +649,7 @@ const DispatchModule = {
                             <button class="btn-secondary" onclick="DispatchModule.closeDetailModal()" style="flex: 1; padding: 12px; background: #e5e7eb; border: none; color: #374151; border-radius: 8px; font-weight: 600; cursor: pointer;">
                                 Đóng
                             </button>
-                            <button class="btn-success" onclick="DispatchModule.completeOrder('${orderId}')" style="flex: 1; padding: 12px; background: #10b981; border: none; color: white; border-radius: 8px; font-weight: 600; cursor: pointer;">
+                            <button class="btn-success" onclick="DispatchModule.closeDetailModal(); openDeliveryModal('${orderId}')" style="flex: 1; padding: 12px; background: #10b981; border: none; color: white; border-radius: 8px; font-weight: 600; cursor: pointer;">
                                 <i class="bi bi-check-circle"></i> Hoàn thành
                             </button>
                         </div>
