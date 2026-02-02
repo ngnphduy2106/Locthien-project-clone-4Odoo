@@ -2683,7 +2683,22 @@ function openDeliveryModal(orderId) {
             <h4 style="margin:20px 0 12px; font-size:14px; color:var(--text-secondary);">Sản phẩm giao</h4>
             <div id="delivery-cart-list"></div>
             
-            <div class="form-group" style="margin-top:20px;">
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:20px;">
+                <div class="form-group" style="margin:0;">
+                    <label class="form-label"><i class="bi bi-person"></i> Tài xế</label>
+                    <input type="text" id="inp-del-driver" class="form-control" 
+                           value="${order.driver_name || order.taiXe || order.driver || state.user?.name || ''}" 
+                           placeholder="Tên tài xế...">
+                </div>
+                <div class="form-group" style="margin:0;">
+                    <label class="form-label"><i class="bi bi-truck"></i> Biển số xe</label>
+                    <input type="text" id="inp-del-plate" class="form-control" 
+                           value="${order.plate || order.bienSo || order.vehicle_plate || ''}" 
+                           placeholder="Biển số...">
+                </div>
+            </div>
+            
+            <div class="form-group" style="margin-top:16px;">
                 <label class="form-label">Kho xuất</label>
                 <div style="display:flex; gap:16px;">
                     <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
@@ -2891,8 +2906,15 @@ async function submitDelivery() {
     let warehouse = 'LT1';
     for (const r of warehouseGroup) if (r.checked) warehouse = r.value;
 
+    // Read from form inputs
     const noteEl = window.$('#inp-del-note');
+    const driverEl = window.$('#inp-del-driver');
+    const plateEl = window.$('#inp-del-plate');
+
     const note = noteEl?.value || '';
+    const driverName = driverEl?.value?.trim() || state.user?.name || '';
+    const plate = plateEl?.value?.trim() || '';
+
     const order = state.currentDeliveryOrder;
 
     if (!order) {
@@ -2900,12 +2922,18 @@ async function submitDelivery() {
         return;
     }
 
+    if (!driverName) {
+        alert('Vui lòng nhập tên tài xế!');
+        driverEl?.focus();
+        return;
+    }
+
     const payload = {
         type: order.type || 'EXPORT',
         warehouse: warehouse,
         partner: order.customerName || order.khach || order.account_name || '',
-        driver_name: order.driver_name || order.driverName || order.taiXe || order.driver || state.user?.name || '',
-        plate: order.plate || order.bienSo || order.vehicle_plate || '',
+        driver_name: driverName,
+        plate: plate,
         note: note,
         sender: state.user?.name,
         cart: state.deliveryCart.map(i => ({
