@@ -275,6 +275,9 @@ function initApp() {
     // Load drivers for assignment forms
     loadDrivers();
 
+    // Initialize Flatpickr date pickers with dd/mm/yyyy format
+    initDatePickers();
+
     // Show appropriate section based on role
     const normalizedRole = (state.user?.role || '').toLowerCase();
     if (normalizedRole === 'driver') {
@@ -283,6 +286,40 @@ function initApp() {
         showSection('dashboard');
     }
 }
+
+// Initialize all date pickers with Vietnamese format
+function initDatePickers() {
+    const flatpickrConfig = {
+        locale: 'vn',
+        dateFormat: 'd/m/Y',
+        altInput: true,
+        altFormat: 'd/m/Y',
+        allowInput: true
+    };
+
+    // Dashboard date pickers
+    const dateFrom = document.getElementById('dashboard-date-from');
+    const dateTo = document.getElementById('dashboard-date-to');
+    if (dateFrom) flatpickr(dateFrom, flatpickrConfig);
+    if (dateTo) flatpickr(dateTo, flatpickrConfig);
+
+    // Dispatch order date filter
+    const orderDateFilter = document.getElementById('order-date-filter');
+    if (orderDateFilter) {
+        flatpickr(orderDateFilter, {
+            ...flatpickrConfig,
+            onChange: function (selectedDates, dateStr) {
+                // Convert dd/mm/yyyy to yyyy-mm-dd for filtering
+                if (selectedDates.length > 0) {
+                    const d = selectedDates[0];
+                    const isoDate = d.toISOString().split('T')[0];
+                    filterByDate(isoDate);
+                }
+            }
+        });
+    }
+}
+window.initDatePickers = initDatePickers;
 
 // Apply role-based UI visibility
 function applyRoleBasedUI(role) {
@@ -416,9 +453,11 @@ async function loadDashboard() {
         const periodSelect = window.$('#dashboard-period');
         const period = periodSelect?.value || 'month';
 
-        // Get custom date range if selected
-        const dateFrom = window.$('#dashboard-date-from')?.value;
-        const dateTo = window.$('#dashboard-date-to')?.value;
+        // Get custom date range if selected (from Flatpickr instances)
+        const dateFromEl = document.getElementById('dashboard-date-from');
+        const dateToEl = document.getElementById('dashboard-date-to');
+        const dateFrom = dateFromEl?._flatpickr?.selectedDates?.[0];
+        const dateTo = dateToEl?._flatpickr?.selectedDates?.[0];
 
         // Get orders data - include deleted/cancelled when viewing all
         const includeDeleted = (period === 'all' || period === 'custom');
@@ -452,18 +491,17 @@ async function loadDashboard() {
                 case 'year':
                     return orderDate.getFullYear() === now.getFullYear();
                 case 'custom':
-                    // Filter by custom date range
+                    // Filter by custom date range (dateFrom/dateTo are Date objects from Flatpickr)
                     if (dateFrom && dateTo) {
-                        const from = new Date(dateFrom);
-                        const to = new Date(dateTo);
-                        to.setHours(23, 59, 59, 999); // Include entire end day
-                        return orderDate >= from && orderDate <= to;
+                        const toEnd = new Date(dateTo);
+                        toEnd.setHours(23, 59, 59, 999); // Include entire end day
+                        return orderDate >= dateFrom && orderDate <= toEnd;
                     } else if (dateFrom) {
-                        return orderDate >= new Date(dateFrom);
+                        return orderDate >= dateFrom;
                     } else if (dateTo) {
-                        const to = new Date(dateTo);
-                        to.setHours(23, 59, 59, 999);
-                        return orderDate <= to;
+                        const toEnd = new Date(dateTo);
+                        toEnd.setHours(23, 59, 59, 999);
+                        return orderDate <= toEnd;
                     }
                     return true;
                 default:
