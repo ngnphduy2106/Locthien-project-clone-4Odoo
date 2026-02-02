@@ -297,11 +297,18 @@ function initDatePickers() {
         allowInput: true
     };
 
-    // Dashboard date pickers
+    // Dashboard date pickers - auto-reload when date changes
     const dateFrom = document.getElementById('dashboard-date-from');
     const dateTo = document.getElementById('dashboard-date-to');
-    if (dateFrom) flatpickr(dateFrom, flatpickrConfig);
-    if (dateTo) flatpickr(dateTo, flatpickrConfig);
+    const dashboardDateConfig = {
+        ...flatpickrConfig,
+        onChange: function () {
+            // Auto-reload dashboard when date selection changes
+            loadDashboard();
+        }
+    };
+    if (dateFrom) flatpickr(dateFrom, dashboardDateConfig);
+    if (dateTo) flatpickr(dateTo, dashboardDateConfig);
 
     // Dispatch order date filter
     const orderDateFilter = document.getElementById('order-date-filter');
