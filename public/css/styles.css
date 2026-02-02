@@ -2833,4 +2833,35 @@ body {
     .page-content>section div[style*="grid-template-columns: 1fr 1fr"]>.card {
         margin-bottom: 16px;
     }
+
+    /* Warehouse stats cards - 2 columns on mobile */
+    #section-warehouse .stat-cards {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 12px;
+    }
+
+    #section-warehouse .stat-card-value {
+        font-size: 1.5rem !important;
+    }
+
+    /* Warehouse table responsive */
+    #warehouse-table {
+        font-size: 13px;
+    }
+
+    #warehouse-table th:nth-child(1),
+    #warehouse-table td:nth-child(1) {
+        display: none;
+        /* Hide # column on mobile */
+    }
+
+    #warehouse-table th:nth-child(6),
+    #warehouse-table td:nth-child(6) {
+        padding: 4px !important;
+    }
+
+    #warehouse-table .btn-sm {
+        padding: 4px 6px !important;
+        font-size: 12px !important;
+    }
 }
