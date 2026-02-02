@@ -2691,18 +2691,14 @@ function openDeliveryModal(orderId) {
             <h4 style="margin:20px 0 12px; font-size:14px; color:var(--text-secondary);">Sản phẩm giao</h4>
             <div id="delivery-cart-list"></div>
             
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:20px;">
-                <div class="form-group" style="margin:0;">
-                    <label class="form-label"><i class="bi bi-person"></i> Tài xế</label>
-                    <input type="text" id="inp-del-driver" class="form-control" 
-                           value="${order.driver_name || order.taiXe || order.driver || state.user?.name || ''}" 
-                           placeholder="Tên tài xế...">
                 </div>
-                <div class="form-group" style="margin:0;">
-                    <label class="form-label"><i class="bi bi-truck"></i> Biển số xe</label>
-                    <input type="text" id="inp-del-plate" class="form-control" 
-                           value="${order.plate || order.bienSo || order.vehicle_plate || ''}" 
-                           placeholder="Biển số...">
+                <div class="detail-row">
+                    <label>Tài xế:</label>
+                    <span><strong>${order.driver_name || order.taiXe || order.driver || state.user?.name || 'Chưa phân công'}</strong></span>
+                </div>
+                <div class="detail-row">
+                    <label>Biển số:</label>
+                    <span>${order.plate || order.bienSo || order.vehicle_plate || 'Chưa có'}</span>
                 </div>
             </div>
             
@@ -2901,27 +2897,10 @@ window.removeDeliveryImage = removeDeliveryImage;
 
 
 async function submitDelivery() {
-    if (!state.deliveryCart || !state.deliveryCart.length) {
-        alert('Giỏ hàng trống!');
-        return;
-    }
-
+    // Validate images
     if (!state.selectedImages || !state.selectedImages.length) {
         if (!confirm('Cảnh báo: Chưa có ảnh chứng minh. Tiếp tục?')) return;
     }
-
-    const warehouseGroup = document.getElementsByName('del-wh');
-    let warehouse = 'LT1';
-    for (const r of warehouseGroup) if (r.checked) warehouse = r.value;
-
-    // Read from form inputs
-    const noteEl = window.$('#inp-del-note');
-    const driverEl = window.$('#inp-del-driver');
-    const plateEl = window.$('#inp-del-plate');
-
-    const note = noteEl?.value || '';
-    const driverName = driverEl?.value?.trim() || state.user?.name || '';
-    const plate = plateEl?.value?.trim() || '';
 
     const order = state.currentDeliveryOrder;
 
@@ -2930,35 +2909,19 @@ async function submitDelivery() {
         return;
     }
 
-    if (!driverName) {
-        alert('Vui lòng nhập tên tài xế!');
-        driverEl?.focus();
-        return;
-    }
+    const noteEl = window.$('#inp-del-note');
+    const note = noteEl?.value || '';
 
+    // Use simplified admin_completed flow - backend reads driver info from order
     const payload = {
-        type: order.type || 'EXPORT',
-        warehouse: warehouse,
-        partner: order.customerName || order.khach || order.account_name || '',
-        driver_name: driverName,
-        plate: plate,
-        note: note,
-        sender: state.user?.name,
-        cart: state.deliveryCart.map(i => ({
-            product: { name: i.product, code: i.code },
-            weight_kg: i.qty,
-            unit: i.unit,
-            density: i.density,
-            isShell: i.isShell,
-            note: i.note
-        })),
+        admin_completed: true,
+        delivery_note: note || `Hoàn thành bởi ${state.user?.name || 'Driver'}`,
         images: (state.selectedImages || []).filter(img => img !== null)
     };
 
     console.log('📤 Submit delivery payload:', {
         orderId: order.id,
-        driver: payload.driver_name,
-        plate: payload.plate,
+        admin_completed: true,
         imagesCount: payload.images.length
     });
 
