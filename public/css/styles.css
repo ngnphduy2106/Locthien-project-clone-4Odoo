@@ -2341,6 +2341,23 @@ body {
     .header-actions {
         gap: 8px;
     }
+
+    /* History Cards Responsive - Mobile */
+    #history-cards-container {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    .history-order-card {
+        padding: 16px;
+    }
+}
+
+/* Tablet Responsive for History Cards */
+@media (min-width: 768px) and (max-width: 1024px) {
+    #history-cards-container {
+        grid-template-columns: repeat(2, 1fr);
+    }
 }
 
 /* Small Mobile (max-width: 480px) */
