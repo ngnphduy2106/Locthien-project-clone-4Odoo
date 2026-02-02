@@ -962,6 +962,29 @@ function renderDispatchOrders() {
         });
     }
 
+    // Sort orders: by order number descending (newest first), then by date descending
+    orders = [...orders].sort((a, b) => {
+        // Extract numeric part from order number (e.g., PO4100136821.25 -> 4100136821)
+        const getOrderNum = (order) => {
+            const orderNo = order.soDon || order.sale_order_no || order.id || '';
+            const match = String(orderNo).match(/(\d+)/);
+            return match ? parseInt(match[1], 10) : 0;
+        };
+
+        const numA = getOrderNum(a);
+        const numB = getOrderNum(b);
+
+        // First sort by order number descending (higher number = newer)
+        if (numB !== numA) {
+            return numB - numA;
+        }
+
+        // Then sort by date descending (newer date first)
+        const dateA = a.ngay || a.sale_order_date || '';
+        const dateB = b.ngay || b.sale_order_date || '';
+        return dateB.localeCompare(dateA);
+    });
+
     if (orders.length === 0) {
         container.innerHTML = `
             <div style="text-align:center; padding:60px; color:var(--text-muted);">
