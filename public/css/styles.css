@@ -99,6 +99,13 @@ body {
     color: white;
 }
 
+.sidebar-logo {
+    width: 44px;
+    height: 44px;
+    object-fit: contain;
+    border-radius: 8px;
+}
+
 .sidebar-brand-text {
     font-weight: 600;
     font-size: 16px;
