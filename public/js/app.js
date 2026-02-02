@@ -1684,6 +1684,70 @@ function switchMyOrdersTab(tab) {
 // Export switchMyOrdersTab
 window.switchMyOrdersTab = switchMyOrdersTab;
 
+// Filter and sort My Orders
+function filterMyOrders() {
+    const searchInput = document.getElementById('my-orders-search');
+    const sortSelect = document.getElementById('my-orders-sort');
+
+    const query = (searchInput?.value || '').toLowerCase().trim();
+    const sortValue = sortSelect?.value || 'date-desc';
+
+    console.log('🔍 Filtering My Orders:', { query, sortValue });
+
+    // Get all orders from state
+    let orders = [...(state.myOrders || [])];
+
+    // Filter by search query
+    if (query) {
+        orders = orders.filter(order => {
+            const searchFields = [
+                order.soDon || order.sale_order_no || order.id,
+                order.khach || order.account_name || order.customer,
+                order.diaChi || order.shipping_address
+            ].map(f => (f || '').toLowerCase());
+
+            return searchFields.some(field => field.includes(query));
+        });
+    }
+
+    // Sort
+    orders.sort((a, b) => {
+        switch (sortValue) {
+            case 'date-asc':
+                return new Date(a.ngay || a.sale_order_date || 0) - new Date(b.ngay || b.sale_order_date || 0);
+            case 'date-desc':
+                return new Date(b.ngay || b.sale_order_date || 0) - new Date(a.ngay || a.sale_order_date || 0);
+            case 'customer-asc':
+                return (a.khach || a.account_name || '').localeCompare(b.khach || b.account_name || '');
+            case 'customer-desc':
+                return (b.khach || b.account_name || '').localeCompare(a.khach || a.account_name || '');
+            default:
+                return 0;
+        }
+    });
+
+    // Categorize and re-render
+    const pending = orders.filter(o => o.statusCode === 'CHO_NHAN' || o.status === 'assigned');
+    const delivering = orders.filter(o => o.statusCode === 'DANG_GIAO' || o.status === 'in_transit' || o.status === 'DELIVERING');
+    const completed = orders.filter(o => o.statusCode === 'HOAN_THANH' || o.status === 'completed' || o.status === 'Đã thực hiện');
+
+    // Update badges
+    const pendingBadge = window.$('#pending-badge');
+    const deliveringBadge = window.$('#delivering-badge');
+    const completedBadge = window.$('#completed-badge');
+    if (pendingBadge) pendingBadge.textContent = pending.length;
+    if (deliveringBadge) deliveringBadge.textContent = delivering.length;
+    if (completedBadge) completedBadge.textContent = completed.length;
+
+    // Re-render lists
+    renderMyOrdersList('my-orders-pending-list', pending, 'pending');
+    renderMyOrdersList('my-orders-delivering-list', delivering, 'delivering');
+    renderMyOrdersList('my-orders-completed-list', completed, 'completed');
+}
+
+// Export filterMyOrders
+window.filterMyOrders = filterMyOrders;
+
 // === ORDER HISTORY ===
 async function loadOrderHistory() {
     const tbody = window.$('#history-table-body');

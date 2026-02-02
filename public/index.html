@@ -627,6 +627,22 @@
                         </div>
                     </div>
 
+                    <!-- Search and Sort Controls -->
+                    <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:16px; align-items:center;">
+                        <div class="search-input" style="flex:1; min-width:200px;">
+                            <i class="bi bi-search"></i>
+                            <input type="text" placeholder="Tìm kiếm theo mã đơn, khách hàng, địa chỉ..."
+                                id="my-orders-search" oninput="filterMyOrders()">
+                        </div>
+                        <select id="my-orders-sort" class="form-select" style="width:auto; min-width:150px;"
+                            onchange="filterMyOrders()">
+                            <option value="date-desc">Mới nhất</option>
+                            <option value="date-asc">Cũ nhất</option>
+                            <option value="customer-asc">Khách hàng A-Z</option>
+                            <option value="customer-desc">Khách hàng Z-A</option>
+                        </select>
+                    </div>
+
                     <!-- Tab Navigation -->
                     <div class="tab-nav" style="margin-bottom:20px;">
                         <button class="tab-btn active" onclick="switchMyOrdersTab('pending')" id="my-tab-pending">
@@ -686,6 +702,32 @@
                                 <i class="bi bi-list-ul" style="font-size:18px; color:#6B7280;"></i>
                             </button>
                         </div>
+                    </div>
+
+                    <!-- Search and Sort Controls -->
+                    <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:16px; align-items:center;">
+                        <div class="search-input" style="flex:1; min-width:200px;">
+                            <i class="bi bi-search"></i>
+                            <input type="text" placeholder="Tìm kiếm theo mã đơn, khách hàng, tài xế, địa chỉ..."
+                                id="history-search" oninput="OrderHistoryModule.filterHistory()">
+                        </div>
+                        <select id="history-sort" class="form-select" style="width:auto; min-width:150px;"
+                            onchange="OrderHistoryModule.sortHistory()">
+                            <option value="date-desc">Mới nhất</option>
+                            <option value="date-asc">Cũ nhất</option>
+                            <option value="customer-asc">Khách hàng A-Z</option>
+                            <option value="customer-desc">Khách hàng Z-A</option>
+                            <option value="driver-asc">Tài xế A-Z</option>
+                            <option value="amount-desc">Giá cao - thấp</option>
+                            <option value="amount-asc">Giá thấp - cao</option>
+                        </select>
+                        <select id="history-status-filter" class="form-select" style="width:auto; min-width:140px;"
+                            onchange="OrderHistoryModule.filterHistory()">
+                            <option value="">Tất cả trạng thái</option>
+                            <option value="Hoàn thành">Hoàn thành</option>
+                            <option value="Đã hủy">Đã hủy</option>
+                            <option value="Đã hủy bỏ">Đã hủy bỏ</option>
+                        </select>
                     </div>
 
                     <!-- Cards Container -->

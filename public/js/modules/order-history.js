@@ -4,6 +4,7 @@
 
 const OrderHistoryModule = {
     history: [],
+    filteredHistory: [], // Stores filtered/sorted results
     currentPage: 1,
     itemsPerPage: 20,
     totalPages: 1,
@@ -409,10 +410,87 @@ const OrderHistoryModule = {
         }
     },
 
-    // Search history
-    searchHistory(query) {
-        // TODO: Implement search with API
-        console.log('Search history:', query);
+    // Filter history based on search and status
+    filterHistory() {
+        const searchInput = document.getElementById('history-search');
+        const statusFilter = document.getElementById('history-status-filter');
+
+        const query = (searchInput?.value || '').toLowerCase().trim();
+        const status = statusFilter?.value || '';
+
+        console.log('🔍 Filtering history:', { query, status });
+
+        this.filteredHistory = this.history.filter(order => {
+            // Status filter
+            if (status && (order.status || '').toLowerCase() !== status.toLowerCase()) {
+                return false;
+            }
+
+            // Search filter
+            if (query) {
+                const searchFields = [
+                    order.soDon || order.sale_order_no || order.id,
+                    order.khach || order.account_name || order.customer,
+                    order.taiXe || order.driver,
+                    order.diaChi || order.shipping_address
+                ].map(f => (f || '').toLowerCase());
+
+                return searchFields.some(field => field.includes(query));
+            }
+
+            return true;
+        });
+
+        // Apply current sort
+        this.sortHistory(false);
+    },
+
+    // Sort history
+    sortHistory(doRender = true) {
+        const sortSelect = document.getElementById('history-sort');
+        const sortValue = sortSelect?.value || 'date-desc';
+
+        console.log('📊 Sorting history by:', sortValue);
+
+        const data = this.filteredHistory.length > 0 ? this.filteredHistory : [...this.history];
+
+        data.sort((a, b) => {
+            switch (sortValue) {
+                case 'date-asc':
+                    return new Date(a.ngay || a.sale_order_date || 0) - new Date(b.ngay || b.sale_order_date || 0);
+                case 'date-desc':
+                    return new Date(b.ngay || b.sale_order_date || 0) - new Date(a.ngay || a.sale_order_date || 0);
+                case 'customer-asc':
+                    return (a.khach || a.account_name || '').localeCompare(b.khach || b.account_name || '');
+                case 'customer-desc':
+                    return (b.khach || b.account_name || '').localeCompare(a.khach || a.account_name || '');
+                case 'driver-asc':
+                    return (a.taiXe || a.driver || '').localeCompare(b.taiXe || b.driver || '');
+                case 'amount-desc':
+                    return (b.amount || b.sale_order_amount || 0) - (a.amount || a.sale_order_amount || 0);
+                case 'amount-asc':
+                    return (a.amount || a.sale_order_amount || 0) - (b.amount || b.sale_order_amount || 0);
+                default:
+                    return 0;
+            }
+        });
+
+        this.filteredHistory = data;
+
+        if (doRender) {
+            this.renderFilteredHistory();
+        }
+    },
+
+    // Render filtered results
+    renderFilteredHistory() {
+        const data = this.filteredHistory.length > 0 ? this.filteredHistory : this.history;
+
+        // Temporarily swap history with filtered for rendering
+        const originalHistory = this.history;
+        this.history = data;
+        this.renderHistory();
+        this.history = originalHistory;
     },
 
     // Export to Excel
