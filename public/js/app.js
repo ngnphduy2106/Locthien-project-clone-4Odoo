@@ -1672,8 +1672,9 @@ function getStatusText(status) {
 }
 
 
-async function viewOrderDetail(orderId) {
-    console.log('viewOrderDetail called with:', orderId);
+async function viewOrderDetail(orderId, options = {}) {
+    const isReadonly = options.readonly === true;
+    console.log('viewOrderDetail called with:', orderId, isReadonly ? '(readonly)' : '');
     console.log('state.orders:', state.orders);
 
     // Find order from state - try multiple matching approaches including exports and myOrders
@@ -1862,7 +1863,7 @@ async function viewOrderDetail(orderId) {
                         <i class="bi bi-hourglass-split"></i> Đang tải ảnh...
                     </div>
                 </div>
-                ${isAdminRole() ? `
+                ${!isReadonly && isAdminRole() ? `
                 <div style="margin-top:12px;">
                     <label style="display:inline-flex; align-items:center; gap:8px; padding:8px 16px; background:var(--success); color:white; border-radius:8px; cursor:pointer; font-size:13px;">
                         <i class="bi bi-plus-circle"></i> Bổ sung ảnh
@@ -1908,12 +1909,12 @@ async function viewOrderDetail(orderId) {
             
             <!--ACTION BUTTONS-->
         <div style="margin-top:20px; padding-top:16px; border-top:1px solid var(--border); display:flex; gap:8px; flex-wrap:wrap;">
-            ${isAdminRole() && (order.status === 'Mới' || order.status === 'Chưa thực hiện') ? `
+            ${!isReadonly && isAdminRole() && (order.status === 'Mới' || order.status === 'Chưa thực hiện') ? `
                     <button class="btn btn-primary" onclick="closeOrderModal(); assignDriver('${order.id}')">
                         <i class="bi bi-person-plus"></i> Phân công tài xế
                     </button>
                 ` : ''}
-            ${(order.status === 'Đang thực hiện' || order.status === 'Chờ giao' || order.status === 'assigned') && isAdminRole() ? `
+            ${!isReadonly && (order.status === 'Đang thực hiện' || order.status === 'Chờ giao' || order.status === 'assigned') && isAdminRole() ? `
                     <button class="btn btn-info" onclick="closeOrderModal(); assignDriver('${order.id}')" style="background:var(--info); color:white;">
                         <i class="bi bi-person-gear"></i> Đổi tài xế
                     </button>
@@ -1921,7 +1922,7 @@ async function viewOrderDetail(orderId) {
                         <i class="bi bi-check-circle"></i> Hoàn thành
                     </button>
                 ` : ''}
-            ${isAdminRole() ? `
+            ${!isReadonly && isAdminRole() ? `
                     <button class="btn btn-warning" onclick="closeOrderModal(); editOrder('${order.id}')">
                         <i class="bi bi-pencil"></i> Chỉnh sửa
                     </button>

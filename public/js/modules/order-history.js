@@ -396,7 +396,7 @@ const OrderHistoryModule = {
                 state.orders.completed.push(order);
             }
 
-            viewOrderDetail(order.id);
+            viewOrderDetail(order.id, { readonly: true });
         } else {
             // Fallback: simple alert
             let details = `Chi tiết đơn hàng ${order.soDon || orderId} \n\n`;
