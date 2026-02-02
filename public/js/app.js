@@ -2901,9 +2901,9 @@ async function submitDelivery() {
     const payload = {
         type: order.type || 'EXPORT',
         warehouse: warehouse,
-        partner: order.customerName || order.khach,
-        driver_name: order.driverName || order.taiXe || state.user?.name,
-        plate: order.plate || order.bienSo || '',
+        partner: order.customerName || order.khach || order.account_name || '',
+        driver_name: order.driver_name || order.driverName || order.taiXe || order.driver || state.user?.name || '',
+        plate: order.plate || order.bienSo || order.vehicle_plate || '',
         note: note,
         sender: state.user?.name,
         cart: state.deliveryCart.map(i => ({
@@ -2916,6 +2916,13 @@ async function submitDelivery() {
         })),
         images: (state.selectedImages || []).filter(img => img !== null)
     };
+
+    console.log('📤 Submit delivery payload:', {
+        orderId: order.id,
+        driver: payload.driver_name,
+        plate: payload.plate,
+        imagesCount: payload.images.length
+    });
 
     showLoading('Đang xử lý...');
 
