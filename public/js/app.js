@@ -44,6 +44,93 @@ function hideLoading() {
     hide('loading');
 }
 
+// === TOAST NOTIFICATION SYSTEM ===
+function showToast(message, type = 'info', duration = 3000) {
+    // Create container if not exists
+    let container = document.getElementById('toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toast-container';
+        container.style.cssText = 'position:fixed; top:20px; right:20px; z-index:10000; display:flex; flex-direction:column; gap:10px; max-width:380px;';
+        document.body.appendChild(container);
+    }
+
+    // Create toast element
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+
+    // Icons and colors based on type
+    const icons = {
+        success: 'bi-check-circle-fill',
+        error: 'bi-x-circle-fill',
+        warning: 'bi-exclamation-triangle-fill',
+        info: 'bi-info-circle-fill'
+    };
+    const colors = {
+        success: '#10b981',
+        error: '#ef4444',
+        warning: '#f59e0b',
+        info: '#3b82f6'
+    };
+
+    toast.style.cssText = `
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 14px 16px;
+        background: #1f2937;
+        border-left: 4px solid ${colors[type] || colors.info};
+        border-radius: 8px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+        color: #fff;
+        font-size: 14px;
+        animation: slideIn 0.3s ease;
+        cursor: pointer;
+    `;
+
+    toast.innerHTML = `
+        <i class="bi ${icons[type] || icons.info}" style="color:${colors[type] || colors.info}; font-size:18px; flex-shrink:0; margin-top:1px;"></i>
+        <span style="flex:1; line-height:1.4;">${message}</span>
+        <button onclick="this.parentElement.remove()" style="background:none; border:none; color:#9ca3af; cursor:pointer; font-size:16px; padding:0; margin-left:8px;">×</button>
+    `;
+
+    container.appendChild(toast);
+
+    // Click to dismiss
+    toast.addEventListener('click', () => toast.remove());
+
+    // Auto remove after duration
+    if (duration > 0) {
+        setTimeout(() => {
+            toast.style.animation = 'slideOut 0.3s ease forwards';
+            setTimeout(() => toast.remove(), 300);
+        }, duration);
+    }
+
+    return toast;
+}
+
+// Shorthand functions
+function toastSuccess(msg, duration) { return showToast(msg, 'success', duration); }
+function toastError(msg, duration) { return showToast(msg, 'error', duration || 5000); }
+function toastWarning(msg, duration) { return showToast(msg, 'warning', duration); }
+function toastInfo(msg, duration) { return showToast(msg, 'info', duration); }
+
+// Override alert to use toast
+window._originalAlert = window.alert;
+window.alert = function (msg) {
+    // Detect type from message content
+    if (msg.includes('✅') || msg.includes('thành công') || msg.includes('Đã ')) {
+        showToast(msg.replace('✅ ', ''), 'success');
+    } else if (msg.includes('❌') || msg.includes('Lỗi') || msg.includes('lỗi') || msg.includes('Không thể') || msg.includes('không thể')) {
+        showToast(msg.replace('❌ ', ''), 'error', 5000);
+    } else if (msg.includes('Vui lòng') || msg.includes('Chưa') || msg.includes('giới hạn')) {
+        showToast(msg, 'warning');
+    } else {
+        showToast(msg, 'info');
+    }
+};
+
 // Check if current user has admin privileges
 function isAdminRole() {
     const role = (state.user?.role || '').toLowerCase().trim();
