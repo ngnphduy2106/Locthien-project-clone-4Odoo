@@ -1982,11 +1982,11 @@ async function viewOrderDetail(orderId, options = {}) {
                 </div>
                 <div class="detail-row">
                     <label>Tài xế:</label>
-                    <span>${order.taiXe || order.driver || 'Chưa phân công'}</span>
+                    <span>${order.driver_name || order.taiXe || order.driver || order.driverName || 'Chưa phân công'}</span>
                 </div>
                 <div class="detail-row">
                     <label>Biển số xe:</label>
-                    <span>${order.bienSo || order.plate || 'Chưa có'}</span>
+                    <span>${order.plate || order.bienSo || order.vehicle_plate || 'Chưa có'}</span>
                 </div>
                 ${!isDriver ? `
                 <div class="detail-row">
