@@ -423,7 +423,15 @@ const OrderHistoryModule = {
         const query = (searchInput?.value || '').toLowerCase().trim();
         const status = statusFilter?.value || '';
 
-        console.log('🔍 Filtering history:', { query, status });
+        console.log('🔍 Filtering history:', { query, status, totalOrders: this.history.length });
+        console.log('📦 Sample order:', this.history[0]);
+
+        // Start with all history if no filters
+        if (!query && !status) {
+            this.filteredHistory = [...this.history];
+            this.renderHistory();
+            return;
+        }
 
         this.filteredHistory = this.history.filter(order => {
             // Status filter
@@ -431,23 +439,44 @@ const OrderHistoryModule = {
                 return false;
             }
 
-            // Search filter
+            // Search filter - check ALL possible field names
             if (query) {
                 const searchFields = [
-                    order.soDon || order.sale_order_no || order.id,
-                    order.khach || order.account_name || order.customer,
-                    order.taiXe || order.driver,
-                    order.diaChi || order.shipping_address
-                ].map(f => (f || '').toLowerCase());
+                    // Order ID fields
+                    order.orderCode,
+                    order.id,
+                    order.soDon,
+                    order.sale_order_no,
+                    // Customer fields
+                    order.customerName,
+                    order.accountName,
+                    order.account_name,
+                    order.khach,
+                    order.customer,
+                    // Driver fields
+                    order.driverName,
+                    order.driver_name,
+                    order.driver,
+                    order.taiXe,
+                    // Address fields
+                    order.shippingAddress,
+                    order.shipping_address,
+                    order.diaChi,
+                    order.address
+                ].map(f => String(f || '').toLowerCase());
 
-                return searchFields.some(field => field.includes(query));
+                const matches = searchFields.some(field => field.includes(query));
+                return matches;
             }
 
             return true;
         });
 
-        // Apply current sort
+        console.log('✅ Filtered results:', this.filteredHistory.length);
+
+        // Apply current sort and render
         this.sortHistory(false);
+        this.renderHistory();
     },
 
     // Sort history
@@ -462,19 +491,19 @@ const OrderHistoryModule = {
         data.sort((a, b) => {
             switch (sortValue) {
                 case 'date-asc':
-                    return new Date(a.ngay || a.sale_order_date || 0) - new Date(b.ngay || b.sale_order_date || 0);
+                    return new Date(a.orderDate || a.order_date || a.createdAt || 0) - new Date(b.orderDate || b.order_date || b.createdAt || 0);
                 case 'date-desc':
-                    return new Date(b.ngay || b.sale_order_date || 0) - new Date(a.ngay || a.sale_order_date || 0);
+                    return new Date(b.orderDate || b.order_date || b.createdAt || 0) - new Date(a.orderDate || a.order_date || a.createdAt || 0);
                 case 'customer-asc':
-                    return (a.khach || a.account_name || '').localeCompare(b.khach || b.account_name || '');
+                    return (a.customerName || a.accountName || '').localeCompare(b.customerName || b.accountName || '');
                 case 'customer-desc':
-                    return (b.khach || b.account_name || '').localeCompare(a.khach || a.account_name || '');
+                    return (b.customerName || b.accountName || '').localeCompare(a.customerName || a.accountName || '');
                 case 'driver-asc':
-                    return (a.taiXe || a.driver || '').localeCompare(b.taiXe || b.driver || '');
+                    return (a.driverName || a.driver_name || '').localeCompare(b.driverName || b.driver_name || '');
                 case 'amount-desc':
-                    return (b.amount || b.sale_order_amount || 0) - (a.amount || a.sale_order_amount || 0);
+                    return (b.totalAmount || b.total_amount || 0) - (a.totalAmount || a.total_amount || 0);
                 case 'amount-asc':
-                    return (a.amount || a.sale_order_amount || 0) - (b.amount || b.sale_order_amount || 0);
+                    return (a.totalAmount || a.total_amount || 0) - (b.totalAmount || b.total_amount || 0);
                 default:
                     return 0;
             }
