@@ -129,12 +129,12 @@ export const db = {
         const { useSupabase, useFirebase } = getMode();
         if (useSupabase) {
             let query = supabase.from('orders').select('*').order('sale_order_date', { ascending: false });
-            
+
             // Filter out cancelled orders by default (soft-deleted from MISA)
             if (!includeDeleted) {
                 query = query.neq('status', 'Đã hủy bỏ');
             }
-            
+
             const { data, error } = await query;
             if (error) console.error('Supabase getOrders error:', error);
             // Map to frontend field names for compatibility
@@ -222,6 +222,17 @@ export const db = {
                 data.products = products;
                 data.cart = products;
                 data.local_items = localItems;
+
+                // Map custom fields to frontend field names (same as getOrders)
+                data.soDon = data.sale_order_no;
+                data.ngay = data.sale_order_date;
+                data.khach = data.account_name;
+                data.diaChi = data.shipping_address || data.billing_address || '';
+                data.amount = data.sale_order_amount || 0;
+                data.taiXe = data.custom_field13 || '';
+                data.bienSo = data.custom_field14 || '';
+                data.driver_name = data.custom_field13 || '';
+                data.plate = data.custom_field14 || '';
             }
 
 
