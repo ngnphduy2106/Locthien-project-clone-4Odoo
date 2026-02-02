@@ -1550,7 +1550,7 @@ async function loadMyOrders() {
 
         // Separate into 3 categories using statusCode from backend
         const pending = orders.filter(o => o.statusCode === 'CHO_NHAN' || o.status === 'assigned');
-        const delivering = orders.filter(o => o.statusCode === 'DANG_GIAO' || o.status === 'in_transit' || o.status === 'DELIVERING');
+        const delivering = orders.filter(o => o.statusCode === 'DANG_GIAO' || o.status === 'in_transit' || o.status === 'DELIVERING' || o.status === 'Đang thực hiện');
         const completed = orders.filter(o => o.statusCode === 'HOAN_THANH' || o.status === 'completed' || o.status === 'Đã thực hiện');
 
         console.log(`📊 Categories: Pending=${pending.length}, Delivering=${delivering.length}, Completed=${completed.length}`);
