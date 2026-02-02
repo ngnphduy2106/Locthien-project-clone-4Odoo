@@ -70,6 +70,7 @@ const OrderHistoryModule = {
             }
 
             this.history = data.data || data.orders || data.history || [];
+            this.filteredHistory = [...this.history]; // Initialize filtered with all data
             this.totalPages = data.totalPages || Math.ceil((data.total || this.history.length) / this.itemsPerPage);
             this.currentPage = page;
             this.renderHistory();
@@ -134,40 +135,43 @@ const OrderHistoryModule = {
 
     // Render lịch sử (Router)
     renderHistory() {
-        console.log('🎨 Layout:', this.useCardLayout ? 'CARDS' : 'TABLE', '| Data:', this.history.length);
+        // Use filteredHistory if available, otherwise use all history
+        const dataToRender = this.filteredHistory.length > 0 ? this.filteredHistory : this.history;
+        console.log('🎨 Layout:', this.useCardLayout ? 'CARDS' : 'TABLE', '| Data:', dataToRender.length);
         if (this.useCardLayout) {
-            this.renderCards();
+            this.renderCards(dataToRender);
         } else {
-            this.renderTable();
+            this.renderTable(dataToRender);
         }
         this.renderPagination();
     },
 
     // NEW: Render as cards
-    renderCards() {
+    renderCards(data) {
+        const orders = data || this.history;
         const container = document.getElementById('history-cards-container');
         const tableContainer = document.getElementById('history-table-container');
 
         if (!container) {
             console.error('❌ Cards container not found! Falling back to table.');
             this.useCardLayout = false;
-            this.renderTable();
+            this.renderTable(orders);
             return;
         }
 
         container.classList.remove('hidden');
         if (tableContainer) tableContainer.classList.add('hidden');
 
-        if (this.history.length === 0) {
+        if (orders.length === 0) {
             console.log('⚠️ No history data to display');
-            container.innerHTML = '<div class="history-empty-state"><i class="bi bi-inbox"></i><h4>Chưa có lịch sử đơn hàng</h4></div>';
+            container.innerHTML = '<div class="history-empty-state"><i class="bi bi-inbox"></i><h4>Không tìm thấy đơn hàng</h4></div>';
             return;
         }
 
-        console.log('🎴 Rendering', this.history.length, 'cards...');
-        console.log('📦 Sample data:', this.history[0]);
+        console.log('🎴 Rendering', orders.length, 'cards...');
+        console.log('📦 Sample data:', orders[0]);
 
-        container.innerHTML = this.history.map(order => {
+        container.innerHTML = orders.map(order => {
             const orderId = order.orderCode || order.id || 'N/A';
             const customer = order.customerName || order.accountName || 'N/A';
             const date = order.orderDate || order.order_date || order.createdAt;
@@ -218,7 +222,8 @@ const OrderHistoryModule = {
     },
 
     // OLD: Render as table
-    renderTable() {
+    renderTable(data) {
+        const orders = data || this.history;
         const container = document.getElementById('history-table-body');
         const cardsContainer = document.getElementById('history-cards-container');
         const tableContainer = document.getElementById('history-table-container');
@@ -231,19 +236,19 @@ const OrderHistoryModule = {
         if (cardsContainer) cardsContainer.classList.add('hidden');
         if (tableContainer) tableContainer.classList.remove('hidden');
 
-        if (this.history.length === 0) {
+        if (orders.length === 0) {
             container.innerHTML = `
                 <tr>
                     <td colspan="7" style="text-align: center; padding: 40px; color: #8c8c8c;">
                         <i class="bi bi-inbox" style="font-size: 48px; display: block; margin-bottom: 12px;"></i>
-                        Chưa có lịch sử đơn hàng
+                        Không tìm thấy đơn hàng
                     </td>
                 </tr>
             `;
             return;
         }
 
-        container.innerHTML = this.history.map(order => {
+        container.innerHTML = orders.map(order => {
             const orderId = order.orderCode || order.id || 'N/A';
             const customer = order.customerName || order.accountName || 'N/A';
             const date = order.orderDate || order.order_date || order.createdAt;
@@ -268,7 +273,7 @@ const OrderHistoryModule = {
             </tr>`;
         }).join('');
 
-        console.log('✅ Rendered', this.history.length, 'table rows');
+        console.log('✅ Rendered', orders.length, 'table rows');
     },
 
     // Toggle between card/table views
@@ -478,19 +483,8 @@ const OrderHistoryModule = {
         this.filteredHistory = data;
 
         if (doRender) {
-            this.renderFilteredHistory();
+            this.renderHistory();
         }
-    },
-
-    // Render filtered results
-    renderFilteredHistory() {
-        const data = this.filteredHistory.length > 0 ? this.filteredHistory : this.history;
-
-        // Temporarily swap history with filtered for rendering
-        const originalHistory = this.history;
-        this.history = data;
-        this.renderHistory();
-        this.history = originalHistory;
     },
 
     // Export to Excel
