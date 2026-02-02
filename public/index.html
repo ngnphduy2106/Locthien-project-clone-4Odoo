@@ -746,9 +746,95 @@
 
                 <!-- ==================== WAREHOUSE SECTION ==================== -->
                 <section id="section-warehouse" class="hidden">
-                    <h2 class="page-heading">Quản lý Kho hàng</h2>
-                    <div id="warehouse-content">
-                        <!-- Content will be rendered by module -->
+                    <div
+                        style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
+                        <h2 class="page-heading" style="margin-bottom:0;">Quản lý Kho hàng</h2>
+                        <div style="display:flex; gap:8px; align-items:center;">
+                            <select id="warehouse-select" class="form-select" style="width:auto;"
+                                onchange="loadWarehouse()">
+                                <option value="LT1">Kho Lộc Thiên 1</option>
+                                <option value="LT2">Kho Lộc Thiên 2</option>
+                            </select>
+                            <button class="btn btn-outline" onclick="loadWarehouse()" title="Làm mới">
+                                <i class="bi bi-arrow-clockwise"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Warehouse Stats Cards -->
+                    <div class="stat-cards" style="grid-template-columns: repeat(4, 1fr); margin-bottom:24px;">
+                        <div class="stat-card" style="background: linear-gradient(135deg, #4dabf7, #339af0);">
+                            <div class="stat-card-content">
+                                <div class="stat-card-label" style="color:#fff; opacity:0.9;">Tổng sản phẩm</div>
+                                <div class="stat-card-value" id="stat-total-products"
+                                    style="color:#fff; font-size:2rem;">0</div>
+                            </div>
+                        </div>
+                        <div class="stat-card" style="background: linear-gradient(135deg, #51cf66, #40c057);">
+                            <div class="stat-card-content">
+                                <div class="stat-card-label" style="color:#fff; opacity:0.9;">Còn hàng</div>
+                                <div class="stat-card-value" id="stat-in-stock" style="color:#fff; font-size:2rem;">0
+                                </div>
+                            </div>
+                        </div>
+                        <div class="stat-card" style="background: linear-gradient(135deg, #ffa94d, #fd7e14);">
+                            <div class="stat-card-content">
+                                <div class="stat-card-label" style="color:#fff; opacity:0.9;">Sắp hết</div>
+                                <div class="stat-card-value" id="stat-low-stock" style="color:#fff; font-size:2rem;">0
+                                </div>
+                            </div>
+                        </div>
+                        <div class="stat-card" style="background: linear-gradient(135deg, #ff6b6b, #fa5252);">
+                            <div class="stat-card-content">
+                                <div class="stat-card-label" style="color:#fff; opacity:0.9;">Hết hàng</div>
+                                <div class="stat-card-value" id="stat-out-stock" style="color:#fff; font-size:2rem;">0
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Search -->
+                    <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:16px;">
+                        <div class="search-input" style="flex:1; min-width:200px;">
+                            <i class="bi bi-search"></i>
+                            <input type="text" placeholder="Tìm kiếm sản phẩm..." id="warehouse-search-input"
+                                oninput="filterWarehouseProducts(this.value)">
+                        </div>
+                        <select id="warehouse-status-filter" class="form-select" style="width:auto;"
+                            onchange="filterWarehouseProducts()">
+                            <option value="">Tất cả trạng thái</option>
+                            <option value="OK">Còn hàng</option>
+                            <option value="LOW">Sắp hết</option>
+                            <option value="OUT_OF_STOCK">Hết hàng</option>
+                        </select>
+                    </div>
+
+                    <!-- Inventory Table -->
+                    <div class="card">
+                        <div class="card-body" style="padding: 0; overflow-x: auto;">
+                            <table class="data-table" id="warehouse-table">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Tên sản phẩm</th>
+                                        <th style="text-align:right;">Số lượng</th>
+                                        <th>Đơn vị</th>
+                                        <th>Trạng thái</th>
+                                        <th>Thao tác</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="warehouse-table-body">
+                                    <tr>
+                                        <td colspan="6"
+                                            style="text-align:center; padding:40px; color:var(--text-muted);">
+                                            <i class="bi bi-box-seam"
+                                                style="font-size:48px; display:block; margin-bottom:12px;"></i>
+                                            Đang tải dữ liệu kho...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </section>
 

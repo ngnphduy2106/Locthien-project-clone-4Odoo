@@ -268,6 +268,37 @@ const api = {
             body: JSON.stringify({ userId, fcmToken })
         });
         return res.json();
+    },
+
+    // === WAREHOUSE ===
+    getWarehouses: async () => {
+        const res = await fetch(`${API_BASE}/warehouse`);
+        return res.json();
+    },
+
+    getInventory: async (warehouseId) => {
+        const url = warehouseId ? `${API_BASE}/warehouse/inventory?warehouseId=${warehouseId}` : `${API_BASE}/warehouse/inventory`;
+        const res = await fetch(url);
+        return res.json();
+    },
+
+    getWarehouseAlerts: async () => {
+        const res = await fetch(`${API_BASE}/warehouse/alerts`);
+        return res.json();
+    },
+
+    adjustInventory: async (data) => {
+        const res = await fetch(`${API_BASE}/warehouse/adjust`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        return res.json();
+    },
+
+    getProductHistory: async (productName) => {
+        const res = await fetch(`${API_BASE}/warehouse/history/${encodeURIComponent(productName)}`);
+        return res.json();
     }
 };
 

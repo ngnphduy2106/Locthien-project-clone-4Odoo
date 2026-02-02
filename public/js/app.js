@@ -107,6 +107,9 @@ function showSection(sectionId) {
         case 'users':
             loadUsers();
             break;
+        case 'warehouse':
+            loadWarehouse();
+            break;
     }
 }
 
@@ -4538,6 +4541,235 @@ window.editUser = editUser;
 window.updateUserStatus = updateUserStatus;
 window.closeEditUserModal = closeEditUserModal;
 window.submitEditUser = submitEditUser;
+
+// ===============================================
+// WAREHOUSE MANAGEMENT
+// ===============================================
+
+let warehouseInventory = []; // Store current inventory for filtering
+
+async function loadWarehouse() {
+    const warehouseId = window.$('#warehouse-select')?.value || 'LT1';
+    const tableBody = window.$('#warehouse-table-body');
+
+    if (tableBody) {
+        tableBody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:40px; color:var(--text-muted);">
+            <i class="bi bi-hourglass-split" style="font-size:24px;"></i> Đang tải...
+        </td></tr>`;
+    }
+
+    try {
+        const res = await api.getInventory(warehouseId);
+
+        if (res && res.data) {
+            warehouseInventory = res.data;
+            renderWarehouseTable(warehouseInventory);
+            updateWarehouseStats(warehouseInventory);
+        } else {
+            warehouseInventory = [];
+            renderWarehouseTable([]);
+            updateWarehouseStats([]);
+        }
+    } catch (e) {
+        console.error('Error loading warehouse:', e);
+        if (tableBody) {
+            tableBody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:40px; color:var(--danger);">
+                <i class="bi bi-exclamation-triangle" style="font-size:24px;"></i> Lỗi tải dữ liệu kho
+            </td></tr>`;
+        }
+    }
+}
+
+function renderWarehouseTable(items) {
+    const tableBody = window.$('#warehouse-table-body');
+    if (!tableBody) return;
+
+    if (!items || items.length === 0) {
+        tableBody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:40px; color:var(--text-muted);">
+            <i class="bi bi-inbox" style="font-size:48px; display:block; margin-bottom:12px;"></i>
+            Không có sản phẩm trong kho
+        </td></tr>`;
+        return;
+    }
+
+    tableBody.innerHTML = items.map((item, index) => {
+        const statusBadge = getStockStatusBadge(item.status);
+        const qty = Number(item.qty) || 0;
+
+        return `
+            <tr>
+                <td>${index + 1}</td>
+                <td><strong>${item.product || item.name || '-'}</strong></td>
+                <td style="text-align:right; font-weight:600; font-size:16px;">${qty.toLocaleString('vi-VN')}</td>
+                <td>${item.unit || 'Kg'}</td>
+                <td><span class="badge ${statusBadge.class}">${statusBadge.text}</span></td>
+                <td>
+                    <button class="btn btn-sm btn-outline" onclick="viewProductHistory('${encodeURIComponent(item.product || item.name)}')" title="Lịch sử">
+                        <i class="bi bi-clock-history"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline" onclick="showAdjustInventoryModal('${encodeURIComponent(item.product || item.name)}', ${qty})" title="Điều chỉnh">
+                        <i class="bi bi-pencil-square"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function getStockStatusBadge(status) {
+    switch (status) {
+        case 'OK':
+            return { class: 'badge-success', text: 'Còn hàng' };
+        case 'LOW':
+            return { class: 'badge-warning', text: 'Sắp hết' };
+        case 'OUT_OF_STOCK':
+            return { class: 'badge-danger', text: 'Hết hàng' };
+        default:
+            return { class: 'badge-secondary', text: status || 'N/A' };
+    }
+}
+
+function updateWarehouseStats(items) {
+    const total = items.length;
+    const inStock = items.filter(i => i.status === 'OK').length;
+    const lowStock = items.filter(i => i.status === 'LOW').length;
+    const outStock = items.filter(i => i.status === 'OUT_OF_STOCK').length;
+
+    const statTotal = window.$('#stat-total-products');
+    const statIn = window.$('#stat-in-stock');
+    const statLow = window.$('#stat-low-stock');
+    const statOut = window.$('#stat-out-stock');
+
+    if (statTotal) statTotal.textContent = total;
+    if (statIn) statIn.textContent = inStock;
+    if (statLow) statLow.textContent = lowStock;
+    if (statOut) statOut.textContent = outStock;
+}
+
+function filterWarehouseProducts(searchText) {
+    const search = (searchText || window.$('#warehouse-search-input')?.value || '').toLowerCase().trim();
+    const statusFilter = window.$('#warehouse-status-filter')?.value || '';
+
+    let filtered = warehouseInventory;
+
+    if (search) {
+        filtered = filtered.filter(item => {
+            const name = (item.product || item.name || '').toLowerCase();
+            return name.includes(search);
+        });
+    }
+
+    if (statusFilter) {
+        filtered = filtered.filter(item => item.status === statusFilter);
+    }
+
+    renderWarehouseTable(filtered);
+}
+
+async function viewProductHistory(productName) {
+    const decoded = decodeURIComponent(productName);
+    showLoading('Đang tải lịch sử...');
+
+    try {
+        const res = await api.getProductHistory(decoded);
+        hideLoading();
+
+        if (res && res.data) {
+            const history = res.data.sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 50);
+
+            const historyHtml = history.length > 0 ? history.map(h => `
+                <tr>
+                    <td>${formatDate(h.date)}</td>
+                    <td>
+                        <span class="badge ${h.type === 'NHAP' ? 'badge-success' : 'badge-warning'}">
+                            ${h.type === 'NHAP' ? 'Nhập' : 'Xuất'}
+                        </span>
+                    </td>
+                    <td style="text-align:right;">${(h.qty || 0).toLocaleString('vi-VN')}</td>
+                    <td>${h.partner || '-'}</td>
+                    <td>${h.note || '-'}</td>
+                </tr>
+            `).join('') : '<tr><td colspan="5" style="text-align:center;">Không có dữ liệu</td></tr>';
+
+            // Show in modal
+            const modal = window.$('#modal-order-detail');
+            const modalBody = window.$('#modal-order-body');
+            const modalTitle = window.$('#modal-order-title');
+
+            if (modalTitle) modalTitle.textContent = `Lịch sử: ${decoded}`;
+            if (modalBody) {
+                modalBody.innerHTML = `
+                    <div style="overflow-x:auto;">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Ngày</th>
+                                    <th>Loại</th>
+                                    <th style="text-align:right;">Số lượng</th>
+                                    <th>Đối tác</th>
+                                    <th>Ghi chú</th>
+                                </tr>
+                            </thead>
+                            <tbody>${historyHtml}</tbody>
+                        </table>
+                    </div>
+                `;
+            }
+            if (modal) modal.classList.remove('hidden');
+        }
+    } catch (e) {
+        hideLoading();
+        console.error('Error loading product history:', e);
+        alert('Không thể tải lịch sử sản phẩm');
+    }
+}
+
+async function showAdjustInventoryModal(productName, currentQty) {
+    const decoded = decodeURIComponent(productName);
+    const adjustQty = prompt(`Điều chỉnh số lượng cho "${decoded}"\nSố lượng hiện tại: ${currentQty}\n\nNhập số dương để tăng, số âm để giảm:`);
+
+    if (adjustQty === null) return;
+
+    const qty = parseFloat(adjustQty);
+    if (isNaN(qty) || qty === 0) {
+        alert('Vui lòng nhập số hợp lệ!');
+        return;
+    }
+
+    const reason = prompt('Lý do điều chỉnh:') || 'Điều chỉnh thủ công';
+
+    showLoading('Đang cập nhật...');
+
+    try {
+        const res = await api.adjustInventory({
+            warehouseId: window.$('#warehouse-select')?.value || 'LT1',
+            materialCode: decoded,
+            adjustQty: qty,
+            reason: reason,
+            user: state.user?.name || 'Unknown'
+        });
+
+        hideLoading();
+
+        if (res && !res.error) {
+            alert('Đã điều chỉnh tồn kho thành công!');
+            loadWarehouse();
+        } else {
+            alert('Lỗi: ' + (res?.errorMessage || res?.msg || 'Không thể điều chỉnh'));
+        }
+    } catch (e) {
+        hideLoading();
+        console.error('Error adjusting inventory:', e);
+        alert('Lỗi khi điều chỉnh tồn kho');
+    }
+}
+
+// Export warehouse functions
+window.loadWarehouse = loadWarehouse;
+window.renderWarehouseTable = renderWarehouseTable;
+window.filterWarehouseProducts = filterWarehouseProducts;
+window.viewProductHistory = viewProductHistory;
+window.showAdjustInventoryModal = showAdjustInventoryModal;
 
 // ===============================================
 // DRIVER COMPLETION FORM WITH IMAGE UPLOAD
