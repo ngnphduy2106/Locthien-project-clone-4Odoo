@@ -2527,6 +2527,67 @@ function toggleUserMenu(event) {
 
 window.toggleUserMenu = toggleUserMenu;
 
+// === USER PROFILE MODAL ===
+function showUserProfile() {
+    const menu = window.$('#user-menu');
+    if (menu) menu.classList.add('hidden');
+
+    // Get user data from state
+    const user = state.user || {};
+    const userName = user.name || user.fullName || user.phone || 'User';
+    const userPhone = user.phone || '';
+    const userRole = (user.role || '').toLowerCase();
+    const userPlate = user.plate || '';
+
+    // Role labels
+    const roleLabels = {
+        admin: 'Quản trị viên',
+        driver: 'Tài xế',
+        sales: 'Nhân viên',
+        accountant: 'Kế toán'
+    };
+
+    // Open modal
+    const modal = window.$('#modal-user-profile');
+    if (!modal) return;
+
+    // Populate user info card
+    const profileInitial = window.$('#profile-user-initial');
+    const profileName = window.$('#profile-user-name');
+    const profilePhone = window.$('#profile-user-phone');
+    const profileFullname = window.$('#profile-fullname');
+    const profilePhoneInput = window.$('#profile-phone-input');
+    const profileRoleInput = window.$('#profile-role');
+    const profilePlate = window.$('#profile-plate');
+
+    if (profileInitial) profileInitial.textContent = userName.charAt(0).toUpperCase();
+    if (profileName) profileName.textContent = userName;
+    if (profilePhone) profilePhone.textContent = userPhone || 'Chưa có SĐT';
+    if (profileFullname) profileFullname.value = userName;
+    if (profilePhoneInput) profilePhoneInput.value = userPhone;
+    if (profileRoleInput) profileRoleInput.value = roleLabels[userRole] || user.role || 'Người dùng';
+    if (profilePlate) profilePlate.value = userPlate || '';
+
+    modal.classList.remove('hidden');
+    console.log('📱 User profile opened:', { userName, userPhone, userRole });
+}
+
+function closeUserProfileModal(event) {
+    // If called from overlay click, check if clicked on overlay itself
+    if (event && event.target && !event.target.closest('.modal-content')) {
+        // Clicked on overlay, close modal
+    } else if (event) {
+        // Clicked inside modal content, don't close
+        return;
+    }
+
+    const modal = window.$('#modal-user-profile');
+    if (modal) modal.classList.add('hidden');
+}
+
+window.showUserProfile = showUserProfile;
+window.closeUserProfileModal = closeUserProfileModal;
+
 // === DELIVERY MODAL (HOÀN THÀNH ĐƠN) ===
 
 function openDeliveryModal(orderId) {
