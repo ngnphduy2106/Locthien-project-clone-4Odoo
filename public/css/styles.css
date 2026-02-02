@@ -2591,70 +2591,228 @@ body {
     }
 }
 
-/* Order Detail Modal - Mobile Responsive Product Table */
+/* ==================== MODAL STYLES ==================== */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 16px;
+    overflow: auto;
+}
+
+.modal-overlay .modal-content {
+    background: white;
+    border-radius: 16px;
+    width: 100%;
+    max-width: 800px;
+    max-height: calc(100vh - 32px);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: var(--shadow-lg);
+}
+
+.modal-overlay .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    background: linear-gradient(135deg, var(--primary), #764ba2);
+    color: white;
+    flex-shrink: 0;
+}
+
+.modal-overlay .modal-header h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.modal-overlay .modal-close {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+}
+
+.modal-overlay .modal-close:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.modal-overlay .modal-body {
+    padding: 20px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.modal-overlay .modal-footer {
+    padding: 16px 20px;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+/* Order Detail Grid */
+.order-detail-grid {
+    display: grid;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.order-detail-grid .detail-row {
+    display: flex;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.order-detail-grid .detail-row:last-child {
+    border-bottom: none;
+}
+
+.order-detail-grid .detail-row label {
+    flex-shrink: 0;
+    width: 120px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
+.order-detail-grid .detail-row span {
+    flex: 1;
+    color: var(--text-primary);
+}
+
+/* Data Table in Modal */
+.modal-body .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.modal-body .data-table th,
+.modal-body .data-table td {
+    padding: 10px 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.modal-body .data-table th {
+    background: var(--body-bg);
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+/* Order Detail Modal - Mobile Responsive */
 @media (max-width: 767px) {
-    #modal-order-detail .modal-content {
-        margin: 8px;
+    .modal-overlay {
+        padding: 8px;
+        align-items: flex-start;
+    }
+
+    .modal-overlay .modal-content {
+        max-width: 100%;
         max-height: calc(100vh - 16px);
-        width: calc(100% - 16px);
+        border-radius: 12px;
     }
 
-    #modal-order-detail .modal-body {
-        padding: 12px !important;
+    .modal-overlay .modal-header {
+        padding: 12px 16px;
     }
 
-    #modal-order-detail .order-detail-grid .detail-row {
+    .modal-overlay .modal-header h3 {
+        font-size: 15px;
+    }
+
+    .modal-overlay .modal-body {
+        padding: 12px 16px;
+    }
+
+    /* Order detail grid stacked on mobile */
+    .order-detail-grid .detail-row {
         flex-direction: column;
         gap: 4px;
+        padding: 6px 0;
     }
 
-    #modal-order-detail .order-detail-grid .detail-row label {
+    .order-detail-grid .detail-row label {
+        width: auto;
         font-size: 11px;
         color: var(--text-muted);
     }
 
-    #modal-order-detail .data-table {
-        display: block;
-        overflow-x: auto;
+    .order-detail-grid .detail-row span {
+        font-size: 14px;
     }
 
-    #modal-order-detail .data-table th,
-    #modal-order-detail .data-table td {
-        padding: 8px 6px !important;
-        font-size: 12px !important;
+    /* Product table wrapper for scroll */
+    .modal-body .data-table-wrapper,
+    .modal-body>div:has(.data-table) {
+        overflow-x: auto;
+        margin: 0 -16px;
+        padding: 0 16px;
+    }
+
+    .modal-body .data-table {
+        min-width: 350px;
+    }
+
+    .modal-body .data-table th,
+    .modal-body .data-table td {
+        padding: 8px;
+        font-size: 12px;
         white-space: nowrap;
     }
 
-    #modal-order-detail .data-table th:first-child,
-    #modal-order-detail .data-table td:first-child {
-        max-width: 150px;
+    .modal-body .data-table th:first-child,
+    .modal-body .data-table td:first-child {
         white-space: normal;
+        max-width: 140px;
         word-break: break-word;
     }
 
     /* Proof images gallery */
-    #modal-order-detail .proof-gallery {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
+    .proof-gallery {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 8px !important;
     }
 
-    #modal-order-detail .proof-gallery img {
-        width: 60px;
-        height: 60px;
+    .proof-gallery img {
+        width: 60px !important;
+        height: 60px !important;
+        object-fit: cover;
+        border-radius: 6px;
     }
 
     /* Chat section */
-    #modal-order-detail .chat-messages-container {
-        max-height: 200px;
+    .chat-messages-container {
+        max-height: 180px !important;
     }
 
-    #modal-order-detail .modal-footer {
+    /* Footer buttons */
+    .modal-overlay .modal-footer {
         flex-direction: column;
-        gap: 8px;
+        padding: 12px 16px;
     }
 
-    #modal-order-detail .modal-footer .btn {
+    .modal-overlay .modal-footer .btn {
         width: 100%;
     }
 }
