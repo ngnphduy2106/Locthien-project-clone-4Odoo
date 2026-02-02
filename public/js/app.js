@@ -58,6 +58,19 @@ function showSection(sectionId) {
     // Close mobile menu when navigating
     if (window.closeMobileMenu) window.closeMobileMenu();
 
+    // Role-based access control
+    const normalizedRole = (state.user?.role || '').toLowerCase();
+    const isAccountant = normalizedRole === 'accountant' || normalizedRole === 'kế toán' || normalizedRole === 'ke toan' || normalizedRole === 'ketoan';
+
+    // Accountant can only access dashboard and order-history
+    if (isAccountant) {
+        const allowedSections = ['dashboard', 'order-history'];
+        if (!allowedSections.includes(sectionId)) {
+            console.warn('⛔ Accountant không có quyền truy cập:', sectionId);
+            sectionId = 'dashboard'; // Redirect to dashboard
+        }
+    }
+
     // Hide all sections
     window.$$('[id^="section-"]').forEach(el => el.classList.add('hidden'));
 
@@ -243,7 +256,7 @@ function initApp() {
         const userName = state.user.name || state.user.fullName || state.user.phone || 'User';
         // Normalize role to lowercase
         const normalizedRole = (state.user.role || '').toLowerCase();
-        const roleLabels = { admin: 'Quản trị viên', driver: 'Tài xế', sales: 'Nhân viên' };
+        const roleLabels = { admin: 'Quản trị viên', driver: 'Tài xế', sales: 'Nhân viên', accountant: 'Kế toán', 'kế toán': 'Kế toán', 'ke toan': 'Kế toán', ketoan: 'Kế toán' };
 
         console.log('👤 User info:', { name: userName, role: state.user.role, normalized: normalizedRole });
 
@@ -337,8 +350,9 @@ function applyRoleBasedUI(role) {
     const normalizedRole = (role || '').toLowerCase();
     const isAdmin = normalizedRole === 'admin';
     const isDriver = normalizedRole === 'driver';
+    const isAccountant = normalizedRole === 'accountant' || normalizedRole === 'kế toán' || normalizedRole === 'ke toan' || normalizedRole === 'ketoan';
 
-    console.log('🔐 Applying role-based UI:', { role, normalizedRole, isAdmin, isDriver });
+    console.log('🔐 Applying role-based UI:', { role, normalizedRole, isAdmin, isDriver, isAccountant });
 
     // Hide/show elements with data-role="admin"
     document.querySelectorAll('[data-role="admin"]').forEach(el => {
@@ -372,6 +386,30 @@ function applyRoleBasedUI(role) {
         if (navHr) navHr.style.display = 'none';
         if (navMaterials) navMaterials.style.display = 'none';
         if (navWarehouse) navWarehouse.style.display = 'none';
+    }
+
+    // Accountant restrictions - only dashboard and order history
+    if (isAccountant) {
+        console.log('💼 Accountant mode: Showing only dashboard and order history');
+
+        // Hide all order management items except order-history
+        const navDispatch = window.$('#nav-dispatch');
+        const navCreateOrder = window.$('#nav-create-order');
+        const navMyOrders = window.$('#nav-my-orders');
+        if (navDispatch) navDispatch.style.display = 'none';
+        if (navCreateOrder) navCreateOrder.style.display = 'none';
+        if (navMyOrders) navMyOrders.style.display = 'none';
+
+        // Hide HR, Materials, Warehouse
+        const navHr = window.$('#nav-hr');
+        const navMaterials = window.$('#nav-materials');
+        const navWarehouse = window.$('#nav-warehouse');
+        if (navHr) navHr.style.display = 'none';
+        if (navMaterials) navMaterials.style.display = 'none';
+        if (navWarehouse) navWarehouse.style.display = 'none';
+
+        // Also hide nav-users
+        if (navUsers) navUsers.style.display = 'none';
     }
 
     // Update my-orders badge for all roles
