@@ -2598,20 +2598,28 @@ window.closeUserProfileModal = closeUserProfileModal;
 // === DELIVERY MODAL (HOÀN THÀNH ĐƠN) ===
 
 function openDeliveryModal(orderId) {
-    // Search in all lists with robust matching
-    const allOrders = [...(state.orders.pending || []), ...(state.orders.assigned || []), ...(state.orders.completed || [])];
+    // Search in all lists with robust matching - include dispatch module orders
+    const dispatchOrders = window.DispatchModule?.orders || [];
+    const allOrders = [
+        ...dispatchOrders,
+        ...(state.orders.pending || []),
+        ...(state.orders.assigned || []),
+        ...(state.orders.completed || []),
+        ...(state.myOrders || [])
+    ];
 
     const findOrder = (list) => list.find(o => {
-        const oIdStr = String(o.id);
+        const oIdStr = String(o.id || o.order_id);
         const searchIdStr = String(orderId);
         return oIdStr === searchIdStr ||
             o.id === orderId ||
+            o.order_id === orderId ||
             o.id === parseInt(orderId) ||
             o.soDon === orderId ||
             o.sale_order_no === orderId;
     });
 
-    const order = findOrder(allOrders) || findOrder(state.myOrders || []);
+    const order = findOrder(allOrders);
 
     if (!order) {
         console.error('Order not found for delivery modal:', orderId);
