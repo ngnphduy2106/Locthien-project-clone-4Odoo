@@ -389,14 +389,39 @@ async function forceSyncMisa() {
 }
 
 // === DASHBOARD ===
+
+// Handle period dropdown change - show/hide custom date inputs
+function onDashboardPeriodChange() {
+    const periodSelect = window.$('#dashboard-period');
+    const dateRangeDiv = window.$('#dashboard-date-range');
+
+    if (periodSelect?.value === 'custom') {
+        if (dateRangeDiv) {
+            dateRangeDiv.classList.remove('hidden');
+            dateRangeDiv.style.display = 'flex';
+        }
+    } else {
+        if (dateRangeDiv) {
+            dateRangeDiv.classList.add('hidden');
+            dateRangeDiv.style.display = 'none';
+        }
+        loadDashboard();
+    }
+}
+window.onDashboardPeriodChange = onDashboardPeriodChange;
+
 async function loadDashboard() {
     try {
         // Get period filter
         const periodSelect = window.$('#dashboard-period');
         const period = periodSelect?.value || 'month';
 
+        // Get custom date range if selected
+        const dateFrom = window.$('#dashboard-date-from')?.value;
+        const dateTo = window.$('#dashboard-date-to')?.value;
+
         // Get orders data - include deleted/cancelled when viewing all
-        const includeDeleted = (period === 'all');
+        const includeDeleted = (period === 'all' || period === 'custom');
         const res = await api.getOrders(includeDeleted);
 
         // Combine all orders (pending + assigned + completed + cancelled if available)
@@ -426,6 +451,21 @@ async function loadDashboard() {
                     return orderDate.getMonth() === now.getMonth() && orderDate.getFullYear() === now.getFullYear();
                 case 'year':
                     return orderDate.getFullYear() === now.getFullYear();
+                case 'custom':
+                    // Filter by custom date range
+                    if (dateFrom && dateTo) {
+                        const from = new Date(dateFrom);
+                        const to = new Date(dateTo);
+                        to.setHours(23, 59, 59, 999); // Include entire end day
+                        return orderDate >= from && orderDate <= to;
+                    } else if (dateFrom) {
+                        return orderDate >= new Date(dateFrom);
+                    } else if (dateTo) {
+                        const to = new Date(dateTo);
+                        to.setHours(23, 59, 59, 999);
+                        return orderDate <= to;
+                    }
+                    return true;
                 default:
                     return true;
             }

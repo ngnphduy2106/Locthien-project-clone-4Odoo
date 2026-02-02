@@ -203,15 +203,24 @@
                 <section id="section-dashboard">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
                         <h2 class="page-heading" style="margin-bottom:0;">Tổng quan thương mại</h2>
-                        <div style="display:flex; gap:8px; align-items:center;">
+                        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
                             <select id="dashboard-period" class="form-select" style="width:auto;"
-                                onchange="loadDashboard()">
+                                onchange="onDashboardPeriodChange()">
                                 <option value="all">Tất cả</option>
                                 <option value="today">Hôm nay</option>
                                 <option value="week">Tuần này</option>
                                 <option value="month" selected>Tháng này</option>
                                 <option value="year">Năm nay</option>
+                                <option value="custom">Khoảng ngày...</option>
                             </select>
+                            <div id="dashboard-date-range" class="hidden"
+                                style="display:flex; gap:6px; align-items:center;">
+                                <input type="date" id="dashboard-date-from" class="form-control"
+                                    style="width:auto; padding:6px 10px;">
+                                <span>đến</span>
+                                <input type="date" id="dashboard-date-to" class="form-control"
+                                    style="width:auto; padding:6px 10px;">
+                            </div>
                             <button class="btn btn-outline" onclick="loadDashboard()" style="padding:8px 12px;">
                                 <i class="bi bi-arrow-clockwise"></i>
                             </button>
