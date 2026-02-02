@@ -383,7 +383,7 @@ router.put('/:id/assign', async (req, res) => {
             console.error('Push notification error:', notifyErr.message);
         }
 
-        // Send Telegram notification (async, don't block response)
+        // Send Telegram notification to DRIVER group (async, don't block response)
         try {
             const { sendTelegramMessage } = await import('../services/telegram.js');
             const orderInfo = await db.getOrder(id);
@@ -397,8 +397,8 @@ router.put('/:id/assign', async (req, res) => {
             msg += `🔢 Biển số: ${plate || 'Chưa có'}\n`;
             if (note) msg += `📝 Ghi chú: ${note}\n`;
 
-            await sendTelegramMessage(msg, 'XUAT');
-            console.log(`📬 Telegram notification sent for order ${id}`);
+            await sendTelegramMessage(msg, 'DRIVER');
+            console.log(`📬 Telegram DRIVER notification sent for order ${id}`);
         } catch (tgErr) {
             console.error('Telegram notification error:', tgErr.message);
         }

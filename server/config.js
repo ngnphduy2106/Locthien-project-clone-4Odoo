@@ -18,6 +18,7 @@ export const CONFIG = {
     TELEGRAM_CHAT_NHAP: process.env.TELEGRAM_CHAT_NHAP || '',
     TELEGRAM_CHAT_XUAT: process.env.TELEGRAM_CHAT_XUAT || '',
     TELEGRAM_CHAT_NOTIFY: process.env.TELEGRAM_CHAT_NOTIFY || '',
+    TELEGRAM_CHAT_DRIVER: process.env.TELEGRAM_CHAT_DRIVER || '',
 
     // App Settings
     APP_VERSION: '2.0.0',
