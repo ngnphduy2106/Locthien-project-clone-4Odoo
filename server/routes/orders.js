@@ -820,7 +820,24 @@ router.post('/:id/complete', async (req, res) => {
             }, 0) || 0;
             console.log(`📊 My actual qty from cart: ${myActualQty}kg`);
 
-            // Update this assignment as completed
+            // STEP 1: First get the assignment to find the correct order_id BEFORE updating
+            // This ensures we have the source-of-truth order_id regardless of URL format
+            const { data: assignmentBeforeUpdate, error: lookupErr } = await supabase
+                .from('order_driver_assignments')
+                .select('order_id, driver_name')
+                .eq('id', assignment_id)
+                .single();
+
+            if (lookupErr || !assignmentBeforeUpdate) {
+                console.error(`❌ Assignment lookup failed: ${lookupErr?.message || 'Not found'}`);
+                return res.json(createResponse(true, 'Không tìm thấy assignment!'));
+            }
+
+            // Use order_id from database (source of truth) - NOT from URL params
+            const actualOrderId = assignmentBeforeUpdate.order_id;
+            console.log(`📍 Source-of-truth order_id: "${actualOrderId}" (URL param was: "${id}")`);
+
+            // STEP 2: Update this assignment as completed
             console.log(`🔧 Updating assignment id: ${assignment_id} to status: completed`);
             const { data: updateResult, error: updateErr } = await supabase
                 .from('order_driver_assignments')
@@ -833,27 +850,18 @@ router.post('/:id/complete', async (req, res) => {
                     completed_at: new Date().toISOString()
                 })
                 .eq('id', assignment_id)
-                .select();  // Add select to get result
+                .select();
 
             if (updateErr) {
                 console.error('❌ Assignment update error:', updateErr.message);
+                return res.json(createResponse(true, 'Lỗi cập nhật assignment: ' + updateErr.message));
             } else if (!updateResult || updateResult.length === 0) {
-                console.error(`⚠️ Assignment update: NO ROWS AFFECTED! assignment_id=${assignment_id} may not exist`);
-            } else {
-                console.log(`✅ Assignment ${assignment_id} updated successfully:`, updateResult[0].status);
+                console.error(`⚠️ Assignment update: NO ROWS AFFECTED! assignment_id=${assignment_id}`);
+                return res.json(createResponse(true, 'Assignment không được cập nhật!'));
             }
+            console.log(`✅ Assignment ${assignment_id} updated successfully: status=${updateResult[0].status}`);
 
-            // Get the assignment we just updated to find correct order_id
-            const { data: updatedAssignment } = await supabase
-                .from('order_driver_assignments')
-                .select('order_id')
-                .eq('id', assignment_id)
-                .single();
-
-            const actualOrderId = updatedAssignment?.order_id || id;
-            console.log(`📍 Looking up assignments for order_id: ${actualOrderId} (param id was: ${id})`);
-
-            // Check all assignments for this order using the actual order_id from assignment
+            // STEP 3: Query ALL assignments for this order using the correct order_id
             const { data: assignments, error: assignQueryErr } = await supabase
                 .from('order_driver_assignments')
                 .select('*')
@@ -863,41 +871,60 @@ router.post('/:id/complete', async (req, res) => {
             if (assignQueryErr) {
                 console.error('❌ Assignment query error:', assignQueryErr.message);
             }
-            console.log(`📋 Found ${assignments?.length || 0} assignments for order_id: ${actualOrderId}`);
+            console.log(`📋 Found ${assignments?.length || 0} assignments for order_id: "${actualOrderId}"`);
 
-            if (assignments && assignments.length > 1) {
+            // STEP 4: Force-patch the current assignment's status in our local array
+            // This handles any Supabase replication delay
+            const patchedAssignments = (assignments || []).map(a => {
+                if (a.id === assignment_id) {
+                    return { ...a, status: 'completed', actual_qty: myActualQty };
+                }
+                return a;
+            });
+
+            console.log(`🔍 Patched assignment statuses:`, patchedAssignments.map(a => ({ id: a.id.slice(-8), status: a.status, driver: a.driver_name })));
+
+            if (patchedAssignments && patchedAssignments.length > 1) {
                 isMultiDriverOrder = true;
-                allAssignments = assignments;
-                firstDriverName = assignments[0].driver_name; // First assigned driver for MISA
+                allAssignments = patchedAssignments;
+                firstDriverName = patchedAssignments[0].driver_name; // First assigned driver for MISA
 
-                // Check if ALL drivers completed
-                allDriversCompleted = assignments.every(a => a.status === 'completed');
-                totalActualQty = assignments.reduce((sum, a) => sum + Number(a.actual_qty || 0), 0);
+                // Check if ALL drivers completed (using patched data)
+                allDriversCompleted = patchedAssignments.every(a => a.status === 'completed');
+                totalActualQty = patchedAssignments.reduce((sum, a) => sum + Number(a.actual_qty || 0), 0);
 
-                console.log(`📊 Multi-driver status: ${assignments.filter(a => a.status === 'completed').length}/${assignments.length} completed, Total: ${totalActualQty}kg`);
+                const completedCount = patchedAssignments.filter(a => a.status === 'completed').length;
+                console.log(`📊 Multi-driver status: ${completedCount}/${patchedAssignments.length} completed, Total: ${totalActualQty}kg`);
 
                 if (!allDriversCompleted) {
                     // Partial completion - return early, don't sync MISA yet
-                    const completedCount = assignments.filter(a => a.status === 'completed').length;
-
-                    // Update order with partial completion info
-                    await db.updateOrder(id, {
-                        delivery_status: `${completedCount}/${assignments.length} hoàn thành`,
-                        partial_completion: true
-                    });
+                    // Use actualOrderId for updateOrder to handle ID format differences
+                    try {
+                        await db.updateOrder(actualOrderId, {
+                            delivery_status: `${completedCount}/${patchedAssignments.length} hoàn thành`,
+                            partial_completion: true
+                        });
+                    } catch (orderUpdateErr) {
+                        // Fallback to URL param id if actualOrderId doesn't work
+                        console.log(`⚠️ updateOrder with actualOrderId failed, trying URL param id`);
+                        await db.updateOrder(id, {
+                            delivery_status: `${completedCount}/${patchedAssignments.length} hoàn thành`,
+                            partial_completion: true
+                        });
+                    }
 
                     return res.json(createResponse(false,
-                        `Bạn đã hoàn thành phần của mình! (${completedCount}/${assignments.length} tài xế)`,
+                        `Bạn đã hoàn thành phần của mình! (${completedCount}/${patchedAssignments.length} tài xế)`,
                         {
                             partial: true,
-                            progress: `${completedCount}/${assignments.length}`,
+                            progress: `${completedCount}/${patchedAssignments.length}`,
                             yourQty: myActualQty,
                             // Debug info
                             _debug: {
                                 actualOrderId,
                                 paramId: id,
                                 assignmentId: assignment_id,
-                                assignmentStatuses: assignments.map(a => ({ id: a.id, status: a.status, driver: a.driver_name }))
+                                assignmentStatuses: patchedAssignments.map(a => ({ id: a.id, status: a.status, driver: a.driver_name }))
                             }
                         }
                     ));
