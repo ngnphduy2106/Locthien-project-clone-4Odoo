@@ -839,12 +839,27 @@ router.post('/:id/complete', async (req, res) => {
                 console.log(`✅ Assignment ${assignment_id} completed with ${myActualQty}kg`);
             }
 
-            // Check all assignments for this order
-            const { data: assignments } = await supabase
+            // Get the assignment we just updated to find correct order_id
+            const { data: updatedAssignment } = await supabase
+                .from('order_driver_assignments')
+                .select('order_id')
+                .eq('id', assignment_id)
+                .single();
+
+            const actualOrderId = updatedAssignment?.order_id || id;
+            console.log(`📍 Looking up assignments for order_id: ${actualOrderId} (param id was: ${id})`);
+
+            // Check all assignments for this order using the actual order_id from assignment
+            const { data: assignments, error: assignQueryErr } = await supabase
                 .from('order_driver_assignments')
                 .select('*')
-                .eq('order_id', id)
+                .eq('order_id', actualOrderId)
                 .order('created_at', { ascending: true });
+
+            if (assignQueryErr) {
+                console.error('❌ Assignment query error:', assignQueryErr.message);
+            }
+            console.log(`📋 Found ${assignments?.length || 0} assignments for order_id: ${actualOrderId}`);
 
             if (assignments && assignments.length > 1) {
                 isMultiDriverOrder = true;
