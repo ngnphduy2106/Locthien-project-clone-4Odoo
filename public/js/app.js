@@ -1672,7 +1672,10 @@ function renderMyOrdersList(containerId, orders, type) {
                         <button class="btn btn-outline btn-sm" onclick="${isImport ? `viewImportDetail('${order.id}')` : `viewOrderDetail('${order.id}')`}">
                             <i class="bi bi-eye"></i> Chi tiết
                         </button>
-                        <button class="btn btn-success btn-sm" onclick="${isImport ? `showImportCompletionModal('${order.id}')` : `showDriverCompletionModal('${order.id}')`}" style="background:linear-gradient(135deg, #10b981, #059669); border:none;">
+                        <button class="btn btn-success btn-sm" onclick="${isImport
+                    ? `showImportCompletionModal('${order.id}'${assignmentId ? `, '${assignmentId}'` : ''})`
+                    : `showDriverCompletionModal('${order.id}'${assignmentId ? `, '${assignmentId}'` : ''})`
+                }" style="background:linear-gradient(135deg, #10b981, #059669); border:none;">
                             <i class="bi bi-check-circle"></i> Hoàn thành
                         </button>
                     ` : ''}
@@ -4542,23 +4545,33 @@ async function submitImportMultiDriverAssignment() {
         return;
     }
 
-    // For multiple drivers - use first one for now (can extend later to split import)
-    // TODO: Implement split import tickets API
-    alert('Hiện tại chỉ hỗ trợ gán 1 tài xế cho phiếu nhập. Tính năng chia đơn đang phát triển.');
-
-    // Assign first driver for now
-    const a = assignments[0];
-    showLoading('Đang gán tài xế...');
+    // For multiple drivers - use multi-driver API
+    showLoading('Đang phân công tài xế...');
     try {
-        const res = await api.assignImportDriver(importId, a.driver_name, a.plate);
+        const payload = {
+            assignments: assignments.map(a => ({
+                driver_name: a.driver_name,
+                plate: a.plate || '',
+                qty: a.qty,
+                type: a.is_external ? 'external' : 'internal'
+            }))
+        };
+
+        const res = await fetch(`/api/imports/${importId}/assign-multi`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
         hideLoading();
 
-        if (res.error) {
-            alert(res.msg || 'Lỗi gán tài xế!');
+        if (data.error) {
+            alert(data.msg || 'Lỗi phân công!');
             return;
         }
 
-        alert(`Đã gán tài xế ${a.driver_name}!`);
+        alert(data.msg || `Đã phân công ${assignments.length} tài xế!`);
         closeOrderModal();
         loadImportTickets();
     } catch (e) {
@@ -5641,7 +5654,7 @@ function removeCompletionImage(idx) {
 }
 
 // Show driver completion modal
-function showDriverCompletionModal(orderId) {
+function showDriverCompletionModal(orderId, assignmentId = null) {
     // Find order from all lists
     const allOrders = [
         ...(state.orders?.pending || []),
@@ -5663,7 +5676,10 @@ function showDriverCompletionModal(orderId) {
     completionImages = [];
     completionLocalItems = [];
 
-    // Store order for submission
+    // Store order for submission - include assignmentId if passed
+    if (assignmentId) {
+        order.assignment_id = assignmentId;
+    }
     state.currentCompletionOrder = order;
 
     const modal = window.$('#modal-order-detail');
@@ -5859,7 +5875,7 @@ window.compressImage = compressImage;
 // IMPORT COMPLETION MODAL (giống Export)
 // ===============================================
 
-function showImportCompletionModal(importId) {
+function showImportCompletionModal(importId, assignmentId = null) {
     // Find import from all lists including myOrders
     const allImports = [
         ...(state.imports?.pending || []),
@@ -5881,7 +5897,10 @@ function showImportCompletionModal(importId) {
     completionImages = [];
     completionLocalItems = [];
 
-    // Store import for submission
+    // Store import for submission - include assignmentId if passed
+    if (assignmentId) {
+        imp.assignment_id = assignmentId;
+    }
     state.currentCompletionImport = imp;
 
     const modal = window.$('#modal-order-detail');

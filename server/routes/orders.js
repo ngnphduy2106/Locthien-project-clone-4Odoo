@@ -120,13 +120,52 @@ router.get('/my/:driverName', async (req, res) => {
 
         // ===== 1. QUERY MULTI-DRIVER ASSIGNMENTS =====
         try {
-            const { data: assignments } = await supabase
-                .from('order_driver_assignments')
-                .select('*')
-                .or(`driver_name.ilike.%${driverName}%,driver_name.eq.${driverName}`);
+            console.log(`🔍 Querying assignments for driver: "${driverName}" (isAdmin: ${isAdmin})`);
+
+            let assignments = [];
+
+            if (isAdmin) {
+                // Admin sees ALL external driver assignments
+                const { data: allAssignments, error: allErr } = await supabase
+                    .from('order_driver_assignments')
+                    .select('*')
+                    .eq('driver_type', 'external');
+
+                if (allErr) console.error('Admin assignment query error:', allErr.message);
+
+                // Also get assignments matching admin name (if admin has personal orders)
+                const { data: myAssignments } = await supabase
+                    .from('order_driver_assignments')
+                    .select('*')
+                    .ilike('driver_name', `%${driverName}%`);
+
+                // Merge and dedupe
+                const allIds = new Set();
+                assignments = [];
+                for (const a of [...(allAssignments || []), ...(myAssignments || [])]) {
+                    if (!allIds.has(a.id)) {
+                        allIds.add(a.id);
+                        assignments.push(a);
+                    }
+                }
+                console.log(`📋 Admin sees ${assignments.length} total assignments (external + personal)`);
+            } else {
+                // Regular driver - only see their own assignments
+                const { data: driverAssignments, error: assignErr } = await supabase
+                    .from('order_driver_assignments')
+                    .select('*')
+                    .ilike('driver_name', `%${driverName}%`);
+
+                if (assignErr) console.error('Assignment query error:', assignErr.message);
+                assignments = driverAssignments || [];
+            }
+
+            console.log(`📋 Assignment query result: ${assignments.length} rows`);
 
             if (assignments && assignments.length > 0) {
-                console.log(`📦 Found ${assignments.length} driver assignments for ${driverName}`);
+                console.log(`📦 Found ${assignments.length} driver assignments:`,
+                    assignments.map(a => ({ id: a.id, driver_name: a.driver_name, order_id: a.order_id, qty: a.assigned_qty })));
+
 
                 for (const assign of assignments) {
                     // Find the parent order
