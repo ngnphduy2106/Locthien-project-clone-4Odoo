@@ -238,13 +238,13 @@ const DispatchModule = {
     getActionButton(order) {
         const status = order.status;
 
-        if (status === 'Chờ xử lý' || status === 'PENDING' || status === 'NEW') {
+        if (status === 'Chờ xử lý' || status === 'PENDING' || status === 'NEW' || status === 'Chưa thực hiện') {
             return `
                 <button class="btn-view" onclick="event.stopPropagation(); DispatchModule.showAssignDriverModal('${order.id || order.order_id}')">
                     <i class="bi bi-person-plus"></i> Gán tài xế
                 </button>
             `;
-        } else if (status === 'Đang giao' || status === 'DELIVERING' || status === 'IN_PROGRESS') {
+        } else if (status === 'Đang giao' || status === 'DELIVERING' || status === 'IN_PROGRESS' || status === 'Đang thực hiện') {
             return `
                 <button class="btn-view" onclick="event.stopPropagation(); DispatchModule.viewOrderDetail('${order.id || order.order_id}')">
                     Xem chi tiết <i class="bi bi-arrow-right"></i>
@@ -262,9 +262,9 @@ const DispatchModule = {
     // Filter orders by tab
     filterOrdersByTab() {
         const statusMap = {
-            'pending': ['Chờ xử lý', 'PENDING', 'NEW'],
-            'delivering': ['Đang giao', 'DELIVERING', 'IN_PROGRESS'],
-            'completed': ['Hoàn thành', 'COMPLETED', 'DONE']
+            'pending': ['Chờ xử lý', 'PENDING', 'NEW', 'Chưa thực hiện'],
+            'delivering': ['Đang giao', 'DELIVERING', 'IN_PROGRESS', 'Đang thực hiện'],
+            'completed': ['Hoàn thành', 'COMPLETED', 'DONE', 'Đã thực hiện']
         };
 
         const validStatuses = statusMap[this.currentTab] || [];
@@ -295,13 +295,17 @@ const DispatchModule = {
             'Chờ xử lý': 'warning',
             'PENDING': 'warning',
             'NEW': 'warning',
+            'Chưa thực hiện': 'warning',
             'Đang giao': 'info',
             'DELIVERING': 'info',
             'IN_PROGRESS': 'info',
+            'Đang thực hiện': 'info',
             'Hoàn thành': 'success',
             'COMPLETED': 'success',
             'DONE': 'success',
+            'Đã thực hiện': 'success',
             'Đã hủy': 'danger',
+            'Đã hủy bỏ': 'danger',
             'CANCELLED': 'danger'
         };
         return statusMap[status] || '';
@@ -1022,9 +1026,9 @@ const DispatchModule = {
                 (order.address || order.delivery_address || '').toLowerCase().includes(query.toLowerCase());
 
             const statusMap = {
-                'pending': ['Chờ xử lý', 'PENDING', 'NEW'],
-                'delivering': ['Đang giao', 'DELIVERING', 'IN_PROGRESS'],
-                'completed': ['Hoàn thành', 'COMPLETED', 'DONE']
+                'pending': ['Chờ xử lý', 'PENDING', 'NEW', 'Chưa thực hiện'],
+                'delivering': ['Đang giao', 'DELIVERING', 'IN_PROGRESS', 'Đang thực hiện'],
+                'completed': ['Hoàn thành', 'COMPLETED', 'DONE', 'Đã thực hiện']
             };
             const validStatuses = statusMap[this.currentTab] || [];
             const matchesTab = validStatuses.includes(order.status);

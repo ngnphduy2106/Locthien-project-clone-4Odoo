@@ -712,12 +712,27 @@ router.post('/:id/complete', async (req, res) => {
             // Check if export ticket already exists
             const { data: existingTicket } = await supabase
                 .from('export_tickets')
-                .select('id')
+                .select('id, images')
                 .eq('order_id', id)
+                .order('created_at', { ascending: false })
                 .limit(1)
                 .single();
 
-            if (!existingTicket) {
+            if (existingTicket) {
+                // Ticket exists - update images if provided
+                if (images && images.length > 0) {
+                    const existingImages = existingTicket.images || [];
+                    const newImages = [...existingImages, ...images].slice(0, 10); // Max 10 images
+
+                    await supabase
+                        .from('export_tickets')
+                        .update({ images: newImages })
+                        .eq('id', existingTicket.id);
+
+                    console.log(`📸 Updated export ticket ${existingTicket.id} with ${images.length} new images`);
+                }
+            } else {
+                // No ticket exists - create new one
                 const orderProducts = products || fullOrderForTicket?.cart || fullOrderForTicket?.products || [];
                 const totalQty = orderProducts.reduce((sum, p) => sum + Number(p.qty || p.quantity || 0), 0);
 
