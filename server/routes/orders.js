@@ -259,10 +259,42 @@ router.get('/my/:driverName', async (req, res) => {
         // ===== 3. IMPORT TICKETS - MULTI-DRIVER =====
         try {
             // First check import_driver_assignments
-            const { data: importAssignments } = await supabase
-                .from('import_driver_assignments')
-                .select('*')
-                .or(`driver_name.ilike.%${driverName}%,driver_name.eq.${driverName}`);
+            let importAssignments = [];
+
+            if (isAdmin) {
+                // Admin sees ALL external driver assignments for imports
+                const { data: allExternalImports, error: extErr } = await supabase
+                    .from('import_driver_assignments')
+                    .select('*')
+                    .eq('driver_type', 'external');
+
+                if (extErr) console.error('Admin import assignment query error:', extErr.message);
+
+                // Also get personal import assignments
+                const { data: myImportAssigns } = await supabase
+                    .from('import_driver_assignments')
+                    .select('*')
+                    .ilike('driver_name', `%${driverName}%`);
+
+                // Merge and dedupe
+                const allIds = new Set();
+                for (const a of [...(allExternalImports || []), ...(myImportAssigns || [])]) {
+                    if (!allIds.has(a.id)) {
+                        allIds.add(a.id);
+                        importAssignments.push(a);
+                    }
+                }
+                console.log(`📦 Admin sees ${importAssignments.length} import assignments (external + personal)`);
+            } else {
+                // Regular driver - only see their own import assignments
+                const { data: driverImportAssigns, error: assignErr } = await supabase
+                    .from('import_driver_assignments')
+                    .select('*')
+                    .or(`driver_name.ilike.%${driverName}%,driver_name.eq.${driverName}`);
+
+                if (assignErr) console.error('Import assignment query error:', assignErr.message);
+                importAssignments = driverImportAssigns || [];
+            }
 
             if (importAssignments && importAssignments.length > 0) {
                 console.log(`📦 Found ${importAssignments.length} import driver assignments`);
