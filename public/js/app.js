@@ -1819,10 +1819,41 @@ function filterMyOrders() {
         }
     });
 
-    // Categorize and re-render
-    const pending = orders.filter(o => o.statusCode === 'CHO_NHAN' || o.status === 'assigned');
-    const delivering = orders.filter(o => o.statusCode === 'DANG_GIAO' || o.status === 'in_transit' || o.status === 'DELIVERING');
-    const completed = orders.filter(o => o.statusCode === 'HOAN_THANH' || o.status === 'completed' || o.status === 'Đã thực hiện');
+    // Categorize and re-render - check multiple status variations
+    const isCompleted = (o) => {
+        const status = (o.status || '').toLowerCase();
+        const statusCode = (o.statusCode || '').toUpperCase();
+        const deliveryStatus = (o.delivery_status || '').toLowerCase();
+        return statusCode === 'HOAN_THANH' ||
+            status === 'completed' ||
+            status === 'đã thực hiện' ||
+            status === 'delivered' ||
+            deliveryStatus.includes('đã giao') ||
+            deliveryStatus.includes('hoàn thành');
+    };
+
+    const isDelivering = (o) => {
+        const status = (o.status || '').toLowerCase();
+        const statusCode = (o.statusCode || '').toUpperCase();
+        return statusCode === 'DANG_GIAO' ||
+            status === 'in_transit' ||
+            status === 'delivering' ||
+            status === 'đang thực hiện';
+    };
+
+    const isPending = (o) => {
+        const status = (o.status || '').toLowerCase();
+        const statusCode = (o.statusCode || '').toUpperCase();
+        return statusCode === 'CHO_NHAN' ||
+            status === 'assigned' ||
+            status === 'pending' ||
+            status === 'chưa thực hiện';
+    };
+
+    // Categorize with priority: completed > delivering > pending
+    const completed = orders.filter(o => isCompleted(o));
+    const delivering = orders.filter(o => !isCompleted(o) && isDelivering(o));
+    const pending = orders.filter(o => !isCompleted(o) && !isDelivering(o));
 
     // Update badges
     const pendingBadge = window.$('#pending-badge');
