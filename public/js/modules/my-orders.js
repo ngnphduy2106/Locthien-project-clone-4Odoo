@@ -51,7 +51,18 @@ const MyOrdersModule = {
                 this.currentUser = JSON.parse(userStr);
             }
 
-            const response = await fetch('/api/orders/my-orders');
+            // Get driver name from user session
+            const driverName = this.currentUser?.name || this.currentUser?.fullName || '';
+            const role = this.currentUser?.role || 'DRIVER';
+
+            if (!driverName) {
+                console.warn('No driver name found in session');
+                this.orders = [];
+                this.renderOrders();
+                return;
+            }
+
+            const response = await fetch(`/api/orders/my/${encodeURIComponent(driverName)}?role=${role}`);
             const data = await response.json();
 
             if (data.error) {
@@ -60,7 +71,8 @@ const MyOrdersModule = {
                 return;
             }
 
-            this.orders = data.orders || [];
+            this.orders = data.data || [];
+            console.log(`📋 My Orders loaded: ${this.orders.length} (exports + imports)`);
 
             // Load unread counts before rendering
             await this.loadUnreadCounts();
@@ -115,9 +127,26 @@ const MyOrdersModule = {
             return;
         }
 
+        // Helper to check if order is in "delivering" state
+        const isDelivering = (o) => {
+            const s = (o.status || '').toLowerCase();
+            const code = o.statusCode || '';
+            return code === 'DANG_GIAO' || code === 'CHO_NHAN' ||
+                s === 'đang giao' || s === 'delivering' || s === 'đang thực hiện' ||
+                s === 'assigned' || s === 'in_transit';
+        };
+
+        // Helper to check if order is completed
+        const isCompleted = (o) => {
+            const s = (o.status || '').toLowerCase();
+            const code = o.statusCode || '';
+            return code === 'HOAN_THANH' ||
+                s === 'hoàn thành' || s === 'completed' || s === 'đã thực hiện';
+        };
+
         // Group by status
-        const delivering = this.orders.filter(o => o.status === 'Đang giao' || o.status === 'DELIVERING');
-        const completed = this.orders.filter(o => o.status === 'Hoàn thành' || o.status === 'COMPLETED');
+        const delivering = this.orders.filter(o => isDelivering(o));
+        const completed = this.orders.filter(o => isCompleted(o));
 
         container.innerHTML = `
             <div class="stats-grid" style="margin-bottom: 24px;">
@@ -139,44 +168,47 @@ const MyOrdersModule = {
 
             ${delivering.length > 0 ? `
                 <h3 style="margin-bottom: 16px;"><i class="bi bi-truck"></i> Đơn đang giao</h3>
-                ${delivering.map(order => this.renderOrderCard(order)).join('')}
+                ${delivering.map(order => this.renderOrderCard(order, true)).join('')}
             ` : ''}
 
             ${completed.length > 0 ? `
                 <h3 style="margin-top: 32px; margin-bottom: 16px;"><i class="bi bi-check-circle"></i> Đơn đã hoàn thành</h3>
-                ${completed.map(order => this.renderOrderCard(order)).join('')}
+                ${completed.map(order => this.renderOrderCard(order, false)).join('')}
             ` : ''}
         `;
     },
 
     // Render order card
-    renderOrderCard(order) {
-        const isDelivering = order.status === 'Đang giao' || order.status === 'DELIVERING';
+    renderOrderCard(order, isDelivering = false) {
         const orderId = order.id || order.order_id;
+        const orderType = order.type || 'export';
+        const typeBadge = orderType === 'import'
+            ? '<span class="type-badge import" style="background:#4CAF50; color:white; padding:2px 8px; border-radius:4px; font-size:11px; margin-left:8px;">Nhập</span>'
+            : '<span class="type-badge export" style="background:#2196F3; color:white; padding:2px 8px; border-radius:4px; font-size:11px; margin-left:8px;">Xuất</span>';
 
         return `
             <div class="order-card" style="position:relative;">
                 ${this.getUnreadBadgeHtml(orderId)}
                 <div class="order-header">
                     <div>
-                        <div class="order-id">#${order.id || order.order_id}</div>
-                        <div class="order-customer">${order.customer || order.customer_name}</div>
+                        <div class="order-id">#${order.soDon || order.id || order.order_id}${typeBadge}</div>
+                        <div class="order-customer">${order.customer || order.customer_name || order.khach || ''}</div>
                     </div>
-                    <span class="status-badge ${isDelivering ? 'info' : 'success'}">${order.status}</span>
+                    <span class="status-badge ${isDelivering ? 'info' : 'success'}">${this.getStatusDisplay(order)}</span>
                 </div>
                 <div class="order-info">
-                    <div><i class="bi bi-geo-alt"></i> ${order.address || order.delivery_address}</div>
-                    <div><i class="bi bi-calendar"></i> ${order.date || order.order_date}</div>
+                    <div><i class="bi bi-geo-alt"></i> ${order.address || order.delivery_address || order.diaChi || ''}</div>
+                    <div><i class="bi bi-calendar"></i> ${order.date || order.order_date || ''}</div>
                     ${order.completedDate || order.completed_at ? `<div><i class="bi bi-check-circle"></i> Hoàn thành: ${order.completedDate || order.completed_at}</div>` : ''}
                 </div>
                 <div class="order-footer">
-                    <div class="order-total">${(order.total || order.total_amount || 0).toLocaleString('vi-VN')} VNĐ</div>
+                    <div class="order-total">${(order.total || order.total_amount || 0).toLocaleString('vi-VN')} ${orderType === 'import' ? 'kg' : 'VNĐ'}</div>
                     ${isDelivering ? `
-                        <button class="btn-view" onclick="MyOrdersModule.completeOrder('${order.id || order.order_id}')">
+                        <button class="btn-view" onclick="MyOrdersModule.completeOrder('${orderId}', '${orderType}')">
                             <i class="bi bi-check-circle"></i> Hoàn thành
                         </button>
                     ` : `
-                        <button class="btn-view" onclick="MyOrdersModule.viewDetail('${order.id || order.order_id}')">
+                        <button class="btn-view" onclick="MyOrdersModule.viewDetail('${orderId}', '${orderType}')">
                             Xem chi tiết
                         </button>
                     `}
@@ -185,8 +217,17 @@ const MyOrdersModule = {
         `;
     },
 
+    // Get display status text
+    getStatusDisplay(order) {
+        const code = order.statusCode || '';
+        if (code === 'CHO_NHAN') return 'Chờ nhận';
+        if (code === 'DANG_GIAO') return 'Đang giao';
+        if (code === 'HOAN_THANH') return 'Hoàn thành';
+        return order.status || 'N/A';
+    },
+
     // Hoàn thành đơn hàng
-    async completeOrder(orderId) {
+    async completeOrder(orderId, orderType = 'export') {
         if (!confirm('Xác nhận hoàn thành đơn hàng này?')) {
             return;
         }
@@ -196,39 +237,50 @@ const MyOrdersModule = {
             const order = this.orders.find(o => (o.id || o.order_id) === orderId);
             const products = order?.products || order?.items || [];
 
-            // Build cart from order products (driver flow)
-            const cart = products.map(p => ({
-                product: {
-                    code: p.code || p.material_code || '',
-                    name: p.name || p.material_name || ''
-                },
-                weight_kg: p.qty || p.quantity || 0,
-                unit: p.unit || 'kg'
-            }));
-
             // Get driver info from localStorage
             const userStr = localStorage.getItem('user');
             const user = userStr ? JSON.parse(userStr) : {};
             const driverName = user.name || user.fullName || localStorage.getItem('userName') || 'Driver';
             const plate = user.plate || '';
 
-            // Call API with proper driver complete payload
-            const response = await fetch(`/api/orders/${orderId}/complete`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    type: 'XUAT',  // Export order
-                    warehouse: 'LT1',
-                    partner: order?.customer || order?.customer_name || 'Khách hàng',
-                    driver_name: driverName,
-                    plate: plate,
-                    cart: cart,  // Actual products
-                    note: '',
-                    sender: driverName
-                })
-            });
+            let response;
+
+            if (orderType === 'import') {
+                // Import ticket completion - use Supabase imports API
+                response = await fetch(`/api/imports/${orderId}/complete`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        actual_products: products,
+                        note: `Hoàn thành bởi ${driverName}`
+                    })
+                });
+            } else {
+                // Export order completion - use MISA orders API
+                const cart = products.map(p => ({
+                    product: {
+                        code: p.code || p.material_code || '',
+                        name: p.name || p.material_name || ''
+                    },
+                    weight_kg: p.qty || p.quantity || 0,
+                    unit: p.unit || 'kg'
+                }));
+
+                response = await fetch(`/api/orders/${orderId}/complete`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        type: 'XUAT',
+                        warehouse: 'LT1',
+                        partner: order?.customer || order?.customer_name || 'Khách hàng',
+                        driver_name: driverName,
+                        plate: plate,
+                        cart: cart,
+                        note: '',
+                        sender: driverName
+                    })
+                });
+            }
 
             const data = await response.json();
 
@@ -247,12 +299,14 @@ const MyOrdersModule = {
     },
 
     // Xem chi tiết
-    viewDetail(orderId) {
+    viewDetail(orderId, orderType = 'export') {
         const order = this.orders.find(o => (o.id || o.order_id) === orderId);
         if (!order) return;
 
         console.log('View order detail:', order);
-        alert(`Chi tiết đơn hàng ${orderId}\n\nKhách hàng: ${order.customer || order.customer_name}\nĐịa chỉ: ${order.address || order.delivery_address}\nTổng tiền: ${(order.total || order.total_amount || 0).toLocaleString('vi-VN')} VNĐ`);
+        const typeLabel = orderType === 'import' ? 'Đơn nhập' : 'Đơn xuất';
+        const totalLabel = orderType === 'import' ? 'kg' : 'VNĐ';
+        alert(`${typeLabel} ${order.soDon || orderId}\n\n${orderType === 'import' ? 'NCC' : 'Khách hàng'}: ${order.customer || order.customer_name || order.khach}\nĐịa chỉ: ${order.address || order.delivery_address || order.diaChi}\nTổng: ${(order.total || order.total_amount || 0).toLocaleString('vi-VN')} ${totalLabel}`);
     }
 };
 

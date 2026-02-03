@@ -95,7 +95,7 @@ router.get('/export-tickets', async (req, res) => {
     }
 });
 
-// GET /api/orders/my/:driverName - Get orders for driver
+// GET /api/orders/my/:driverName - Get orders for driver (both export and import)
 router.get('/my/:driverName', async (req, res) => {
     try {
         const { driverName } = req.params;
@@ -136,7 +136,7 @@ router.get('/my/:driverName', async (req, res) => {
             return match;
         });
 
-        console.log(`📋 Driver ${driverName} (${role}) | Total DB Orders: ${orders.length} | Matches: ${myOrders.length}`);
+        console.log(`📋 Driver ${driverName} (${role}) | Total DB Orders: ${orders.length} | Export Matches: ${myOrders.length}`);
 
         // Debug: Show sample of orders with taiXe for non-matching scenarios
         if (myOrders.length === 0 && orders.length > 0) {
@@ -161,8 +161,54 @@ router.get('/my/:driverName', async (req, res) => {
 
             console.log(`   Order ${o.soDon}: status="${o.status}" -> statusCode="${statusCode}"`);
 
-            return { ...o, statusCode };
+            return { ...o, statusCode, type: 'export' };
         });
+
+        // ===== INCLUDE IMPORT TICKETS =====
+        try {
+            const { createClient } = await import('@supabase/supabase-js');
+            const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+            const { data: importTickets } = await supabase
+                .from('import_tickets')
+                .select('*')
+                .or(`assigned_driver.ilike.%${driverName}%,assigned_driver.eq.${driverName}`)
+                .neq('status', 'cancelled');
+
+            if (importTickets && importTickets.length > 0) {
+                console.log(`📦 Import tickets for ${driverName}: ${importTickets.length}`);
+
+                const mappedImports = importTickets.map(imp => ({
+                    id: imp.id,
+                    order_id: imp.id,
+                    soDon: imp.ticket_no,
+                    sale_order_no: imp.ticket_no,
+                    khach: imp.supplier_name,
+                    customer: imp.supplier_name,
+                    customer_name: imp.supplier_name,
+                    diaChi: imp.supplier_address,
+                    address: imp.supplier_address,
+                    delivery_address: imp.supplier_address,
+                    taiXe: imp.assigned_driver,
+                    driver: imp.assigned_driver,
+                    bienSo: imp.assigned_plate,
+                    plate: imp.assigned_plate,
+                    status: imp.status,
+                    products: imp.products,
+                    total: imp.total_qty,
+                    created_at: imp.created_at,
+                    order_date: imp.expected_date || imp.created_at,
+                    type: 'import',
+                    statusCode: imp.status === 'assigned' ? 'CHO_NHAN' :
+                        imp.status === 'in_transit' ? 'DANG_GIAO' :
+                            imp.status === 'completed' ? 'HOAN_THANH' : 'CHO_NHAN'
+                }));
+
+                myOrders = [...myOrders, ...mappedImports];
+            }
+        } catch (importErr) {
+            console.error('Import tickets fetch error:', importErr.message);
+        }
 
         res.json({ error: false, data: myOrders });
 
