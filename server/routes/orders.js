@@ -887,7 +887,14 @@ router.post('/:id/complete', async (req, res) => {
                         {
                             partial: true,
                             progress: `${completedCount}/${assignments.length}`,
-                            yourQty: myActualQty
+                            yourQty: myActualQty,
+                            // Debug info
+                            _debug: {
+                                actualOrderId,
+                                paramId: id,
+                                assignmentId: assignment_id,
+                                assignmentStatuses: assignments.map(a => ({ id: a.id, status: a.status, driver: a.driver_name }))
+                            }
                         }
                     ));
                 }

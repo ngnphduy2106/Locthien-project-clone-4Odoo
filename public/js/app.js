@@ -6015,6 +6015,7 @@ async function submitDriverCompletion() {
 
         // Show partial completion message if applicable
         if (res.data?.partial) {
+            console.log('🔍 Partial completion debug:', res.data._debug);
             alert(res.msg || `Đã hoàn thành phần của bạn! (${res.data.progress})`);
         } else {
             alert(res.msg || 'Đã hoàn thành đơn hàng thành công!');
