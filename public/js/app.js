@@ -1244,50 +1244,78 @@ function renderDispatchOrders() {
         return;
     }
 
-    container.innerHTML = orders.map(order => `
-        <div class="order-card" style="position:relative;">
-            ${getUnreadBadgeHtml(order.id, 'export')}
-            <div class="order-card-header">
-                <div>
-                    <div class="order-id">#${order.soDon || order.sale_order_no || order.id}</div>
-                    <div class="order-customer">${order.khach || order.account_name || 'Khách hàng'}</div>
+    // Compact row-based layout for better density
+    container.innerHTML = `
+        <div class="compact-order-list">
+            ${orders.map(order => `
+                <div class="compact-order-row" onclick="viewOrderDetail('${order.id}')" style="
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    padding: 12px 16px;
+                    background: var(--card-bg);
+                    border-radius: 8px;
+                    margin-bottom: 8px;
+                    cursor: pointer;
+                    border-left: 4px solid ${order.status === 'Hoàn thành' || order.status === 'Đã thực hiện' ? 'var(--success)' :
+            order.status === 'Đang thực hiện' || order.status === 'Đang giao' ? 'var(--info)' : 'var(--warning)'};
+                    transition: all 0.15s ease;
+                    position: relative;
+                " onmouseenter="this.style.background='var(--hover-bg)'" onmouseleave="this.style.background='var(--card-bg)'">
+                    ${getUnreadBadgeHtml(order.id, 'export')}
+                    
+                    <!-- Order ID -->
+                    <div style="min-width: 140px; font-weight: 600; color: var(--primary); font-size: 13px;">
+                        ${order.soDon || order.sale_order_no || order.id}
+                    </div>
+                    
+                    <!-- Customer (flex-grow) -->
+                    <div style="flex: 1; min-width: 0;">
+                        <div style="font-weight: 500; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px;">
+                            ${order.khach || order.account_name || 'Khách hàng'}
+                        </div>
+                        <div style="font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            <i class="bi bi-geo-alt" style="font-size: 10px;"></i> ${order.diaChi || order.shipping_address || 'Sunco'}
+                        </div>
+                    </div>
+                    
+                    <!-- Date -->
+                    <div style="min-width: 80px; font-size: 12px; color: var(--text-secondary); text-align: center;">
+                        ${formatDate(order.ngay || order.sale_order_date)}
+                    </div>
+                    
+                    <!-- Driver/Plate -->
+                    <div style="min-width: 100px; font-size: 12px; color: var(--text-secondary); text-align: center;">
+                        ${order.taiXe ? `<span style="color: var(--info);">${order.taiXe}</span>` : '<span style="opacity:0.5;">—</span>'}
+                    </div>
+                    
+                    <!-- Status Badge -->
+                    <div style="min-width: 90px; text-align: center;">
+                        <span class="badge badge-${getStatusBadge(order.status)}" style="font-size: 11px; padding: 4px 10px;">
+                            ${getStatusText(order.status)}
+                        </span>
+                    </div>
+                    
+                    <!-- Actions -->
+                    <div style="display: flex; gap: 6px;" onclick="event.stopPropagation()">
+                        <button class="btn btn-outline btn-sm" onclick="viewOrderDetail('${order.id}')" style="padding: 4px 10px; font-size: 11px;">
+                            <i class="bi bi-eye"></i>
+                        </button>
+                        ${state.currentDispatchTab === 'pending' ? `
+                            <button class="btn btn-info btn-sm" onclick="assignDriver('${order.id}')" style="padding: 4px 10px; font-size: 11px;">
+                                <i class="bi bi-person-plus"></i>
+                            </button>
+                        ` : ''}
+                        ${state.currentDispatchTab === 'assigned' && isAdminRole() ? `
+                            <button class="btn btn-success btn-sm" onclick="showDriverCompletionModal('${order.id}')" style="padding: 4px 10px; font-size: 11px;">
+                                <i class="bi bi-check"></i>
+                            </button>
+                        ` : ''}
+                    </div>
                 </div>
-                <span class="badge badge-${getStatusBadge(order.status)}">${getStatusText(order.status)}</span>
-            </div>
-            <div class="order-meta">
-                <div class="order-meta-item">
-                    <i class="bi bi-calendar3"></i>
-                    ${formatDate(order.ngay || order.sale_order_date)}
-                </div>
-                <div class="order-meta-item">
-                    <i class="bi bi-geo-alt"></i>
-                    ${order.diaChi || order.shipping_address || 'Chưa có địa chỉ'}
-                </div>
-                ${order.taiXe ? `
-                <div class="order-meta-item">
-                    <i class="bi bi-truck"></i>
-                    ${order.taiXe}${order.bienSo ? ' - ' + order.bienSo : ''}
-                </div>
-                ` : ''}
-            </div>
-            <div class="order-total">${formatCurrency(order.amount || order.sale_order_amount || 0)}</div>
-            <div class="order-card-footer">
-                <button class="btn btn-outline btn-sm" onclick="viewOrderDetail('${order.id}')">
-                    <i class="bi bi-eye"></i> Chi tiết
-                </button>
-                ${state.currentDispatchTab === 'pending' ? `
-                    <button class="btn btn-info btn-sm" onclick="assignDriver('${order.id}')">
-                        <i class="bi bi-person-plus"></i> Gán tài xế
-                    </button>
-                ` : ''}
-                ${state.currentDispatchTab === 'assigned' && isAdminRole() ? `
-                    <button class="btn btn-success btn-sm" onclick="showDriverCompletionModal('${order.id}')">
-                        <i class="bi bi-check-circle"></i> Hoàn thành
-                    </button>
-                ` : ''}
-            </div>
+            `).join('')}
         </div>
-    `).join('');
+    `;
 }
 
 
