@@ -1032,59 +1032,89 @@ function renderImportList() {
         return;
     }
 
-    container.innerHTML = imports.map(imp => `
-        <div class="order-card" style="position:relative;">
-            ${getUnreadBadgeHtml(imp.id, 'import')}
-            <div class="order-card-header">
-                <div>
-                    <div class="order-id">#${imp.ticket_no || imp.id}</div>
-                    <div class="order-customer">${imp.supplier_name || 'NCC'}</div>
+    // Compact row-based layout for imports
+    container.innerHTML = `
+        <div class="compact-order-list">
+            ${imports.map(imp => `
+                <div class="compact-order-row" onclick="viewImportDetail('${imp.id}')" style="
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    padding: 12px 16px;
+                    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+                    border-radius: 8px;
+                    margin-bottom: 8px;
+                    cursor: pointer;
+                    border-left: 4px solid ${imp.status === 'Hoàn thành' || imp.status === 'completed' ? 'var(--success)' :
+            imp.status === 'Đang thực hiện' || imp.status === 'assigned' ? 'var(--info)' : '#4CAF50'};
+                    transition: all 0.15s ease;
+                    position: relative;
+                " onmouseenter="this.style.opacity='0.9'" onmouseleave="this.style.opacity='1'">
+                    ${getUnreadBadgeHtml(imp.id, 'import')}
+                    
+                    <!-- Ticket No -->
+                    <div style="min-width: 100px; font-weight: 600; color: #16a34a; font-size: 13px;">
+                        ${imp.ticket_no || imp.id}
+                        <span style="background:#4CAF50; color:white; padding:1px 6px; border-radius:4px; font-size:10px; margin-left:4px;">Nhập</span>
+                    </div>
+                    
+                    <!-- Supplier (flex-grow) -->
+                    <div style="flex: 1; min-width: 0;">
+                        <div style="font-weight: 500; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px;">
+                            ${imp.supplier_name || 'NCC'}
+                        </div>
+                        <div style="font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            <i class="bi bi-geo-alt" style="font-size: 10px;"></i> ${imp.supplier_address || 'Sunco'}
+                        </div>
+                    </div>
+                    
+                    <!-- Date -->
+                    <div style="min-width: 80px; font-size: 12px; color: var(--text-secondary); text-align: center;">
+                        ${formatDate(imp.expected_date || imp.created_at)}
+                    </div>
+                    
+                    <!-- Driver -->
+                    <div style="min-width: 100px; font-size: 12px; color: var(--text-secondary); text-align: center;">
+                        ${imp.assigned_driver || imp.driver_name ? `<span style="color: var(--info);">${imp.assigned_driver || imp.driver_name}</span>` : '<span style="opacity:0.5;">—</span>'}
+                    </div>
+                    
+                    <!-- Status Badge -->
+                    <div style="min-width: 90px; text-align: center;">
+                        <span class="badge badge-${getStatusBadge(imp.status)}" style="font-size: 11px; padding: 4px 10px;">
+                            ${getStatusText(imp.status)}
+                        </span>
+                    </div>
+                    
+                    <!-- Actions -->
+                    <div style="display: flex; gap: 6px;" onclick="event.stopPropagation()">
+                        <button class="btn btn-outline btn-sm" onclick="viewImportDetail('${imp.id}')" style="padding: 4px 10px; font-size: 11px;">
+                            <i class="bi bi-eye"></i>
+                        </button>
+                        ${(state.currentDispatchTab === 'pending' || state.currentDispatchTab === 'assigned') && isAdminRole() ? `
+                            <button class="btn btn-warning btn-sm" onclick="editImport('${imp.id}')" style="padding: 4px 10px; font-size: 11px;">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                        ` : ''}
+                        ${state.currentDispatchTab === 'pending' ? `
+                            <button class="btn btn-info btn-sm" onclick="assignImportDriver('${imp.id}')" style="padding: 4px 10px; font-size: 11px;">
+                                <i class="bi bi-person-plus"></i>
+                            </button>
+                        ` : ''}
+                        ${state.currentDispatchTab === 'assigned' && isAdminRole() ? `
+                            <button class="btn btn-success btn-sm" onclick="adminCompleteImport('${imp.id}')" style="padding: 4px 10px; font-size: 11px;">
+                                <i class="bi bi-check"></i>
+                            </button>
+                        ` : ''}
+                        ${(state.currentDispatchTab === 'pending' || state.currentDispatchTab === 'assigned') && isAdminRole() ? `
+                            <button class="btn btn-danger btn-sm" onclick="deleteImportTicket('${imp.id}')" style="padding: 4px 10px; font-size: 11px;" title="Xóa">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        ` : ''}
+                    </div>
                 </div>
-                <span class="badge badge-${getStatusBadge(imp.status)}">${getStatusText(imp.status)}</span>
-            </div>
-            <div class="order-meta">
-                <div class="order-meta-item">
-                    <i class="bi bi-calendar3"></i>
-                    ${formatDate(imp.expected_date || imp.created_at)}
-                </div>
-                <div class="order-meta-item">
-                    <i class="bi bi-geo-alt"></i>
-                    ${imp.supplier_address || 'Chưa có địa chỉ'}
-                </div>
-                ${imp.assigned_driver || imp.driver_name ? `
-                <div class="order-meta-item">
-                    <i class="bi bi-truck"></i>
-                    ${imp.assigned_driver || imp.driver_name}${imp.assigned_plate || imp.plate ? ' - ' + (imp.assigned_plate || imp.plate) : ''}
-                </div>
-                ` : ''}
-            </div>
-            <div class="order-card-footer">
-                <button class="btn btn-outline btn-sm" onclick="viewImportDetail('${imp.id}')">
-                    <i class="bi bi-eye"></i> Chi tiết
-                </button>
-                ${(state.currentDispatchTab === 'pending' || state.currentDispatchTab === 'assigned') && isAdminRole() ? `
-                    <button class="btn btn-warning btn-sm" onclick="editImport('${imp.id}')">
-                        <i class="bi bi-pencil"></i> Sửa
-                    </button>
-                ` : ''}
-                ${state.currentDispatchTab === 'pending' ? `
-                    <button class="btn btn-info btn-sm" onclick="assignImportDriver('${imp.id}')">
-                        <i class="bi bi-person-plus"></i> Gán tài xế
-                    </button>
-                ` : ''}
-                ${state.currentDispatchTab === 'assigned' && isAdminRole() ? `
-                    <button class="btn btn-success btn-sm" onclick="adminCompleteImport('${imp.id}')">
-                        <i class="bi bi-check-circle"></i> Hoàn thành
-                    </button>
-                ` : ''}
-                ${(state.currentDispatchTab === 'pending' || state.currentDispatchTab === 'assigned') && isAdminRole() ? `
-                    <button class="btn btn-danger btn-sm" onclick="deleteImportTicket('${imp.id}')" title="Xóa đơn nhập">
-                        <i class="bi bi-trash"></i>
-                    </button>
-                ` : ''}
-            </div>
+            `).join('')}
         </div>
-    `).join('');
+    `;
 }
 
 // Store filters for dispatch
@@ -1657,103 +1687,112 @@ function renderMyOrdersList(containerId, orders, type) {
         return;
     }
 
-    // Badge styles per type
-    const badgeStyles = {
-        pending: 'background:var(--warning-light); color:var(--warning);',
-        delivering: 'background:var(--info-light); color:var(--info);',
-        completed: 'background:var(--success-light); color:var(--success);'
-    };
-    const badgeTexts = { pending: 'Chờ nhận', delivering: 'Đang giao', completed: 'Hoàn thành' };
-
-    container.innerHTML = orders.map(order => {
+    // Compact row-based layout
+    container.innerHTML = `
+        <div class="compact-order-list">
+            ${orders.map(order => {
         const orderId = order.soDon || order.orderCode || order.id;
         const chatBadge = getUnreadBadgeHtml(orderId, order.type || 'export');
         const isImport = order.type === 'import';
-        const cardBorderColor = isImport ? '#4CAF50' : (type === 'pending' ? 'var(--warning)' : type === 'delivering' ? 'var(--info)' : 'var(--success)');
-        const cardBg = isImport ? 'background: linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%);' : '';
-        const typeBadge = isImport
-            ? '<span style="background:#4CAF50; color:white; padding:2px 8px; border-radius:4px; font-size:11px; margin-left:8px;">Nhập</span>'
-            : '';
+        const borderColor = isImport ? '#4CAF50' : (type === 'pending' ? 'var(--warning)' : type === 'delivering' ? 'var(--info)' : 'var(--success)');
+        const bgColor = isImport ? 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)' : 'var(--card-bg)';
 
         // Multi-driver split badge
         const isSplit = order.is_split_order || false;
         const splitProgress = order.split_progress || '';
-        const splitBadge = isSplit
-            ? `<span style="background:#8B5CF6; color:white; padding:2px 8px; border-radius:4px; font-size:11px; margin-left:8px;">
-                🔀 Chia đơn ${splitProgress ? `(${splitProgress})` : ''}
-               </span>`
-            : '';
 
-        // Show assigned qty for split orders - Admin sees driver name, driver sees "(của bạn)"
-        const isAdmin = (state.user?.role || '').toLowerCase() === 'admin' || (state.user?.role || '').toLowerCase() === 'tester';
-        const qtyDisplay = isSplit && order.assigned_qty
-            ? `<span style="color:#8B5CF6; font-weight:600;"> - ${order.assigned_qty}kg ${isAdmin ? `(${order.taiXe || order.driver_name || 'Tài xế'})` : '(của bạn)'}</span>`
-            : '';
-
-        // Pass assignment_id to start functions
+        // Assignment ID for split orders
         const assignmentId = order.assignment_id || null;
-        if (order.is_split_order) {
-            console.log(`📋 Split order ${orderId}: assignment_id=${assignmentId}, split_progress=${order.split_progress}`);
-        }
+
+        // Build action function names
         const startFn = isImport
             ? `startImportOrder('${order.id}'${assignmentId ? `, '${assignmentId}'` : ''})`
             : `startOrder('${order.id}'${assignmentId ? `, '${assignmentId}'` : ''})`;
 
+        const completeFn = isImport
+            ? `showImportCompletionModal('${order.id}'${assignmentId ? `, '${assignmentId}'` : ''})`
+            : `showDriverCompletionModal('${order.id}'${assignmentId ? `, '${assignmentId}'` : ''})`;
+
+        const viewFn = isImport ? `viewImportDetail('${order.id}')` : `viewOrderDetail('${order.id}')`;
+
+        // Status text/color by type
+        const statusColors = { pending: 'var(--warning)', delivering: 'var(--info)', completed: 'var(--success)' };
+        const statusTexts = { pending: 'Chờ nhận', delivering: 'Đang giao', completed: 'Hoàn thành' };
+
         return `
-        <div class="order-card" style="margin-bottom:12px; border-left:4px solid ${cardBorderColor}; position:relative; ${cardBg}">
-            ${chatBadge}
-            <div class="order-card-header">
-                <div>
-                    <div class="order-id" style="font-size:16px; font-weight:700;">#${orderId}${typeBadge}${splitBadge}</div>
-                    <div class="order-customer" style="font-size:14px; color:var(--text-secondary);">${order.khach || order.customerName || order.accountName || 'Khách hàng'}${qtyDisplay}</div>
-                </div>
-                <span class="badge" style="${badgeStyles[type]}">${badgeTexts[type]}</span>
-            </div>
-            <div class="order-meta" style="margin:12px 0; display:flex; flex-wrap:wrap; gap:16px;">
-                <div class="order-meta-item" style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text-muted);">
-                    <i class="bi bi-geo-alt"></i>
-                    ${order.diaChi || order.address || 'Chưa có địa chỉ'}
-                </div>
-                <div class="order-meta-item" style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text-muted);">
-                    <i class="bi bi-calendar3"></i>
-                    ${formatDate(order.ngay || order.sale_order_date || order.createdAt)}
-                </div>
-            </div>
-            ${type === 'completed' ? renderCompletedOrderExtras(order) : ''}
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px; padding-top:12px; border-top:1px solid var(--border);">
-                <div class="order-info" style="font-size:14px; color:var(--text-muted);">
-                    <i class="bi bi-box-seam"></i> ${(order.cart || order.products || []).length || 0} sản phẩm
-                </div>
-                <div style="display:flex; gap:8px;">
-                    ${type === 'pending' ? `
-                        <button class="btn btn-outline btn-sm" onclick="${isImport ? `viewImportDetail('${order.id}')` : `viewOrderDetail('${order.id}')`}">
-                            <i class="bi bi-eye"></i> Chi tiết
-                        </button>
-                        <button class="btn btn-warning btn-sm" onclick="${startFn}" style="background:linear-gradient(135deg, #f59e0b, #d97706); color:white; border:none;">
-                            <i class="bi bi-play-circle"></i> Nhận đơn
-                        </button>
-                    ` : ''}
-                    ${type === 'delivering' ? `
-                        <button class="btn btn-outline btn-sm" onclick="${isImport ? `viewImportDetail('${order.id}')` : `viewOrderDetail('${order.id}')`}">
-                            <i class="bi bi-eye"></i> Chi tiết
-                        </button>
-                        <button class="btn btn-success btn-sm" onclick="${isImport
-                    ? `showImportCompletionModal('${order.id}'${assignmentId ? `, '${assignmentId}'` : ''})`
-                    : `showDriverCompletionModal('${order.id}'${assignmentId ? `, '${assignmentId}'` : ''})`
-                }" style="background:linear-gradient(135deg, #10b981, #059669); border:none;">
-                            <i class="bi bi-check-circle"></i> Hoàn thành
-                        </button>
-                    ` : ''}
-                    ${type === 'completed' ? `
-                        <button class="btn btn-outline btn-sm" onclick="${isImport ? `viewImportDetail('${order.id}')` : `viewOrderDetail('${order.id}')`}">
-                            <i class="bi bi-eye"></i> Xem chi tiết
-                        </button>
-                    ` : ''}
-                </div>
-            </div>
+                    <div class="compact-order-row" onclick="${viewFn}" style="
+                        display: flex;
+                        align-items: center;
+                        gap: 12px;
+                        padding: 12px 16px;
+                        background: ${bgColor};
+                        border-radius: 8px;
+                        margin-bottom: 8px;
+                        cursor: pointer;
+                        border-left: 4px solid ${borderColor};
+                        transition: all 0.15s ease;
+                        position: relative;
+                    " onmouseenter="this.style.opacity='0.95'" onmouseleave="this.style.opacity='1'">
+                        ${chatBadge}
+                        
+                        <!-- Order ID + Badges -->
+                        <div style="min-width: 160px;">
+                            <div style="font-weight: 600; color: var(--primary); font-size: 13px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                                ${orderId}
+                                ${isImport ? '<span style="background:#4CAF50; color:white; padding:1px 6px; border-radius:4px; font-size:10px;">Nhập</span>' : ''}
+                                ${isSplit ? `<span style="background:#8B5CF6; color:white; padding:1px 6px; border-radius:4px; font-size:10px;">🔀 ${splitProgress || 'Chia'}</span>` : ''}
+                            </div>
+                            ${isSplit && order.assigned_qty ? `<div style="font-size:11px; color:#8B5CF6;">${order.assigned_qty}kg (của bạn)</div>` : ''}
+                        </div>
+                        
+                        <!-- Customer (flex-grow) -->
+                        <div style="flex: 1; min-width: 0;">
+                            <div style="font-weight: 500; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px;">
+                                ${order.khach || order.customerName || order.accountName || 'Khách hàng'}
+                            </div>
+                            <div style="font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                <i class="bi bi-geo-alt" style="font-size: 10px;"></i> ${order.diaChi || order.address || 'Sunco'}
+                            </div>
+                        </div>
+                        
+                        <!-- Date -->
+                        <div style="min-width: 75px; font-size: 12px; color: var(--text-secondary); text-align: center;">
+                            ${formatDate(order.ngay || order.sale_order_date || order.createdAt)}
+                        </div>
+                        
+                        <!-- Products count -->
+                        <div style="min-width: 70px; font-size: 11px; color: var(--text-muted); text-align: center;">
+                            <i class="bi bi-box-seam"></i> ${(order.cart || order.products || []).length || 0}
+                        </div>
+                        
+                        <!-- Status Badge -->
+                        <div style="min-width: 85px; text-align: center;">
+                            <span style="background: ${statusColors[type]}20; color: ${statusColors[type]}; padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 500;">
+                                ${statusTexts[type]}
+                            </span>
+                        </div>
+                        
+                        <!-- Actions -->
+                        <div style="display: flex; gap: 6px;" onclick="event.stopPropagation()">
+                            <button class="btn btn-outline btn-sm" onclick="${viewFn}" style="padding: 4px 10px; font-size: 11px;">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                            ${type === 'pending' ? `
+                                <button class="btn btn-warning btn-sm" onclick="${startFn}" style="padding: 4px 10px; font-size: 11px; background:linear-gradient(135deg, #f59e0b, #d97706); color:white; border:none;">
+                                    <i class="bi bi-play-circle"></i>
+                                </button>
+                            ` : ''}
+                            ${type === 'delivering' ? `
+                                <button class="btn btn-success btn-sm" onclick="${completeFn}" style="padding: 4px 10px; font-size: 11px; background:linear-gradient(135deg, #10b981, #059669); border:none;">
+                                    <i class="bi bi-check"></i>
+                                </button>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+    }).join('')}
         </div>
     `;
-    }).join('');
 }
 
 // Render extras (local items + note) for completed orders
