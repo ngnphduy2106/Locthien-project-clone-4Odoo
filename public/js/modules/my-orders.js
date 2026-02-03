@@ -127,8 +127,24 @@ const MyOrdersModule = {
             return;
         }
 
+        // Helper to check if split order has all drivers completed (e.g., "2/2")
+        const isSplitCompleted = (o) => {
+            const progress = o.split_progress || '';
+            if (!progress) return false;
+            const match = progress.match(/(\d+)\/(\d+)/);
+            if (match) {
+                const completed = parseInt(match[1]);
+                const total = parseInt(match[2]);
+                return completed === total && total > 0;
+            }
+            return false;
+        };
+
         // Helper to check if order is in "delivering" state
         const isDelivering = (o) => {
+            // If split order with all drivers completed, it's NOT delivering
+            if (isSplitCompleted(o)) return false;
+
             const s = (o.status || '').toLowerCase();
             const code = o.statusCode || '';
             return code === 'DANG_GIAO' || code === 'CHO_NHAN' ||
@@ -138,6 +154,9 @@ const MyOrdersModule = {
 
         // Helper to check if order is completed
         const isCompleted = (o) => {
+            // Split order with all drivers completed
+            if (isSplitCompleted(o)) return true;
+
             const s = (o.status || '').toLowerCase();
             const code = o.statusCode || '';
             return code === 'HOAN_THANH' ||
