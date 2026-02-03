@@ -169,16 +169,41 @@ router.get('/my/:driverName', async (req, res) => {
             const { createClient } = await import('@supabase/supabase-js');
             const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
-            const { data: importTickets } = await supabase
+            // Build query based on role
+            const normalizedRole = (role || '').toUpperCase();
+            let query = supabase
                 .from('import_tickets')
                 .select('*')
-                .or(`assigned_driver.ilike.%${driverName}%,assigned_driver.eq.${driverName}`)
                 .neq('status', 'cancelled');
 
-            if (importTickets && importTickets.length > 0) {
-                console.log(`📦 Import tickets for ${driverName}: ${importTickets.length}`);
+            // Admin/Tester: Get all assigned imports (including external drivers)
+            // Regular driver: Get only their imports
+            if (normalizedRole === 'ADMIN' || normalizedRole === 'TESTER') {
+                // Admin sees: their own imports + all external driver imports
+                query = query.not('assigned_driver', 'is', null);
+            } else {
+                // Regular driver: only their assigned imports
+                query = query.or(`assigned_driver.ilike.%${driverName}%,assigned_driver.eq.${driverName}`);
+            }
 
-                const mappedImports = importTickets.map(imp => ({
+            const { data: importTickets } = await query;
+
+            if (importTickets && importTickets.length > 0) {
+                console.log(`📦 Import tickets for ${driverName} (${role}): ${importTickets.length}`);
+
+                // Filter for admin: own imports + external driver imports
+                let filteredImports = importTickets;
+                if (normalizedRole === 'ADMIN' || normalizedRole === 'TESTER') {
+                    filteredImports = importTickets.filter(imp => {
+                        const assignedUpper = (imp.assigned_driver || '').toUpperCase();
+                        const isMyImport = assignedUpper.includes(myName) || myName.includes(assignedUpper);
+                        const isExternalDriver = assignedUpper && !internalDrivers.includes(assignedUpper);
+                        return isMyImport || isExternalDriver;
+                    });
+                    console.log(`   Admin filter: ${filteredImports.length} imports (own + external)`);
+                }
+
+                const mappedImports = filteredImports.map(imp => ({
                     id: imp.id,
                     order_id: imp.id,
                     soDon: imp.ticket_no,
