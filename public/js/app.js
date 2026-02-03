@@ -2475,11 +2475,13 @@ function addDriverAssignmentRow() {
     }
 
     // Add to list
+    const isExternal = select?.value === '__EXTERNAL__';
     state.driverAssignments.push({
         driver_name: driverName,
         plate: plate,
         qty: qty,
-        is_external: select?.value === '__EXTERNAL__'
+        type: isExternal ? 'external' : 'internal',  // Backend reads this field
+        is_external: isExternal  // Keep for UI display
     });
 
     // Reset form
