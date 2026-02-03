@@ -283,7 +283,7 @@ router.get('/my/:driverName', async (req, res) => {
                     // Check for split
                     const { data: allImportAssigns } = await supabase
                         .from('import_driver_assignments')
-                        .select('id, status, assigned_qty, actual_qty')
+                        .select('id, status, assigned_qty, actual_qty, driver_name, plate')
                         .eq('import_id', assign.import_id);
 
                     const isSplitOrder = allImportAssigns && allImportAssigns.length > 1;
@@ -305,6 +305,7 @@ router.get('/my/:driverName', async (req, res) => {
                         actual_qty: assign.actual_qty || 0,
                         is_split_order: isSplitOrder,
                         split_progress: isSplitOrder ? `${completedCount}/${totalCount}` : null,
+                        all_assignments: allImportAssigns || [],  // Include all assignments for frontend display
                         type: 'import',
                         statusCode
                     });
