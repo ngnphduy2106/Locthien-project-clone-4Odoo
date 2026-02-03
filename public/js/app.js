@@ -1631,6 +1631,9 @@ function renderMyOrdersList(containerId, orders, type) {
 
         // Pass assignment_id to start functions
         const assignmentId = order.assignment_id || null;
+        if (order.is_split_order) {
+            console.log(`📋 Split order ${orderId}: assignment_id=${assignmentId}, split_progress=${order.split_progress}`);
+        }
         const startFn = isImport
             ? `startImportOrder('${order.id}'${assignmentId ? `, '${assignmentId}'` : ''})`
             : `startOrder('${order.id}'${assignmentId ? `, '${assignmentId}'` : ''})`;
