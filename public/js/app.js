@@ -2898,7 +2898,8 @@ window.removeDeliveryImage = removeDeliveryImage;
 
 async function submitDelivery() {
     // Validate images
-    if (!state.selectedImages || !state.selectedImages.length) {
+    const validImages = (state.selectedImages || []).filter(img => img !== null);
+    if (!validImages.length) {
         if (!confirm('Cảnh báo: Chưa có ảnh chứng minh. Tiếp tục?')) return;
     }
 
@@ -2912,32 +2913,49 @@ async function submitDelivery() {
     const noteEl = window.$('#inp-del-note');
     const note = noteEl?.value || '';
 
-    // Use simplified admin_completed flow - backend reads driver info from order
-    const payload = {
-        admin_completed: true,
-        delivery_note: note || `Hoàn thành bởi ${state.user?.name || 'Driver'}`,
-        images: (state.selectedImages || []).filter(img => img !== null)
-    };
-
-    console.log('📤 Submit delivery payload:', {
-        orderId: order.id,
-        admin_completed: true,
-        imagesCount: payload.images.length
-    });
-
     showLoading('Đang xử lý...');
 
     try {
-        const res = await api.completeOrder(order.id, payload);
-        hideLoading();
+        // Step 1: Complete the order (without images)
+        const completePayload = {
+            admin_completed: true,
+            delivery_note: note || `Hoàn thành bởi ${state.user?.name || 'Driver'}`
+        };
 
-        if (res.error) {
-            alert('Lỗi: ' + (res.msg || res.message));
-        } else {
-            alert(res.msg || 'Đã hoàn thành đơn hàng!');
-            closeDeliveryModal();
-            loadOrders();
+        console.log('📤 Step 1: Complete order:', { orderId: order.id });
+        const completeRes = await api.completeOrder(order.id, completePayload);
+
+        if (completeRes.error) {
+            hideLoading();
+            alert('Lỗi hoàn thành đơn: ' + (completeRes.msg || completeRes.message));
+            return;
         }
+
+        // Step 2: Add proof images using dedicated API (if have images)
+        if (validImages.length > 0) {
+            console.log(`📸 Step 2: Adding ${validImages.length} proof images...`);
+
+            const imageRes = await fetch(`/api/orders/${order.id}/add-proof-images`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ images: validImages })
+            });
+
+            const imageData = await imageRes.json();
+
+            if (imageData.error) {
+                console.warn('⚠️ Image save warning:', imageData.msg);
+                // Don't fail the whole operation, just warn
+            } else {
+                console.log('✅ Proof images saved successfully');
+            }
+        }
+
+        hideLoading();
+        alert(completeRes.msg || 'Đã hoàn thành đơn hàng!');
+        closeDeliveryModal();
+        loadOrders();
+
     } catch (e) {
         hideLoading();
         console.error('Submit delivery error:', e);
