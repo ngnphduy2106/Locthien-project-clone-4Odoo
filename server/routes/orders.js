@@ -821,7 +821,8 @@ router.post('/:id/complete', async (req, res) => {
             console.log(`📊 My actual qty from cart: ${myActualQty}kg`);
 
             // Update this assignment as completed
-            const { error: updateErr } = await supabase
+            console.log(`🔧 Updating assignment id: ${assignment_id} to status: completed`);
+            const { data: updateResult, error: updateErr } = await supabase
                 .from('order_driver_assignments')
                 .update({
                     status: 'completed',
@@ -831,12 +832,15 @@ router.post('/:id/complete', async (req, res) => {
                     proof_images: images || [],
                     completed_at: new Date().toISOString()
                 })
-                .eq('id', assignment_id);
+                .eq('id', assignment_id)
+                .select();  // Add select to get result
 
             if (updateErr) {
-                console.error('Assignment update error:', updateErr.message);
+                console.error('❌ Assignment update error:', updateErr.message);
+            } else if (!updateResult || updateResult.length === 0) {
+                console.error(`⚠️ Assignment update: NO ROWS AFFECTED! assignment_id=${assignment_id} may not exist`);
             } else {
-                console.log(`✅ Assignment ${assignment_id} completed with ${myActualQty}kg`);
+                console.log(`✅ Assignment ${assignment_id} updated successfully:`, updateResult[0].status);
             }
 
             // Get the assignment we just updated to find correct order_id
