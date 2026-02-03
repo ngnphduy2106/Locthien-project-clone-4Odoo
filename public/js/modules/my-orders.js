@@ -140,8 +140,18 @@ const MyOrdersModule = {
             return false;
         };
 
+        // Helper to check if THIS driver's assignment is completed 
+        // (for split orders, each driver sees their own assignment status)
+        const isMyAssignmentCompleted = (o) => {
+            // Check assignment_status field (returned from backend for each driver's assignment)
+            const assignStatus = (o.assignment_status || '').toLowerCase();
+            return assignStatus === 'completed';
+        };
+
         // Helper to check if order is in "delivering" state
         const isDelivering = (o) => {
+            // If this driver's assignment is completed, it's NOT in delivering for them
+            if (isMyAssignmentCompleted(o)) return false;
             // If split order with all drivers completed, it's NOT delivering
             if (isSplitCompleted(o)) return false;
 
@@ -152,8 +162,10 @@ const MyOrdersModule = {
                 s === 'assigned' || s === 'in_transit';
         };
 
-        // Helper to check if order is completed
+        // Helper to check if order is completed (for this driver)
         const isCompleted = (o) => {
+            // This driver's assignment is completed (even if other drivers haven't)
+            if (isMyAssignmentCompleted(o)) return true;
             // Split order with all drivers completed
             if (isSplitCompleted(o)) return true;
 
