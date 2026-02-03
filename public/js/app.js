@@ -4030,6 +4030,9 @@ function viewImportDetail(importId) {
                     </button>
                 ` : ''}
                 ${(imp.status === 'assigned' || imp.status === 'in_transit') && isAdminRole() ? `
+                    <button class="btn btn-info" onclick="closeOrderModal(); assignImportDriver('${imp.id}')" style="background:var(--info); color:white;">
+                        <i class="bi bi-person-gear"></i> Đổi tài xế
+                    </button>
                     <button class="btn btn-success" onclick="adminCompleteImport('${imp.id}')">
                         <i class="bi bi-check-circle"></i> Admin hoàn thành
                     </button>
