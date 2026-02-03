@@ -1549,9 +1549,12 @@ async function loadMyOrders() {
         await loadUnreadCounts();
 
         // Separate into 3 categories using statusCode from backend
-        const pending = orders.filter(o => o.statusCode === 'CHO_NHAN' || o.status === 'assigned');
-        const delivering = orders.filter(o => o.statusCode === 'DANG_GIAO' || o.status === 'in_transit' || o.status === 'DELIVERING' || o.status === 'Đang thực hiện');
-        const completed = orders.filter(o => o.statusCode === 'HOAN_THANH' || o.status === 'completed' || o.status === 'Đã thực hiện');
+        // IMPORTANT: Check assignment_status FIRST for split orders to avoid duplicates
+        const isMyAssignmentCompleted = (o) => (o.assignment_status || '').toLowerCase() === 'completed';
+
+        const pending = orders.filter(o => !isMyAssignmentCompleted(o) && (o.statusCode === 'CHO_NHAN' || o.status === 'assigned'));
+        const delivering = orders.filter(o => !isMyAssignmentCompleted(o) && (o.statusCode === 'DANG_GIAO' || o.status === 'in_transit' || o.status === 'DELIVERING' || o.status === 'Đang thực hiện'));
+        const completed = orders.filter(o => isMyAssignmentCompleted(o) || o.statusCode === 'HOAN_THANH' || o.status === 'completed' || o.status === 'Đã thực hiện');
 
         console.log(`📊 Categories: Pending=${pending.length}, Delivering=${delivering.length}, Completed=${completed.length}`);
 
@@ -1823,7 +1826,13 @@ function filterMyOrders() {
     });
 
     // Categorize and re-render - check multiple status variations
+    // IMPORTANT: Check assignment_status FIRST for split orders to avoid duplicates
+    const isMyAssignmentCompleted = (o) => (o.assignment_status || '').toLowerCase() === 'completed';
+
     const isCompleted = (o) => {
+        // Driver's assignment is completed - highest priority
+        if (isMyAssignmentCompleted(o)) return true;
+
         const status = (o.status || '').toLowerCase();
         const statusCode = (o.statusCode || '').toUpperCase();
         const deliveryStatus = (o.delivery_status || '').toLowerCase();
@@ -1837,6 +1846,9 @@ function filterMyOrders() {
     };
 
     const isDelivering = (o) => {
+        // Don't show as delivering if this driver's assignment is completed
+        if (isMyAssignmentCompleted(o)) return false;
+
         const status = (o.status || '').toLowerCase();
         const statusCode = (o.statusCode || '').toUpperCase();
         return statusCode === 'DANG_GIAO' ||
@@ -1846,6 +1858,9 @@ function filterMyOrders() {
     };
 
     const isPending = (o) => {
+        // Don't show as pending if this driver's assignment is completed
+        if (isMyAssignmentCompleted(o)) return false;
+
         const status = (o.status || '').toLowerCase();
         const statusCode = (o.statusCode || '').toUpperCase();
         return statusCode === 'CHO_NHAN' ||
