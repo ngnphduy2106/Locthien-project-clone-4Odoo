@@ -146,7 +146,7 @@ const OrderHistoryModule = {
         this.renderPagination();
     },
 
-    // NEW: Render as cards
+    // NEW: Render as compact rows (matching dispatch view)
     renderCards(data) {
         const orders = data || this.history;
         const container = document.getElementById('history-cards-container');
@@ -168,57 +168,87 @@ const OrderHistoryModule = {
             return;
         }
 
-        console.log('🎴 Rendering', orders.length, 'cards...');
-        console.log('📦 Sample data:', orders[0]);
+        console.log('🎴 Rendering', orders.length, 'compact rows...');
 
-        container.innerHTML = orders.map(order => {
+        // Compact row-based layout
+        container.innerHTML = `
+            <div class="compact-order-list" style="display: flex; flex-direction: column; gap: 0;">
+                ${orders.map(order => {
             const orderId = order.orderCode || order.id || 'N/A';
-            const customer = order.customerName || order.accountName || 'N/A';
+            const customer = order.customerName || order.accountName || order.khach || order.account_name || 'N/A';
+            const address = order.shippingAddress || order.shipping_address || order.diaChi || 'Sunco';
             const date = order.orderDate || order.order_date || order.createdAt;
             const amount = order.totalAmount || order.total_amount || 0;
             const status = order.status || 'N/A';
-            const driver = order.driverName || order.driver_name || '-';
-            const completedDate = order.completedAt || order.completed_at;
+            const driver = order.driverName || order.driver_name || order.taiXe || '-';
             const statusClass = this.getStatusClass(status);
             const statusText = this.getStatusText(status);
 
             return `
-                <div class="history-order-card status-${statusClass}" 
-                     onclick="OrderHistoryModule.viewDetail('${orderId}')"
-                     data-order-id="${orderId}">
-                    <div class="order-card-header">
-                        <div>
-                            <div class="order-id">#${orderId}</div>
-                            <div class="order-customer">${customer}</div>
+                        <div class="compact-order-row" onclick="OrderHistoryModule.viewDetail('${orderId}')" style="
+                            display: flex;
+                            align-items: center;
+                            gap: 12px;
+                            padding: 12px 16px;
+                            background: var(--card-bg);
+                            border-radius: 8px;
+                            margin-bottom: 8px;
+                            cursor: pointer;
+                            border-left: 4px solid ${status === 'Hoàn thành' || status === 'COMPLETED' || status === 'DONE' ? 'var(--success)' :
+                    status === 'Đã hủy' || status === 'Đã hủy bỏ' || status === 'CANCELLED' ? 'var(--danger)' : 'var(--warning)'};
+                            transition: all 0.15s ease;
+                        " onmouseenter="this.style.background='var(--hover-bg)'" onmouseleave="this.style.background='var(--card-bg)'">
+                            
+                            <!-- Order ID -->
+                            <div style="min-width: 140px; font-weight: 600; color: var(--primary); font-size: 13px;">
+                                ${orderId}
+                            </div>
+                            
+                            <!-- Customer (flex-grow) -->
+                            <div style="flex: 1; min-width: 0;">
+                                <div style="font-weight: 500; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px;">
+                                    ${customer}
+                                </div>
+                                <div style="font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                    <i class="bi bi-geo-alt" style="font-size: 10px;"></i> ${address}
+                                </div>
+                            </div>
+                            
+                            <!-- Date -->
+                            <div style="min-width: 80px; font-size: 12px; color: var(--text-secondary); text-align: center;">
+                                ${date ? new Date(date).toLocaleDateString('vi-VN') : 'N/A'}
+                            </div>
+                            
+                            <!-- Driver -->
+                            <div style="min-width: 100px; font-size: 12px; color: var(--text-secondary); text-align: center;">
+                                ${driver !== '-' ? `<span style="color: var(--info);">${driver}</span>` : '<span style="opacity:0.5;">—</span>'}
+                            </div>
+                            
+                            <!-- Amount -->
+                            <div style="min-width: 100px; font-size: 12px; font-weight: 600; color: var(--text-primary); text-align: right;">
+                                ${amount.toLocaleString('vi-VN')}đ
+                            </div>
+                            
+                            <!-- Status Badge -->
+                            <div style="min-width: 90px; text-align: center;">
+                                <span class="badge badge-${statusClass}" style="font-size: 11px; padding: 4px 10px;">
+                                    ${statusText}
+                                </span>
+                            </div>
+                            
+                            <!-- Actions -->
+                            <div style="display: flex; gap: 6px;" onclick="event.stopPropagation()">
+                                <button class="btn btn-outline btn-sm" onclick="OrderHistoryModule.viewDetail('${orderId}')" style="padding: 4px 10px; font-size: 11px;">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                            </div>
                         </div>
-                        <span class="badge badge-${statusClass}">${statusText}</span>
-                    </div>
-                    <div class="order-meta">
-                        <div class="order-meta-item">
-                            <i class="bi bi-calendar3"></i>
-                            <span>${date ? new Date(date).toLocaleDateString('vi-VN') : 'N/A'}</span>
-                        </div>
-                        <div class="order-meta-item">
-                            <i class="bi bi-person"></i>
-                            <span>Tài xế: ${driver}</span>
-                        </div>
-                        <div class="order-meta-item">
-                            <i class="bi bi-check-circle"></i>
-                            <span>Hoàn thành: ${completedDate ? new Date(completedDate).toLocaleString('vi-VN') : '-'}</span>
-                        </div>
-                    </div>
-                    <div class="order-card-footer">
-                        <div class="order-total">${amount.toLocaleString('vi-VN')} VNĐ</div>
-                        <button class="btn-view-detail" 
-                                onclick="event.stopPropagation(); OrderHistoryModule.viewDetail('${orderId}')">
-                            <i class="bi bi-eye"></i> Chi tiết
-                        </button>
-                    </div>
-                </div>
-            `;
-        }).join('');
+                    `;
+        }).join('')}
+            </div>
+        `;
 
-        console.log('✅ Rendered', this.history.length, 'cards');
+        console.log('✅ Rendered', orders.length, 'compact rows');
     },
 
     // OLD: Render as table
