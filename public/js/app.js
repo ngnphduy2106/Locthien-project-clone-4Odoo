@@ -16,8 +16,16 @@ let state = {
     orderProducts: [],
     historyPage: 1,
     historyPerPage: 10,
-    unreadCounts: {} // { orderId: count, import_ticketId: count }
+    unreadCounts: {}, // { orderId: count, import_ticketId: count }
+    // Cache timestamps - prevent repeated API calls on tab switch
+    _cache: {
+        dispatch: 0,      // Last load timestamp for dispatch/orders
+        myOrders: 0,      // Last load timestamp for my-orders
+        dashboard: 0,     // Last load timestamp for dashboard
+        cacheTTL: 30000   // 30 seconds cache validity
+    }
 };
+
 
 
 // === DOM HELPERS (use globals from core.js) ===
@@ -187,19 +195,41 @@ function showSection(sectionId) {
 
     state.currentSection = sectionId;
 
-    // Load section data
+    // Helper: Check if cache is still valid
+    const isCacheValid = (key) => {
+        const now = Date.now();
+        const lastLoad = state._cache[key] || 0;
+        return (now - lastLoad) < state._cache.cacheTTL;
+    };
+
+    // Load section data (with caching to prevent repeated API calls)
     switch (sectionId) {
         case 'dashboard':
-            loadDashboard();
+            if (!isCacheValid('dashboard')) {
+                loadDashboard();
+                state._cache.dashboard = Date.now();
+            }
             break;
         case 'dispatch':
-            loadOrders();
+            if (!isCacheValid('dispatch')) {
+                loadOrders();
+                state._cache.dispatch = Date.now();
+            } else {
+                // Just re-render from existing state (instant)
+                renderDispatchOrders();
+            }
             break;
         case 'create-order':
             initCreateOrder();
             break;
         case 'my-orders':
-            loadMyOrders();
+            if (!isCacheValid('myOrders')) {
+                loadMyOrders();
+                state._cache.myOrders = Date.now();
+            } else {
+                // Just re-render from existing state (instant)
+                filterMyOrders();
+            }
             break;
         case 'order-history':
             // loadOrderHistory(); // DISABLED - Now using OrderHistoryModule
