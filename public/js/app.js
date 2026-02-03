@@ -2175,6 +2175,10 @@ async function viewOrderDetail(orderId, options = {}) {
                     <span>${order.diaChi || order.shipping_address || 'Chưa có địa chỉ'}</span>
                 </div>
                 <div class="detail-row">
+                    <label>SĐT người nhận:</label>
+                    <span>${order.mobile || order.receiver_mobile || order.phone || order.receiver_phone || order.contact_phone || 'Chưa có'}</span>
+                </div>
+                <div class="detail-row">
                     <label>Trạng thái:</label>
                     <span class="badge badge-${getStatusBadge(order.status)}">${getStatusText(order.status)}</span>
                 </div>

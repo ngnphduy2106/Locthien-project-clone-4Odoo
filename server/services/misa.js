@@ -294,6 +294,7 @@ const performSync = async () => {
             console.log('   list_product:', JSON.stringify(item.list_product || [], null, 2));
             console.log('   description:', item.description || item.Description || '(EMPTY)');
             console.log('   owner_name:', item.owner_name || item.OwnerName || item.ownerName || '(EMPTY)');
+            console.log('   mobile/phone:', item.mobile || item.phone || item.receiver_mobile || item.contact_mobile || '(EMPTY)');
         }
 
         let shouldFetchDetail = false;
