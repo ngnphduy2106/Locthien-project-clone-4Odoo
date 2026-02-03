@@ -5746,6 +5746,8 @@ function removeCompletionImage(idx) {
 
 // Show driver completion modal
 function showDriverCompletionModal(orderId, assignmentId = null) {
+    console.log(`🎯 showDriverCompletionModal called - orderId: ${orderId}, assignmentId: ${assignmentId}`);
+
     // Find order from all lists
     const allOrders = [
         ...(state.orders?.pending || []),
@@ -5754,14 +5756,20 @@ function showDriverCompletionModal(orderId, assignmentId = null) {
         ...(state.myOrders || [])
     ];
 
+    console.log(`📋 Searching in ${allOrders.length} orders`);
+
     const order = allOrders.find(o =>
         o.id == orderId || o.soDon == orderId || o.sale_order_no == orderId
     );
 
     if (!order) {
+        console.error(`❌ Order not found! orderId: ${orderId}`);
+        console.log(`📦 Available IDs:`, allOrders.slice(0, 5).map(o => ({ id: o.id, soDon: o.soDon })));
         alert('Không tìm thấy đơn hàng!');
         return;
     }
+
+    console.log(`✅ Order found:`, order.id, order.soDon);
 
     // Reset images and local items
     completionImages = [];
@@ -5911,14 +5919,40 @@ async function submitDriverCompletion() {
     showLoading('Đang xử lý hoàn thành đơn...');
 
     try {
+        // Build cart from order products with proper format for backend
+        const orderProducts = order.products || order.cart || order.chiTiet || [];
+        const cart = orderProducts.map(p => ({
+            product: {
+                code: p.code || p.product?.code || '',
+                name: p.name || p.product?.name || p.productName || ''
+            },
+            weight_kg: p.qty || p.quantity || 0,
+            qty: p.qty || p.quantity || 0,
+            unit: p.unit || 'Kg'
+        }));
+
+        console.log('📦 Submitting completion with cart:', cart.length, 'items');
+        console.log('🔑 assignment_id:', order.assignment_id);
+
         const res = await api.completeOrder(order.id, {
-            products: order.products || order.cart || order.chiTiet || [],
+            // Driver complete fields (backend expects these)
+            cart: cart,
+            driver_name: state.user?.fullName || state.user?.name || '',
+            plate: state.user?.plate || '',
+            warehouse: 'Kho Lộc Thiên',
+            partner: order.khach || order.account_name || '',
+            type: 'XUAT',
+            // Common fields
             delivery_note: deliveryNote,
+            note: deliveryNote,
             images: completionImages,
             local_items: completionLocalItems,
-            admin_completed: isAdminRole(),
-            // Multi-driver support: pass assignment_id if present
-            assignment_id: order.assignment_id || null
+            sender: state.user?.fullName || '',
+            // Multi-driver support
+            assignment_id: order.assignment_id || null,
+            // Also send products for admin flow compatibility  
+            products: orderProducts,
+            admin_completed: isAdminRole()
         });
 
         hideLoading();
