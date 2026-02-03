@@ -4130,18 +4130,21 @@ async function viewImportDetail(importId) {
     const modalBody = window.$('#modal-order-body');
     const modalTitle = window.$('#modal-order-title');
 
-    if (modalTitle) modalTitle.textContent = `Chi tiết phiếu nhập #${imp.ticket_no || imp.id}`;
+    // Use soDon (from myOrders) or ticket_no (from imports state) or id as fallback
+    const displayTicketNo = imp.soDon || imp.ticket_no || imp.id;
+
+    if (modalTitle) modalTitle.textContent = `Chi tiết phiếu nhập #${displayTicketNo}`;
 
     if (modalBody) {
         modalBody.innerHTML = `
             <div class="order-detail-grid">
                 <div class="detail-row">
                     <label>Mã phiếu:</label>
-                    <span><strong>#${imp.ticket_no || imp.id}</strong></span>
+                    <span><strong>#${displayTicketNo}</strong></span>
                 </div>
                 <div class="detail-row">
                     <label>Nhà cung cấp:</label>
-                    <span>${imp.supplier_name || 'Chưa có'}</span>
+                    <span>${imp.supplier_name || imp.khach || 'Chưa có'}</span>
                 </div>
                 <div class="detail-row">
                     <label>Ngày dự kiến:</label>
