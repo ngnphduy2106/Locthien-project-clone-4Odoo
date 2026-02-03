@@ -463,6 +463,33 @@ const DispatchModule = {
                             </div>
                         </div>
 
+                        <!-- Ghi chú từ MISA (nếu có) -->
+                        ${order.misa_note ? `
+                        <div class="detail-section">
+                            <h4 class="section-title" style="color: #f59e0b;"><i class="bi bi-sticky"></i> Ghi chú từ MISA</h4>
+                            <div class="info-card" style="background: #fffbeb; border-left: 3px solid #f59e0b;">
+                                <div class="info-row" style="color: #78350f;">
+                                    ${order.misa_note}
+                                </div>
+                            </div>
+                        </div>
+                        ` : ''}
+
+                        <!-- Người tạo đơn (nếu có) -->
+                        ${order.creator_name ? `
+                        <div class="detail-section">
+                            <h4 class="section-title" style="color: #3b82f6;"><i class="bi bi-person-badge"></i> Người tạo đơn</h4>
+                            <div class="info-card" style="background: #eff6ff; border-left: 3px solid #3b82f6;">
+                                <div class="info-row" style="color: #1e3a8a;">
+                                    ${order.creator_name}
+                                </div>
+                                <div class="info-row" style="font-size: 12px; color: #6b7280;">
+                                    Liên hệ người này nếu cần hỗ trợ
+                                </div>
+                            </div>
+                        </div>
+                        ` : ''}
+
                         <!-- Danh sách hàng hóa -->
                         <div class="detail-section">
                             <h4 class="section-title"><i class="bi bi-box-seam"></i> Danh sách hàng hóa</h4>
