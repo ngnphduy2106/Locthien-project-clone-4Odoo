@@ -1650,7 +1650,7 @@ function renderMyOrdersList(containerId, orders, type) {
                         <button class="btn btn-outline btn-sm" onclick="${isImport ? `viewImportDetail('${order.id}')` : `viewOrderDetail('${order.id}')`}">
                             <i class="bi bi-eye"></i> Chi tiết
                         </button>
-                        <button class="btn btn-success btn-sm" onclick="${isImport ? `completeImportOrder('${order.id}')` : `completeOrder('${order.id}')`}" style="background:linear-gradient(135deg, #10b981, #059669); border:none;">
+                        <button class="btn btn-success btn-sm" onclick="${isImport ? `showImportCompletionModal('${order.id}')` : `showDriverCompletionModal('${order.id}')`}" style="background:linear-gradient(135deg, #10b981, #059669); border:none;">
                             <i class="bi bi-check-circle"></i> Hoàn thành
                         </button>
                     ` : ''}
@@ -5703,6 +5703,226 @@ window.viewCompletionImage = viewCompletionImage;
 window.removeCompletionImage = removeCompletionImage;
 window.submitDriverCompletion = submitDriverCompletion;
 window.compressImage = compressImage;
+
+// ===============================================
+// IMPORT COMPLETION MODAL (giống Export)
+// ===============================================
+
+function showImportCompletionModal(importId) {
+    // Find import from all lists including myOrders
+    const allImports = [
+        ...(state.imports?.pending || []),
+        ...(state.imports?.assigned || []),
+        ...(state.imports?.completed || []),
+        ...(state.myOrders || []).filter(o => o.type === 'import')
+    ];
+
+    const imp = allImports.find(i =>
+        i.id == importId || i.ticket_no == importId
+    );
+
+    if (!imp) {
+        alert('Không tìm thấy phiếu nhập!');
+        return;
+    }
+
+    // Reset images and local items
+    completionImages = [];
+    completionLocalItems = [];
+
+    // Store import for submission
+    state.currentCompletionImport = imp;
+
+    const modal = window.$('#modal-order-detail');
+    const modalBody = window.$('#modal-order-body');
+    const modalTitle = window.$('#modal-order-title');
+
+    if (modalTitle) {
+        modalTitle.innerHTML = `<i class="bi bi-check-circle" style="color:#4CAF50;"></i> Xác nhận hoàn thành nhập`;
+    }
+
+    // Get products list
+    let products = imp.products || imp.cart || [];
+    if (typeof products === 'string') {
+        try { products = JSON.parse(products); } catch (e) { products = []; }
+    }
+
+    const productsHtml = products.length > 0
+        ? products.map(p => `
+            <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--border);">
+                <span>${p.name || p.product || p.productName || '-'}</span>
+                <span style="font-weight:600;">${p.qty || p.quantity || 0} ${p.unit || 'Kg'}</span>
+            </div>
+        `).join('')
+        : '<p style="color:var(--text-muted);">Không có sản phẩm</p>';
+
+    if (modalBody) {
+        modalBody.innerHTML = `
+            <div style="background:linear-gradient(135deg, #E8F5E9, #C8E6C9); padding:16px; border-radius:12px; margin-bottom:20px;">
+                <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
+                    <div style="background:#4CAF50; color:white; width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center;">
+                        <i class="bi bi-box-arrow-in-down" style="font-size:18px;"></i>
+                    </div>
+                    <div>
+                        <div style="font-weight:700; font-size:16px;">#${imp.ticket_no || imp.soDon || imp.id}
+                            <span style="background:#4CAF50; color:white; padding:2px 8px; border-radius:4px; font-size:11px; margin-left:8px;">Nhập</span>
+                        </div>
+                        <div style="color:var(--text-secondary); font-size:13px;">${imp.supplier_name || imp.khach || 'Nhà cung cấp'}</div>
+                    </div>
+                </div>
+                <div style="font-size:13px; color:var(--text-secondary);">
+                    <i class="bi bi-geo-alt"></i> ${imp.supplier_address || imp.diaChi || 'Chưa có địa chỉ'}
+                </div>
+            </div>
+
+            <div style="margin-bottom:20px;">
+                <h4 style="font-size:14px; color:var(--text-secondary); margin-bottom:12px;">
+                    <i class="bi bi-box-seam"></i> Sản phẩm nhập
+                </h4>
+                <div style="background:var(--body-bg); padding:12px; border-radius:8px; max-height:150px; overflow-y:auto;">
+                    ${productsHtml}
+                </div>
+            </div>
+
+            <!-- MẶT HÀNG PHỤ (VỎ) -->
+            <div style="margin-bottom:20px;">
+                <h4 style="font-size:14px; color:var(--warning); margin-bottom:12px;">
+                    <i class="bi bi-box2"></i> Mặt hàng phụ (Vỏ) <span style="font-weight:normal; color:var(--text-muted);">- Chỉ lưu local</span>
+                </h4>
+                <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px;">
+                    <button type="button" class="btn btn-outline btn-sm" onclick="addCompletionLocalItem('Vỏ can 30L')" style="border-color:var(--warning); color:var(--warning);">
+                        <i class="bi bi-droplet"></i> Vỏ can 30L
+                    </button>
+                    <button type="button" class="btn btn-outline btn-sm" onclick="addCompletionLocalItem('Vỏ phuy')" style="border-color:var(--info); color:var(--info);">
+                        <i class="bi bi-archive"></i> Vỏ phuy
+                    </button>
+                    <button type="button" class="btn btn-outline btn-sm" onclick="addCompletionLocalItem('Vỏ tank')" style="border-color:var(--primary); color:var(--primary);">
+                        <i class="bi bi-box-seam"></i> Vỏ tank
+                    </button>
+                    <button type="button" class="btn btn-outline btn-sm" onclick="addCompletionLocalItem('Vỏ can 20L')" style="border-color:var(--warning); color:var(--warning);">
+                        <i class="bi bi-droplet-half"></i> Vỏ can 20L
+                    </button>
+                </div>
+                <div style="display:flex; gap:8px; margin-bottom:12px;">
+                    <input type="text" id="completion-local-item-name" class="form-control" placeholder="Hoặc nhập tên mặt hàng..." style="flex:1;">
+                    <input type="number" id="completion-local-item-qty" class="form-control" value="1" min="1" style="width:80px;">
+                    <button type="button" class="btn btn-primary btn-sm" onclick="addCompletionLocalItemManual()">
+                        <i class="bi bi-plus"></i> Thêm
+                    </button>
+                </div>
+                <div id="completion-local-items-table" style="background:var(--body-bg); padding:12px; border-radius:8px; min-height:60px;">
+                    <div style="text-align:center; color:var(--text-muted); padding:16px;">
+                        <i class="bi bi-inbox" style="font-size:24px;"></i>
+                        <p style="margin-top:8px;">Chưa có mặt hàng phụ</p>
+                    </div>
+                </div>
+            </div>
+
+            <div style="margin-bottom:20px;">
+                <h4 style="font-size:14px; color:var(--text-secondary); margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
+                    <span><i class="bi bi-camera"></i> Ảnh nhập hàng</span>
+                    <span id="completion-images-counter" style="font-size:12px; background:#4CAF50; color:white; padding:2px 8px; border-radius:12px;">0/${MAX_COMPLETION_IMAGES} ảnh</span>
+                </h4>
+                <div id="completion-images-preview" style="min-height:60px; padding:12px; background:var(--body-bg); border-radius:8px; border:2px dashed var(--border);">
+                    <p style="color:var(--text-muted); font-size:13px;">Chưa có ảnh nào được chọn</p>
+                </div>
+                <label style="display:inline-flex; align-items:center; gap:8px; margin-top:12px; padding:10px 16px; background:#4CAF50; color:white; border-radius:8px; cursor:pointer; font-weight:500;">
+                    <i class="bi bi-plus-circle"></i> Chọn ảnh
+                    <input type="file" accept="image/*" multiple onchange="handleCompletionImagesSelect(this)" style="display:none;">
+                </label>
+                <span style="margin-left:12px; font-size:12px; color:var(--text-muted);">Tối đa ${MAX_COMPLETION_IMAGES} ảnh, tự động nén</span>
+            </div>
+
+            <div style="margin-bottom:24px;">
+                <h4 style="font-size:14px; color:var(--text-secondary); margin-bottom:12px;">
+                    <i class="bi bi-pencil-square"></i> Ghi chú nhập hàng
+                </h4>
+                <textarea id="completion-note" class="form-control" rows="3" placeholder="Nhập ghi chú khi nhập hàng (nếu có)...">${imp.note || ''}</textarea>
+            </div>
+
+            <div style="display:flex; gap:12px;">
+                <button class="btn btn-outline" onclick="closeOrderModal()" style="flex:1;">
+                    <i class="bi bi-x-lg"></i> Hủy
+                </button>
+                <button class="btn btn-success" onclick="submitImportCompletion()" style="flex:2; background:#4CAF50;">
+                    <i class="bi bi-check-circle"></i> Xác nhận hoàn thành
+                </button>
+            </div>
+        `;
+    }
+
+    if (modal) modal.classList.remove('hidden');
+}
+
+// Submit import completion
+async function submitImportCompletion() {
+    const imp = state.currentCompletionImport;
+    if (!imp) {
+        alert('Không tìm thấy thông tin phiếu nhập!');
+        return;
+    }
+
+    const noteEl = window.$('#completion-note');
+    const deliveryNote = noteEl?.value?.trim() || '';
+
+    // Confirm before submit
+    if (!confirm(`Xác nhận hoàn thành phiếu nhập #${imp.ticket_no || imp.soDon || imp.id}?`)) {
+        return;
+    }
+
+    showLoading('Đang xử lý hoàn thành phiếu nhập...');
+
+    try {
+        // Get driver info from localStorage
+        const userStr = localStorage.getItem('user');
+        const user = userStr ? JSON.parse(userStr) : {};
+        const driverName = user.name || user.fullName || 'Driver';
+        const plate = user.plate || '';
+
+        const res = await fetch(`/api/imports/${imp.id}/complete`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                driver: driverName,
+                plate,
+                note: deliveryNote,
+                images: completionImages,
+                local_items: completionLocalItems,
+                admin_completed: isAdminRole()
+            })
+        });
+
+        const data = await res.json();
+        hideLoading();
+
+        if (data.error) {
+            alert('Lỗi: ' + (data.msg || data.message || 'Không thể hoàn thành'));
+            return;
+        }
+
+        alert(data.msg || 'Đã hoàn thành phiếu nhập thành công!');
+        closeOrderModal();
+
+        // Refresh orders list
+        loadMyOrders();
+        loadImportTickets();
+
+        // Reset state
+        completionImages = [];
+        completionLocalItems = [];
+        state.currentCompletionImport = null;
+
+    } catch (e) {
+        hideLoading();
+        console.error('Submit import completion error:', e);
+        alert('Lỗi kết nối: ' + e.message);
+    }
+}
+
+// Export import completion functions
+window.showImportCompletionModal = showImportCompletionModal;
+window.submitImportCompletion = submitImportCompletion;
+
 
 // ===============================================
 // COMPLETION LOCAL ITEMS (VỎ)
