@@ -164,6 +164,9 @@ export const db = {
                     bienSo: o.custom_field14 || '',
                     driver: o.custom_field13 || '',
                     plate: o.custom_field14 || '',
+                    // MISA Description & Creator (for driver view)
+                    misa_note: o.description || '', // Ghi chú từ MISA CRM
+                    creator_name: o.owner_name || '', // Người tạo đơn (để tài xế liên lạc)
                     // Products
                     products: products,
                     cart: products
@@ -233,6 +236,9 @@ export const db = {
                 data.bienSo = data.custom_field14 || '';
                 data.driver_name = data.custom_field13 || '';
                 data.plate = data.custom_field14 || '';
+                // MISA Description & Creator (for driver view)
+                data.misa_note = data.description || ''; // Ghi chú từ MISA CRM
+                data.creator_name = data.owner_name || ''; // Người tạo đơn (để tài xế liên lạc)
             }
 
 

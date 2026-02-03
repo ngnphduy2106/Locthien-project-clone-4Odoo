@@ -336,8 +336,77 @@ const MyOrdersModule = {
 
         console.log('View order detail:', order);
         const typeLabel = orderType === 'import' ? 'Đơn nhập' : 'Đơn xuất';
-        const totalLabel = orderType === 'import' ? 'kg' : 'VNĐ';
-        alert(`${typeLabel} ${order.soDon || orderId}\n\n${orderType === 'import' ? 'NCC' : 'Khách hàng'}: ${order.customer || order.customer_name || order.khach}\nĐịa chỉ: ${order.address || order.delivery_address || order.diaChi}\nTổng: ${(order.total || order.total_amount || 0).toLocaleString('vi-VN')} ${totalLabel}`);
+
+        // Build product list
+        const products = order.products || order.cart || [];
+        const productsList = products.map(p =>
+            `• ${p.name || p.code}: ${p.qty || p.amount || 0} ${p.unit || 'kg'}`
+        ).join('\n') || 'Chưa có sản phẩm';
+
+        // Format amount
+        const amount = (order.sale_order_amount || order.total || order.amount || 0).toLocaleString('vi-VN');
+
+        // Build detail modal HTML
+        const modalHtml = `
+            <div class="modal-overlay" id="my-order-detail-modal" onclick="if(event.target === this) this.remove()">
+                <div class="modal-content" style="max-width: 500px; max-height: 85vh; overflow-y: auto;">
+                    <div class="modal-header">
+                        <h3>📦 ${typeLabel} ${order.soDon || orderId}</h3>
+                        <button onclick="document.getElementById('my-order-detail-modal').remove()" class="btn-close">&times;</button>
+                    </div>
+                    <div class="modal-body" style="padding: 1rem;">
+                        <!-- Thông tin khách hàng -->
+                        <div style="margin-bottom: 1rem; padding: 0.75rem; background: var(--bg-tertiary); border-radius: 8px;">
+                            <div style="font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary);">
+                                👤 ${order.customer || order.customer_name || order.khach || 'Khách hàng'}
+                            </div>
+                            <div style="color: var(--text-secondary); font-size: 0.9rem;">
+                                📍 ${order.address || order.delivery_address || order.diaChi || 'Chưa có địa chỉ'}
+                            </div>
+                            ${order.phone ? `<div style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.25rem;">📞 <a href="tel:${order.phone}" style="color: var(--primary-color);">${order.phone}</a></div>` : ''}
+                        </div>
+                        
+                        <!-- Ghi chú từ MISA (nếu có) -->
+                        ${order.misa_note ? `
+                        <div style="margin-bottom: 1rem; padding: 0.75rem; background: #fffbeb; border-radius: 8px; border-left: 3px solid #f59e0b;">
+                            <div style="font-weight: 600; margin-bottom: 0.25rem; color: #92400e; font-size: 0.8rem;">📝 GHI CHÚ TỪ MISA</div>
+                            <div style="color: #78350f;">${order.misa_note}</div>
+                        </div>
+                        ` : ''}
+                        
+                        <!-- Người tạo đơn -->
+                        ${order.creator_name ? `
+                        <div style="margin-bottom: 1rem; padding: 0.75rem; background: #eff6ff; border-radius: 8px; border-left: 3px solid #3b82f6;">
+                            <div style="font-weight: 600; margin-bottom: 0.25rem; color: #1e40af; font-size: 0.8rem;">👔 NGƯỜI TẠO ĐƠN</div>
+                            <div style="color: #1e3a8a;">${order.creator_name}</div>
+                            <div style="font-size: 0.75rem; color: #6b7280; margin-top: 0.25rem;">Liên hệ người này nếu cần hỗ trợ</div>
+                        </div>
+                        ` : ''}
+                        
+                        <!-- Sản phẩm -->
+                        <div style="margin-bottom: 1rem;">
+                            <div style="font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary);">📋 Sản phẩm</div>
+                            <div style="background: var(--bg-tertiary); padding: 0.75rem; border-radius: 8px; font-size: 0.9rem; white-space: pre-line;">
+                                ${productsList}
+                            </div>
+                        </div>
+                        
+                        <!-- Tổng tiền -->
+                        <div style="text-align: right; padding: 0.75rem; background: linear-gradient(135deg, #10b981, #059669); border-radius: 8px; color: white;">
+                            <div style="font-size: 0.8rem; opacity: 0.9;">Tổng giá trị</div>
+                            <div style="font-size: 1.25rem; font-weight: 700;">${amount} VNĐ</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Remove existing modal if any
+        const existing = document.getElementById('my-order-detail-modal');
+        if (existing) existing.remove();
+
+        // Add modal to page
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
     }
 };
 
