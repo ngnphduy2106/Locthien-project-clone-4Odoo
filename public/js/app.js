@@ -5921,7 +5921,14 @@ async function submitDriverCompletion() {
     try {
         // Build cart from order products with proper format for backend
         const orderProducts = order.products || order.cart || order.chiTiet || [];
-        const cart = orderProducts.map(p => ({
+
+        // Handle string products (sometimes it's JSON string)
+        let parsedProducts = orderProducts;
+        if (typeof orderProducts === 'string') {
+            try { parsedProducts = JSON.parse(orderProducts); } catch (e) { parsedProducts = []; }
+        }
+
+        const cart = (parsedProducts || []).map(p => ({
             product: {
                 code: p.code || p.product?.code || '',
                 name: p.name || p.product?.name || p.productName || ''
@@ -5931,27 +5938,34 @@ async function submitDriverCompletion() {
             unit: p.unit || 'Kg'
         }));
 
-        console.log('📦 Submitting completion with cart:', cart.length, 'items');
-        console.log('🔑 assignment_id:', order.assignment_id);
+        // Get driver info - fallback to order data if state.user doesn't have it
+        const driverName = state.user?.fullName || state.user?.name || order.taiXe || order.driver_name || '';
+        const driverPlate = state.user?.plate || order.bienSo || order.plate || '';
+
+        console.log('📦 Submitting completion:');
+        console.log('  - cart items:', cart.length);
+        console.log('  - driver:', driverName, ', plate:', driverPlate);
+        console.log('  - assignment_id:', order.assignment_id || 'NONE');
+        console.log('  - order id:', order.id);
 
         const res = await api.completeOrder(order.id, {
             // Driver complete fields (backend expects these)
             cart: cart,
-            driver_name: state.user?.fullName || state.user?.name || '',
-            plate: state.user?.plate || '',
+            driver_name: driverName,
+            plate: driverPlate,
             warehouse: 'Kho Lộc Thiên',
-            partner: order.khach || order.account_name || '',
+            partner: order.khach || order.account_name || order.customerName || '',
             type: 'XUAT',
             // Common fields
             delivery_note: deliveryNote,
             note: deliveryNote,
             images: completionImages,
             local_items: completionLocalItems,
-            sender: state.user?.fullName || '',
+            sender: driverName,
             // Multi-driver support
             assignment_id: order.assignment_id || null,
             // Also send products for admin flow compatibility  
-            products: orderProducts,
+            products: parsedProducts,
             admin_completed: isAdminRole()
         });
 
