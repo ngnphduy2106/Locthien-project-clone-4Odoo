@@ -809,6 +809,7 @@ router.post('/:id/complete', async (req, res) => {
         let firstDriverName = driver_name;
         let totalActualQty = 0;
         let allAssignments = [];
+        let firstDriverPlate = null; // Plate of first driver who completed (for MISA sync)
 
         if (assignment_id) {
             console.log(`🔀 Multi-driver completion - Assignment: ${assignment_id}`);
@@ -846,7 +847,8 @@ router.post('/:id/complete', async (req, res) => {
                     actual_qty: myActualQty,
                     local_items: local_items || [],
                     delivery_note: note || delivery_note || '',
-                    proof_images: images || []
+                    proof_images: images || [],
+                    completed_at: new Date().toISOString() // Track completion time for MISA priority
                 })
                 .eq('id', assignment_id)
                 .select();
@@ -886,7 +888,24 @@ router.post('/:id/complete', async (req, res) => {
             if (patchedAssignments && patchedAssignments.length > 1) {
                 isMultiDriverOrder = true;
                 allAssignments = patchedAssignments;
-                firstDriverName = patchedAssignments[0].driver_name; // First assigned driver for MISA
+
+                // PRIORITY: Find the driver who completed FIRST (by completed_at timestamp)
+                // This ensures MISA gets consistent driver+plate from the same source
+                const completedFromDB = patchedAssignments
+                    .filter(a => a.status === 'completed' && a.completed_at)
+                    .sort((a, b) => new Date(a.completed_at) - new Date(b.completed_at));
+
+                if (completedFromDB.length > 0) {
+                    // Use the first driver who completed (from database)
+                    firstDriverName = completedFromDB[0].driver_name;
+                    firstDriverPlate = completedFromDB[0].plate;
+                    console.log(`🔍 MISA Priority: Using first completed driver from DB: ${firstDriverName} (${firstDriverPlate}), completed_at: ${completedFromDB[0].completed_at}`);
+                } else {
+                    // Fallback: if no completed_at timestamps, use first assigned
+                    firstDriverName = patchedAssignments[0].driver_name;
+                    firstDriverPlate = patchedAssignments[0].plate;
+                    console.log(`🔍 MISA Fallback: Using first assigned driver: ${firstDriverName} (${firstDriverPlate})`);
+                }
 
                 // Check if ALL drivers completed (using patched data)
                 allDriversCompleted = patchedAssignments.every(a => a.status === 'completed');
@@ -1070,16 +1089,17 @@ router.post('/:id/complete', async (req, res) => {
                     }));
                 }
 
-                // For multi-driver: use first driver name for MISA
+                // For multi-driver: use first COMPLETED driver's name and plate (from DB) for MISA
                 const misaDriverName = isMultiDriverOrder ? firstDriverName : driver_name;
-                console.log(`📤 MISA Sync - Driver: ${misaDriverName}, isMultiDriver: ${isMultiDriverOrder}, TotalQty: ${isMultiDriverOrder ? totalActualQty : 'N/A'}`);
+                const misaPlate = isMultiDriverOrder && firstDriverPlate ? firstDriverPlate : plate;
+                console.log(`📤 MISA Sync - Driver: ${misaDriverName}, Plate: ${misaPlate}, isMultiDriver: ${isMultiDriverOrder}, TotalQty: ${isMultiDriverOrder ? totalActualQty : 'N/A'}`);
 
                 const syncResult = await updateMisaOrder(orderInfo.sale_order_no || id, {
                     misa_id: orderInfo.misa_id,
                     delivery_status: 'Đã giao hàng',
                     status: 'Đã thực hiện',
                     driver: misaDriverName,
-                    plate,
+                    plate: misaPlate,
                     cart: misaCart
                 });
 
