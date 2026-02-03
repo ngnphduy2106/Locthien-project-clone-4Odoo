@@ -187,7 +187,7 @@ const MyOrdersModule = {
             : '<span class="type-badge export" style="background:#2196F3; color:white; padding:2px 8px; border-radius:4px; font-size:11px; margin-left:8px;">Xuất</span>';
 
         return `
-            <div class="order-card" style="position:relative;">
+            <div class="order-card" style="position:relative; `${orderType === 'import' ? 'background:linear-gradient(135deg,#E8F5E9 0%,#C8E6C9 100%);border-left:4px solid #4CAF50;' : 'background:linear-gradient(135deg,#E3F2FD 0%,#BBDEFB 100%);border-left:4px solid #2196F3;'}">
                 ${this.getUnreadBadgeHtml(orderId)}
                 <div class="order-header">
                     <div>
