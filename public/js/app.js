@@ -5826,16 +5826,18 @@ function showImportCompletionModal(importId) {
             <div style="margin-bottom:20px;">
                 <h4 style="font-size:14px; color:var(--text-secondary); margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
                     <span><i class="bi bi-camera"></i> Ảnh nhập hàng</span>
-                    <span id="completion-images-counter" style="font-size:12px; background:#4CAF50; color:white; padding:2px 8px; border-radius:12px;">0/${MAX_COMPLETION_IMAGES} ảnh</span>
+                    <span id="importProofImagesCount" style="font-size:12px; background:#4CAF50; color:white; padding:2px 8px; border-radius:12px;"></span>
                 </h4>
-                <div id="completion-images-preview" style="min-height:60px; padding:12px; background:var(--body-bg); border-radius:8px; border:2px dashed var(--border);">
-                    <p style="color:var(--text-muted); font-size:13px;">Chưa có ảnh nào được chọn</p>
+                <div id="importProofImagesGallery" style="display:flex; flex-wrap:wrap; gap:8px; min-height:60px; padding:12px; background:var(--body-bg); border-radius:8px; border:2px dashed var(--border);">
+                    <div style="text-align:center; width:100%; color:var(--text-muted); padding:16px;">
+                        <i class="bi bi-arrow-repeat spin"></i> Đang tải ảnh...
+                    </div>
                 </div>
                 <label style="display:inline-flex; align-items:center; gap:8px; margin-top:12px; padding:10px 16px; background:#4CAF50; color:white; border-radius:8px; cursor:pointer; font-weight:500;">
-                    <i class="bi bi-plus-circle"></i> Chọn ảnh
-                    <input type="file" accept="image/*" multiple onchange="handleCompletionImagesSelect(this)" style="display:none;">
+                    <i class="bi bi-plus-circle"></i> Thêm ảnh
+                    <input type="file" accept="image/*" multiple onchange="handleAddImportProofImages(this, '${imp.id}')" style="display:none;">
                 </label>
-                <span style="margin-left:12px; font-size:12px; color:var(--text-muted);">Tối đa ${MAX_COMPLETION_IMAGES} ảnh, tự động nén</span>
+                <span style="margin-left:12px; font-size:12px; color:var(--text-muted);">Tối đa 10 ảnh, tự động nén & lưu</span>
             </div>
 
             <div style="margin-bottom:24px;">
@@ -5857,6 +5859,9 @@ function showImportCompletionModal(importId) {
     }
 
     if (modal) modal.classList.remove('hidden');
+
+    // Load existing proof images
+    loadImportProofImages(imp.id);
 }
 
 // Submit import completion
@@ -5891,7 +5896,6 @@ async function submitImportCompletion() {
                 driver: driverName,
                 plate,
                 note: deliveryNote,
-                images: completionImages,
                 local_items: completionLocalItems,
                 admin_completed: isAdminRole()
             })
@@ -5913,7 +5917,6 @@ async function submitImportCompletion() {
         loadImportTickets();
 
         // Reset state
-        completionImages = [];
         completionLocalItems = [];
         state.currentCompletionImport = null;
 
