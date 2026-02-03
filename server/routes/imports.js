@@ -51,6 +51,35 @@ router.get('/', async (req, res) => {
     }
 });
 
+// GET /api/imports/:id/assignments - Get all driver assignments for an import
+router.get('/:id/assignments', async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const { data, error } = await getSupabase()
+            .from('import_driver_assignments')
+            .select('id, driver_name, plate, driver_type, assigned_qty, actual_qty, status, note')
+            .eq('import_id', id)
+            .order('created_at', { ascending: true });
+
+        if (error) {
+            console.error('Get import assignments error:', error.message);
+            return res.json({ error: false, data: [] });
+        }
+
+        console.log(`📋 Found ${(data || []).length} assignments for import ${id}`);
+
+        res.json({
+            error: false,
+            data: data || []
+        });
+
+    } catch (e) {
+        console.error('Get import assignments error:', e.message);
+        res.json({ error: false, data: [] });
+    }
+});
+
 // POST /api/imports - Create new import ticket
 router.post('/', async (req, res) => {
     try {

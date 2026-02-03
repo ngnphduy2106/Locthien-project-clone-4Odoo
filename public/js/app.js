@@ -4053,7 +4053,7 @@ function removeLocalItemEdit(idx) {
 // IMPORT TICKET ACTIONS
 // ===============================================
 
-function viewImportDetail(importId) {
+async function viewImportDetail(importId) {
     // Find import from state - include myOrders for drivers
     const allImports = [
         ...(state.imports?.pending || []),
@@ -4061,11 +4061,26 @@ function viewImportDetail(importId) {
         ...(state.imports?.completed || []),
         ...(state.myOrders || []).filter(o => o.type === 'import')
     ];
-    const imp = allImports.find(i => i.id == importId);
+    let imp = allImports.find(i => i.id == importId);
 
     if (!imp) {
         alert('Không tìm thấy phiếu nhập!');
         return;
+    }
+
+    // Fetch all_assignments from API if not already present
+    if (!imp.all_assignments || imp.all_assignments.length === 0) {
+        console.log(`📥 Fetching import_driver_assignments for import ${importId}...`);
+        try {
+            const res = await fetch(`/api/imports/${importId}/assignments`);
+            const data = await res.json();
+            if (data && data.data && Array.isArray(data.data)) {
+                imp.all_assignments = data.data;
+                console.log(`✅ Fetched ${data.data.length} assignments:`, data.data);
+            }
+        } catch (e) {
+            console.error('Failed to fetch import assignments:', e.message);
+        }
     }
 
     // Get products, handle JSON string format
