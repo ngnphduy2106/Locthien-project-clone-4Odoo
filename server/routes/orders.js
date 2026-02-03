@@ -1136,6 +1136,9 @@ router.post('/:id/assign-multi', async (req, res) => {
         const { id } = req.params;
         const { assignments } = req.body;
 
+        console.log(`\n📦 ASSIGN-MULTI for order ${id}`);
+        console.log(`📋 Received ${assignments?.length || 0} assignments:`, JSON.stringify(assignments, null, 2));
+
         if (!assignments || !assignments.length) {
             return res.json(createResponse(true, 'Chưa có phân công nào!'));
         }
@@ -1145,7 +1148,8 @@ router.post('/:id/assign-multi', async (req, res) => {
         const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
         // Delete existing assignments for this order
-        await supabase.from('order_driver_assignments').delete().eq('order_id', id);
+        const { error: delErr } = await supabase.from('order_driver_assignments').delete().eq('order_id', id);
+        if (delErr) console.error('Delete existing assignments error:', delErr.message);
 
         // Insert new assignments
         const insertData = assignments.map(a => ({
@@ -1158,11 +1162,17 @@ router.post('/:id/assign-multi', async (req, res) => {
             note: a.note || ''
         }));
 
-        const { error } = await supabase.from('order_driver_assignments').insert(insertData);
+        console.log(`🔄 Insert data (${insertData.length} rows):`, JSON.stringify(insertData, null, 2));
+
+        const { data: insertedRows, error } = await supabase.from('order_driver_assignments').insert(insertData).select();
+        console.log(`✅ Inserted ${insertedRows?.length || 0} rows, error: ${error?.message || 'none'}`);
 
         if (error) {
+            console.error('❌ Insert error:', error.message);
             return res.json(createResponse(true, 'Lỗi lưu phân công: ' + error.message));
         }
+
+        console.log(`✅ Successfully inserted ${insertedRows?.length || 'N/A'} assignments`);
 
         // Update order with first driver info (main driver)
         const mainDriver = assignments[0];
