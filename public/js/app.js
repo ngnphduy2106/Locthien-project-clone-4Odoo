@@ -4056,8 +4056,13 @@ function viewImportDetail(importId) {
 }
 
 async function assignImportDriver(importId) {
-    // Find import from pending
-    const imp = (state.imports?.pending || []).find(i => i.id == importId);
+    // Find import from pending OR assigned - admin can reassign drivers
+    const allImportsForAssign = [
+        ...(state.imports?.pending || []),
+        ...(state.imports?.assigned || [])
+    ];
+
+    const imp = allImportsForAssign.find(i => i.id == importId);
 
     if (!imp) {
         alert('Không tìm thấy phiếu nhập!');
@@ -4066,6 +4071,18 @@ async function assignImportDriver(importId) {
 
     // Store current import ID for assignment
     state.currentAssignImportId = importId;
+
+    // Calculate total qty from products (handle JSON string)
+    let products = imp.products || imp.cart || [];
+    if (typeof products === 'string') {
+        try { products = JSON.parse(products); } catch (e) { products = []; }
+    }
+    if (!Array.isArray(products)) products = [];
+    const totalQty = products.reduce((sum, p) => sum + (parseFloat(p.qty || p.quantity || p.amount || 0)), 0);
+    state.currentImportTotalQty = totalQty;
+
+    // Init driver assignments array for import
+    state.importDriverAssignments = [];
 
     // Build driver select options with plate data
     const driverOptions = (state.drivers || []).map(d =>
@@ -4077,11 +4094,11 @@ async function assignImportDriver(importId) {
     const modalBody = window.$('#modal-order-body');
     const modalTitle = window.$('#modal-order-title');
 
-    if (modalTitle) modalTitle.textContent = `Gán tài xế - Phiếu nhập #${imp.ticket_no || imp.id}`;
+    if (modalTitle) modalTitle.textContent = `Phân công tài xế - Phiếu nhập #${imp.ticket_no || imp.id}`;
 
     if (modalBody) {
         modalBody.innerHTML = `
-            <div class="order-detail-grid" style="margin-bottom:24px;">
+            <div class="order-detail-grid" style="margin-bottom:16px;">
                 <div class="detail-row">
                     <label>Nhà cung cấp:</label>
                     <span>${imp.supplier_name || 'Chưa có'}</span>
@@ -4091,52 +4108,238 @@ async function assignImportDriver(importId) {
                     <span>${imp.supplier_address || 'Chưa có'}</span>
                 </div>
                 <div class="detail-row">
-                    <label>Ngày dự kiến:</label>
-                    <span>${formatDate(imp.expected_date || imp.created_at)}</span>
+                    <label>Tổng SL:</label>
+                    <span style="color:var(--success); font-weight:600;">${formatNumber(totalQty)} kg</span>
                 </div>
             </div>
             
-            <div class="form-group">
-                <label class="form-label">Chọn tài xế *</label>
-                <select id="assign-driver-select" class="form-control" onchange="onDriverChange(this)">
-                    <option value="">-- Chọn tài xế --</option>
-                    ${driverOptions}
-                </select>
+            <!--Multi-Driver Assignment Section-->
+            <div style="background:var(--body-bg); padding:16px; border-radius:8px; margin-bottom:16px;">
+                <h4 style="margin:0 0 12px; font-size:14px;">Phân công tài xế (Đơn Nhập)</h4>
+                
+                <!-- Driver List -->
+                <div id="import-driver-assignments-list" style="margin-bottom:16px;"></div>
+                
+                <!-- Add Driver Form -->
+                <div style="border:1px dashed var(--border); padding:12px; border-radius:8px;">
+                    <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end;">
+                        <div style="flex:1; min-width:150px;">
+                            <label class="form-label" style="font-size:12px;">Chọn tài xế</label>
+                            <select id="import-new-driver-select" class="form-control" onchange="onImportDriverChange(this)">
+                                <option value="">-- Chọn tài xế --</option>
+                                ${driverOptions}
+                                <option value="__EXTERNAL__">➕ Tài xế ngoài...</option>
+                            </select>
+                        </div>
+                        <div id="import-external-driver-fields" class="hidden" style="display:none; gap:8px; flex:2;">
+                            <div style="flex:1;">
+                                <label class="form-label" style="font-size:12px;">Tên tài xế ngoài</label>
+                                <input type="text" id="import-external-driver-name" class="form-control" placeholder="Nhập tên...">
+                            </div>
+                            <div style="flex:1;">
+                                <label class="form-label" style="font-size:12px;">Biển số xe</label>
+                                <input type="text" id="import-external-driver-plate" class="form-control" placeholder="Biển số...">
+                            </div>
+                        </div>
+                        <div style="width:100px;">
+                            <label class="form-label" style="font-size:12px;">Số lượng (kg)</label>
+                            <input type="number" id="import-new-driver-qty" class="form-control" placeholder="SL" value="">
+                        </div>
+                        <button class="btn btn-primary" onclick="addImportDriverAssignmentRow()" style="height:38px;">
+                            <i class="bi bi-plus"></i> Thêm
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Summary -->
+                <div id="import-qty-summary" style="margin-top:12px; padding:8px; background:var(--card-bg); border-radius:4px; font-size:13px;"></div>
             </div>
             
-            <div class="form-group">
-                <label class="form-label">Biển số xe</label>
-                <input type="text" id="assign-plate" class="form-control" placeholder="Tự động điền khi chọn tài xế">
-            </div>
-            
-            <div style="display:flex; gap:12px; margin-top:24px;">
+            <div style="display:flex; gap:12px; margin-top:16px;">
                 <button class="btn btn-outline" onclick="closeOrderModal()">Hủy</button>
-                <button class="btn btn-primary" onclick="confirmAssignImportDriver()">
-                    <i class="bi bi-check"></i> Xác nhận gán
+                <button class="btn btn-success" onclick="submitImportMultiDriverAssignment()">
+                    <i class="bi bi-check-all"></i> Xác nhận phân công
                 </button>
             </div>
         `;
+
+        // Render summary
+        updateImportQtySummaryDisplay();
     }
 
     if (modal) modal.classList.remove('hidden');
 }
 
-async function confirmAssignImportDriver() {
-    const importId = state.currentAssignImportId;
-    const driverSelect = window.$('#assign-driver-select');
-    const plateInput = window.$('#assign-plate');
+// Handle import driver select change for external driver
+function onImportDriverChange(selectEl) {
+    const externalFields = window.$('#import-external-driver-fields');
+    if (selectEl.value === '__EXTERNAL__') {
+        externalFields?.classList.remove('hidden');
+        externalFields.style.display = 'flex';
+    } else {
+        externalFields?.classList.add('hidden');
+        externalFields.style.display = 'none';
+        // Auto-fill plate
+        const selectedOption = selectEl.options[selectEl.selectedIndex];
+        const plate = selectedOption?.getAttribute('data-plate') || '';
+        const externalPlate = window.$('#import-external-driver-plate');
+        if (externalPlate) externalPlate.value = plate;
+    }
+}
 
-    const driverName = driverSelect?.value;
-    const plate = plateInput?.value || '';
+// Add driver to import assignment list
+function addImportDriverAssignmentRow() {
+    const select = window.$('#import-new-driver-select');
+    const qtyInput = window.$('#import-new-driver-qty');
+    const externalName = window.$('#import-external-driver-name');
+    const externalPlate = window.$('#import-external-driver-plate');
 
-    if (!driverName) {
-        alert('Vui lòng chọn tài xế!');
+    let driverName = select?.value;
+    let plate = '';
+
+    // Handle external driver
+    if (driverName === '__EXTERNAL__') {
+        driverName = externalName?.value?.trim();
+        plate = externalPlate?.value?.trim() || '';
+        if (!driverName) {
+            alert('Vui lòng nhập tên tài xế ngoài!');
+            return;
+        }
+    } else {
+        if (!driverName) {
+            alert('Vui lòng chọn tài xế!');
+            return;
+        }
+        const selectedOption = select.options[select.selectedIndex];
+        plate = selectedOption?.getAttribute('data-plate') || '';
+    }
+
+    const qty = parseFloat(qtyInput?.value) || 0;
+    if (qty <= 0) {
+        alert('Vui lòng nhập số lượng hợp lệ!');
         return;
     }
 
+    // Add to list
+    state.importDriverAssignments.push({
+        driver_name: driverName,
+        plate: plate,
+        qty: qty,
+        is_external: select?.value === '__EXTERNAL__'
+    });
+
+    // Reset form
+    select.value = '';
+    qtyInput.value = '';
+    if (externalName) externalName.value = '';
+    if (externalPlate) externalPlate.value = '';
+    window.$('#import-external-driver-fields')?.classList.add('hidden');
+
+    renderImportDriverAssignmentsList();
+    updateImportQtySummaryDisplay();
+}
+
+// Remove driver from import list
+function removeImportDriverAssignmentRow(idx) {
+    state.importDriverAssignments.splice(idx, 1);
+    renderImportDriverAssignmentsList();
+    updateImportQtySummaryDisplay();
+}
+
+// Render import driver assignments list
+function renderImportDriverAssignmentsList() {
+    const container = window.$('#import-driver-assignments-list');
+    if (!container) return;
+
+    if (!state.importDriverAssignments || !state.importDriverAssignments.length) {
+        container.innerHTML = '<p style="color:var(--text-muted); text-align:center; margin:16px 0;">Chưa có tài xế được phân công</p>';
+        return;
+    }
+
+    container.innerHTML = state.importDriverAssignments.map((a, idx) => `
+        <div style="display:flex; align-items:center; gap:12px; padding:10px; background:var(--card-bg); border-radius:6px; margin-bottom:8px; border-left:3px solid ${a.is_external ? 'var(--warning)' : 'var(--success)'};">
+            <div style="flex:1;">
+                <strong>${a.driver_name}</strong>
+                ${a.is_external ? '<span style="font-size:11px; background:var(--warning); color:#000; padding:2px 6px; border-radius:4px; margin-left:6px;">Tài xế ngoài</span>' : ''}
+                <br><small style="color:var(--text-muted);">🚗 ${a.plate || 'Chưa có biển số'}</small>
+            </div>
+            <div style="font-weight:600; color:var(--success);">${formatNumber(a.qty)} kg</div>
+            <button onclick="removeImportDriverAssignmentRow(${idx})" style="background:var(--danger); color:white; border:none; border-radius:4px; width:28px; height:28px; cursor:pointer;">
+                <i class="bi bi-x"></i>
+            </button>
+        </div>
+    `).join('');
+}
+
+// Update import qty summary
+function updateImportQtySummaryDisplay() {
+    const container = window.$('#import-qty-summary');
+    if (!container) return;
+
+    const totalAssigned = (state.importDriverAssignments || []).reduce((sum, a) => sum + a.qty, 0);
+    const totalOrder = state.currentImportTotalQty || 0;
+    const remaining = totalOrder - totalAssigned;
+
+    const color = remaining === 0 ? 'var(--success)' : (remaining < 0 ? 'var(--danger)' : 'var(--warning)');
+
+    container.innerHTML = `
+        <div style="display:flex; justify-content:space-between;">
+            <span>Tổng phiếu nhập:</span>
+            <strong>${formatNumber(totalOrder)} kg</strong>
+        </div>
+        <div style="display:flex; justify-content:space-between;">
+            <span>Đã phân công:</span>
+            <strong>${formatNumber(totalAssigned)} kg</strong>
+        </div>
+        <div style="display:flex; justify-content:space-between; color:${color};">
+            <span>Còn lại:</span>
+            <strong>${formatNumber(remaining)} kg</strong>
+        </div>
+    `;
+}
+
+// Submit import multi-driver assignment
+async function submitImportMultiDriverAssignment() {
+    const importId = state.currentAssignImportId;
+    const assignments = state.importDriverAssignments || [];
+
+    if (!assignments.length) {
+        alert('Vui lòng thêm ít nhất một tài xế!');
+        return;
+    }
+
+    // For single driver - use existing API
+    if (assignments.length === 1) {
+        const a = assignments[0];
+        showLoading('Đang gán tài xế...');
+        try {
+            const res = await api.assignImportDriver(importId, a.driver_name, a.plate);
+            hideLoading();
+
+            if (res.error) {
+                alert(res.msg || 'Lỗi gán tài xế!');
+                return;
+            }
+
+            alert(res.msg || 'Đã gán tài xế!');
+            closeOrderModal();
+            loadImportTickets();
+        } catch (e) {
+            hideLoading();
+            alert('Lỗi: ' + e.message);
+        }
+        return;
+    }
+
+    // For multiple drivers - use first one for now (can extend later to split import)
+    // TODO: Implement split import tickets API
+    alert('Hiện tại chỉ hỗ trợ gán 1 tài xế cho phiếu nhập. Tính năng chia đơn đang phát triển.');
+
+    // Assign first driver for now
+    const a = assignments[0];
     showLoading('Đang gán tài xế...');
     try {
-        const res = await api.assignImportDriver(importId, driverName, plate);
+        const res = await api.assignImportDriver(importId, a.driver_name, a.plate);
         hideLoading();
 
         if (res.error) {
@@ -4144,13 +4347,18 @@ async function confirmAssignImportDriver() {
             return;
         }
 
-        alert(res.msg || 'Đã gán tài xế!');
+        alert(`Đã gán tài xế ${a.driver_name}!`);
         closeOrderModal();
         loadImportTickets();
     } catch (e) {
         hideLoading();
         alert('Lỗi: ' + e.message);
     }
+}
+
+// Keep old confirmAssignImportDriver for backward compatibility
+async function confirmAssignImportDriver() {
+    submitImportMultiDriverAssignment();
 }
 
 async function adminCompleteImport(importId) {
@@ -4496,6 +4704,13 @@ window.viewImportDetail = viewImportDetail;
 window.assignImportDriver = assignImportDriver;
 window.confirmAssignImportDriver = confirmAssignImportDriver;
 window.adminCompleteImport = adminCompleteImport;
+// Import multi-driver exports
+window.onImportDriverChange = onImportDriverChange;
+window.addImportDriverAssignmentRow = addImportDriverAssignmentRow;
+window.removeImportDriverAssignmentRow = removeImportDriverAssignmentRow;
+window.renderImportDriverAssignmentsList = renderImportDriverAssignmentsList;
+window.updateImportQtySummaryDisplay = updateImportQtySummaryDisplay;
+window.submitImportMultiDriverAssignment = submitImportMultiDriverAssignment;
 // Edit order exports
 window.editOrder = editOrder;
 window.saveEditOrder = saveEditOrder;
