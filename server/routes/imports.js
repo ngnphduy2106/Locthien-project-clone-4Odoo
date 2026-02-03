@@ -242,7 +242,7 @@ router.put('/:id/start', async (req, res) => {
 router.put('/:id/complete', async (req, res) => {
     try {
         const { id } = req.params;
-        const { actual_products, note } = req.body;
+        const { actual_products, note, local_items, driver, plate } = req.body;
 
         // Fetch original to merge (No-Delete logic)
         const { data: original } = await getSupabase().from('import_tickets').select('*').eq('id', id).single();
@@ -272,14 +272,21 @@ router.put('/:id/complete', async (req, res) => {
             qty: m.actual_qty || m.qty // Use actual if provided, else keep original
         }));
 
+        const updateData = {
+            status: 'completed',
+            products: mergedProducts,
+            completed_at: new Date().toISOString()
+        };
+
+        // Add optional fields
+        if (note) updateData.note = note;
+        if (local_items) updateData.local_items = local_items;
+        if (driver) updateData.completed_by = driver;
+        if (plate) updateData.completed_plate = plate;
+
         const { data, error } = await getSupabase()
             .from('import_tickets')
-            .update({
-                status: 'completed',
-                products: mergedProducts,
-                note: note || undefined,
-                completed_at: new Date().toISOString()
-            })
+            .update(updateData)
             .eq('id', id)
             .select()
             .single();

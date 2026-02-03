@@ -1633,6 +1633,7 @@ function renderMyOrdersList(containerId, orders, type) {
                     ${formatDate(order.ngay || order.sale_order_date || order.createdAt)}
                 </div>
             </div>
+            ${type === 'completed' ? renderCompletedOrderExtras(order) : ''}
             <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px; padding-top:12px; border-top:1px solid var(--border);">
                 <div class="order-info" style="font-size:14px; color:var(--text-muted);">
                     <i class="bi bi-box-seam"></i> ${(order.cart || order.products || []).length || 0} sản phẩm
@@ -1664,6 +1665,62 @@ function renderMyOrdersList(containerId, orders, type) {
         </div>
     `;
     }).join('');
+}
+
+// Render extras (local items + note) for completed orders
+function renderCompletedOrderExtras(order) {
+    let html = '';
+
+    // Parse local_items
+    let localItems = order.local_items || [];
+    if (typeof localItems === 'string') {
+        try { localItems = JSON.parse(localItems); } catch (e) { localItems = []; }
+    }
+
+    // Get note
+    const note = order.delivery_note || order.note || '';
+
+    // Only render if there's content
+    if (localItems.length === 0 && !note) {
+        return '';
+    }
+
+    html += '<div style="margin:12px 0; padding:12px; background:var(--body-bg); border-radius:8px;">';
+
+    // Local items section
+    if (localItems.length > 0) {
+        html += `
+            <div style="margin-bottom:${note ? '12px' : '0'};">
+                <div style="font-size:12px; color:var(--warning); font-weight:600; margin-bottom:6px;">
+                    <i class="bi bi-box2"></i> Mặt hàng phụ:
+                </div>
+                <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                    ${localItems.map(item => `
+                        <span style="background:var(--warning-light); color:var(--warning); padding:4px 10px; border-radius:16px; font-size:12px; font-weight:500;">
+                            ${item.name || item} ${item.qty ? `x${item.qty}` : ''}
+                        </span>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    // Note section
+    if (note) {
+        html += `
+            <div>
+                <div style="font-size:12px; color:var(--info); font-weight:600; margin-bottom:4px;">
+                    <i class="bi bi-pencil-square"></i> Ghi chú:
+                </div>
+                <div style="font-size:13px; color:var(--text-secondary); font-style:italic;">
+                    "${note}"
+                </div>
+            </div>
+        `;
+    }
+
+    html += '</div>';
+    return html;
 }
 
 // Switch tabs in My Orders section

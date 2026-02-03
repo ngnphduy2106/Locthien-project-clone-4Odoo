@@ -604,7 +604,7 @@ router.post('/:id/complete', async (req, res) => {
         const { id } = req.params;
         const {
             // Admin complete fields
-            products, delivery_note, admin_completed,
+            products, delivery_note, admin_completed, local_items,
             // Driver complete fields
             type, warehouse, partner, driver_name, plate, cart, note, sender, images
         } = req.body;
@@ -634,6 +634,8 @@ router.post('/:id/complete', async (req, res) => {
                 taiXe: driver_name,
                 bienSo: plate,
                 cart: updatedProducts,
+                local_items: local_items || [],
+                delivery_note: note || delivery_note || '',
                 crm_sync_status: 'PUSHING'
             });
 
@@ -690,7 +692,8 @@ router.post('/:id/complete', async (req, res) => {
                         isShell: c.isShell || false
                     })),
                     total_qty: totalQty,
-                    note: note || `Tạo bởi: ${sender || driver_name}`,
+                    note: note || delivery_note || `Tạo bởi: ${sender || driver_name}`,
+                    local_items: local_items || [],
                     images: images || []
                 });
             } catch (err) {
@@ -764,6 +767,7 @@ router.post('/:id/complete', async (req, res) => {
             delivery_status: 'Hoàn thành',
             completed_at: new Date().toISOString(),
             delivery_note: delivery_note || '',
+            local_items: local_items || [],
             admin_completed: admin_completed || false
         });
 
