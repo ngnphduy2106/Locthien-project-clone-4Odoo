@@ -1824,9 +1824,10 @@ function filterMyOrders() {
         const status = (o.status || '').toLowerCase();
         const statusCode = (o.statusCode || '').toUpperCase();
         const deliveryStatus = (o.delivery_status || '').toLowerCase();
+        // Use includes() for more flexible matching
         return statusCode === 'HOAN_THANH' ||
             status === 'completed' ||
-            status === 'đã thực hiện' ||
+            status.includes('thực hiện') && status.includes('đã') ||  // "Đã thực hiện"
             status === 'delivered' ||
             deliveryStatus.includes('đã giao') ||
             deliveryStatus.includes('hoàn thành');
@@ -1838,7 +1839,7 @@ function filterMyOrders() {
         return statusCode === 'DANG_GIAO' ||
             status === 'in_transit' ||
             status === 'delivering' ||
-            status === 'đang thực hiện';
+            (status.includes('đang') && status.includes('thực hiện'));  // "Đang thực hiện"
     };
 
     const isPending = (o) => {
@@ -1847,13 +1848,15 @@ function filterMyOrders() {
         return statusCode === 'CHO_NHAN' ||
             status === 'assigned' ||
             status === 'pending' ||
-            status === 'chưa thực hiện';
+            (status.includes('chưa') && status.includes('thực hiện'));  // "Chưa thực hiện"
     };
 
     // Categorize with priority: completed > delivering > pending
     const completed = orders.filter(o => isCompleted(o));
     const delivering = orders.filter(o => !isCompleted(o) && isDelivering(o));
     const pending = orders.filter(o => !isCompleted(o) && !isDelivering(o));
+
+    console.log(`📊 My Orders categorized: Completed=${completed.length}, Delivering=${delivering.length}, Pending=${pending.length}`);
 
     // Update badges
     const pendingBadge = window.$('#pending-badge');
