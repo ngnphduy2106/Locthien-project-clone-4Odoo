@@ -75,9 +75,11 @@ const api = {
         return res.json();
     },
 
-    startOrder: async (id) => {
+    startOrder: async (id, assignmentId = null) => {
         const res = await fetch(`${API_BASE}/orders/${id}/start`, {
-            method: 'PUT'
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ assignment_id: assignmentId })
         });
         return res.json();
     },

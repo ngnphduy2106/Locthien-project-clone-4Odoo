@@ -208,12 +208,101 @@ router.put('/:id/assign', async (req, res) => {
     }
 });
 
-// PUT /api/imports/:id/start - Start import delivery (in transit)
+// POST /api/imports/:id/assign-multi - Multi-driver assignment for imports
+router.post('/:id/assign-multi', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { assignments } = req.body;
+
+        if (!assignments || !assignments.length) {
+            return res.json(createResponse(true, 'Chưa có phân công nào!'));
+        }
+
+        const supabase = getSupabase();
+
+        // Delete existing assignments for this import
+        await supabase.from('import_driver_assignments').delete().eq('import_id', id);
+
+        // Insert new assignments
+        const insertData = assignments.map(a => ({
+            import_id: id,
+            driver_name: a.driver_name,
+            driver_type: a.type || 'internal',
+            plate: a.plate || '',
+            assigned_qty: Number(a.qty) || 0,
+            status: 'pending',
+            note: a.note || ''
+        }));
+
+        const { error } = await supabase.from('import_driver_assignments').insert(insertData);
+
+        if (error) {
+            return res.json(createResponse(true, 'Lỗi lưu phân công: ' + error.message));
+        }
+
+        // Update import with first driver info (main driver)
+        const mainDriver = assignments[0];
+        await supabase
+            .from('import_tickets')
+            .update({
+                status: 'assigned',
+                assigned_driver: mainDriver.driver_name,
+                assigned_plate: mainDriver.plate || '',
+                note: assignments.length > 1 ? `Chia ${assignments.length} tài xế` : (mainDriver.note || '')
+            })
+            .eq('id', id);
+
+        // Send Telegram notification
+        try {
+            const { sendTelegramMessage } = await import('../services/telegram.js');
+            const { data: impData } = await supabase.from('import_tickets').select('*').eq('id', id).single();
+
+            let msg = `🚛 <b>PHÂN CÔNG NHẬP HÀNG</b>\n`;
+            msg += `#${impData?.ticket_no || id}\n`;
+            msg += `📦 NCC: ${impData?.supplier_name || ''}\n\n`;
+            msg += `<b>Danh sách tài xế:</b>\n`;
+
+            assignments.forEach((a, i) => {
+                const typeLabel = a.type === 'external' ? '(Ngoài)' : '(NB)';
+                msg += `${i + 1}. ${a.driver_name} ${typeLabel} - ${a.qty}kg\n`;
+            });
+
+            await sendTelegramMessage(msg);
+        } catch (teleErr) {
+            console.error('Telegram notification error:', teleErr.message);
+        }
+
+        res.json(createResponse(false, `Đã phân công ${assignments.length} tài xế!`));
+
+    } catch (e) {
+        console.error('Multi-assign import error:', e);
+        res.json(createResponse(true, e.message));
+    }
+});
+
+// PUT /api/imports/:id/start - Start import delivery (supports multi-driver)
 router.put('/:id/start', async (req, res) => {
     try {
         const { id } = req.params;
+        const { assignment_id } = req.body; // Optional: for multi-driver imports
 
-        const { data, error } = await getSupabase()
+        const supabase = getSupabase();
+
+        // If multi-driver import, update assignment status
+        if (assignment_id) {
+            const { error } = await supabase
+                .from('import_driver_assignments')
+                .update({ status: 'delivering' })
+                .eq('id', assignment_id);
+
+            if (error) {
+                console.error('Assignment status update error:', error.message);
+            } else {
+                console.log(`✅ Import assignment ${assignment_id} status -> delivering`);
+            }
+        }
+
+        const { data, error } = await supabase
             .from('import_tickets')
             .update({
                 status: 'in_transit',
@@ -238,11 +327,75 @@ router.put('/:id/start', async (req, res) => {
     }
 });
 
-// PUT /api/imports/:id/complete - Complete import ticket
+// PUT /api/imports/:id/complete - Complete import ticket (supports multi-driver)
 router.put('/:id/complete', async (req, res) => {
     try {
         const { id } = req.params;
-        const { actual_products, note, local_items, driver, plate } = req.body;
+        const { actual_products, note, local_items, driver, plate, assignment_id } = req.body;
+
+        const supabase = getSupabase();
+
+        // ============================================================
+        // MULTI-DRIVER COMPLETION: Check if this is a split import
+        // ============================================================
+        if (assignment_id) {
+            console.log(`🔀 Multi-driver import completion - Assignment: ${assignment_id}`);
+
+            // Calculate total qty from actual_products
+            const myActualQty = actual_products?.reduce((sum, p) => sum + Number(p.qty || 0), 0) || 0;
+
+            // Update this assignment as completed
+            const { error: updateErr } = await supabase
+                .from('import_driver_assignments')
+                .update({
+                    status: 'completed',
+                    actual_qty: myActualQty,
+                    local_items: local_items || [],
+                    delivery_note: note || '',
+                    completed_at: new Date().toISOString()
+                })
+                .eq('id', assignment_id);
+
+            if (updateErr) {
+                console.error('Import assignment update error:', updateErr.message);
+            } else {
+                console.log(`✅ Import assignment ${assignment_id} completed with ${myActualQty}kg`);
+            }
+
+            // Check all assignments for this import
+            const { data: assignments } = await supabase
+                .from('import_driver_assignments')
+                .select('*')
+                .eq('import_id', id);
+
+            if (assignments && assignments.length > 1) {
+                // Check if ALL drivers completed
+                const allCompleted = assignments.every(a => a.status === 'completed');
+                const completedCount = assignments.filter(a => a.status === 'completed').length;
+
+                console.log(`📊 Multi-driver import status: ${completedCount}/${assignments.length} completed`);
+
+                if (!allCompleted) {
+                    // Partial completion - return early
+                    await supabase
+                        .from('import_tickets')
+                        .update({ note: `${completedCount}/${assignments.length} hoàn thành` })
+                        .eq('id', id);
+
+                    return res.json(createResponse(false,
+                        `Bạn đã hoàn thành phần của mình! (${completedCount}/${assignments.length} tài xế)`,
+                        {
+                            partial: true,
+                            progress: `${completedCount}/${assignments.length}`,
+                            yourQty: myActualQty
+                        }
+                    ));
+                }
+
+                // All completed - proceed with full completion below
+                console.log(`🎉 All import drivers completed!`);
+            }
+        }
 
         // Fetch original to merge (No-Delete logic)
         const { data: original } = await getSupabase().from('import_tickets').select('*').eq('id', id).single();

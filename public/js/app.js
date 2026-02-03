@@ -1613,13 +1613,34 @@ function renderMyOrdersList(containerId, orders, type) {
         const typeBadge = isImport
             ? '<span style="background:#4CAF50; color:white; padding:2px 8px; border-radius:4px; font-size:11px; margin-left:8px;">Nhập</span>'
             : '';
+
+        // Multi-driver split badge
+        const isSplit = order.is_split_order || false;
+        const splitProgress = order.split_progress || '';
+        const splitBadge = isSplit
+            ? `<span style="background:#8B5CF6; color:white; padding:2px 8px; border-radius:4px; font-size:11px; margin-left:8px;">
+                🔀 Chia đơn ${splitProgress ? `(${splitProgress})` : ''}
+               </span>`
+            : '';
+
+        // Show assigned qty for split orders
+        const qtyDisplay = isSplit && order.assigned_qty
+            ? `<span style="color:#8B5CF6; font-weight:600;"> - ${order.assigned_qty}kg (của bạn)</span>`
+            : '';
+
+        // Pass assignment_id to start functions
+        const assignmentId = order.assignment_id || null;
+        const startFn = isImport
+            ? `startImportOrder('${order.id}'${assignmentId ? `, '${assignmentId}'` : ''})`
+            : `startOrder('${order.id}'${assignmentId ? `, '${assignmentId}'` : ''})`;
+
         return `
         <div class="order-card" style="margin-bottom:12px; border-left:4px solid ${cardBorderColor}; position:relative; ${cardBg}">
             ${chatBadge}
             <div class="order-card-header">
                 <div>
-                    <div class="order-id" style="font-size:16px; font-weight:700;">#${orderId}${typeBadge}</div>
-                    <div class="order-customer" style="font-size:14px; color:var(--text-secondary);">${order.khach || order.customerName || order.accountName || 'Khách hàng'}</div>
+                    <div class="order-id" style="font-size:16px; font-weight:700;">#${orderId}${typeBadge}${splitBadge}</div>
+                    <div class="order-customer" style="font-size:14px; color:var(--text-secondary);">${order.khach || order.customerName || order.accountName || 'Khách hàng'}${qtyDisplay}</div>
                 </div>
                 <span class="badge" style="${badgeStyles[type]}">${badgeTexts[type]}</span>
             </div>
@@ -1643,7 +1664,7 @@ function renderMyOrdersList(containerId, orders, type) {
                         <button class="btn btn-outline btn-sm" onclick="${isImport ? `viewImportDetail('${order.id}')` : `viewOrderDetail('${order.id}')`}">
                             <i class="bi bi-eye"></i> Chi tiết
                         </button>
-                        <button class="btn btn-warning btn-sm" onclick="${isImport ? `startImportOrder('${order.id}')` : `startOrder('${order.id}')`}" style="background:linear-gradient(135deg, #f59e0b, #d97706); color:white; border:none;">
+                        <button class="btn btn-warning btn-sm" onclick="${startFn}" style="background:linear-gradient(135deg, #f59e0b, #d97706); color:white; border:none;">
                             <i class="bi bi-play-circle"></i> Nhận đơn
                         </button>
                     ` : ''}
@@ -3039,13 +3060,13 @@ async function submitDelivery() {
 }
 
 // === START ORDER (DRIVER) ===
-async function startOrder(orderId) {
+async function startOrder(orderId, assignmentId = null) {
     if (!confirm('Xác nhận nhận đơn này?')) return;
 
     showLoading('Đang cập nhật...');
 
     try {
-        const res = await api.startOrder(orderId);
+        const res = await api.startOrder(orderId, assignmentId);
         hideLoading();
         alert(res.msg || 'Đã nhận đơn!');
         loadMyOrders();
@@ -3056,7 +3077,7 @@ async function startOrder(orderId) {
 }
 
 // === START IMPORT ORDER (DRIVER) ===
-async function startImportOrder(importId) {
+async function startImportOrder(importId, assignmentId = null) {
     if (!confirm('Xác nhận nhận đơn nhập này?')) return;
 
     showLoading('Đang cập nhật...');
@@ -3064,7 +3085,8 @@ async function startImportOrder(importId) {
     try {
         const res = await fetch(`/api/imports/${importId}/start`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' }
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ assignment_id: assignmentId })
         });
         const data = await res.json();
         hideLoading();
@@ -5787,7 +5809,9 @@ async function submitDriverCompletion() {
             delivery_note: deliveryNote,
             images: completionImages,
             local_items: completionLocalItems,
-            admin_completed: isAdminRole()
+            admin_completed: isAdminRole(),
+            // Multi-driver support: pass assignment_id if present
+            assignment_id: order.assignment_id || null
         });
 
         hideLoading();
@@ -5797,11 +5821,19 @@ async function submitDriverCompletion() {
             return;
         }
 
-        alert(res.msg || 'Đã hoàn thành đơn hàng thành công!');
+        // Show partial completion message if applicable
+        if (res.data?.partial) {
+            alert(res.msg || `Đã hoàn thành phần của bạn! (${res.data.progress})`);
+        } else {
+            alert(res.msg || 'Đã hoàn thành đơn hàng thành công!');
+        }
+
+
         closeOrderModal();
 
         // Refresh orders list
         loadOrders();
+        loadMyOrders();
 
         // Reset state
         completionImages = [];
@@ -6011,7 +6043,9 @@ async function submitImportCompletion() {
                 plate,
                 note: deliveryNote,
                 local_items: completionLocalItems,
-                admin_completed: isAdminRole()
+                admin_completed: isAdminRole(),
+                // Multi-driver support
+                assignment_id: imp.assignment_id || null
             })
         });
 
@@ -6023,7 +6057,13 @@ async function submitImportCompletion() {
             return;
         }
 
-        alert(data.msg || 'Đã hoàn thành phiếu nhập thành công!');
+        // Show partial completion message if applicable
+        if (data.data?.partial) {
+            alert(data.msg || `Đã hoàn thành phần của bạn! (${data.data.progress})`);
+        } else {
+            alert(data.msg || 'Đã hoàn thành phiếu nhập thành công!');
+        }
+
         closeOrderModal();
 
         // Refresh orders list
