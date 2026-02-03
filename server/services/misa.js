@@ -292,6 +292,8 @@ const performSync = async () => {
             console.log('🔍 Sample MISA Item Keys:', Object.keys(item));
             console.log('   sale_order_id (mapped):', saleOrderId);
             console.log('   list_product:', JSON.stringify(item.list_product || [], null, 2));
+            console.log('   description:', item.description || item.Description || '(EMPTY)');
+            console.log('   owner_name:', item.owner_name || item.OwnerName || item.ownerName || '(EMPTY)');
         }
 
         let shouldFetchDetail = false;
@@ -322,8 +324,18 @@ const performSync = async () => {
                 // 3. Status Change Check (Optimize: Only update if different and local is 'Mới')
                 const statusChanged = existingOrder.status !== newStatus && existingOrder.status === 'Mới';
 
-                if (!hasProducts || hasZeroQty || statusChanged || !hasMisaId || hasMissingPrice) {
+                // 4. Check if owner_name (creator_name) is missing - need to populate from MISA
+                const hasOwnerName = !!existingOrder.creator_name || !!existingOrder.owner_name;
+                const misaHasOwnerName = !!(item.owner_name || item.OwnerName);
+
+                // 5. Check if description (misa_note) is missing - need to populate from MISA
+                const hasDescription = !!existingOrder.misa_note || !!existingOrder.description;
+                const misaHasDescription = !!(item.description || item.Description);
+
+                if (!hasProducts || hasZeroQty || statusChanged || !hasMisaId || hasMissingPrice || (!hasOwnerName && misaHasOwnerName) || (!hasDescription && misaHasDescription)) {
                     if (hasMissingPrice) console.log(`💰 Updating ${saleOrderNo} (Missing price data)...`);
+                    if (!hasOwnerName && misaHasOwnerName) console.log(`👤 Updating ${saleOrderNo} (Missing owner_name)...`);
+                    if (!hasDescription && misaHasDescription) console.log(`📝 Updating ${saleOrderNo} (Missing description/misa_note)...`);
                     shouldFetchDetail = true;
                 }
             }
@@ -407,6 +419,9 @@ const performSync = async () => {
             status: mapMisaStatus(item),
             delivery_status: item.delivery_status || 'Chưa giao hàng', // Preserve MISA delivery_status
             sale_order_product_mappings: products,  // Products array
+            // Explicitly map description & owner_name (MISA may return camelCase or snake_case)
+            description: item.description || item.Description || '',
+            owner_name: item.owner_name || item.OwnerName || item.ownerName || '',
         };
 
         if (existingIds.has(saleOrderNo)) {

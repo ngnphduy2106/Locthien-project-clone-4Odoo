@@ -347,6 +347,7 @@ export const db = {
             if (data.amount !== undefined) safeData.sale_order_amount = data.amount;
             if (data.sale_order_amount !== undefined) safeData.sale_order_amount = data.sale_order_amount;
             if (data.delivery_status !== undefined) safeData.delivery_status = data.delivery_status;
+            if (data.owner_name !== undefined) safeData.owner_name = data.owner_name;
 
             // Address
             if (data.diaChi !== undefined) safeData.shipping_address = data.diaChi;
