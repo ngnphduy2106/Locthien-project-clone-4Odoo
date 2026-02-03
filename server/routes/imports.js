@@ -463,8 +463,8 @@ router.put('/:id/complete', async (req, res) => {
         // Add optional fields
         if (note) updateData.note = note;
         if (local_items) updateData.local_items = local_items;
-        if (driver) updateData.completed_by = driver;
-        if (plate) updateData.completed_plate = plate;
+        // Note: completed_by and completed_plate columns don't exist in import_tickets
+        // Driver info is already stored in driver_name and plate fields
 
         const { data, error } = await getSupabase()
             .from('import_tickets')
