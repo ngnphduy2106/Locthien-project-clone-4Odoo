@@ -2136,6 +2136,31 @@ async function viewOrderDetail(orderId, options = {}) {
                 ` : ''}
             </div>
             
+            ${order.misa_note ? `
+            <div style="margin:16px 0; padding:12px 16px; background:linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%); border-radius:12px; border-left:4px solid #f59e0b;">
+                <div style="font-size:12px; color:#92400e; font-weight:600; margin-bottom:6px;">
+                    <i class="bi bi-sticky"></i> GHI CHÚ TỪ MISA
+                </div>
+                <div style="font-size:14px; color:#78350f;">
+                    ${order.misa_note}
+                </div>
+            </div>
+            ` : ''}
+            
+            ${order.creator_name ? `
+            <div style="margin:16px 0; padding:12px 16px; background:linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border-radius:12px; border-left:4px solid #3b82f6;">
+                <div style="font-size:12px; color:#1e40af; font-weight:600; margin-bottom:6px;">
+                    <i class="bi bi-person-badge"></i> NGƯỜI TẠO ĐƠN
+                </div>
+                <div style="font-size:14px; color:#1e3a8a;">
+                    ${order.creator_name}
+                </div>
+                <div style="font-size:11px; color:#6b7280; margin-top:4px;">
+                    Liên hệ người này nếu cần hỗ trợ
+                </div>
+            </div>
+            ` : ''}
+            
             ${(() => {
                 // Multi-driver assignment section
                 const allAssignments = order.all_assignments || [];
