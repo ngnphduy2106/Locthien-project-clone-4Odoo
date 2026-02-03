@@ -3924,8 +3924,13 @@ function removeLocalItemEdit(idx) {
 // ===============================================
 
 function viewImportDetail(importId) {
-    // Find import from state
-    const allImports = [...(state.imports?.pending || []), ...(state.imports?.assigned || []), ...(state.imports?.completed || [])];
+    // Find import from state - include myOrders for drivers
+    const allImports = [
+        ...(state.imports?.pending || []),
+        ...(state.imports?.assigned || []),
+        ...(state.imports?.completed || []),
+        ...(state.myOrders || []).filter(o => o.type === 'import')
+    ];
     const imp = allImports.find(i => i.id == importId);
 
     if (!imp) {
