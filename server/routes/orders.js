@@ -792,6 +792,12 @@ router.post('/:id/complete', async (req, res) => {
             assignment_id
         } = req.body;
 
+        console.log(`\n🏁 COMPLETE ORDER - ID: ${id}`);
+        console.log(`📦 Request body keys:`, Object.keys(req.body));
+        console.log(`🔑 assignment_id: ${assignment_id || 'NONE'}`);
+        console.log(`🛒 cart length: ${cart?.length || 0}, products length: ${products?.length || 0}`);
+        console.log(`👤 driver_name: ${driver_name}, admin_completed: ${admin_completed}`);
+
         const { createClient } = await import('@supabase/supabase-js');
         const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
@@ -812,6 +818,7 @@ router.post('/:id/complete', async (req, res) => {
                 if (item.isShell) return sum;
                 return sum + Number(item.weight_kg || item.qty || 0);
             }, 0) || 0;
+            console.log(`📊 My actual qty from cart: ${myActualQty}kg`);
 
             // Update this assignment as completed
             const { error: updateErr } = await supabase
