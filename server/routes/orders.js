@@ -969,16 +969,51 @@ router.post('/:id/complete', async (req, res) => {
             // 2. Sync to MISA CRM
             try {
                 const orderInfo = await db.getOrder(id);
-                const misaCart = cart.filter(item => !item.isShell).map(item => ({
-                    product_code: item.product?.code || item.product?.id || item.code || item.product || '',
-                    warehouse,
-                    unit: item.unit || 'kg',
-                    qty: Number(item.weight_kg || item.qty || 0)
-                }));
+
+                // For multi-driver: combine actual_qty from all assignments
+                let misaCart;
+                if (isMultiDriverOrder && allAssignments && allAssignments.length > 0) {
+                    // Use original order product info but with combined actual quantities
+                    const originalProducts = orderInfo?.products || orderInfo?.cart || [];
+                    console.log(`📦 Multi-driver sync: Using combined qty ${totalActualQty}kg from ${allAssignments.length} drivers`);
+
+                    // Map original products but use total actual qty from all drivers
+                    // If order has single product, use totalActualQty
+                    // If multiple products, use the last driver's cart as base (best we can do)
+                    if (cart.length === 1 || originalProducts.length === 1) {
+                        // Single product - use totalActualQty
+                        misaCart = [{
+                            product_code: cart[0]?.product?.code || cart[0]?.product?.id || cart[0]?.code || originalProducts[0]?.code || '',
+                            warehouse,
+                            unit: cart[0]?.unit || 'kg',
+                            qty: totalActualQty
+                        }];
+                    } else {
+                        // Multiple products - sum quantities from all driver assignments
+                        // Get all proof_images for display
+                        const allProofImages = allAssignments.flatMap(a => a.proof_images || []);
+                        console.log(`📸 Multi-driver: Combined ${allProofImages.length} proof images from all drivers`);
+
+                        misaCart = cart.filter(item => !item.isShell).map(item => ({
+                            product_code: item.product?.code || item.product?.id || item.code || item.product || '',
+                            warehouse,
+                            unit: item.unit || 'kg',
+                            qty: Number(item.weight_kg || item.qty || 0)
+                        }));
+                    }
+                } else {
+                    // Single driver - use cart as-is
+                    misaCart = cart.filter(item => !item.isShell).map(item => ({
+                        product_code: item.product?.code || item.product?.id || item.code || item.product || '',
+                        warehouse,
+                        unit: item.unit || 'kg',
+                        qty: Number(item.weight_kg || item.qty || 0)
+                    }));
+                }
 
                 // For multi-driver: use first driver name for MISA
                 const misaDriverName = isMultiDriverOrder ? firstDriverName : driver_name;
-                console.log(`📤 MISA Sync - Driver: ${misaDriverName}, isMultiDriver: ${isMultiDriverOrder}`);
+                console.log(`📤 MISA Sync - Driver: ${misaDriverName}, isMultiDriver: ${isMultiDriverOrder}, TotalQty: ${isMultiDriverOrder ? totalActualQty : 'N/A'}`);
 
                 const syncResult = await updateMisaOrder(orderInfo.sale_order_no || id, {
                     misa_id: orderInfo.misa_id,
