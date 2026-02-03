@@ -2107,7 +2107,19 @@ async function viewOrderDetail(orderId, options = {}) {
             ` : '';
             })()}
             
-            ${order.note ? `<div style="margin-top:16px; padding:12px; background:var(--body-bg); border-radius:8px;"><strong>Ghi chú:</strong> ${order.note}</div>` : ''}
+            ${(() => {
+                const note = order.delivery_note || order.note || '';
+                return note ? `
+                <div style="margin-top:20px; padding:16px; background:linear-gradient(135deg, #EBF5FF 0%, #DBEAFE 100%); border-radius:12px; border-left:4px solid var(--info);">
+                    <div style="font-size:13px; color:var(--info); font-weight:600; margin-bottom:8px;">
+                        <i class="bi bi-pencil-square"></i> Ghi chú giao hàng
+                    </div>
+                    <div style="font-size:14px; color:var(--text-primary); font-style:italic;">
+                        "${note}"
+                    </div>
+                </div>
+                ` : '';
+            })()}
             
             <!-- PROOF IMAGES SECTION -->
             <div style="margin-top:24px; border-top:1px solid var(--border); padding-top:16px;">
@@ -4097,7 +4109,52 @@ function viewImportDetail(importId) {
                 </tbody>
             </table>
 
-            ${imp.note ? `<div style="margin-top:16px; padding:12px; background:var(--body-bg); border-radius:8px;"><strong>Ghi chú:</strong> ${imp.note}</div>` : ''}
+            ${(() => {
+                // Safe parse local_items - might be JSON string from DB
+                let localItems = imp.local_items || [];
+                if (typeof localItems === 'string') {
+                    try { localItems = JSON.parse(localItems); } catch (e) { localItems = []; }
+                }
+                if (!Array.isArray(localItems)) localItems = [];
+
+                return localItems.length > 0 ? `
+            <!-- MẶT HÀNG PHỤ (Local only) -->
+            <h4 style="margin: 24px 0 12px; font-size:14px; color:var(--warning);">
+                <i class="bi bi-box" style="margin-right:6px;"></i> Mặt hàng phụ (Vỏ)
+                <span style="font-weight:normal; font-size:12px; color:var(--text-muted);"> - Chỉ lưu nội bộ</span>
+            </h4>
+            <table class="data-table" style="width:100%; background:#fefce8; border:1px solid #fef08a;">
+                <thead>
+                    <tr style="background:#fef08a;">
+                        <th style="text-align:left;">Mặt hàng</th>
+                        <th style="text-align:right; width:80px;">Số lượng</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${localItems.map(item => `
+                        <tr>
+                            <td>📦 ${item.name || item.product || '-'}</td>
+                            <td style="text-align:right; font-weight:600;">${item.qty || item.quantity || 0}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+            ` : '';
+            })()}
+
+            ${(() => {
+                const note = imp.note || '';
+                return note ? `
+                <div style="margin-top:20px; padding:16px; background:linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%); border-radius:12px; border-left:4px solid #4CAF50;">
+                    <div style="font-size:13px; color:#4CAF50; font-weight:600; margin-bottom:8px;">
+                        <i class="bi bi-pencil-square"></i> Ghi chú nhập hàng
+                    </div>
+                    <div style="font-size:14px; color:var(--text-primary); font-style:italic;">
+                        "${note}"
+                    </div>
+                </div>
+                ` : '';
+            })()}
 
             <!-- PROOF IMAGES SECTION -->
             <div style="margin-top:24px; border-top:1px solid var(--border); padding-top:16px;">
