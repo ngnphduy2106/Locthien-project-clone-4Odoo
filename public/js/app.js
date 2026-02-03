@@ -1623,9 +1623,10 @@ function renderMyOrdersList(containerId, orders, type) {
                </span>`
             : '';
 
-        // Show assigned qty for split orders
+        // Show assigned qty for split orders - Admin sees driver name, driver sees "(của bạn)"
+        const isAdmin = (state.user?.role || '').toLowerCase() === 'admin' || (state.user?.role || '').toLowerCase() === 'tester';
         const qtyDisplay = isSplit && order.assigned_qty
-            ? `<span style="color:#8B5CF6; font-weight:600;"> - ${order.assigned_qty}kg (của bạn)</span>`
+            ? `<span style="color:#8B5CF6; font-weight:600;"> - ${order.assigned_qty}kg ${isAdmin ? `(${order.taiXe || order.driver_name || 'Tài xế'})` : '(của bạn)'}</span>`
             : '';
 
         // Pass assignment_id to start functions
@@ -2082,6 +2083,41 @@ async function viewOrderDetail(orderId, options = {}) {
                 </div>
                 ` : ''}
             </div>
+            
+            ${(() => {
+                // Multi-driver assignment section
+                const allAssignments = order.all_assignments || [];
+                if (allAssignments.length > 1) {
+                    return `
+            <div style="margin:20px 0; padding:16px; background:linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%); border-radius:12px; border-left:4px solid #8B5CF6;">
+                <div style="font-size:13px; color:#7c3aed; font-weight:600; margin-bottom:12px;">
+                    <i class="bi bi-people"></i> Phân công tài xế (${allAssignments.length} người)
+                </div>
+                <div style="display:flex; flex-direction:column; gap:8px;">
+                    ${allAssignments.map(a => `
+                        <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 12px; background:white; border-radius:8px;">
+                            <div>
+                                <span style="font-weight:600;">${a.driver_name || 'Tài xế'}</span>
+                                ${a.plate ? `<span style="color:#666; font-size:12px; margin-left:8px;">🚚 ${a.plate}</span>` : ''}
+                            </div>
+                            <div style="display:flex; align-items:center; gap:12px;">
+                                <span style="color:#8B5CF6; font-weight:600;">${a.assigned_qty || 0}kg</span>
+                                <span class="badge" style="font-size:11px; ${a.status === 'completed' ? 'background:#dcfce7; color:#16a34a;' :
+                            a.status === 'delivering' ? 'background:#dbeafe; color:#2563eb;' :
+                                'background:#fef3c7; color:#d97706;'
+                        }">${a.status === 'completed' ? '✓ Hoàn thành' :
+                            a.status === 'delivering' ? 'Đang giao' :
+                                'Chờ nhận'
+                        }</span>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+                    `;
+                }
+                return '';
+            })()}
             
             <h4 style="margin: 24px 0 12px; font-size:14px; color:var(--text-secondary);">Danh sách sản phẩm</h4>
             <table class="data-table" style="width:100%;">
