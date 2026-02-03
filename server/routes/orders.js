@@ -846,8 +846,7 @@ router.post('/:id/complete', async (req, res) => {
                     actual_qty: myActualQty,
                     local_items: local_items || [],
                     delivery_note: note || delivery_note || '',
-                    proof_images: images || [],
-                    completed_at: new Date().toISOString()
+                    proof_images: images || []
                 })
                 .eq('id', assignment_id)
                 .select();
