@@ -2943,49 +2943,88 @@ body {
         padding: 0 !important;
     }
 
-    .compact-order-row {
+    /* Force wrapping and vertical layout on mobile */
+    .compact-order-row,
+    [class*="compact-order-row"],
+    div[style*="compact-order-row"] {
         flex-wrap: wrap !important;
         padding: 12px !important;
-        gap: 8px !important;
+        gap: 6px !important;
+        flex-direction: column !important;
+        align-items: flex-start !important;
     }
 
-    /* Order ID - full width on mobile */
-    .compact-order-row>div:first-child {
-        min-width: 100% !important;
-        font-size: 14px !important;
-        margin-bottom: 4px;
-    }
-
-    /* Customer info - full width */
-    .compact-order-row>div:nth-child(2) {
-        flex: 1 1 100% !important;
-        min-width: 100% !important;
-    }
-
-    /* Date, Driver, Amount - inline row */
-    .compact-order-row>div:nth-child(3),
-    .compact-order-row>div:nth-child(4),
-    .compact-order-row>div:nth-child(5) {
-        min-width: auto !important;
-        flex: 1 !important;
+    /* All divs inside compact row - reset inline min-width */
+    .compact-order-row>div,
+    .compact-order-row>[style*="min-width"] {
+        min-width: unset !important;
+        width: 100% !important;
+        flex: none !important;
         text-align: left !important;
     }
 
-    /* Status badge */
+    /* Order ID row with badges - horizontal */
+    .compact-order-row>div:first-child {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 6px !important;
+        align-items: center !important;
+        font-size: 14px !important;
+        margin-bottom: 4px !important;
+    }
+
+    /* Customer info row */
+    .compact-order-row>div:nth-child(2) {
+        margin-bottom: 6px !important;
+    }
+
+    /* Middle info row - make inline (date, driver, amount/products) */
+    .compact-order-row>div:nth-child(3),
+    .compact-order-row>div:nth-child(4),
+    .compact-order-row>div:nth-child(5) {
+        display: inline-flex !important;
+        width: auto !important;
+        font-size: 11px !important;
+        padding-right: 12px !important;
+    }
+
+    /* Status badge - inline */
     .compact-order-row>div:nth-child(6) {
-        min-width: auto !important;
+        display: inline-flex !important;
+        width: auto !important;
     }
 
-    /* Action buttons - right aligned */
+    /* Action buttons container - full width, flex end */
     .compact-order-row>div:last-child {
-        margin-left: auto;
+        width: 100% !important;
+        display: flex !important;
+        justify-content: flex-end !important;
+        gap: 8px !important;
+        margin-top: 8px !important;
+        padding-top: 8px !important;
+        border-top: 1px solid var(--border-color) !important;
     }
 
-    .compact-order-row .btn-sm {
-        padding: 6px 10px !important;
+    /* Buttons - slightly larger touch targets */
+    .compact-order-row .btn-sm,
+    .compact-order-row button {
+        padding: 8px 12px !important;
+        font-size: 12px !important;
     }
 
-    /* ====== STAT CARDS - 2 COLUMNS ====== */
+    /* ====== MY ORDERS PAGE - STAT CARDS ====== */
+    #section-my-orders .stat-cards,
+    .my-orders-stats {
+        display: grid !important;
+        grid-template-columns: repeat(3, 1fr) !important;
+        gap: 8px !important;
+    }
+
+    #section-my-orders .stat-card {
+        padding: 12px !important;
+    }
+
+    /* ====== STAT CARDS GENERAL - 2 COLUMNS ====== */
     .stat-cards {
         grid-template-columns: repeat(2, 1fr) !important;
         gap: 12px !important;
@@ -3015,23 +3054,28 @@ body {
     }
 
     .tab-btn {
-        padding: 8px 14px !important;
-        font-size: 12px !important;
+        padding: 8px 12px !important;
+        font-size: 11px !important;
         flex-shrink: 0;
+        white-space: nowrap;
     }
 
     /* ====== SEARCH & FILTER BAR ====== */
-    .search-filter-bar {
-        flex-direction: column;
+    .search-filter-bar,
+    div[style*="search"] {
+        flex-direction: column !important;
         gap: 8px !important;
     }
 
-    .search-filter-bar .search-input {
+    .search-filter-bar .search-input,
+    .search-filter-bar input[type="text"],
+    .search-filter-bar input[type="search"] {
         width: 100% !important;
         min-width: 100% !important;
     }
 
-    .search-filter-bar .form-select {
+    .search-filter-bar .form-select,
+    .search-filter-bar select {
         width: 100% !important;
     }
 
@@ -3042,7 +3086,7 @@ body {
 
     .page-heading {
         font-size: 18px !important;
-        margin-bottom: 16px !important;
+        margin-bottom: 12px !important;
     }
 
     /* ====== DRIVER COMPLETION MODAL ====== */
@@ -3053,6 +3097,34 @@ body {
     /* ====== HISTORY CARDS CONTAINER ====== */
     #history-cards-container {
         grid-template-columns: 1fr !important;
+    }
+
+    /* ====== FILTERS ROW - STACK ON MOBILE ====== */
+    .filters-row,
+    div[style*="gap"][style*="flex"] {
+        flex-wrap: wrap !important;
+    }
+
+    /* ====== SIDEBAR COLLAPSE ON MOBILE ====== */
+    .sidebar {
+        transform: translateX(-100%);
+        position: fixed !important;
+        z-index: 1000;
+        transition: transform 0.3s ease;
+    }
+
+    .sidebar.open {
+        transform: translateX(0);
+    }
+
+    .main-content {
+        margin-left: 0 !important;
+        width: 100% !important;
+    }
+
+    /* Mobile menu toggle button */
+    .mobile-menu-toggle {
+        display: flex !important;
     }
 }
 
