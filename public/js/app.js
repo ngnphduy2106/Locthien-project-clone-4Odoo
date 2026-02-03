@@ -1021,10 +1021,10 @@ function renderImportList() {
                     <i class="bi bi-geo-alt"></i>
                     ${imp.supplier_address || 'Chưa có địa chỉ'}
                 </div>
-                ${imp.driver_name ? `
+                ${imp.assigned_driver || imp.driver_name ? `
                 <div class="order-meta-item">
                     <i class="bi bi-truck"></i>
-                    ${imp.driver_name}${imp.plate ? ' - ' + imp.plate : ''}
+                    ${imp.assigned_driver || imp.driver_name}${imp.assigned_plate || imp.plate ? ' - ' + (imp.assigned_plate || imp.plate) : ''}
                 </div>
                 ` : ''}
             </div>
@@ -3940,11 +3940,11 @@ function viewImportDetail(importId) {
                 </div>
                 <div class="detail-row">
                     <label>Tài xế:</label>
-                    <span>${imp.driver_name || 'Chưa phân công'}</span>
+                    <span>${imp.assigned_driver || imp.driver_name || 'Chưa phân công'}</span>
                 </div>
                 <div class="detail-row">
                     <label>Biển số xe:</label>
-                    <span>${imp.plate || 'Chưa có'}</span>
+                    <span>${imp.assigned_plate || imp.plate || 'Chưa có'}</span>
                 </div>
                 <div class="detail-row">
                     <label>Tổng tiền:</label>
