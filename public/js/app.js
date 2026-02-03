@@ -1606,13 +1606,19 @@ function renderMyOrdersList(containerId, orders, type) {
 
     container.innerHTML = orders.map(order => {
         const orderId = order.soDon || order.orderCode || order.id;
-        const chatBadge = getUnreadBadgeHtml(orderId, 'export');
+        const chatBadge = getUnreadBadgeHtml(orderId, order.type || 'export');
+        const isImport = order.type === 'import';
+        const cardBorderColor = isImport ? '#4CAF50' : (type === 'pending' ? 'var(--warning)' : type === 'delivering' ? 'var(--info)' : 'var(--success)');
+        const cardBg = isImport ? 'background: linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%);' : '';
+        const typeBadge = isImport
+            ? '<span style="background:#4CAF50; color:white; padding:2px 8px; border-radius:4px; font-size:11px; margin-left:8px;">Nhập</span>'
+            : '';
         return `
-        <div class="order-card" style="margin-bottom:12px; border-left:4px solid ${type === 'pending' ? 'var(--warning)' : type === 'delivering' ? 'var(--info)' : 'var(--success)'}; position:relative;">
+        <div class="order-card" style="margin-bottom:12px; border-left:4px solid ${cardBorderColor}; position:relative; ${cardBg}">
             ${chatBadge}
             <div class="order-card-header">
                 <div>
-                    <div class="order-id" style="font-size:16px; font-weight:700;">#${orderId}</div>
+                    <div class="order-id" style="font-size:16px; font-weight:700;">#${orderId}${typeBadge}</div>
                     <div class="order-customer" style="font-size:14px; color:var(--text-secondary);">${order.khach || order.customerName || order.accountName || 'Khách hàng'}</div>
                 </div>
                 <span class="badge" style="${badgeStyles[type]}">${badgeTexts[type]}</span>
@@ -1633,23 +1639,23 @@ function renderMyOrdersList(containerId, orders, type) {
                 </div>
                 <div style="display:flex; gap:8px;">
                     ${type === 'pending' ? `
-                        <button class="btn btn-outline btn-sm" onclick="viewOrderDetail('${order.id}')">
+                        <button class="btn btn-outline btn-sm" onclick="${isImport ? `viewImportDetail('${order.id}')` : `viewOrderDetail('${order.id}')`}">
                             <i class="bi bi-eye"></i> Chi tiết
                         </button>
-                        <button class="btn btn-warning btn-sm" onclick="startOrder('${order.id}')" style="background:linear-gradient(135deg, #f59e0b, #d97706); color:white; border:none;">
+                        <button class="btn btn-warning btn-sm" onclick="${isImport ? `startImportOrder('${order.id}')` : `startOrder('${order.id}')`}" style="background:linear-gradient(135deg, #f59e0b, #d97706); color:white; border:none;">
                             <i class="bi bi-play-circle"></i> Nhận đơn
                         </button>
                     ` : ''}
                     ${type === 'delivering' ? `
-                        <button class="btn btn-outline btn-sm" onclick="viewOrderDetail('${order.id}')">
+                        <button class="btn btn-outline btn-sm" onclick="${isImport ? `viewImportDetail('${order.id}')` : `viewOrderDetail('${order.id}')`}">
                             <i class="bi bi-eye"></i> Chi tiết
                         </button>
-                        <button class="btn btn-success btn-sm" onclick="completeOrder('${order.id}')" style="background:linear-gradient(135deg, #10b981, #059669); border:none;">
+                        <button class="btn btn-success btn-sm" onclick="${isImport ? `completeImportOrder('${order.id}')` : `completeOrder('${order.id}')`}" style="background:linear-gradient(135deg, #10b981, #059669); border:none;">
                             <i class="bi bi-check-circle"></i> Hoàn thành
                         </button>
                     ` : ''}
                     ${type === 'completed' ? `
-                        <button class="btn btn-outline btn-sm" onclick="viewOrderDetail('${order.id}')">
+                        <button class="btn btn-outline btn-sm" onclick="${isImport ? `viewImportDetail('${order.id}')` : `viewOrderDetail('${order.id}')`}">
                             <i class="bi bi-eye"></i> Xem chi tiết
                         </button>
                     ` : ''}
@@ -2973,6 +2979,67 @@ async function startOrder(orderId) {
         const res = await api.startOrder(orderId);
         hideLoading();
         alert(res.msg || 'Đã nhận đơn!');
+        loadMyOrders();
+    } catch (e) {
+        hideLoading();
+        alert('Lỗi: ' + e.message);
+    }
+}
+
+// === START IMPORT ORDER (DRIVER) ===
+async function startImportOrder(importId) {
+    if (!confirm('Xác nhận nhận đơn nhập này?')) return;
+
+    showLoading('Đang cập nhật...');
+
+    try {
+        const res = await fetch(`/api/imports/${importId}/start`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        const data = await res.json();
+        hideLoading();
+
+        if (data.error) {
+            alert('Lỗi: ' + (data.msg || data.message || 'Không thể nhận đơn'));
+            return;
+        }
+
+        alert(data.msg || 'Đã nhận đơn nhập!');
+        loadMyOrders();
+    } catch (e) {
+        hideLoading();
+        alert('Lỗi: ' + e.message);
+    }
+}
+
+// === COMPLETE IMPORT ORDER (DRIVER) ===
+async function completeImportOrder(importId) {
+    if (!confirm('Xác nhận hoàn thành đơn nhập này?')) return;
+
+    showLoading('Đang xử lý...');
+
+    try {
+        // Get driver info from localStorage
+        const userStr = localStorage.getItem('user');
+        const user = userStr ? JSON.parse(userStr) : {};
+        const driverName = user.name || user.fullName || 'Driver';
+        const plate = user.plate || '';
+
+        const res = await fetch(`/api/imports/${importId}/complete`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ driver: driverName, plate })
+        });
+        const data = await res.json();
+        hideLoading();
+
+        if (data.error) {
+            alert('Lỗi: ' + (data.msg || data.message || 'Không thể hoàn thành'));
+            return;
+        }
+
+        alert(data.msg || 'Đã hoàn thành đơn nhập!');
         loadMyOrders();
     } catch (e) {
         hideLoading();
@@ -4707,6 +4774,8 @@ window.viewImportDetail = viewImportDetail;
 window.assignImportDriver = assignImportDriver;
 window.confirmAssignImportDriver = confirmAssignImportDriver;
 window.adminCompleteImport = adminCompleteImport;
+window.startImportOrder = startImportOrder;
+window.completeImportOrder = completeImportOrder;
 // Import multi-driver exports
 window.onImportDriverChange = onImportDriverChange;
 window.addImportDriverAssignmentRow = addImportDriverAssignmentRow;
