@@ -242,32 +242,35 @@ const DispatchModule = {
             return `
                 <div class="compact-order-row" onclick="DispatchModule.viewOrderDetail('${orderId}')" style="
                     display: flex;
-                    flex-wrap: wrap;
-                    gap: 4px 8px;
-                    padding: 6px 10px;
+                    flex-direction: column;
+                    gap: 2px;
+                    padding: 8px 60px 8px 10px;
                     background: var(--card-bg);
                     border-radius: 6px;
                     cursor: pointer;
                     border-left: 3px solid ${borderColor};
                     transition: all 0.15s ease;
+                    position: relative;
                 " onmouseenter="this.style.opacity='0.9'" onmouseleave="this.style.opacity='1'">
                     
-                    <!-- ROW 1: PO + Date + Status + Driver + Buttons -->
-                    <div style="display:flex; align-items:center; gap:6px; width:100%;">
+                    <!-- BUTTONS: Absolute positioned top-right -->
+                    <div style="position:absolute; right:8px; top:50%; transform:translateY(-50%); display:flex; gap:4px;" onclick="event.stopPropagation()">
+                        <button class="btn btn-outline btn-sm" onclick="DispatchModule.viewOrderDetail('${orderId}')" style="padding:4px; font-size:10px; border-radius:50%; width:28px; height:28px; display:flex; align-items:center; justify-content:center;">
+                            <i class="bi bi-eye"></i>
+                        </button>
+                        ${this.getActionButton(order)}
+                    </div>
+                    
+                    <!-- ROW 1: PO + Date + Status + Driver -->
+                    <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
                         <span style="font-weight:600; color:var(--primary); font-size:11px;">${orderId}</span>
                         <span style="font-size:10px; color:var(--text-secondary);">${date ? new Date(date).toLocaleDateString('vi-VN') : 'N/A'}</span>
                         <span class="badge badge-${this.getStatusClass(status)}" style="font-size:9px; padding:2px 5px;">${status}</span>
-                        <span style="font-size:10px; color:var(--info); margin-left:auto;">${driver || ''}</span>
-                        <div style="display:flex; gap:4px; flex-shrink:0;" onclick="event.stopPropagation()">
-                            <button class="btn btn-outline btn-sm" onclick="DispatchModule.viewOrderDetail('${orderId}')" style="padding:3px 6px; font-size:9px; border-radius:50%; width:24px; height:24px;">
-                                <i class="bi bi-eye"></i>
-                            </button>
-                            ${this.getActionButton(order)}
-                        </div>
+                        <span style="font-size:10px; color:var(--info);">${driver || ''}</span>
                     </div>
                     
                     <!-- ROW 2: Customer + Address -->
-                    <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:100%;">
+                    <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                         <span style="font-weight:500; color:var(--text-primary); font-size:12px;">${customer}</span>
                         <span style="font-size:10px; color:var(--text-muted); margin-left:8px;"><i class="bi bi-geo-alt" style="font-size:9px;"></i> ${address}</span>
                     </div>
