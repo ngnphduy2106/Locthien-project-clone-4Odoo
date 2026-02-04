@@ -3336,48 +3336,63 @@ async function submitDelivery() {
     const noteEl = window.$('#inp-del-note');
     const note = noteEl?.value || '';
 
+    // Get warehouse selection
+    const whRadio = document.querySelector('input[name="del-wh"]:checked');
+    const warehouse = whRadio?.value || 'LT1';
+
+    // Get driver info
+    const driverName = order.driver_name || order.taiXe || state.user?.name || 'Driver';
+    const plate = order.plate || order.bienSo || state.user?.plate || '';
+
     showLoading('Đang xử lý...');
 
     try {
-        // Step 1: Complete the order (without images)
+        // Build cart from deliveryCart
+        const cart = (state.deliveryCart || []).filter(item => !item.isShell).map(item => ({
+            product: {
+                code: item.code || '',
+                name: item.product || ''
+            },
+            weight_kg: Number(item.qty || 0),
+            unit: item.unit || 'kg'
+        }));
+
+        // Prepare payload with BOTH order data AND images
         const completePayload = {
-            admin_completed: true,
-            delivery_note: note || `Hoàn thành bởi ${state.user?.name || 'Driver'}`
+            type: 'XUAT',
+            warehouse: warehouse,
+            partner: order.khach || order.account_name || 'Khách hàng',
+            driver_name: driverName,
+            plate: plate,
+            cart: cart,
+            delivery_note: note || `Hoàn thành bởi ${driverName}`,
+            sender: driverName,
+            images: validImages // Include images directly in the complete request
         };
 
-        console.log('📤 Step 1: Complete order:', { orderId: order.id });
+        console.log('📤 Complete order with images:', {
+            orderId: order.id,
+            cartItems: cart.length,
+            imageCount: validImages.length
+        });
+
         const completeRes = await api.completeOrder(order.id, completePayload);
 
+        hideLoading();
+
         if (completeRes.error) {
-            hideLoading();
             alert('Lỗi hoàn thành đơn: ' + (completeRes.msg || completeRes.message));
             return;
         }
 
-        // Step 2: Add proof images using dedicated API (if have images)
-        if (validImages.length > 0) {
-            console.log(`📸 Step 2: Adding ${validImages.length} proof images...`);
-
-            const imageRes = await fetch(`/api/orders/${order.id}/add-proof-images`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ images: validImages })
-            });
-
-            const imageData = await imageRes.json();
-
-            if (imageData.error) {
-                console.warn('⚠️ Image save warning:', imageData.msg);
-                // Don't fail the whole operation, just warn
-            } else {
-                console.log('✅ Proof images saved successfully');
-            }
-        }
-
-        hideLoading();
         alert(completeRes.msg || 'Đã hoàn thành đơn hàng!');
         closeDeliveryModal();
-        loadOrders();
+
+        // Reload appropriate section
+        if (typeof loadOrders === 'function') loadOrders();
+        if (typeof loadMyOrders === 'function') loadMyOrders();
+        if (window.DispatchModule?.loadOrders) window.DispatchModule.loadOrders();
+        if (window.MyOrdersModule?.loadMyOrders) window.MyOrdersModule.loadMyOrders();
 
     } catch (e) {
         hideLoading();
