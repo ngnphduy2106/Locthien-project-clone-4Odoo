@@ -925,23 +925,19 @@ router.post('/:id/complete', async (req, res) => {
                 isMultiDriverOrder = true;
                 allAssignments = patchedAssignments;
 
-                // PRIORITY: Find the driver who completed FIRST (by completed_at timestamp)
-                // This ensures MISA gets consistent driver+plate from the same source
-                const completedFromDB = patchedAssignments
-                    .filter(a => a.status === 'completed' && a.completed_at)
-                    .sort((a, b) => new Date(a.completed_at) - new Date(b.completed_at));
+                // COMBINE all driver names and plates with " và " for MISA
+                const allDriverNames = patchedAssignments
+                    .map(a => a.driver_name)
+                    .filter(Boolean)
+                    .join(' và ');
+                const allPlates = patchedAssignments
+                    .map(a => a.plate)
+                    .filter(Boolean)
+                    .join(' và ');
 
-                if (completedFromDB.length > 0) {
-                    // Use the first driver who completed (from database)
-                    firstDriverName = completedFromDB[0].driver_name;
-                    firstDriverPlate = completedFromDB[0].plate;
-                    console.log(`🔍 MISA Priority: Using first completed driver from DB: ${firstDriverName} (${firstDriverPlate}), completed_at: ${completedFromDB[0].completed_at}`);
-                } else {
-                    // Fallback: if no completed_at timestamps, use first assigned
-                    firstDriverName = patchedAssignments[0].driver_name;
-                    firstDriverPlate = patchedAssignments[0].plate;
-                    console.log(`🔍 MISA Fallback: Using first assigned driver: ${firstDriverName} (${firstDriverPlate})`);
-                }
+                firstDriverName = allDriverNames || patchedAssignments[0]?.driver_name;
+                firstDriverPlate = allPlates || patchedAssignments[0]?.plate;
+                console.log(`🔍 MISA Multi-driver: taiXe="${firstDriverName}", bienSo="${firstDriverPlate}"`);
 
                 // Check if ALL drivers completed (using patched data)
                 allDriversCompleted = patchedAssignments.every(a => a.status === 'completed');
