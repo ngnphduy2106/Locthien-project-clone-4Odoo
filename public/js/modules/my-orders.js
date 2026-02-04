@@ -229,7 +229,7 @@ const MyOrdersModule = {
                 </div>
                 <div class="order-info">
                     <div><i class="bi bi-geo-alt"></i> ${order.address || order.delivery_address || order.diaChi || ''}</div>
-                    <div><i class="bi bi-calendar"></i> ${order.date || order.order_date || order.ngay || order.expected_date || 'N/A'}</div>
+                    <div><i class="bi bi-calendar"></i> ${order.date || order.order_date || order.ngay || order.expected_date || order.created_at || order.import_date || 'N/A'}</div>
                     ${order.completedDate || order.completed_at ? `<div><i class="bi bi-check-circle"></i> Hoàn thành: ${order.completedDate || order.completed_at}</div>` : ''}
                 </div>
                 <div class="order-footer">

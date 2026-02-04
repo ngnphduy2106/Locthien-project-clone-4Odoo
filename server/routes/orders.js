@@ -407,7 +407,10 @@ router.get('/my/:driverName', async (req, res) => {
                         split_progress: isSplitOrder ? `${completedCount}/${totalCount}` : null,
                         all_assignments: allImportAssigns || [],  // Include all assignments for frontend display
                         type: 'import',
-                        statusCode
+                        statusCode,
+                        // Date fields for display
+                        expected_date: imp.expected_date || imp.created_at,
+                        created_at: imp.created_at
                     });
                 }
             }
@@ -455,7 +458,10 @@ router.get('/my/:driverName', async (req, res) => {
                         is_split_order: false,
                         statusCode: imp.status === 'assigned' ? 'CHO_NHAN' :
                             imp.status === 'in_transit' ? 'DANG_GIAO' :
-                                imp.status === 'completed' ? 'HOAN_THANH' : 'CHO_NHAN'
+                                imp.status === 'completed' ? 'HOAN_THANH' : 'CHO_NHAN',
+                        // Date fields for display
+                        expected_date: imp.expected_date || imp.created_at,
+                        created_at: imp.created_at
                     });
                 }
             }
