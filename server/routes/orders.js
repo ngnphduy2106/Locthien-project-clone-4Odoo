@@ -200,6 +200,7 @@ router.get('/my/:driverName', async (req, res) => {
                         // Override with assignment-specific data
                         assignment_id: assign.id,
                         assigned_qty: assign.assigned_qty,
+                        assigned_products: assign.assigned_products, // Custom products for this driver
                         actual_qty: assign.actual_qty || 0,
                         assignment_status: assign.status,
                         assignment_plate: assign.plate,

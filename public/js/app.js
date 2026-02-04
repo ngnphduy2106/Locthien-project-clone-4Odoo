@@ -3162,8 +3162,27 @@ function openDeliveryModal(orderId) {
 
     state.currentDeliveryOrder = order;
 
-    // Initialize Cart from Order Products - handle ALL formats including JSON strings
-    let orderProducts = order.products || order.cart || order.chiTiet || order.sale_order_product_mappings || [];
+    // ==========================================
+    // SPLIT ORDER: Use assigned_products if available
+    // ==========================================
+    let orderProducts = null;
+
+    // Priority 1: Check for assigned_products (custom split order products)
+    if (order.assigned_products) {
+        let assignedProducts = order.assigned_products;
+        if (typeof assignedProducts === 'string') {
+            try { assignedProducts = JSON.parse(assignedProducts); } catch (e) { assignedProducts = null; }
+        }
+        if (Array.isArray(assignedProducts) && assignedProducts.length > 0) {
+            console.log(`📦 Split order detected - using assigned_products:`, assignedProducts);
+            orderProducts = assignedProducts;
+        }
+    }
+
+    // Priority 2: Fallback to original order products
+    if (!orderProducts) {
+        orderProducts = order.products || order.cart || order.chiTiet || order.sale_order_product_mappings || [];
+    }
 
     // Parse JSON string if needed (database might return string)
     if (typeof orderProducts === 'string') {
