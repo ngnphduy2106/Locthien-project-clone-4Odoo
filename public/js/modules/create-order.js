@@ -5,11 +5,13 @@
 const CreateOrderModule = {
     orderProducts: [],
     suppliers: [],
+    materials: [], // MISA products with code + name
 
     // Khởi tạo module
     init() {
         console.log('Create Order Module initialized');
         this.loadSuppliers();
+        this.loadMaterials(); // Load MISA products
         this.resetForm();
         this.renderForm();
     },
@@ -26,6 +28,58 @@ const CreateOrderModule = {
             }
         } catch (e) {
             console.error('Failed to load suppliers:', e);
+        }
+    },
+
+    // Load materials (products from MISA)
+    async loadMaterials() {
+        try {
+            const response = await fetch('/api/materials');
+            const data = await response.json();
+            if (!data.error && data.data) {
+                this.materials = data.data;
+                this.updateMaterialsDatalist();
+                console.log(`🧪 Loaded ${this.materials.length} materials from MISA`);
+            }
+        } catch (e) {
+            console.error('Failed to load materials:', e);
+        }
+    },
+
+    // Update materials datalist (codes and names)
+    updateMaterialsDatalist() {
+        const codeList = document.getElementById('material-code-list');
+        const nameList = document.getElementById('material-name-list');
+
+        if (codeList) {
+            codeList.innerHTML = this.materials.map(m =>
+                `<option value="${m.code}">${m.name}</option>`
+            ).join('');
+        }
+        if (nameList) {
+            nameList.innerHTML = this.materials.map(m =>
+                `<option value="${m.name}">${m.code}</option>`
+            ).join('');
+        }
+    },
+
+    // Autofill: when code selected, fill name
+    onProductCodeChange(codeInput) {
+        const code = codeInput.value.trim();
+        const material = this.materials.find(m => m.code === code);
+        if (material) {
+            const nameInput = document.getElementById('prod-name');
+            if (nameInput) nameInput.value = material.name;
+        }
+    },
+
+    // Autofill: when name selected, fill code
+    onProductNameChange(nameInput) {
+        const name = nameInput.value.trim();
+        const material = this.materials.find(m => m.name === name);
+        if (material) {
+            const codeInput = document.getElementById('prod-code');
+            if (codeInput) codeInput.value = material.code;
         }
     },
 
@@ -326,9 +380,11 @@ const CreateOrderModule = {
 
     // Thêm sản phẩm
     addProduct() {
+        const codeInput = document.getElementById('prod-code');
         const nameInput = document.getElementById('prod-name');
         const qtyInput = document.getElementById('prod-qty');
 
+        const code = codeInput?.value?.trim() || '';
         const name = nameInput.value.trim();
         const qty = parseFloat(qtyInput.value);
 
@@ -338,15 +394,18 @@ const CreateOrderModule = {
         }
 
         this.orderProducts.push({
+            code: code,
             name: name,
             qty: qty,
             unit: 'Kg'
         });
 
         // Clear inputs
+        if (codeInput) codeInput.value = '';
         nameInput.value = '';
         qtyInput.value = '';
-        nameInput.focus();
+        if (codeInput) codeInput.focus();
+        else nameInput.focus();
 
         this.renderProductList();
     },
@@ -538,6 +597,7 @@ const CreateOrderModule = {
                                     <i class="bi bi-box"></i>
                                 </div>
                                 <span>${product.name}</span>
+                                ${product.code ? `<span style="background:#e0e7ff; color:#4338ca; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:500; margin-left:8px;">${product.code}</span>` : ''}
                             </div>
                             <div class="product-badge">
                                 <i class="bi bi-speedometer2"></i>

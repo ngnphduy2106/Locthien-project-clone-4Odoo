@@ -456,12 +456,23 @@
                                 Thêm sản phẩm mới
                             </div>
                             <div class="card-body">
+                                <!-- Product Code (MISA) -->
+                                <div class="form-group">
+                                    <label class="form-label">Mã sản phẩm (MISA)</label>
+                                    <input type="text" id="prod-code" class="form-control" placeholder="VD: HC001"
+                                        list="material-code-list" autocomplete="off"
+                                        oninput="CreateOrderModule.onProductCodeChange(this)">
+                                    <datalist id="material-code-list"></datalist>
+                                </div>
+
                                 <!-- Product Name -->
                                 <div class="form-group">
                                     <label class="form-label">Tên sản phẩm <span
                                             style="color:var(--danger);">*</span></label>
                                     <input type="text" id="prod-name" class="form-control"
-                                        placeholder="VD: Acid Sulfuric H2SO4">
+                                        placeholder="VD: Acid Sulfuric H2SO4" list="material-name-list"
+                                        autocomplete="off" oninput="CreateOrderModule.onProductNameChange(this)">
+                                    <datalist id="material-name-list"></datalist>
                                 </div>
 
                                 <!-- Quantity & Unit Row -->
