@@ -118,6 +118,41 @@ router.get('/assignment/:id', async (req, res) => {
     }
 });
 
+// GET /api/orders/:orderId/assignments - Get ALL assignments for an order
+router.get('/:orderId/assignments', async (req, res) => {
+    try {
+        const { orderId } = req.params;
+        const { createClient } = await import('@supabase/supabase-js');
+        const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+        const { data, error } = await supabase
+            .from('order_driver_assignments')
+            .select('*')
+            .eq('order_id', orderId)
+            .order('created_at', { ascending: true });
+
+        if (error) {
+            return res.json(createResponse(true, error.message));
+        }
+
+        // Combine all driver names and plates
+        const allDrivers = (data || []).map(a => a.driver_name).filter(Boolean).join(' và ');
+        const allPlates = (data || []).map(a => a.plate).filter(Boolean).join(' và ');
+
+        res.json({
+            error: false,
+            data: data || [],
+            combined: {
+                drivers: allDrivers,
+                plates: allPlates,
+                count: data?.length || 0
+            }
+        });
+    } catch (e) {
+        res.json(createResponse(true, e.message));
+    }
+});
+
 // GET /api/orders/my/:driverName - Get orders for driver (both export and import)
 // Supports multi-driver splitting via order_driver_assignments table
 router.get('/my/:driverName', async (req, res) => {

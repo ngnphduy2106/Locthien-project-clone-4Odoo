@@ -2275,6 +2275,8 @@ async function viewOrderDetail(orderId, options = {}) {
     let isSplitOrder = order.is_split_order;
     let driverAssignedQty = order.assigned_qty ? Number(order.assigned_qty) : null;
     let actualProducts = null;  // Actual delivered products for this driver
+    let combinedDrivers = null; // All driver names combined
+    let combinedPlates = null;  // All plates combined
 
     // If we have assignment_id, fetch full assignment data from API
     if (order.assignment_id) {
@@ -2295,6 +2297,21 @@ async function viewOrderDetail(orderId, options = {}) {
         } catch (e) {
             console.error('Error fetching assignment:', e);
         }
+    }
+
+    // Fetch ALL assignments for this order to get combined driver names
+    const orderId = order.soDon || order.id || order.sale_order_no;
+    try {
+        const assignResp = await fetch(`/api/orders/${orderId}/assignments`);
+        const assignData = await assignResp.json();
+        if (!assignData.error && assignData.combined && assignData.combined.count > 1) {
+            combinedDrivers = assignData.combined.drivers;
+            combinedPlates = assignData.combined.plates;
+            isSplitOrder = true;
+            console.log(`👥 Multi-driver order: ${combinedDrivers} | ${combinedPlates}`);
+        }
+    } catch (e) {
+        console.error('Error fetching assignments:', e);
     }
 
     // For completed split orders: show actual delivered products instead of original
@@ -2353,11 +2370,11 @@ async function viewOrderDetail(orderId, options = {}) {
                 </div>
                 <div class="detail-row">
                     <label>Tài xế:</label>
-                    <span>${order.driver_name || order.taiXe || order.driver || order.driverName || 'Chưa phân công'}</span>
+                    <span>${combinedDrivers || order.driver_name || order.taiXe || order.driver || order.driverName || 'Chưa phân công'}</span>
                 </div>
                 <div class="detail-row">
                     <label>Biển số xe:</label>
-                    <span>${order.plate || order.bienSo || order.vehicle_plate || 'Chưa có'}</span>
+                    <span>${combinedPlates || order.plate || order.bienSo || order.vehicle_plate || 'Chưa có'}</span>
                 </div>
                 ${isSplitOrder ? `
                 <div class="detail-row" style="background: linear-gradient(135deg, #fef3c7, #fde68a); padding: 10px; border-radius: 8px; margin: 8px 0;">
