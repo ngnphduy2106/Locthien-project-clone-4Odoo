@@ -1584,6 +1584,7 @@ async function loadMyOrders() {
         const role = state.user?.role || 'driver';
 
         console.log(`📱 Loading my orders for driver: "${driverName}", role: ${role}`);
+        console.time('⏱️ loadMyOrders');
 
         const res = await api.getMyOrders(driverName, role);
         const orders = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
@@ -1591,13 +1592,10 @@ async function loadMyOrders() {
         // Save to state for use in viewOrderDetail
         state.myOrders = orders;
 
-        console.log(`📦 Received ${orders.length} orders:`, orders.map(o => ({ id: o.soDon, status: o.status, statusCode: o.statusCode })));
+        console.log(`📦 Received ${orders.length} orders`);
 
-        // Load unread counts BEFORE rendering for chat badges
-        await loadUnreadCounts();
-
+        // === RENDER IMMEDIATELY (no blocking on unread counts) ===
         // Separate into 3 categories using statusCode from backend
-        // IMPORTANT: Check assignment_status FIRST for split orders to avoid duplicates
         const isMyAssignmentCompleted = (o) => (o.assignment_status || '').toLowerCase() === 'completed';
 
         const pending = orders.filter(o => !isMyAssignmentCompleted(o) && (o.statusCode === 'CHO_NHAN' || o.status === 'assigned'));
@@ -1622,10 +1620,22 @@ async function loadMyOrders() {
         if (deliveringBadge) deliveringBadge.textContent = delivering.length;
         if (completedBadge) completedBadge.textContent = completed.length;
 
-        // Render lists
+        // Render lists IMMEDIATELY (fast first paint)
         renderMyOrdersList('my-orders-pending-list', pending, 'pending');
         renderMyOrdersList('my-orders-delivering-list', delivering, 'delivering');
         renderMyOrdersList('my-orders-completed-list', completed, 'completed');
+
+        console.timeEnd('⏱️ loadMyOrders');
+
+        // === LAZY LOAD UNREAD COUNTS (non-blocking, update badges after) ===
+        loadUnreadCounts().then(() => {
+            // Re-render to update chat badges after unread counts loaded
+            renderMyOrdersList('my-orders-pending-list', pending, 'pending');
+            renderMyOrdersList('my-orders-delivering-list', delivering, 'delivering');
+            renderMyOrdersList('my-orders-completed-list', completed, 'completed');
+            console.log('💬 Chat badges updated');
+        }).catch(e => console.warn('Chat badge load error:', e));
+
     } catch (e) {
         console.error('Load my orders error:', e);
     }
