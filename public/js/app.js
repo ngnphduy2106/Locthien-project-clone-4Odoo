@@ -6129,20 +6129,40 @@ function showDriverCompletionModal(orderId, assignmentId = null) {
         modalTitle.innerHTML = `<i class="bi bi-check-circle" style="color:var(--success);"></i> Xác nhận hoàn thành`;
     }
 
-    // Get products list
+    // Get products list and initialize completion cart
     let products = order.products || order.cart || order.chiTiet || [];
     if (typeof products === 'string') {
         try { products = JSON.parse(products); } catch (e) { products = []; }
     }
 
+    // Initialize completion cart with products for editing
+    state.completionCart = products.map((p, idx) => ({
+        code: p.code || p.product_code || '',
+        name: p.name || p.product || p.productName || '-',
+        planQty: Number(p.qty || p.quantity || 0),
+        actualQty: Number(p.qty || p.quantity || 0), // Default to planned qty
+        unit: p.unit || 'Kg',
+        note: ''
+    }));
+
     const productsHtml = products.length > 0
-        ? products.map(p => `
-            <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--border);">
-                <span>${p.name || p.product || p.productName || '-'}</span>
-                <span style="font-weight:600;">${p.qty || p.quantity || 0} ${p.unit || 'Kg'}</span>
+        ? products.map((p, idx) => `
+            <div style="display:flex; align-items:center; gap:12px; padding:12px; border-bottom:1px solid var(--border); background:${idx % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.02)'};">
+                <div style="flex:2;">
+                    <div style="font-weight:600; color:var(--text-primary);">${p.name || p.product || p.productName || '-'}</div>
+                    <div style="font-size:11px; color:var(--text-muted);">Yêu cầu: ${p.qty || p.quantity || 0} ${p.unit || 'Kg'}</div>
+                </div>
+                <div style="flex:1;">
+                    <input type="number" class="form-control" 
+                        id="actual-qty-${idx}"
+                        value="${p.qty || p.quantity || 0}" 
+                        onchange="updateCompletionQty(${idx}, this.value)"
+                        style="padding:8px; font-size:14px; font-weight:600; text-align:center;">
+                </div>
+                <div style="width:50px; text-align:right; color:var(--text-secondary);">${p.unit || 'Kg'}</div>
             </div>
         `).join('')
-        : '<p style="color:var(--text-muted);">Không có sản phẩm</p>';
+        : '<p style="color:var(--text-muted); padding:20px; text-align:center;">Không có sản phẩm</p>';
 
     if (modalBody) {
         modalBody.innerHTML = `
@@ -6162,10 +6182,11 @@ function showDriverCompletionModal(orderId, assignmentId = null) {
             </div>
 
             <div style="margin-bottom:20px;">
-                <h4 style="font-size:14px; color:var(--text-secondary); margin-bottom:12px;">
-                    <i class="bi bi-box-seam"></i> Sản phẩm giao
+                <h4 style="font-size:14px; color:var(--text-secondary); margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
+                    <span><i class="bi bi-box-seam"></i> Sản phẩm giao</span>
+                    <span style="font-size:11px; color:var(--info);"><i class="bi bi-pencil"></i> Nhập SL thực tế</span>
                 </h4>
-                <div style="background:var(--body-bg); padding:12px; border-radius:8px; max-height:150px; overflow-y:auto;">
+                <div style="background:var(--body-bg); border-radius:8px; max-height:200px; overflow-y:auto; border:1px solid var(--border);">
                     ${productsHtml}
                 </div>
             </div>
@@ -6240,6 +6261,17 @@ function showDriverCompletionModal(orderId, assignmentId = null) {
     if (modal) modal.classList.remove('hidden');
 }
 
+// Update actual quantity in completion cart
+function updateCompletionQty(idx, value) {
+    if (state.completionCart && state.completionCart[idx]) {
+        state.completionCart[idx].actualQty = Number(value) || 0;
+        console.log(`📝 Updated product ${idx} actual qty: ${value}`);
+    }
+}
+
+// Export for HTML onclick
+window.updateCompletionQty = updateCompletionQty;
+
 // Submit driver completion
 async function submitDriverCompletion() {
     const order = state.currentCompletionOrder;
@@ -6259,24 +6291,23 @@ async function submitDriverCompletion() {
     showLoading('Đang xử lý hoàn thành đơn...');
 
     try {
-        // Build cart from order products with proper format for backend
-        const orderProducts = order.products || order.cart || order.chiTiet || [];
+        // Build cart from completionCart (has user-edited actual quantities)
+        const cart = (state.completionCart || []).map(item => ({
+            product: {
+                code: item.code || '',
+                name: item.name || ''
+            },
+            weight_kg: item.actualQty || 0,
+            qty: item.actualQty || 0,
+            unit: item.unit || 'Kg'
+        }));
 
-        // Handle string products (sometimes it's JSON string)
+        // Also keep parsed products for admin flow
+        const orderProducts = order.products || order.cart || order.chiTiet || [];
         let parsedProducts = orderProducts;
         if (typeof orderProducts === 'string') {
             try { parsedProducts = JSON.parse(orderProducts); } catch (e) { parsedProducts = []; }
         }
-
-        const cart = (parsedProducts || []).map(p => ({
-            product: {
-                code: p.code || p.product?.code || '',
-                name: p.name || p.product?.name || p.productName || ''
-            },
-            weight_kg: p.qty || p.quantity || 0,
-            qty: p.qty || p.quantity || 0,
-            unit: p.unit || 'Kg'
-        }));
 
         // Get driver info - fallback to order data if state.user doesn't have it
         const driverName = state.user?.fullName || state.user?.name || order.taiXe || order.driver_name || '';
