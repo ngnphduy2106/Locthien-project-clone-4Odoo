@@ -1247,76 +1247,67 @@ function renderDispatchOrders() {
         return;
     }
 
-    // Compact row-based layout for better density
+    // Compact 2-row layout matching imports
     container.innerHTML = `
-        <div class="compact-order-list">
-            ${orders.map(order => `
-                <div class="compact-order-row" onclick="viewOrderDetail('${order.id}')" style="
+        <div class="compact-order-list" style="display:flex; flex-direction:column; gap:4px;">
+            ${orders.map(order => {
+        const orderId = order.id;
+        const orderNo = order.soDon || order.sale_order_no || order.id;
+        const date = order.ngay || order.sale_order_date;
+        const customer = order.khach || order.account_name || 'Khách hàng';
+        const address = order.diaChi || order.shipping_address || 'Sunco';
+        const driver = order.taiXe || order.driver_name || '';
+        const status = order.status || 'Chờ xử lý';
+        const borderColor = status === 'Hoàn thành' || status === 'Đã thực hiện' ? 'var(--success)' :
+            status === 'Đang thực hiện' || status === 'Đang giao' ? 'var(--info)' : 'var(--warning)';
+
+        return `
+                <div class="compact-order-row" onclick="viewOrderDetail('${orderId}')" style="
                     display: flex;
-                    align-items: center;
-                    gap: 12px;
-                    padding: 12px 16px;
+                    flex-wrap: wrap;
+                    gap: 4px 8px;
+                    padding: 6px 10px;
                     background: var(--card-bg);
-                    border-radius: 8px;
-                    margin-bottom: 8px;
+                    border-radius: 6px;
                     cursor: pointer;
-                    border-left: 4px solid ${order.status === 'Hoàn thành' || order.status === 'Đã thực hiện' ? 'var(--success)' :
-            order.status === 'Đang thực hiện' || order.status === 'Đang giao' ? 'var(--info)' : 'var(--warning)'};
+                    border-left: 3px solid ${borderColor};
                     transition: all 0.15s ease;
                     position: relative;
-                " onmouseenter="this.style.background='var(--hover-bg)'" onmouseleave="this.style.background='var(--card-bg)'">
-                    ${getUnreadBadgeHtml(order.id, 'export')}
+                " onmouseenter="this.style.opacity='0.9'" onmouseleave="this.style.opacity='1'">
+                    ${getUnreadBadgeHtml(orderId, 'export')}
                     
-                    <!-- Order ID -->
-                    <div style="min-width: 140px; font-weight: 600; color: var(--primary); font-size: 13px;">
-                        ${order.soDon || order.sale_order_no || order.id}
+                    <!-- ROW 1: PO + Date + Status + Driver -->
+                    <div style="display:flex; align-items:center; gap:8px; width:100%; flex-wrap:wrap;">
+                        <span style="font-weight:600; color:var(--primary); font-size:11px;">${orderNo}</span>
+                        <span style="font-size:10px; color:var(--text-secondary);">${formatDate(date)}</span>
+                        <span class="badge badge-${getStatusBadge(status)}" style="font-size:9px; padding:2px 5px;">${getStatusText(status)}</span>
+                        <span style="font-size:10px; color:var(--info); margin-left:auto;">${driver || '—'}</span>
                     </div>
                     
-                    <!-- Customer (flex-grow) -->
-                    <div style="flex: 1; min-width: 0;">
-                        <div style="font-weight: 500; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px;">
-                            ${order.khach || order.account_name || 'Khách hàng'}
+                    <!-- ROW 2: Customer + Address + Buttons -->
+                    <div style="display:flex; align-items:center; gap:8px; width:100%;">
+                        <div style="flex:1; min-width:0;">
+                            <span style="font-weight:500; color:var(--text-primary); font-size:11px;">${customer}</span>
+                            <span style="font-size:9px; color:var(--text-muted); margin-left:6px;"><i class="bi bi-geo-alt" style="font-size:8px;"></i> ${address}</span>
                         </div>
-                        <div style="font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                            <i class="bi bi-geo-alt" style="font-size: 10px;"></i> ${order.diaChi || order.shipping_address || 'Sunco'}
+                        <div style="display:flex; gap:4px;" onclick="event.stopPropagation()">
+                            <button class="btn btn-outline btn-sm" onclick="viewOrderDetail('${orderId}')" style="padding:3px 6px; font-size:9px;">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                            ${state.currentDispatchTab === 'pending' ? `
+                                <button class="btn btn-info btn-sm" onclick="assignDriver('${orderId}')" style="padding:3px 6px; font-size:9px;">
+                                    <i class="bi bi-person-plus"></i>
+                                </button>
+                            ` : ''}
+                            ${state.currentDispatchTab === 'assigned' && isAdminRole() ? `
+                                <button class="btn btn-success btn-sm" onclick="showDriverCompletionModal('${orderId}')" style="padding:3px 6px; font-size:9px;">
+                                    <i class="bi bi-check"></i>
+                                </button>
+                            ` : ''}
                         </div>
                     </div>
-                    
-                    <!-- Date -->
-                    <div style="min-width: 80px; font-size: 12px; color: var(--text-secondary); text-align: center;">
-                        ${formatDate(order.ngay || order.sale_order_date)}
-                    </div>
-                    
-                    <!-- Driver/Plate -->
-                    <div style="min-width: 100px; font-size: 12px; color: var(--text-secondary); text-align: center;">
-                        ${order.taiXe ? `<span style="color: var(--info);">${order.taiXe}</span>` : '<span style="opacity:0.5;">—</span>'}
-                    </div>
-                    
-                    <!-- Status Badge -->
-                    <div style="min-width: 90px; text-align: center;">
-                        <span class="badge badge-${getStatusBadge(order.status)}" style="font-size: 11px; padding: 4px 10px;">
-                            ${getStatusText(order.status)}
-                        </span>
-                    </div>
-                    
-                    <!-- Actions -->
-                    <div style="display: flex; gap: 6px;" onclick="event.stopPropagation()">
-                        <button class="btn btn-outline btn-sm" onclick="viewOrderDetail('${order.id}')" style="padding: 4px 10px; font-size: 11px;">
-                            <i class="bi bi-eye"></i>
-                        </button>
-                        ${state.currentDispatchTab === 'pending' ? `
-                            <button class="btn btn-info btn-sm" onclick="assignDriver('${order.id}')" style="padding: 4px 10px; font-size: 11px;">
-                                <i class="bi bi-person-plus"></i>
-                            </button>
-                        ` : ''}
-                        ${state.currentDispatchTab === 'assigned' && isAdminRole() ? `
-                            <button class="btn btn-success btn-sm" onclick="showDriverCompletionModal('${order.id}')" style="padding: 4px 10px; font-size: 11px;">
-                                <i class="bi bi-check"></i>
-                            </button>
-                        ` : ''}
-                    </div>
-                </div>
-            `).join('')}
+                </div>`;
+    }).join('')}
         </div>
     `;
 }
