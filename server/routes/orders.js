@@ -412,7 +412,9 @@ router.get('/my/:driverName', async (req, res) => {
                         ngay: (() => {
                             const d = new Date(imp.expected_date || imp.created_at);
                             if (isNaN(d.getTime())) return '';
-                            return `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
+                            const day = String(d.getDate()).padStart(2, '0');
+                            const month = String(d.getMonth() + 1).padStart(2, '0');
+                            return `${day}/${month}/${d.getFullYear()}`;
                         })(),
                         expected_date: imp.expected_date,
                         created_at: imp.created_at
@@ -468,7 +470,9 @@ router.get('/my/:driverName', async (req, res) => {
                         ngay: (() => {
                             const d = new Date(imp.expected_date || imp.created_at);
                             if (isNaN(d.getTime())) return '';
-                            return `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
+                            const day = String(d.getDate()).padStart(2, '0');
+                            const month = String(d.getMonth() + 1).padStart(2, '0');
+                            return `${day}/${month}/${d.getFullYear()}`;
                         })(),
                         expected_date: imp.expected_date,
                         created_at: imp.created_at
