@@ -2303,14 +2303,21 @@ async function viewOrderDetail(orderId, options = {}) {
     // Fetch combined driver names for multi-driver orders
     let combinedDrivers = null;
     let combinedPlates = null;
+    let combinedNotes = null;
     const orderNo = order.soDon || order.id || order.sale_order_no;
     try {
         const assignResp = await fetch(`/api/orders/${orderNo}/assignments`);
         const assignData = await assignResp.json();
-        if (!assignData.error && assignData.combined && assignData.combined.count > 1) {
-            combinedDrivers = assignData.combined.drivers;
-            combinedPlates = assignData.combined.plates;
-            console.log(`👥 Multi-driver order: ${combinedDrivers} | ${combinedPlates}`);
+        if (!assignData.error && assignData.combined) {
+            if (assignData.combined.count > 1) {
+                combinedDrivers = assignData.combined.drivers;
+                combinedPlates = assignData.combined.plates;
+            }
+            // Always get notes if available
+            if (assignData.combined.notes) {
+                combinedNotes = assignData.combined.notes;
+            }
+            console.log(`👥 Order assignments: drivers=${combinedDrivers}, notes=${combinedNotes}`);
         }
     } catch (e) {
         console.log('No multi-driver data:', e.message);
@@ -2420,6 +2427,26 @@ async function viewOrderDetail(orderId, options = {}) {
                 }
                 return '';
             })()}
+            
+            ${combinedNotes ? `
+            <div style="margin:16px 0; padding:12px 16px; background:linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); border-radius:12px; border-left:4px solid #10b981;">
+                <div style="font-size:12px; color:#059669; font-weight:600; margin-bottom:6px;">
+                    <i class="bi bi-chat-left-text"></i> GHI CHÚ GIAO HÀNG
+                </div>
+                <div style="font-size:13px; color:#065f46; line-height:1.5;">
+                    ${combinedNotes}
+                </div>
+            </div>
+            ` : (order.delivery_note ? `
+            <div style="margin:16px 0; padding:12px 16px; background:linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); border-radius:12px; border-left:4px solid #10b981;">
+                <div style="font-size:12px; color:#059669; font-weight:600; margin-bottom:6px;">
+                    <i class="bi bi-chat-left-text"></i> GHI CHÚ GIAO HÀNG
+                </div>
+                <div style="font-size:13px; color:#065f46; line-height:1.5;">
+                    ${order.delivery_note}
+                </div>
+            </div>
+            ` : '')}
             
             <h4 style="margin: 24px 0 12px; font-size:14px; color:var(--text-secondary);">Danh sách sản phẩm</h4>
             <table class="data-table" style="width:100%;">

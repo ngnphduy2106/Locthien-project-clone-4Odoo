@@ -135,9 +135,15 @@ router.get('/:orderId/assignments', async (req, res) => {
             return res.json(createResponse(true, error.message));
         }
 
-        // Combine all driver names and plates
+        // Combine all driver names, plates, and delivery notes
         const allDrivers = (data || []).map(a => a.driver_name).filter(Boolean).join(' và ');
         const allPlates = (data || []).map(a => a.plate).filter(Boolean).join(' và ');
+
+        // Combine delivery notes from all drivers
+        const allNotes = (data || [])
+            .filter(a => a.delivery_note && a.delivery_note.trim())
+            .map(a => `${a.driver_name}: ${a.delivery_note}`)
+            .join(' | ');
 
         res.json({
             error: false,
@@ -145,6 +151,7 @@ router.get('/:orderId/assignments', async (req, res) => {
             combined: {
                 drivers: allDrivers,
                 plates: allPlates,
+                notes: allNotes,
                 count: data?.length || 0
             }
         });
