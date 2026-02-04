@@ -3386,6 +3386,12 @@ async function submitDelivery() {
     }
 }
 
+// Export delivery functions to window for use by other modules
+window.openDeliveryModal = openDeliveryModal;
+window.closeDeliveryModal = closeDeliveryModal;
+window.submitDelivery = submitDelivery;
+window.handleImageSelect = handleImageSelect;
+
 // === START ORDER (DRIVER) ===
 async function startOrder(orderId, assignmentId = null) {
     if (!confirm('Xác nhận nhận đơn này?')) return;

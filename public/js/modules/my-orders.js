@@ -259,59 +259,50 @@ const MyOrdersModule = {
 
     // Hoàn thành đơn hàng
     async completeOrder(orderId, orderType = 'export') {
-        if (!confirm('Xác nhận hoàn thành đơn hàng này?')) {
-            return;
-        }
-
         try {
             // Get order details
             const order = this.orders.find(o => (o.id || o.order_id) === orderId);
+
+            if (!order) {
+                alert('Không tìm thấy đơn hàng!');
+                return;
+            }
+
+            // For EXPORT orders - use the delivery modal with image upload
+            if (orderType === 'export') {
+                // Use the global openDeliveryModal function which has image upload
+                if (typeof openDeliveryModal === 'function') {
+                    openDeliveryModal(orderId);
+                } else if (typeof window.openDeliveryModal === 'function') {
+                    window.openDeliveryModal(orderId);
+                } else {
+                    console.error('openDeliveryModal function not found!');
+                    alert('Lỗi: Không tìm thấy form hoàn thành đơn!');
+                }
+                return;
+            }
+
+            // For IMPORT orders - confirm and complete directly
+            if (!confirm('Xác nhận hoàn thành đơn nhập này?')) {
+                return;
+            }
+
             const products = order?.products || order?.items || [];
 
             // Get driver info from localStorage
             const userStr = localStorage.getItem('user');
             const user = userStr ? JSON.parse(userStr) : {};
             const driverName = user.name || user.fullName || localStorage.getItem('userName') || 'Driver';
-            const plate = user.plate || '';
 
-            let response;
-
-            if (orderType === 'import') {
-                // Import ticket completion - use Supabase imports API
-                response = await fetch(`/api/imports/${orderId}/complete`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        actual_products: products,
-                        note: `Hoàn thành bởi ${driverName}`
-                    })
-                });
-            } else {
-                // Export order completion - use MISA orders API
-                const cart = products.map(p => ({
-                    product: {
-                        code: p.code || p.material_code || '',
-                        name: p.name || p.material_name || ''
-                    },
-                    weight_kg: p.qty || p.quantity || 0,
-                    unit: p.unit || 'kg'
-                }));
-
-                response = await fetch(`/api/orders/${orderId}/complete`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        type: 'XUAT',
-                        warehouse: 'LT1',
-                        partner: order?.customer || order?.customer_name || 'Khách hàng',
-                        driver_name: driverName,
-                        plate: plate,
-                        cart: cart,
-                        note: '',
-                        sender: driverName
-                    })
-                });
-            }
+            // Import ticket completion - use Supabase imports API
+            const response = await fetch(`/api/imports/${orderId}/complete`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    actual_products: products,
+                    note: `Hoàn thành bởi ${driverName}`
+                })
+            });
 
             const data = await response.json();
 
@@ -320,7 +311,7 @@ const MyOrdersModule = {
                 return;
             }
 
-            alert('✅ Đã hoàn thành đơn hàng!');
+            alert('✅ Đã hoàn thành đơn nhập!');
             this.loadMyOrders(); // Reload
 
         } catch (error) {
