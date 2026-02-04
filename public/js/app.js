@@ -2611,6 +2611,7 @@ function assignDriver(orderId) {
 
     // Store current order ID for assignment
     state.currentAssignOrderId = orderId;
+    state.currentOrder = order; // Store full order for product selection
 
     // Calculate total qty from products (handle JSON string)
     let products = order.products || order.cart || order.chiTiet || order.sale_order_product_mappings || [];
