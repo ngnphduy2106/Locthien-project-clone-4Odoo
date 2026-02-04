@@ -2786,11 +2786,15 @@ function addDriverAssignmentRow() {
         try { parsedProducts = JSON.parse(products); } catch (e) { parsedProducts = []; }
     }
 
-    parsedProducts.forEach((p, idx) => {
-        const checkbox = window.$(`#assign-prod-${idx}`);
-        const qtyInput = window.$(`#assign-qty-${idx}`);
+    console.log(`📦 Collecting products from ${parsedProducts.length} items...`);
 
-        if (checkbox?.checked && qtyInput) {
+    parsedProducts.forEach((p, idx) => {
+        const checkbox = document.querySelector(`#assign-prod-${idx}`);
+        const qtyInput = document.querySelector(`#assign-qty-${idx}`);
+
+        console.log(`  Product ${idx}: checkbox=${checkbox?.checked}, qtyInput=${qtyInput?.value}`);
+
+        if (checkbox && checkbox.checked && qtyInput) {
             const qty = parseFloat(qtyInput.value) || 0;
             if (qty > 0) {
                 assignedProducts.push({
@@ -2800,6 +2804,7 @@ function addDriverAssignmentRow() {
                     unit: qtyInput.dataset.unit || p.unit || 'kg'
                 });
                 totalQty += qty;
+                console.log(`    ✅ Added: ${p.name} x ${qty}`);
             }
         }
     });
@@ -2857,14 +2862,14 @@ function updateRemainingQuantities() {
         const remaining = originalQty - assignedQty;
 
         // Update remaining display
-        const remainEl = window.$(`#remain-prod-${idx}`);
+        const remainEl = document.querySelector(`#remain-prod-${idx}`);
         if (remainEl) {
             remainEl.textContent = remaining.toFixed(0);
             remainEl.style.color = remaining < 0 ? 'var(--danger)' : (remaining === 0 ? 'var(--success)' : '');
         }
 
         // Update default value in input
-        const qtyInput = window.$(`#assign-qty-${idx}`);
+        const qtyInput = document.querySelector(`#assign-qty-${idx}`);
         if (qtyInput) {
             qtyInput.value = Math.max(0, remaining);
             qtyInput.dataset.max = remaining;
