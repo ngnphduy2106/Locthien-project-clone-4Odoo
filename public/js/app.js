@@ -2216,15 +2216,17 @@ async function viewOrderDetail(orderId, options = {}) {
     console.log('viewOrderDetail called with:', orderId, isReadonly ? '(readonly)' : '');
     console.log('state.orders:', state.orders);
 
-    // Find order from state - try multiple matching approaches including exports and myOrders
+    // Find order from state - PRIORITY: MyOrdersModule first (has assigned_products)
+    const myOrdersModuleOrders = window.MyOrdersModule?.orders || [];
     const allOrders = [
+        ...myOrdersModuleOrders,  // Priority: has assigned_products for split orders
         ...(state.orders.pending || []),
         ...(state.orders.assigned || []),
         ...(state.orders.completed || []),
         ...(state.orders.exports || []),
-        ...(state.myOrders || [])  // Include driver's orders
+        ...(state.myOrders || [])
     ];
-    console.log('allOrders count:', allOrders.length);
+    console.log('allOrders count:', allOrders.length, '(MyOrdersModule:', myOrdersModuleOrders.length, ')');
 
     // More robust matching: try id, soDon, sale_order_no with case-insensitive comparison
     const searchId = String(orderId).toLowerCase().trim();
