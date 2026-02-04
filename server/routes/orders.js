@@ -408,13 +408,15 @@ router.get('/my/:driverName', async (req, res) => {
                         all_assignments: allImportAssigns || [],  // Include all assignments for frontend display
                         type: 'import',
                         statusCode,
-                        // Date fields - format as dd/mm/yyyy for consistency with exports
+                        // Date fields - extract directly from ISO string (no parsing)
                         ngay: (() => {
-                            const d = new Date(imp.expected_date || imp.created_at);
-                            if (isNaN(d.getTime())) return '';
-                            const day = String(d.getDate()).padStart(2, '0');
-                            const month = String(d.getMonth() + 1).padStart(2, '0');
-                            return `${day}/${month}/${d.getFullYear()}`;
+                            const raw = String(imp.expected_date || imp.created_at || '');
+                            // ISO format: YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss
+                            const parts = raw.split('T')[0].split('-');
+                            if (parts.length === 3) {
+                                return `${parts[2]}/${parts[1]}/${parts[0]}`; // DD/MM/YYYY
+                            }
+                            return raw;
                         })(),
                         expected_date: imp.expected_date,
                         created_at: imp.created_at
@@ -466,13 +468,14 @@ router.get('/my/:driverName', async (req, res) => {
                         statusCode: imp.status === 'assigned' ? 'CHO_NHAN' :
                             imp.status === 'in_transit' ? 'DANG_GIAO' :
                                 imp.status === 'completed' ? 'HOAN_THANH' : 'CHO_NHAN',
-                        // Date fields - format as dd/mm/yyyy for consistency with exports
+                        // Date fields - extract directly from ISO string (no parsing)
                         ngay: (() => {
-                            const d = new Date(imp.expected_date || imp.created_at);
-                            if (isNaN(d.getTime())) return '';
-                            const day = String(d.getDate()).padStart(2, '0');
-                            const month = String(d.getMonth() + 1).padStart(2, '0');
-                            return `${day}/${month}/${d.getFullYear()}`;
+                            const raw = String(imp.expected_date || imp.created_at || '');
+                            const parts = raw.split('T')[0].split('-');
+                            if (parts.length === 3) {
+                                return `${parts[2]}/${parts[1]}/${parts[0]}`; // DD/MM/YYYY
+                            }
+                            return raw;
                         })(),
                         expected_date: imp.expected_date,
                         created_at: imp.created_at
