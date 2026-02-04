@@ -69,11 +69,15 @@ async function loginMisa() {
 export const syncMisaProducts = async () => {
     console.log('🔄 Starting MISA Product Sync...');
     if (!cachedToken) await loginMisa();
-    if (!cachedToken) return;
+    if (!cachedToken) {
+        console.error('❌ MISA Product Sync: No token available (login failed)');
+        return { success: false, error: 'MISA login failed', synced: 0 };
+    }
 
     let page = 1;
     let hasMore = true;
     let totalSynced = 0;
+    let errors = [];
 
     try {
         while (hasMore) {
@@ -88,36 +92,52 @@ export const syncMisaProducts = async () => {
             });
 
             const json = await response.json();
+            console.log(`📦 MISA Products Response (Page ${page}):`, JSON.stringify(json).substring(0, 500));
+
             const success = json.Success || json.success;
             const data = json.Data || json.data;
 
             if (success && data && Array.isArray(data) && data.length > 0) {
-                // Upsert to Firestore
-                for (const p of data) {
-                    const material = {
-                        code: p.product_code,
-                        name: p.product_name,
-                        unit: p.unit || '',
-                        price: Number(p.price || 0),
-                        sale_price: Number(p.price || 0), // Map to UI field (snake_case for Supabase)
-                        category: 'MISA CRM', // Default category for filter
-                        type: 'MisaProduct', // Tag as MISA
-                        status: p.status === 2 ? 'INACTIVE' : 'ACTIVE', // Guessing status enum, or just map
-                        description: p.description || ''
-                    };
+                // Log first product for debugging
+                if (page === 1 && data[0]) {
+                    console.log('🔍 Sample MISA Product:', JSON.stringify(data[0], null, 2));
+                }
 
-                    await db.addMaterial(material); // This handles upsert in our DB layer
+                // Upsert to Database
+                for (const p of data) {
+                    try {
+                        const material = {
+                            id: p.product_code, // Use code as ID for upsert
+                            code: p.product_code,
+                            name: p.product_name,
+                            unit: p.unit || '',
+                            price: Number(p.price || 0),
+                            sale_price: Number(p.price || 0),
+                            category: 'MISA CRM',
+                            type: 'MisaProduct',
+                            status: p.status === 2 ? 'INACTIVE' : 'ACTIVE',
+                            description: p.description || ''
+                        };
+
+                        await db.addMaterial(material);
+                    } catch (err) {
+                        console.error(`❌ Failed to add material ${p.product_code}:`, err.message);
+                        errors.push({ code: p.product_code, error: err.message });
+                    }
                 }
 
                 totalSynced += data.length;
                 page++;
             } else {
+                console.log(`📦 Page ${page} returned no data or failed. Stopping.`);
                 hasMore = false;
             }
         }
-        console.log(`✅ MISA Product Sync Complete. Total: ${totalSynced}`);
+        console.log(`✅ MISA Product Sync Complete. Total: ${totalSynced}, Errors: ${errors.length}`);
+        return { success: true, synced: totalSynced, errors };
     } catch (e) {
         console.error('❌ MISA Product Sync Error:', e.message);
+        return { success: false, error: e.message, synced: totalSynced };
     }
 };
 
