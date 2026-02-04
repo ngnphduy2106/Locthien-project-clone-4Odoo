@@ -82,9 +82,11 @@ export const syncMisaProducts = async () => {
     let errors = [];
 
     try {
+        const pageSize = 100; // Max allowed by MISA API
+
         while (hasMore) {
-            console.log(`📡 Fetching MISA Products Page ${page}...`);
-            const response = await fetch(`${MISA_PRODUCTS_URL}?PageSize=100&Page=${page}`, {
+            console.log(`📡 Fetching MISA Products Page ${page} (pageSize=${pageSize})...`);
+            const response = await fetch(`${MISA_PRODUCTS_URL}?pageSize=${pageSize}&page=${page}`, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
@@ -94,27 +96,22 @@ export const syncMisaProducts = async () => {
             });
 
             const json = await response.json();
-
-            // Log ALL response keys to find correct pagination field
             console.log(`🔍 MISA Response Keys:`, Object.keys(json));
-            console.log(`🔍 MISA Full Response (first 800 chars):`, JSON.stringify(json).substring(0, 800));
 
-            // Log total count if available - try multiple possible field names
-            const totalCount = json.TotalCount || json.total_count || json.Total || json.total || json.TotalRecord || json.total_record || 0;
-            const pageSize = 100;
-            console.log(`📦 MISA Products Response (Page ${page}): TotalCount=${totalCount}, data_length=${json.data?.length || json.Data?.length || 0}`);
+            // MISA API uses 'results' field (from API docs), not 'data'
+            const success = json.success;
+            const results = json.results || json.data || json.Data || [];
 
-            const success = json.Success || json.success;
-            const data = json.Data || json.data;
+            console.log(`📦 MISA Products Response (Page ${page}): success=${success}, results_length=${results?.length || 0}`);
 
-            if (success && data && Array.isArray(data) && data.length > 0) {
+            if (success && Array.isArray(results) && results.length > 0) {
                 // Log first product for debugging
-                if (page === 1 && data[0]) {
-                    console.log('🔍 Sample MISA Product:', JSON.stringify(data[0], null, 2));
+                if (page === 1 && results[0]) {
+                    console.log('🔍 Sample MISA Product:', JSON.stringify(results[0], null, 2));
                 }
 
                 // Upsert to Database
-                for (const p of data) {
+                for (const p of results) {
                     try {
                         const material = {
                             id: p.product_code, // Use code as ID for upsert
@@ -141,19 +138,18 @@ export const syncMisaProducts = async () => {
                     }
                 }
 
-                totalSynced += data.length;
+                totalSynced += results.length;
 
-                // Calculate if more pages exist based on TotalCount
-                const expectedPages = totalCount > 0 ? Math.ceil(totalCount / pageSize) : 1;
-                if (page < expectedPages) {
+                // Continue pagination: if we got a full page, there might be more
+                if (results.length >= pageSize) {
                     page++;
-                    console.log(`📄 Moving to page ${page} of ${expectedPages} (totalCount: ${totalCount})`);
+                    console.log(`📄 Moving to page ${page} (got ${results.length} items, may have more)...`);
                 } else {
-                    console.log(`📦 Reached last page (${page}/${expectedPages}). Total synced: ${totalSynced}`);
+                    console.log(`📦 Got ${results.length} items (less than ${pageSize}), this is the last page.`);
                     hasMore = false;
                 }
             } else {
-                console.log(`📦 Page ${page} returned no data or failed. Stopping.`);
+                console.log(`📦 Page ${page} returned no results or failed. Stopping.`);
                 hasMore = false;
             }
         }
