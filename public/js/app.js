@@ -6116,9 +6116,27 @@ function showDriverCompletionModal(orderId, assignmentId = null) {
     completionLocalItems = [];
 
     // Store order for submission - include assignmentId if passed
+    let assignedQty = null;
+    let assignmentData = null;
+
     if (assignmentId) {
         order.assignment_id = assignmentId;
+
+        // Try to find assignment data from order.assignments if available
+        if (order.assignments && Array.isArray(order.assignments)) {
+            assignmentData = order.assignments.find(a => a.id === assignmentId);
+        }
+
+        // If no assignment data found, check if order has assigned_qty directly (for split orders in myOrders)
+        if (!assignmentData && order.assigned_qty) {
+            assignedQty = Number(order.assigned_qty);
+        } else if (assignmentData && assignmentData.assigned_qty) {
+            assignedQty = Number(assignmentData.assigned_qty);
+        }
+
+        console.log(`🔀 Split order detected - assignedQty: ${assignedQty}, assignmentData:`, assignmentData);
     }
+
     state.currentCompletionOrder = order;
 
     const modal = window.$('#modal-order-detail');
@@ -6135,31 +6153,55 @@ function showDriverCompletionModal(orderId, assignmentId = null) {
         try { products = JSON.parse(products); } catch (e) { products = []; }
     }
 
-    // Initialize completion cart with products for editing
-    state.completionCart = products.map((p, idx) => ({
-        code: p.code || p.product_code || '',
-        name: p.name || p.product || p.productName || '-',
-        planQty: Number(p.qty || p.quantity || 0),
-        actualQty: Number(p.qty || p.quantity || 0), // Default to planned qty
-        unit: p.unit || 'Kg',
-        note: ''
-    }));
+    // Calculate total original qty for proportional split
+    let totalOriginalQty = 0;
+    products.forEach(p => {
+        totalOriginalQty += Number(p.qty || p.quantity || 0);
+    });
 
-    const productsHtml = products.length > 0
-        ? products.map((p, idx) => `
+    // Initialize completion cart with products for editing
+    // If this is a split order with assigned_qty, scale product quantities proportionally
+    state.completionCart = products.map((p, idx) => {
+        let productQty = Number(p.qty || p.quantity || 0);
+
+        // For split orders: if assigned_qty is less than total, it's a partial order
+        // Scale all product quantities proportionally
+        if (assignedQty !== null && totalOriginalQty > 0 && assignedQty < totalOriginalQty) {
+            // Calculate proportional qty for this split
+            const ratio = assignedQty / totalOriginalQty;
+            productQty = Math.round(productQty * ratio * 100) / 100;
+            console.log(`   Product ${idx}: ${p.name || p.product} scaled from ${p.qty || p.quantity} to ${productQty} (ratio: ${ratio.toFixed(2)})`);
+        } else if (assignedQty !== null && products.length === 1) {
+            // Single product order: use assigned_qty directly
+            productQty = assignedQty;
+        }
+
+        return {
+            code: p.code || p.product_code || '',
+            name: p.name || p.product || p.productName || '-',
+            planQty: productQty,
+            actualQty: productQty, // Default to planned qty
+            unit: p.unit || 'Kg',
+            note: ''
+        };
+    });
+
+    // Use state.completionCart for display (already has scaled qty for split orders)
+    const productsHtml = state.completionCart.length > 0
+        ? state.completionCart.map((item, idx) => `
             <div style="display:flex; align-items:center; gap:12px; padding:12px; border-bottom:1px solid var(--border); background:${idx % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.02)'};">
                 <div style="flex:2;">
-                    <div style="font-weight:600; color:var(--text-primary);">${p.name || p.product || p.productName || '-'}</div>
-                    <div style="font-size:11px; color:var(--text-muted);">Yêu cầu: ${p.qty || p.quantity || 0} ${p.unit || 'Kg'}</div>
+                    <div style="font-weight:600; color:var(--text-primary);">${item.name}</div>
+                    <div style="font-size:11px; color:var(--text-muted);">Yêu cầu: ${item.planQty} ${item.unit}</div>
                 </div>
                 <div style="flex:1;">
                     <input type="number" class="form-control" 
                         id="actual-qty-${idx}"
-                        value="${p.qty || p.quantity || 0}" 
+                        value="${item.actualQty}" 
                         onchange="updateCompletionQty(${idx}, this.value)"
                         style="padding:8px; font-size:14px; font-weight:600; text-align:center;">
                 </div>
-                <div style="width:50px; text-align:right; color:var(--text-secondary);">${p.unit || 'Kg'}</div>
+                <div style="width:50px; text-align:right; color:var(--text-secondary);">${item.unit}</div>
             </div>
         `).join('')
         : '<p style="color:var(--text-muted); padding:20px; text-align:center;">Không có sản phẩm</p>';
