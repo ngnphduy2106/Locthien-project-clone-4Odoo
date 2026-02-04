@@ -231,7 +231,7 @@ const DispatchModule = {
         const html = `<div class="compact-order-list" style="display:flex; flex-direction:column; gap:4px;">
             ${orders.map(order => {
             const orderId = order.id || order.order_id || order.soDon || order.orderCode;
-            const date = order.date || order.order_date || order.ngay;
+            const date = order.date || order.order_date || order.ngay || order.expected_date;
             const customer = order.customer || order.customer_name || order.khach || 'N/A';
             const address = order.address || order.delivery_address || order.diaChi || 'Sunco';
             const driver = order.driver || order.driver_name || order.assigned_driver || '';
