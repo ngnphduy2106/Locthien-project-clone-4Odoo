@@ -370,6 +370,11 @@ export const db = {
                     : JSON.stringify(data.local_items);
             }
 
+            // Delivery Note (Driver's note when completing order)
+            if (data.delivery_note !== undefined) {
+                safeData.delivery_note = data.delivery_note;
+            }
+
             console.log(`📝 Updating order ${safeId}:`, Object.keys(safeData));
             const { data: updated, error } = await supabase.from('orders').update(safeData).eq('id', safeId).select().single();
             if (error) console.error('Supabase updateOrder error:', error);
