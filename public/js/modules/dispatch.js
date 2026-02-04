@@ -254,7 +254,7 @@ const DispatchModule = {
                 " onmouseenter="this.style.opacity='0.9'" onmouseleave="this.style.opacity='1'">
                     
                     <!-- BUTTONS: Absolute positioned top-right -->
-                    <div style="position:absolute; right:8px; top:50%; transform:translateY(-50%); display:flex; gap:4px;" onclick="event.stopPropagation()">
+                    <div style="position:absolute; right:8px; top:8px; display:flex; gap:4px;" onclick="event.stopPropagation()">
                         <button class="btn btn-outline btn-sm" onclick="DispatchModule.viewOrderDetail('${orderId}')" style="padding:4px; font-size:10px; border-radius:50%; width:28px; height:28px; display:flex; align-items:center; justify-content:center;">
                             <i class="bi bi-eye"></i>
                         </button>
