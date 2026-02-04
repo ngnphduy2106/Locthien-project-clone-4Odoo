@@ -3957,17 +3957,23 @@ window.sendImportChatMessage = sendImportChatMessage;
 
 let driverAssignments = [];
 let currentOrderTotalQty = 0;
+let currentOrderProducts = [];  // Store products for proportional split
 let currentModalOrderId = null;
 
 function initDriverAssignments(order) {
     driverAssignments = [];
-    currentOrderTotalQty = (order.products || order.cart || []).reduce((sum, p) => sum + Number(p.qty || p.quantity || 0), 0);
+    currentOrderProducts = order.products || order.cart || [];
+    if (typeof currentOrderProducts === 'string') {
+        try { currentOrderProducts = JSON.parse(currentOrderProducts); } catch (e) { currentOrderProducts = []; }
+    }
+    currentOrderTotalQty = currentOrderProducts.reduce((sum, p) => sum + Number(p.qty || p.quantity || 0), 0);
 
     if (order.taiXe || order.driver) {
         driverAssignments.push({
             driver_name: order.taiXe || order.driver,
             plate: order.bienSo || order.plate || '',
             qty: currentOrderTotalQty,
+            products: currentOrderProducts,  // Include all products for single driver
             type: 'internal',
             note: order.note || ''
         });
@@ -4048,10 +4054,20 @@ function addDriverAssignment() {
 
     const note = document.getElementById('modal_note')?.value?.trim() || '';
 
+    // Calculate proportional products based on assigned qty
+    const ratio = currentOrderTotalQty > 0 ? qty / currentOrderTotalQty : 0;
+    const proportionalProducts = currentOrderProducts.map(p => ({
+        code: p.code || '',
+        name: p.name || p.productName || '',
+        qty: Math.round(Number(p.qty || p.quantity || 0) * ratio),
+        unit: p.unit || 'kg'
+    }));
+
     driverAssignments.push({
         driver_name: name,
         plate: plate || '',
         qty: qty,
+        products: proportionalProducts,  // Proportional products for this driver
         type: type,
         note: note
     });
