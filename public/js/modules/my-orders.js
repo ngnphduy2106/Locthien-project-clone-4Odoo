@@ -334,27 +334,33 @@ const MyOrdersModule = {
             try { products = JSON.parse(products); } catch (e) { products = []; }
         }
 
-        const productsList = products.map(p =>
-            `• ${p.name || p.code}: ${p.qty || p.amount || 0} ${p.unit || 'kg'}`
-        ).join('\n') || 'Chưa có sản phẩm';
-
-        // Fetch driver's assigned quantity from API if needed
+        // Fetch driver's assigned quantity and actual products from API
         let isSplitOrder = order.is_split_order;
         let driverAssignedQty = order.assigned_qty ? Number(order.assigned_qty) : null;
 
-        if (order.assignment_id && !driverAssignedQty) {
+        if (order.assignment_id) {
             try {
                 const resp = await fetch(`/api/orders/assignment/${order.assignment_id}`);
                 const data = await resp.json();
                 if (!data.error && data.data) {
-                    driverAssignedQty = Number(data.data.assigned_qty) || null;
+                    driverAssignedQty = Number(data.data.assigned_qty) || driverAssignedQty;
                     isSplitOrder = true;
-                    console.log(`📦 Fetched assigned_qty from API: ${driverAssignedQty} kg`);
+
+                    // Use actual_products for completed orders
+                    if (data.data.actual_products && Array.isArray(data.data.actual_products) && data.data.actual_products.length > 0) {
+                        products = data.data.actual_products;
+                        console.log(`📦 Using actual_products for completed order:`, products);
+                    }
                 }
             } catch (e) {
                 console.error('Error fetching assignment:', e);
             }
         }
+
+        // Build products list (may be updated after API call)
+        const productsList = products.map(p =>
+            `• ${p.name || p.code}: ${p.qty || p.amount || 0} ${p.unit || 'kg'}`
+        ).join('\n') || 'Chưa có sản phẩm';
 
         // Show split order badge with driver's assigned quantity
         const splitBadge = (isSplitOrder && driverAssignedQty)

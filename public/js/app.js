@@ -2274,20 +2274,32 @@ async function viewOrderDetail(orderId, options = {}) {
     // For split orders: fetch driver's assigned quantity from API
     let isSplitOrder = order.is_split_order;
     let driverAssignedQty = order.assigned_qty ? Number(order.assigned_qty) : null;
+    let actualProducts = null;  // Actual delivered products for this driver
 
-    // If we have assignment_id but no assigned_qty, fetch from API
-    if (order.assignment_id && !driverAssignedQty) {
+    // If we have assignment_id, fetch full assignment data from API
+    if (order.assignment_id) {
         try {
             const resp = await fetch(`/api/orders/assignment/${order.assignment_id}`);
             const data = await resp.json();
             if (!data.error && data.data) {
-                driverAssignedQty = Number(data.data.assigned_qty) || null;
+                driverAssignedQty = Number(data.data.assigned_qty) || driverAssignedQty;
                 isSplitOrder = true;
-                console.log(`📦 Fetched assigned_qty from API: ${driverAssignedQty} kg`);
+
+                // Use actual_products if order is completed, otherwise assigned_products
+                if (data.data.actual_products && Array.isArray(data.data.actual_products) && data.data.actual_products.length > 0) {
+                    actualProducts = data.data.actual_products;
+                    console.log(`📦 Using actual_products for completed order:`, actualProducts);
+                }
+                console.log(`📦 Fetched from API: assignedQty=${driverAssignedQty}, hasActual=${!!actualProducts}`);
             }
         } catch (e) {
             console.error('Error fetching assignment:', e);
         }
+    }
+
+    // For completed split orders: show actual delivered products instead of original
+    if (actualProducts && actualProducts.length > 0) {
+        products = actualProducts;
     }
 
     console.log(`📦 Order ${order.soDon || order.id} has ${products.length} products, split: ${isSplitOrder}, assignedQty: ${driverAssignedQty}`);
