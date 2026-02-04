@@ -1034,18 +1034,17 @@ function renderImportList() {
 
     // Compact row-based layout for imports
     container.innerHTML = `
-        <div class="compact-order-list">
+        <div class="compact-order-list" style="display:flex; flex-direction:column; gap:4px;">
             ${imports.map(imp => `
                 <div class="compact-order-row" onclick="viewImportDetail('${imp.id}')" style="
                     display: flex;
                     align-items: center;
-                    gap: 12px;
-                    padding: 12px 16px;
+                    gap: 8px;
+                    padding: 8px 12px;
                     background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
-                    border-radius: 8px;
-                    margin-bottom: 8px;
+                    border-radius: 6px;
                     cursor: pointer;
-                    border-left: 4px solid ${imp.status === 'Hoàn thành' || imp.status === 'completed' ? 'var(--success)' :
+                    border-left: 3px solid ${imp.status === 'Hoàn thành' || imp.status === 'completed' ? 'var(--success)' :
             imp.status === 'Đang thực hiện' || imp.status === 'assigned' ? 'var(--info)' : '#4CAF50'};
                     transition: all 0.15s ease;
                     position: relative;
@@ -1053,60 +1052,60 @@ function renderImportList() {
                     ${getUnreadBadgeHtml(imp.id, 'import')}
                     
                     <!-- Ticket No -->
-                    <div style="min-width: 100px; font-weight: 600; color: #16a34a; font-size: 13px;">
+                    <div style="min-width: 90px; font-weight: 600; color: #16a34a; font-size: 11px;">
                         ${imp.ticket_no || imp.id}
-                        <span style="background:#4CAF50; color:white; padding:1px 6px; border-radius:4px; font-size:10px; margin-left:4px;">Nhập</span>
+                        <span style="background:#4CAF50; color:white; padding:1px 4px; border-radius:3px; font-size:9px; margin-left:2px;">Nhập</span>
                     </div>
                     
                     <!-- Supplier (flex-grow) -->
                     <div style="flex: 1; min-width: 0;">
-                        <div style="font-weight: 500; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px;">
+                        <div style="font-weight: 500; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px;">
                             ${imp.supplier_name || 'NCC'}
                         </div>
-                        <div style="font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                            <i class="bi bi-geo-alt" style="font-size: 10px;"></i> ${imp.supplier_address || 'Sunco'}
+                        <div style="font-size: 10px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            <i class="bi bi-geo-alt" style="font-size: 9px;"></i> ${imp.supplier_address || 'Sunco'}
                         </div>
                     </div>
                     
                     <!-- Date -->
-                    <div style="min-width: 80px; font-size: 12px; color: var(--text-secondary); text-align: center;">
+                    <div style="min-width: 70px; font-size: 10px; color: var(--text-secondary); text-align: center;">
                         ${formatDate(imp.expected_date || imp.created_at)}
                     </div>
                     
                     <!-- Driver -->
-                    <div style="min-width: 100px; font-size: 12px; color: var(--text-secondary); text-align: center;">
+                    <div style="min-width: 80px; font-size: 10px; color: var(--text-secondary); text-align: center;">
                         ${imp.assigned_driver || imp.driver_name ? `<span style="color: var(--info);">${imp.assigned_driver || imp.driver_name}</span>` : '<span style="opacity:0.5;">—</span>'}
                     </div>
                     
                     <!-- Status Badge -->
-                    <div style="min-width: 90px; text-align: center;">
-                        <span class="badge badge-${getStatusBadge(imp.status)}" style="font-size: 11px; padding: 4px 10px;">
+                    <div style="min-width: 75px; text-align: center;">
+                        <span class="badge badge-${getStatusBadge(imp.status)}" style="font-size: 9px; padding: 2px 6px;">
                             ${getStatusText(imp.status)}
                         </span>
                     </div>
                     
                     <!-- Actions -->
-                    <div style="display: flex; gap: 6px;" onclick="event.stopPropagation()">
-                        <button class="btn btn-outline btn-sm" onclick="viewImportDetail('${imp.id}')" style="padding: 4px 10px; font-size: 11px;">
+                    <div style="display: flex; gap: 4px;" onclick="event.stopPropagation()">
+                        <button class="btn btn-outline btn-sm" onclick="viewImportDetail('${imp.id}')" style="padding: 3px 6px; font-size: 10px;">
                             <i class="bi bi-eye"></i>
                         </button>
                         ${(state.currentDispatchTab === 'pending' || state.currentDispatchTab === 'assigned') && isAdminRole() ? `
-                            <button class="btn btn-warning btn-sm" onclick="editImport('${imp.id}')" style="padding: 4px 10px; font-size: 11px;">
+                            <button class="btn btn-warning btn-sm" onclick="editImport('${imp.id}')" style="padding: 3px 6px; font-size: 10px;">
                                 <i class="bi bi-pencil"></i>
                             </button>
                         ` : ''}
                         ${state.currentDispatchTab === 'pending' ? `
-                            <button class="btn btn-info btn-sm" onclick="assignImportDriver('${imp.id}')" style="padding: 4px 10px; font-size: 11px;">
+                            <button class="btn btn-info btn-sm" onclick="assignImportDriver('${imp.id}')" style="padding: 3px 6px; font-size: 10px;">
                                 <i class="bi bi-person-plus"></i>
                             </button>
                         ` : ''}
                         ${state.currentDispatchTab === 'assigned' && isAdminRole() ? `
-                            <button class="btn btn-success btn-sm" onclick="adminCompleteImport('${imp.id}')" style="padding: 4px 10px; font-size: 11px;">
+                            <button class="btn btn-success btn-sm" onclick="adminCompleteImport('${imp.id}')" style="padding: 3px 6px; font-size: 10px;">
                                 <i class="bi bi-check"></i>
                             </button>
                         ` : ''}
                         ${(state.currentDispatchTab === 'pending' || state.currentDispatchTab === 'assigned') && isAdminRole() ? `
-                            <button class="btn btn-danger btn-sm" onclick="deleteImportTicket('${imp.id}')" style="padding: 4px 10px; font-size: 11px;" title="Xóa">
+                            <button class="btn btn-danger btn-sm" onclick="deleteImportTicket('${imp.id}')" style="padding: 3px 6px; font-size: 10px;" title="Xóa">
                                 <i class="bi bi-trash"></i>
                             </button>
                         ` : ''}
@@ -1689,7 +1688,7 @@ function renderMyOrdersList(containerId, orders, type) {
 
     // Compact row-based layout
     container.innerHTML = `
-        <div class="compact-order-list">
+        <div class="compact-order-list" style="display:flex; flex-direction:column; gap:4px;">
             ${orders.map(order => {
         const orderId = order.soDon || order.orderCode || order.id;
         const chatBadge = getUnreadBadgeHtml(orderId, order.type || 'export');
@@ -1723,67 +1722,66 @@ function renderMyOrdersList(containerId, orders, type) {
                     <div class="compact-order-row" onclick="${viewFn}" style="
                         display: flex;
                         align-items: center;
-                        gap: 12px;
-                        padding: 12px 16px;
+                        gap: 8px;
+                        padding: 8px 12px;
                         background: ${bgColor};
-                        border-radius: 8px;
-                        margin-bottom: 8px;
+                        border-radius: 6px;
                         cursor: pointer;
-                        border-left: 4px solid ${borderColor};
+                        border-left: 3px solid ${borderColor};
                         transition: all 0.15s ease;
                         position: relative;
                     " onmouseenter="this.style.opacity='0.95'" onmouseleave="this.style.opacity='1'">
                         ${chatBadge}
                         
                         <!-- Order ID + Badges -->
-                        <div style="min-width: 160px;">
-                            <div style="font-weight: 600; color: var(--primary); font-size: 13px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                        <div style="min-width: 140px;">
+                            <div style="font-weight: 600; color: var(--primary); font-size: 11px; display: flex; align-items: center; gap: 4px; flex-wrap: wrap;">
                                 ${orderId}
-                                ${isImport ? '<span style="background:#4CAF50; color:white; padding:1px 6px; border-radius:4px; font-size:10px;">Nhập</span>' : ''}
-                                ${isSplit ? `<span style="background:#8B5CF6; color:white; padding:1px 6px; border-radius:4px; font-size:10px;">🔀 ${splitProgress || 'Chia'}</span>` : ''}
+                                ${isImport ? '<span style="background:#4CAF50; color:white; padding:1px 4px; border-radius:3px; font-size:9px;">Nhập</span>' : ''}
+                                ${isSplit ? `<span style="background:#8B5CF6; color:white; padding:1px 4px; border-radius:3px; font-size:9px;">🔀 ${splitProgress || 'Chia'}</span>` : ''}
                             </div>
-                            ${isSplit && order.assigned_qty ? `<div style="font-size:11px; color:#8B5CF6;">${order.assigned_qty}kg (của bạn)</div>` : ''}
+                            ${isSplit && order.assigned_qty ? `<div style="font-size:9px; color:#8B5CF6;">${order.assigned_qty}kg (của bạn)</div>` : ''}
                         </div>
                         
                         <!-- Customer (flex-grow) -->
                         <div style="flex: 1; min-width: 0;">
-                            <div style="font-weight: 500; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px;">
+                            <div style="font-weight: 500; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px;">
                                 ${order.khach || order.customerName || order.accountName || 'Khách hàng'}
                             </div>
-                            <div style="font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                                <i class="bi bi-geo-alt" style="font-size: 10px;"></i> ${order.diaChi || order.address || 'Sunco'}
+                            <div style="font-size: 10px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                <i class="bi bi-geo-alt" style="font-size: 9px;"></i> ${order.diaChi || order.address || 'Sunco'}
                             </div>
                         </div>
                         
                         <!-- Date -->
-                        <div style="min-width: 75px; font-size: 12px; color: var(--text-secondary); text-align: center;">
+                        <div style="min-width: 70px; font-size: 10px; color: var(--text-secondary); text-align: center;">
                             ${formatDate(order.ngay || order.sale_order_date || order.createdAt)}
                         </div>
                         
                         <!-- Products count -->
-                        <div style="min-width: 70px; font-size: 11px; color: var(--text-muted); text-align: center;">
-                            <i class="bi bi-box-seam"></i> ${(order.cart || order.products || []).length || 0}
+                        <div style="min-width: 50px; font-size: 10px; color: var(--text-muted); text-align: center;">
+                            <i class="bi bi-box-seam" style="font-size:9px;"></i> ${(order.cart || order.products || []).length || 0}
                         </div>
                         
                         <!-- Status Badge -->
-                        <div style="min-width: 85px; text-align: center;">
-                            <span style="background: ${statusColors[type]}20; color: ${statusColors[type]}; padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 500;">
+                        <div style="min-width: 70px; text-align: center;">
+                            <span style="background: ${statusColors[type]}20; color: ${statusColors[type]}; padding: 2px 6px; border-radius: 8px; font-size: 9px; font-weight: 500;">
                                 ${statusTexts[type]}
                             </span>
                         </div>
                         
                         <!-- Actions -->
-                        <div style="display: flex; gap: 6px;" onclick="event.stopPropagation()">
-                            <button class="btn btn-outline btn-sm" onclick="${viewFn}" style="padding: 4px 10px; font-size: 11px;">
+                        <div style="display: flex; gap: 4px;" onclick="event.stopPropagation()">
+                            <button class="btn btn-outline btn-sm" onclick="${viewFn}" style="padding: 3px 6px; font-size: 10px;">
                                 <i class="bi bi-eye"></i>
                             </button>
                             ${type === 'pending' ? `
-                                <button class="btn btn-warning btn-sm" onclick="${startFn}" style="padding: 4px 10px; font-size: 11px; background:linear-gradient(135deg, #f59e0b, #d97706); color:white; border:none;">
+                                <button class="btn btn-warning btn-sm" onclick="${startFn}" style="padding: 3px 6px; font-size: 10px; background:linear-gradient(135deg, #f59e0b, #d97706); color:white; border:none;">
                                     <i class="bi bi-play-circle"></i>
                                 </button>
                             ` : ''}
                             ${type === 'delivering' ? `
-                                <button class="btn btn-success btn-sm" onclick="${completeFn}" style="padding: 4px 10px; font-size: 11px; background:linear-gradient(135deg, #10b981, #059669); border:none;">
+                                <button class="btn btn-success btn-sm" onclick="${completeFn}" style="padding: 3px 6px; font-size: 10px; background:linear-gradient(135deg, #10b981, #059669); border:none;">
                                     <i class="bi bi-check"></i>
                                 </button>
                             ` : ''}
