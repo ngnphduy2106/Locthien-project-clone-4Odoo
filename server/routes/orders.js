@@ -408,8 +408,12 @@ router.get('/my/:driverName', async (req, res) => {
                         all_assignments: allImportAssigns || [],  // Include all assignments for frontend display
                         type: 'import',
                         statusCode,
-                        // Date fields for display - ngay for consistency with exports
-                        ngay: imp.expected_date || imp.created_at,
+                        // Date fields - format as dd/mm/yyyy for consistency with exports
+                        ngay: (() => {
+                            const d = new Date(imp.expected_date || imp.created_at);
+                            if (isNaN(d.getTime())) return '';
+                            return `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
+                        })(),
                         expected_date: imp.expected_date,
                         created_at: imp.created_at
                     });
@@ -460,8 +464,12 @@ router.get('/my/:driverName', async (req, res) => {
                         statusCode: imp.status === 'assigned' ? 'CHO_NHAN' :
                             imp.status === 'in_transit' ? 'DANG_GIAO' :
                                 imp.status === 'completed' ? 'HOAN_THANH' : 'CHO_NHAN',
-                        // Date fields for display - ngay for consistency with exports
-                        ngay: imp.expected_date || imp.created_at,
+                        // Date fields - format as dd/mm/yyyy for consistency with exports
+                        ngay: (() => {
+                            const d = new Date(imp.expected_date || imp.created_at);
+                            if (isNaN(d.getTime())) return '';
+                            return `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
+                        })(),
                         expected_date: imp.expected_date,
                         created_at: imp.created_at
                     });
