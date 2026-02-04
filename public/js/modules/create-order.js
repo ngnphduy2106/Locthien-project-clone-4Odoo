@@ -46,6 +46,35 @@ const CreateOrderModule = {
         }
     },
 
+    // Sync products from MISA CRM
+    async syncMisaProducts() {
+        try {
+            const btn = event?.target;
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Đang đồng bộ...';
+            }
+
+            const response = await fetch('/api/materials/sync-misa', { method: 'POST' });
+            const data = await response.json();
+
+            if (data.error) {
+                alert('❌ Lỗi: ' + data.msg);
+            } else {
+                alert(`✅ ${data.msg}`);
+                await this.loadMaterials(); // Reload materials list
+            }
+        } catch (e) {
+            alert('❌ Lỗi đồng bộ: ' + e.message);
+        } finally {
+            const btn = document.getElementById('btn-sync-misa');
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>Sync MISA';
+            }
+        }
+    },
+
     // Update materials datalist (codes and names)
     updateMaterialsDatalist() {
         const codeList = document.getElementById('material-code-list');

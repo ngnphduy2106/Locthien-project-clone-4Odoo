@@ -5,8 +5,22 @@
 import { Router } from 'express';
 import { createResponse } from '../config.js';
 import db from '../db/index.js';
+import { syncMisaProducts } from '../services/misa.js';
 
 const router = Router();
+
+// POST /api/materials/sync-misa - Sync products from MISA CRM
+router.post('/sync-misa', async (req, res) => {
+    try {
+        console.log('📡 Manual MISA Product Sync requested...');
+        await syncMisaProducts();
+        const materials = await db.getMaterials();
+        res.json(createResponse(false, `Đã đồng bộ ${materials.length} sản phẩm từ MISA!`, { count: materials.length }));
+    } catch (e) {
+        console.error('MISA Sync Error:', e);
+        res.json(createResponse(true, 'Lỗi đồng bộ MISA: ' + e.message));
+    }
+});
 
 // GET /api/materials
 router.get('/', async (req, res) => {
