@@ -2263,42 +2263,23 @@ async function viewOrderDetail(orderId, options = {}) {
     }
 
     // Build products list HTML - handle ALL formats including JSON strings
-    // For split orders: prioritize assigned_products (driver's portion)
     let products = order.products || order.cart || order.chiTiet || order.sale_order_product_mappings || [];
 
-    // Check for assigned_products (split order - show only driver's portion)
-    if (order.assigned_products) {
-        let assignedProducts = order.assigned_products;
-        if (typeof assignedProducts === 'string') {
-            try { assignedProducts = JSON.parse(assignedProducts); } catch (e) { assignedProducts = null; }
-        }
-        if (Array.isArray(assignedProducts) && assignedProducts.length > 0) {
-            products = assignedProducts;
-            console.log('📦 Using assigned_products for split order:', products);
-        }
-    }
-
-    // Parse JSON string if needed (database might return string)
+    // Parse if string
     if (typeof products === 'string') {
-        try {
-            products = JSON.parse(products);
-        } catch (e) {
-            console.error('Failed to parse products JSON:', e, products);
-            products = [];
-        }
+        try { products = JSON.parse(products); } catch (e) { products = []; }
     }
+    if (!Array.isArray(products)) products = [];
 
-    // Ensure it's an array
-    if (!Array.isArray(products)) {
-        console.warn('Products is not an array:', products);
-        products = [];
-    }
+    // For split orders: show driver's assigned quantity instead of total
+    // Just display assigned_qty as summary, products stay the same
+    const isSplitOrder = order.is_split_order && order.assigned_qty;
+    const driverAssignedQty = isSplitOrder ? Number(order.assigned_qty) : null;
 
-    console.log(`📦 Order ${order.soDon || order.id} has ${products.length} products:`, products);
+    console.log(`📦 Order ${order.soDon || order.id} has ${products.length} products, split: ${isSplitOrder}, assignedQty: ${driverAssignedQty}`);
 
     // Check if current user is a driver (hide price info)
     const isDriver = (state.user?.role || '').toLowerCase() === 'driver';
-
     const productsHtml = products.length > 0
         ? products.map(p => `
             <tr>
@@ -2352,6 +2333,12 @@ async function viewOrderDetail(orderId, options = {}) {
                     <label>Biển số xe:</label>
                     <span>${order.plate || order.bienSo || order.vehicle_plate || 'Chưa có'}</span>
                 </div>
+                ${isSplitOrder ? `
+                <div class="detail-row" style="background: linear-gradient(135deg, #fef3c7, #fde68a); padding: 10px; border-radius: 8px; margin: 8px 0;">
+                    <label style="color: #92400e; font-weight: 600;">📦 Phần của bạn:</label>
+                    <span style="color: #78350f; font-weight: 700; font-size: 1.1em;">${driverAssignedQty} kg</span>
+                </div>
+                ` : ''}
                 ${!isDriver ? `
                 <div class="detail-row">
                     <label>Tổng tiền:</label>
@@ -3973,7 +3960,6 @@ function initDriverAssignments(order) {
             driver_name: order.taiXe || order.driver,
             plate: order.bienSo || order.plate || '',
             qty: currentOrderTotalQty,
-            products: currentOrderProducts,  // Include all products for single driver
             type: 'internal',
             note: order.note || ''
         });
@@ -4054,20 +4040,10 @@ function addDriverAssignment() {
 
     const note = document.getElementById('modal_note')?.value?.trim() || '';
 
-    // Calculate proportional products based on assigned qty
-    const ratio = currentOrderTotalQty > 0 ? qty / currentOrderTotalQty : 0;
-    const proportionalProducts = currentOrderProducts.map(p => ({
-        code: p.code || '',
-        name: p.name || p.productName || '',
-        qty: Math.round(Number(p.qty || p.quantity || 0) * ratio),
-        unit: p.unit || 'kg'
-    }));
-
     driverAssignments.push({
         driver_name: name,
         plate: plate || '',
         qty: qty,
-        products: proportionalProducts,  // Proportional products for this driver
         type: type,
         note: note
     });
