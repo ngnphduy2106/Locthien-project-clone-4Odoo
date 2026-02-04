@@ -2303,9 +2303,9 @@ async function viewOrderDetail(orderId, options = {}) {
     // Fetch combined driver names for multi-driver orders
     let combinedDrivers = null;
     let combinedPlates = null;
-    const orderId = order.soDon || order.id || order.sale_order_no;
+    const orderNo = order.soDon || order.id || order.sale_order_no;
     try {
-        const assignResp = await fetch(`/api/orders/${orderId}/assignments`);
+        const assignResp = await fetch(`/api/orders/${orderNo}/assignments`);
         const assignData = await assignResp.json();
         if (!assignData.error && assignData.combined && assignData.combined.count > 1) {
             combinedDrivers = assignData.combined.drivers;
