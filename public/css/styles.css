@@ -2938,26 +2938,26 @@ body {
         font-size: 12px !important;
     }
 
-    /* ====== COMPACT ORDER ROWS - MOBILE RESPONSIVE ====== */
+    /* ====== COMPACT ORDER ROWS - MOBILE 2-ROW LAYOUT ====== */
     .compact-order-list {
         padding: 0 !important;
         gap: 4px !important;
     }
 
-    /* Use flex-row with wrap - first 2 items full width, rest inline */
+    /* Flex-row with wrap - 2 rows only */
     .compact-order-row,
     [class*="compact-order-row"],
     div[style*="compact-order-row"] {
         flex-wrap: wrap !important;
-        padding: 8px 10px !important;
-        gap: 4px 8px !important;
+        padding: 6px 10px !important;
+        gap: 2px 8px !important;
         flex-direction: row !important;
         align-items: center !important;
         margin-bottom: 4px !important;
         border-radius: 6px !important;
     }
 
-    /* All divs inside compact row */
+    /* All children inline by default */
     .compact-order-row>div,
     .compact-order-row>[style*="min-width"] {
         min-width: unset !important;
@@ -2965,50 +2965,50 @@ body {
         text-align: left !important;
     }
 
-    /* Order ID row with badges - full width first row */
+    /* ROW 1: Order ID + Customer side by side */
+    /* Order ID */
     .compact-order-row>div:first-child {
         display: flex !important;
         flex-wrap: wrap !important;
         gap: 4px !important;
         align-items: center !important;
-        font-size: 12px !important;
-        width: 100% !important;
-        flex-basis: 100% !important;
+        font-size: 11px !important;
     }
 
-    /* Customer info row - full width second row */
+    /* Customer - takes remaining space */
     .compact-order-row>div:nth-child(2) {
-        font-size: 12px !important;
-        width: 100% !important;
-        flex-basis: 100% !important;
-        margin-bottom: 2px !important;
+        flex: 1 !important;
+        font-size: 11px !important;
+        min-width: 120px !important;
     }
 
     .compact-order-row>div:nth-child(2)>div:first-child {
-        font-size: 12px !important;
+        font-size: 11px !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
     }
 
     .compact-order-row>div:nth-child(2)>div:last-child {
-        font-size: 10px !important;
+        font-size: 9px !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
     }
 
-    /* Third row items - inline, share horizontal space */
-    /* Date */
+    /* ROW 2: Date, Driver, Status, Buttons - force new line */
     .compact-order-row>div:nth-child(3) {
+        flex-basis: 100% !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 8px !important;
         font-size: 10px !important;
+        margin-top: 2px !important;
     }
 
-    /* Driver/Products */
-    .compact-order-row>div:nth-child(4) {
-        font-size: 10px !important;
-    }
-
-    /* Products count */
-    .compact-order-row>div:nth-child(5) {
-        font-size: 10px !important;
-    }
-
-    /* Status badge */
+    /* Hide individual date/driver/count/status divs - they're inline on row 2 already in desktop */
+    .compact-order-row>div:nth-child(4),
+    .compact-order-row>div:nth-child(5),
     .compact-order-row>div:nth-child(6) {
         font-size: 10px !important;
     }
@@ -3016,21 +3016,21 @@ body {
     .compact-order-row .badge,
     .compact-order-row span[style*="border-radius"] {
         font-size: 9px !important;
-        padding: 2px 6px !important;
+        padding: 2px 5px !important;
     }
 
-    /* Action buttons - push to far right */
+    /* Buttons - push to far right */
     .compact-order-row>div:last-child {
         margin-left: auto !important;
         display: flex !important;
         gap: 4px !important;
     }
 
-    /* Buttons - compact touch targets */
+    /* Buttons - compact */
     .compact-order-row .btn-sm,
     .compact-order-row button {
-        padding: 4px 8px !important;
-        font-size: 10px !important;
+        padding: 4px 6px !important;
+        font-size: 9px !important;
     }
 
     /* ====== MY ORDERS PAGE - STAT CARDS ====== */
