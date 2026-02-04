@@ -3131,9 +3131,11 @@ window.closeUserProfileModal = closeUserProfileModal;
 // === DELIVERY MODAL (HOÀN THÀNH ĐƠN) ===
 
 function openDeliveryModal(orderId) {
-    // Search in all lists with robust matching - include dispatch module orders
+    // Search in all lists with robust matching - include dispatch module and my-orders module
     const dispatchOrders = window.DispatchModule?.orders || [];
+    const myOrdersModuleOrders = window.MyOrdersModule?.orders || [];
     const allOrders = [
+        ...myOrdersModuleOrders,  // Priority: check MyOrdersModule first (has assigned_products)
         ...dispatchOrders,
         ...(state.orders.pending || []),
         ...(state.orders.assigned || []),
