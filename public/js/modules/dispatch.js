@@ -262,11 +262,11 @@ const DispatchModule = {
                     
                     <!-- ROW 2: Customer + Address + Buttons -->
                     <div style="display:flex; align-items:center; gap:8px; width:100%;">
-                        <div style="flex:1; min-width:0;">
+                        <div style="flex:1; min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;">
                             <span style="font-weight:500; color:var(--text-primary); font-size:11px;">${customer}</span>
                             <span style="font-size:9px; color:var(--text-muted); margin-left:6px;"><i class="bi bi-geo-alt" style="font-size:8px;"></i> ${address}</span>
                         </div>
-                        <div style="display:flex; gap:4px;" onclick="event.stopPropagation()">
+                        <div style="display:flex; gap:4px; flex-shrink:0;" onclick="event.stopPropagation()">
                             <button class="btn btn-outline btn-sm" onclick="DispatchModule.viewOrderDetail('${orderId}')" style="padding:3px 6px; font-size:9px;">
                                 <i class="bi bi-eye"></i>
                             </button>
