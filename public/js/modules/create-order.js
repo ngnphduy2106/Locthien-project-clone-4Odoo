@@ -112,6 +112,31 @@ const CreateOrderModule = {
         }
     },
 
+    // Bind event listeners after render
+    bindEvents() {
+        const self = this;
+
+        // Sync MISA button
+        const btnSync = document.getElementById('btn-sync-misa');
+        if (btnSync) {
+            btnSync.addEventListener('click', () => self.syncMisaProducts());
+        }
+
+        // Add product button
+        const btnAdd = document.getElementById('btn-add-product');
+        if (btnAdd) {
+            btnAdd.addEventListener('click', () => self.addProduct());
+        }
+
+        // Submit order button
+        const btnSubmit = document.getElementById('btn-submit-order');
+        if (btnSubmit) {
+            btnSubmit.addEventListener('click', () => self.submitOrder());
+        }
+
+        console.log('✅ Create Order event listeners bound');
+    },
+
     // Update supplier datalist
     updateSupplierDatalist() {
         const datalist = document.getElementById('supplier-list');
@@ -369,8 +394,7 @@ const CreateOrderModule = {
                                 </div>
                                 <span>Sản phẩm</span>
                             </div>
-                            <button type="button" id="btn-sync-misa" class="btn btn-sm btn-outline-primary" 
-                                onclick="CreateOrderModule.syncMisaProducts()" style="font-size: 12px;">
+                            <button type="button" id="btn-sync-misa" class="btn btn-sm btn-outline-primary" style="font-size: 12px;">
                                 <i class="bi bi-arrow-repeat me-1"></i>Sync MISA
                             </button>
                         </div>
@@ -390,7 +414,7 @@ const CreateOrderModule = {
                                         placeholder="Số lượng" step="0.01">
                                 </div>
                                 <div class="col-md-4">
-                                    <button class="btn-add-product w-100" onclick="CreateOrderModule.addProduct()">
+                                    <button id="btn-add-product" class="btn-add-product w-100">
                                         <i class="bi bi-plus-circle me-2"></i>Thêm
                                     </button>
                                 </div>
@@ -403,13 +427,15 @@ const CreateOrderModule = {
             <!-- Submit Button -->
             <div class="row mt-4">
                 <div class="col-12">
-                    <button class="btn-submit-order w-100" onclick="CreateOrderModule.submitOrder()">
+                    <button id="btn-submit-order" class="btn-submit-order w-100">
                         <i class="bi bi-check-circle me-2"></i>Tạo Đơn Nhập
                     </button>
                 </div>
             </div>
         `;
 
+        // Bind event listeners after DOM is rendered
+        this.bindEvents();
         this.resetForm();
     },
 
