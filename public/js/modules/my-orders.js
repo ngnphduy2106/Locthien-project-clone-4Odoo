@@ -178,48 +178,28 @@ const MyOrdersModule = {
         // Helper to get sortable date from order
         const getOrderDate = (o) => {
             const dateStr = o.date || o.order_date || o.ngay || o.expected_date || o.created_at || o.sale_order_date || '';
-            if (!dateStr) {
-                console.log(`⚠️ No date for order ${o.soDon || o.id}`);
-                return new Date(0);
-            }
-
-            // Handle d/m/yyyy or dd/mm/yyyy format (e.g., "3/2/2026" or "31/12/2025")
+            if (!dateStr) return new Date(0);
+            // Handle d/m/yyyy or dd/mm/yyyy format
             if (typeof dateStr === 'string' && dateStr.match(/^\d{1,2}\/\d{1,2}\/\d{4}$/)) {
                 const parts = dateStr.split('/');
-                const parsed = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
-                console.log(`📅 Parsed ${o.soDon || o.id}: "${dateStr}" → ${parsed.toLocaleDateString()}`);
-                return parsed;
+                return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
             }
-
-            // Handle ISO format or other parseable formats
             const parsed = new Date(dateStr);
-            if (!isNaN(parsed.getTime())) {
-                console.log(`📅 ISO parsed ${o.soDon || o.id}: "${dateStr}" → ${parsed.toLocaleDateString()}`);
-                return parsed;
-            }
-
-            console.log(`❌ Failed to parse ${o.soDon || o.id}: "${dateStr}"`);
-            return new Date(0);
+            return isNaN(parsed.getTime()) ? new Date(0) : parsed;
         };
 
-        // Helper to get sortable order code (extract number from code like PO00035.25 or N1045)
+        // Helper to get sortable order code
         const getOrderCode = (o) => {
             const code = o.soDon || o.id || '';
-            // Extract ALL digits and use as number
             const digits = code.replace(/\D/g, '');
             return digits ? parseInt(digits) : 0;
         };
 
-        // Sort function: by date DESC, then by code DESC
+        // Sort: date DESC, then code DESC
         const sortOrders = (orders) => {
             return [...orders].sort((a, b) => {
-                const dateA = getOrderDate(a);
-                const dateB = getOrderDate(b);
-                // Sort by date descending (newest first)
-                const timeDiff = dateB.getTime() - dateA.getTime();
-                if (timeDiff !== 0) return timeDiff;
-                // If same date, sort by code descending
-                return getOrderCode(b) - getOrderCode(a);
+                const timeDiff = getOrderDate(b).getTime() - getOrderDate(a).getTime();
+                return timeDiff !== 0 ? timeDiff : getOrderCode(b) - getOrderCode(a);
             });
         };
 
