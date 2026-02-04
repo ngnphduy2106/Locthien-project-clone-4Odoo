@@ -613,9 +613,14 @@ const DispatchModule = {
                                     <span style="color: #64748b;">Xe:</span>
                                     <strong>${order.vehicle_plate || order.plate || '---'}</strong>
                                 </div>
-                                <div class="info-row" style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #f1f5f9;">
-                                    <span style="color: #64748b;">Ghi chú:</span>
+                                ${order.delivery_note ? `
+                                <div class="info-row" style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #f1f5f9; flex-direction: column; gap: 4px;">
+                                    <span style="color: #64748b;"><i class="bi bi-pencil-square"></i> Ghi chú giao hàng:</span>
+                                    <div style="background: #fef3c7; padding: 10px 12px; border-radius: 6px; border-left: 3px solid #f59e0b; color: #92400e; font-size: 13px;">
+                                        ${order.delivery_note}
+                                    </div>
                                 </div>
+                                ` : ''}
                             </div>
                         </div>
 
