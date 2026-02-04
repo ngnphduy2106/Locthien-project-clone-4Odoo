@@ -1051,39 +1051,36 @@ function renderImportList() {
                 " onmouseenter="this.style.opacity='0.9'" onmouseleave="this.style.opacity='1'">
                     ${getUnreadBadgeHtml(imp.id, 'import')}
                     
-                    <!-- ROW 1: PO + Date + Status + Driver -->
-                    <div style="display:flex; align-items:center; gap:8px; width:100%; flex-wrap:wrap;">
+                    <!-- ROW 1: PO + Date + Status + Driver + Buttons -->
+                    <div style="display:flex; align-items:center; gap:6px; width:100%;">
                         <span style="font-weight:600; color:#16a34a; font-size:11px;">
                             ${imp.ticket_no || imp.id}
                             <span style="background:#4CAF50; color:white; padding:1px 4px; border-radius:3px; font-size:8px; margin-left:2px;">Nhập</span>
                         </span>
                         <span style="font-size:10px; color:var(--text-secondary);">${formatDate(imp.expected_date || imp.created_at)}</span>
                         <span class="badge badge-${getStatusBadge(imp.status)}" style="font-size:9px; padding:2px 5px;">${getStatusText(imp.status)}</span>
-                        <span style="font-size:10px; color:var(--info); margin-left:auto;">${imp.assigned_driver || imp.driver_name || '—'}</span>
-                    </div>
-                    
-                    <!-- ROW 2: Customer + Address + Buttons -->
-                    <div style="display:flex; align-items:center; gap:8px; width:100%; overflow:hidden;">
-                        <div style="flex:1; min-width:0; overflow:hidden;">
-                            <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                                <span style="font-weight:500; color:var(--text-primary); font-size:12px;">${imp.supplier_name || 'NCC'}</span>
-                            </div>
-                        </div>
+                        <span style="font-size:10px; color:var(--info); margin-left:auto;">${imp.assigned_driver || imp.driver_name || ''}</span>
                         <div style="display:flex; gap:4px; flex-shrink:0;" onclick="event.stopPropagation()">
-                            <button class="btn btn-outline btn-sm" onclick="viewImportDetail('${imp.id}')" style="padding:3px 6px; font-size:9px;">
+                            <button class="btn btn-outline btn-sm" onclick="viewImportDetail('${imp.id}')" style="padding:3px 6px; font-size:9px; border-radius:50%; width:24px; height:24px;">
                                 <i class="bi bi-eye"></i>
                             </button>
                             ${state.currentDispatchTab === 'pending' ? `
-                                <button class="btn btn-info btn-sm" onclick="assignImportDriver('${imp.id}')" style="padding:3px 6px; font-size:9px;">
+                                <button class="btn btn-info btn-sm" onclick="assignImportDriver('${imp.id}')" style="padding:3px 6px; font-size:9px; border-radius:50%; width:24px; height:24px;">
                                     <i class="bi bi-person-plus"></i>
                                 </button>
                             ` : ''}
                             ${state.currentDispatchTab === 'assigned' && isAdminRole() ? `
-                                <button class="btn btn-success btn-sm" onclick="adminCompleteImport('${imp.id}')" style="padding:3px 6px; font-size:9px;">
+                                <button class="btn btn-success btn-sm" onclick="adminCompleteImport('${imp.id}')" style="padding:3px 6px; font-size:9px; border-radius:50%; width:24px; height:24px;">
                                     <i class="bi bi-check"></i>
                                 </button>
                             ` : ''}
                         </div>
+                    </div>
+                    
+                    <!-- ROW 2: Customer + Address -->
+                    <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:100%;">
+                        <span style="font-weight:500; color:var(--text-primary); font-size:12px;">${imp.supplier_name || 'NCC'}</span>
+                        <span style="font-size:10px; color:var(--text-muted); margin-left:8px;"><i class="bi bi-geo-alt" style="font-size:9px;"></i> ${imp.supplier_address || 'Sunco'}</span>
                     </div>
                 </div>
             `).join('')}
@@ -1277,36 +1274,33 @@ function renderDispatchOrders() {
                 " onmouseenter="this.style.opacity='0.9'" onmouseleave="this.style.opacity='1'">
                     ${getUnreadBadgeHtml(orderId, 'export')}
                     
-                    <!-- ROW 1: PO + Date + Status + Driver -->
-                    <div style="display:flex; align-items:center; gap:8px; width:100%; flex-wrap:wrap;">
+                    <!-- ROW 1: PO + Date + Status + Driver + Buttons -->
+                    <div style="display:flex; align-items:center; gap:6px; width:100%;">
                         <span style="font-weight:600; color:var(--primary); font-size:11px;">${orderNo}</span>
                         <span style="font-size:10px; color:var(--text-secondary);">${formatDate(date)}</span>
                         <span class="badge badge-${getStatusBadge(status)}" style="font-size:9px; padding:2px 5px;">${getStatusText(status)}</span>
-                        <span style="font-size:10px; color:var(--info); margin-left:auto;">${driver || '—'}</span>
-                    </div>
-                    
-                    <!-- ROW 2: Customer + Address + Buttons -->
-                    <div style="display:flex; align-items:center; gap:8px; width:100%; overflow:hidden;">
-                        <div style="flex:1; min-width:0; overflow:hidden;">
-                            <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                                <span style="font-weight:500; color:var(--text-primary); font-size:12px;">${customer}</span>
-                            </div>
-                        </div>
+                        <span style="font-size:10px; color:var(--info); margin-left:auto;">${driver || ''}</span>
                         <div style="display:flex; gap:4px; flex-shrink:0;" onclick="event.stopPropagation()">
-                            <button class="btn btn-outline btn-sm" onclick="viewOrderDetail('${orderId}')" style="padding:3px 6px; font-size:9px;">
+                            <button class="btn btn-outline btn-sm" onclick="viewOrderDetail('${orderId}')" style="padding:3px 6px; font-size:9px; border-radius:50%; width:24px; height:24px;">
                                 <i class="bi bi-eye"></i>
                             </button>
                             ${state.currentDispatchTab === 'pending' ? `
-                                <button class="btn btn-info btn-sm" onclick="assignDriver('${orderId}')" style="padding:3px 6px; font-size:9px;">
+                                <button class="btn btn-info btn-sm" onclick="assignDriver('${orderId}')" style="padding:3px 6px; font-size:9px; border-radius:50%; width:24px; height:24px;">
                                     <i class="bi bi-person-plus"></i>
                                 </button>
                             ` : ''}
                             ${state.currentDispatchTab === 'assigned' && isAdminRole() ? `
-                                <button class="btn btn-success btn-sm" onclick="showDriverCompletionModal('${orderId}')" style="padding:3px 6px; font-size:9px;">
+                                <button class="btn btn-success btn-sm" onclick="showDriverCompletionModal('${orderId}')" style="padding:3px 6px; font-size:9px; border-radius:50%; width:24px; height:24px;">
                                     <i class="bi bi-check"></i>
                                 </button>
                             ` : ''}
                         </div>
+                    </div>
+                    
+                    <!-- ROW 2: Customer + Address -->
+                    <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:100%;">
+                        <span style="font-weight:500; color:var(--text-primary); font-size:12px;">${customer}</span>
+                        <span style="font-size:10px; color:var(--text-muted); margin-left:8px;"><i class="bi bi-geo-alt" style="font-size:9px;"></i> ${address}</span>
                     </div>
                 </div>`;
     }).join('')}
@@ -1700,8 +1694,8 @@ function renderMyOrdersList(containerId, orders, type) {
                     " onmouseenter="this.style.opacity='0.95'" onmouseleave="this.style.opacity='1'">
                         ${chatBadge}
                         
-                        <!-- ROW 1: PO + Date + Status + Split badge -->
-                        <div style="display:flex; align-items:center; gap:8px; width:100%; flex-wrap:wrap;">
+                        <!-- ROW 1: PO + Date + Status + Split badge + Buttons -->
+                        <div style="display:flex; align-items:center; gap:6px; width:100%;">
                             <span style="font-weight:600; color:var(--primary); font-size:11px;">
                                 ${orderId}
                                 ${isImport ? '<span style="background:#4CAF50; color:white; padding:1px 4px; border-radius:3px; font-size:8px; margin-left:2px;">Nhập</span>' : ''}
@@ -1710,30 +1704,27 @@ function renderMyOrdersList(containerId, orders, type) {
                             <span style="font-size:10px; color:var(--text-secondary);">${formatDate(order.ngay || order.sale_order_date || order.createdAt)}</span>
                             <span style="background:${statusColors[type]}20; color:${statusColors[type]}; padding:2px 5px; border-radius:6px; font-size:9px; font-weight:500;">${statusTexts[type]}</span>
                             ${isSplit && order.assigned_qty ? `<span style="font-size:9px; color:#8B5CF6;">${order.assigned_qty}kg</span>` : ''}
-                        </div>
-                        
-                        <!-- ROW 2: Customer + Address + Buttons -->
-                        <div style="display:flex; align-items:center; gap:8px; width:100%; overflow:hidden;">
-                            <div style="flex:1; min-width:0; overflow:hidden;">
-                                <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                                    <span style="font-weight:500; color:var(--text-primary); font-size:12px;">${order.khach || order.customerName || order.accountName || 'Khách hàng'}</span>
-                                </div>
-                            </div>
-                            <div style="display:flex; gap:4px; flex-shrink:0;" onclick="event.stopPropagation()">
-                                <button class="btn btn-outline btn-sm" onclick="${viewFn}" style="padding:3px 6px; font-size:9px;">
+                            <div style="display:flex; gap:4px; flex-shrink:0; margin-left:auto;" onclick="event.stopPropagation()">
+                                <button class="btn btn-outline btn-sm" onclick="${viewFn}" style="padding:3px 6px; font-size:9px; border-radius:50%; width:24px; height:24px;">
                                     <i class="bi bi-eye"></i>
                                 </button>
                                 ${type === 'pending' ? `
-                                    <button class="btn btn-warning btn-sm" onclick="${startFn}" style="padding:3px 6px; font-size:9px; background:linear-gradient(135deg, #f59e0b, #d97706); color:white; border:none;">
+                                    <button class="btn btn-warning btn-sm" onclick="${startFn}" style="padding:3px 6px; font-size:9px; border-radius:50%; width:24px; height:24px; background:linear-gradient(135deg, #f59e0b, #d97706); color:white; border:none;">
                                         <i class="bi bi-play-circle"></i>
                                     </button>
                                 ` : ''}
                                 ${type === 'delivering' ? `
-                                    <button class="btn btn-success btn-sm" onclick="${completeFn}" style="padding:3px 6px; font-size:9px; background:linear-gradient(135deg, #10b981, #059669); border:none;">
+                                    <button class="btn btn-success btn-sm" onclick="${completeFn}" style="padding:3px 6px; font-size:9px; border-radius:50%; width:24px; height:24px; background:linear-gradient(135deg, #10b981, #059669); border:none;">
                                         <i class="bi bi-check"></i>
                                     </button>
                                 ` : ''}
                             </div>
+                        </div>
+                        
+                        <!-- ROW 2: Customer + Address -->
+                        <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:100%;">
+                            <span style="font-weight:500; color:var(--text-primary); font-size:12px;">${order.khach || order.customerName || order.accountName || 'Khách hàng'}</span>
+                            <span style="font-size:10px; color:var(--text-muted); margin-left:8px;"><i class="bi bi-geo-alt" style="font-size:9px;"></i> ${order.diaChi || order.address || 'Sunco'}</span>
                         </div>
                     </div>
                 `;
