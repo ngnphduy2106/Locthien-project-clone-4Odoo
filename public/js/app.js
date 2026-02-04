@@ -2026,13 +2026,31 @@ function filterMyOrders() {
         });
     }
 
+    // Helper to get sortable date value (parse ISO directly to avoid timezone issues)
+    const getOrderDateValue = (order) => {
+        const raw = order.expected_date || order.created_at || order.sale_order_date || order.ngay || '';
+        if (!raw) return 0;
+        const str = String(raw);
+        // Parse ISO format YYYY-MM-DD
+        const isoMatch = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (isoMatch) {
+            return new Date(parseInt(isoMatch[1]), parseInt(isoMatch[2]) - 1, parseInt(isoMatch[3])).getTime();
+        }
+        // Parse dd/mm/yyyy format
+        const dmyMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+        if (dmyMatch) {
+            return new Date(parseInt(dmyMatch[3]), parseInt(dmyMatch[2]) - 1, parseInt(dmyMatch[1])).getTime();
+        }
+        return new Date(str).getTime() || 0;
+    };
+
     // Sort
     orders.sort((a, b) => {
         switch (sortValue) {
             case 'date-asc':
-                return new Date(a.ngay || a.sale_order_date || 0) - new Date(b.ngay || b.sale_order_date || 0);
+                return getOrderDateValue(a) - getOrderDateValue(b);
             case 'date-desc':
-                return new Date(b.ngay || b.sale_order_date || 0) - new Date(a.ngay || a.sale_order_date || 0);
+                return getOrderDateValue(b) - getOrderDateValue(a);
             case 'customer-asc':
                 return (a.khach || a.account_name || '').localeCompare(b.khach || b.account_name || '');
             case 'customer-desc':
