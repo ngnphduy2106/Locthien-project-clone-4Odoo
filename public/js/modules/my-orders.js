@@ -202,31 +202,31 @@ const MyOrdersModule = {
                 s === 'hoàn thành' || s === 'completed' || s === 'đã thực hiện';
         };
 
-        // Helper to get sortable date from order
+        // Helper to get sortable date from order (returns timestamp for comparison)
         const getOrderDate = (o) => {
-            // Priority 1: Use raw ISO date fields from DB if available (reliable sorting)
-            // This avoids ambiguity of d/m/y vs m/d/y formatting in strings
+            // Priority 1: Parse ISO date directly (YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss)
             const rawDate = o.expected_date || o.created_at || o.order_date || o.sale_order_date || o.import_date;
             if (rawDate) {
-                const d = new Date(rawDate);
-                if (!isNaN(d.getTime())) return d;
+                const str = String(rawDate);
+                const isoMatch = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+                if (isoMatch) {
+                    // Create date from parts (local timezone, no UTC shift)
+                    return new Date(parseInt(isoMatch[1]), parseInt(isoMatch[2]) - 1, parseInt(isoMatch[3]));
+                }
             }
 
-            // Priority 2: Use 'ngay' or 'date' (formatted string or fallback)
+            // Priority 2: Parse 'ngay' or 'date' (dd/mm/yyyy format)
             let val = o.ngay || o.date || '';
             if (!val) return new Date(0);
 
-            // Ensure string and clean
             const str = String(val).trim();
-
-            // Handle dd/mm/yyyy or d/m/yyyy (allows / or - separator)
-            // Capture groups: 1=day, 2=month, 3=year
-            const dmy = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+            // Handle dd/mm/yyyy
+            const dmy = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
             if (dmy) {
                 return new Date(parseInt(dmy[3]), parseInt(dmy[2]) - 1, parseInt(dmy[1]));
             }
 
-            // Handle ISO or other formats
+            // Fallback
             const parsed = new Date(str);
             return isNaN(parsed.getTime()) ? new Date(0) : parsed;
         };
