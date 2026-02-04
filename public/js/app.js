@@ -3169,6 +3169,12 @@ function openDeliveryModal(orderId) {
     // ==========================================
     let orderProducts = null;
 
+    // DEBUG: Log order keys to see what data is available
+    console.log(`🔍 DEBUG openDeliveryModal - Order keys:`, Object.keys(order));
+    console.log(`🔍 DEBUG - order.assigned_products:`, order.assigned_products);
+    console.log(`🔍 DEBUG - order.assignment_id:`, order.assignment_id);
+    console.log(`🔍 DEBUG - Source module (MyOrdersModule.orders length):`, window.MyOrdersModule?.orders?.length);
+
     // Priority 1: Check for assigned_products (custom split order products)
     if (order.assigned_products) {
         let assignedProducts = order.assigned_products;
@@ -3179,6 +3185,8 @@ function openDeliveryModal(orderId) {
             console.log(`📦 Split order detected - using assigned_products:`, assignedProducts);
             orderProducts = assignedProducts;
         }
+    } else {
+        console.log(`⚠️ No assigned_products found on order, using fallback`);
     }
 
     // Priority 2: Fallback to original order products

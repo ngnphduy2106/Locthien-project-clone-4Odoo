@@ -164,8 +164,7 @@ router.get('/my/:driverName', async (req, res) => {
 
             if (assignments && assignments.length > 0) {
                 console.log(`📦 Found ${assignments.length} driver assignments:`,
-                    assignments.map(a => ({ id: a.id, driver_name: a.driver_name, order_id: a.order_id, qty: a.assigned_qty })));
-
+                    assignments.map(a => ({ id: a.id, driver_name: a.driver_name, order_id: a.order_id, qty: a.assigned_qty, assigned_products: a.assigned_products })));
 
                 for (const assign of assignments) {
                     // Find the parent order
