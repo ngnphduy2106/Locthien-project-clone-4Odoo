@@ -50,6 +50,55 @@ router.delete('/clear', async (req, res) => {
     }
 });
 
+// GET /api/materials/test-misa - Test MISA Products API directly
+router.get('/test-misa', async (req, res) => {
+    try {
+        const fetch = (await import('node-fetch')).default;
+
+        // 1. Login to MISA
+        console.log('🔑 Testing MISA login...');
+        const authResponse = await fetch('https://crmconnect.misa.vn/api/v2/Account', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                client_id: process.env.MISA_CLIENT_ID,
+                client_secret: process.env.MISA_CLIENT_SECRET
+            })
+        });
+
+        const authJson = await authResponse.json();
+        console.log('🔑 MISA Auth Response:', JSON.stringify(authJson).substring(0, 300));
+
+        const token = authJson.Data || authJson.data;
+        if (!token) {
+            return res.json(createResponse(true, 'MISA login failed', { authResponse: authJson }));
+        }
+
+        // 2. Fetch Products
+        console.log('📦 Testing MISA Products API...');
+        const productsResponse = await fetch('https://crmconnect.misa.vn/api/v2/Products?PageSize=10&Page=1', {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+                'Clientid': process.env.MISA_CLIENT_ID
+            }
+        });
+
+        const productsJson = await productsResponse.json();
+        console.log('📦 MISA Products Response:', JSON.stringify(productsJson).substring(0, 1000));
+
+        res.json(createResponse(false, 'MISA API Test Complete', {
+            authSuccess: !!(authJson.Success || authJson.success),
+            token: token ? 'OK' : 'FAILED',
+            productsResponse: productsJson
+        }));
+    } catch (e) {
+        console.error('MISA Test Error:', e);
+        res.json(createResponse(true, 'MISA test error: ' + e.message));
+    }
+});
+
 // GET /api/materials
 router.get('/', async (req, res) => {
     try {
