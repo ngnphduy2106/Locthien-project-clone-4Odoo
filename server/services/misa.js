@@ -82,11 +82,12 @@ export const syncMisaProducts = async () => {
     let errors = [];
 
     try {
-        const pageSize = 100; // Max allowed by MISA API
+        const pageSize = 1000; // Same as getMisaOrders - MISA supports large page sizes
 
         while (hasMore) {
-            console.log(`📡 Fetching MISA Products Page ${page} (pageSize=${pageSize})...`);
-            const response = await fetch(`${MISA_PRODUCTS_URL}?pageSize=${pageSize}&page=${page}`, {
+            console.log(`📡 Fetching MISA Products Page ${page} (PageSize=${pageSize})...`);
+            // Use PascalCase params like getMisaOrders
+            const response = await fetch(`${MISA_PRODUCTS_URL}?PageSize=${pageSize}&Page=${page}`, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
@@ -98,20 +99,20 @@ export const syncMisaProducts = async () => {
             const json = await response.json();
             console.log(`🔍 MISA Response Keys:`, Object.keys(json));
 
-            // MISA API uses 'results' field (from API docs), not 'data'
-            const success = json.success;
-            const results = json.results || json.data || json.Data || [];
+            // Use same pattern as getMisaOrders: json.Data || json.data
+            const success = json.Success || json.success;
+            const data = json.Data || json.data || [];
 
-            console.log(`📦 MISA Products Response (Page ${page}): success=${success}, results_length=${results?.length || 0}`);
+            console.log(`📦 MISA Products Response (Page ${page}): success=${success}, data_length=${data?.length || 0}`);
 
-            if (success && Array.isArray(results) && results.length > 0) {
+            if (success && Array.isArray(data) && data.length > 0) {
                 // Log first product for debugging
-                if (page === 1 && results[0]) {
-                    console.log('🔍 Sample MISA Product:', JSON.stringify(results[0], null, 2));
+                if (page === 1 && data[0]) {
+                    console.log('🔍 Sample MISA Product:', JSON.stringify(data[0], null, 2));
                 }
 
                 // Upsert to Database
-                for (const p of results) {
+                for (const p of data) {
                     try {
                         const material = {
                             id: p.product_code, // Use code as ID for upsert
@@ -138,18 +139,18 @@ export const syncMisaProducts = async () => {
                     }
                 }
 
-                totalSynced += results.length;
+                totalSynced += data.length;
 
                 // Continue pagination: if we got a full page, there might be more
-                if (results.length >= pageSize) {
+                if (data.length >= pageSize) {
                     page++;
-                    console.log(`📄 Moving to page ${page} (got ${results.length} items, may have more)...`);
+                    console.log(`📄 Moving to page ${page} (got ${data.length} items, may have more)...`);
                 } else {
-                    console.log(`📦 Got ${results.length} items (less than ${pageSize}), this is the last page.`);
+                    console.log(`📦 Got ${data.length} items (less than ${pageSize}), this is the last page.`);
                     hasMore = false;
                 }
             } else {
-                console.log(`📦 Page ${page} returned no results or failed. Stopping.`);
+                console.log(`📦 Page ${page} returned no data or failed. Stopping.`);
                 hasMore = false;
             }
         }
