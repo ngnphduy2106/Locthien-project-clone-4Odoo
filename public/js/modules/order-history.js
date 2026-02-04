@@ -183,6 +183,8 @@ const OrderHistoryModule = {
             const driver = order.driverName || order.driver_name || order.taiXe || '-';
             const statusClass = this.getStatusClass(status);
             const statusText = this.getStatusText(status);
+            const orderType = order.orderType || 'export';
+            const isImport = orderType === 'import';
 
             return `
                         <div class="compact-order-row" onclick="OrderHistoryModule.viewDetail('${orderId}')" style="
@@ -200,8 +202,9 @@ const OrderHistoryModule = {
                         " onmouseenter="this.style.background='var(--hover-bg)'" onmouseleave="this.style.background='var(--card-bg)'">
                             
                             <!-- Order ID -->
-                            <div style="min-width: 140px; font-weight: 600; color: var(--primary); font-size: 13px;">
+                            <div style="min-width: 140px; font-weight: 600; color: ${isImport ? '#16a34a' : 'var(--primary)'}; font-size: 13px;">
                                 ${orderId}
+                                ${isImport ? '<span style="background:#4CAF50; color:white; padding:1px 5px; border-radius:4px; font-size:9px; margin-left:4px;">Nhập</span>' : ''}
                             </div>
                             
                             <!-- Customer (flex-grow) -->

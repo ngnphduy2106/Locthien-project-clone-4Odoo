@@ -627,12 +627,20 @@
                         </div>
                     </div>
 
-                    <!-- Search and Sort Controls -->
+                    <!-- Search and Sort Controls with Date Filter -->
                     <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:16px; align-items:center;">
                         <div class="search-input" style="flex:1; min-width:200px;">
                             <i class="bi bi-search"></i>
                             <input type="text" placeholder="Tìm kiếm theo mã đơn, khách hàng, địa chỉ..."
                                 id="my-orders-search" oninput="filterMyOrders()">
+                        </div>
+                        <div style="display:flex; gap:8px; align-items:center;">
+                            <input type="date" id="my-orders-date-filter" class="form-control" style="width:auto;"
+                                onchange="filterMyOrders()">
+                            <button class="btn btn-outline btn-sm" onclick="clearMyOrdersDateFilter()"
+                                title="Xóa lọc ngày">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
                         </div>
                         <select id="my-orders-sort" class="form-select" style="width:auto; min-width:150px;"
                             onchange="filterMyOrders()">
@@ -882,15 +890,16 @@
 
                 <!-- ==================== USERS MANAGEMENT SECTION (ADMIN ONLY) ==================== -->
                 <section id="section-users" class="hidden">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                    <div
+                        style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
                         <h2 class="page-heading" style="margin-bottom:0;">Quản lý Tài khoản</h2>
                         <button class="btn btn-primary" onclick="showCreateUserModal()">
                             <i class="bi bi-person-plus"></i> Tạo tài khoản
                         </button>
                     </div>
 
-                    <!-- User Stats Cards -->
-                    <div class="stat-cards" style="grid-template-columns: repeat(4, 1fr); margin-bottom:24px;">
+                    <!-- User Stats Cards - Responsive 2x2 on mobile -->
+                    <div class="stat-cards user-stat-cards" style="margin-bottom:24px;">
                         <div class="stat-card" style="background: linear-gradient(135deg, #667eea, #764ba2);">
                             <div class="stat-card-content">
                                 <div class="stat-card-label" style="color:#fff; opacity:0.9;">Tổng tài khoản</div>
@@ -921,10 +930,10 @@
                         </div>
                     </div>
 
-                    <!-- Users Table -->
+                    <!-- Users Table with mobile scroll -->
                     <div class="card">
-                        <div class="card-body" style="padding: 0;">
-                            <table class="data-table">
+                        <div class="card-body" style="padding: 0; overflow-x: auto;">
+                            <table class="data-table" style="min-width:600px;">
                                 <thead>
                                     <tr>
                                         <th>Họ tên</th>

@@ -3168,3 +3168,29 @@ body {
         grid-template-columns: repeat(2, 1fr) !important;
     }
 }
+
+/* ====== USER STAT CARDS - RESPONSIVE 2x2 ON MOBILE ====== */
+.user-stat-cards {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+}
+
+@media (max-width: 768px) {
+    .user-stat-cards {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 12px !important;
+    }
+
+    .user-stat-cards .stat-card {
+        padding: 12px !important;
+    }
+
+    .user-stat-cards .stat-card-value {
+        font-size: 1.5rem !important;
+    }
+
+    .user-stat-cards .stat-card-label {
+        font-size: 11px !important;
+    }
+}

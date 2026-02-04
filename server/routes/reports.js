@@ -170,19 +170,8 @@ router.get('/order-history', async (req, res) => {
             console.log(`📋 Filtered order history for driver "${driverFilter}": ${historyOrders.length} orders`);
         }
 
-        // Sort by date descending (newest first)
-        historyOrders.sort((a, b) => {
-            const dateA = new Date(a.ngay || a.sale_order_date || a.created_at || 0);
-            const dateB = new Date(b.ngay || b.sale_order_date || b.created_at || 0);
-            return dateB - dateA;
-        });
-
-        const total = historyOrders.length;
-        const totalPages = Math.ceil(total / limit);
-        const paginatedOrders = historyOrders.slice(offset, offset + limit);
-
-        // Map to consistent format (CamelCase for app.js)
-        const mappedOrders = paginatedOrders.map(o => ({
+        // Map export orders
+        const mappedExportOrders = historyOrders.map(o => ({
             id: o.soDon || o.sale_order_no || o.id,
             orderCode: o.soDon || o.sale_order_no || o.id,
             customerName: o.khach || o.account_name || '',
@@ -192,12 +181,64 @@ router.get('/order-history', async (req, res) => {
             driverName: o.taiXe || o.driver || '',
             completedAt: o.completed_at || o.updated_at,
             address: o.diaChi || o.shipping_address || '',
-            products: o.cart || o.products || []
+            products: o.cart || o.products || [],
+            orderType: 'export'
         }));
+
+        // === FETCH IMPORT TICKETS ===
+        let importOrders = [];
+        try {
+            const importTickets = await db.getImportTickets();
+            const completedImports = importTickets.filter(t => {
+                const s = String(t.status || '').trim().toLowerCase();
+                return historyStatuses.some(hs => hs.toLowerCase() === s);
+            });
+
+            // Apply driver filter for imports
+            let filteredImports = completedImports;
+            if (driverFilter) {
+                const driverLower = driverFilter.toLowerCase();
+                filteredImports = completedImports.filter(t => {
+                    const importDriver = String(t.assigned_driver || t.driver_name || '').toLowerCase();
+                    return importDriver.includes(driverLower);
+                });
+            }
+
+            importOrders = filteredImports.map(t => ({
+                id: t.ticket_no || t.id,
+                orderCode: t.ticket_no || t.id,
+                customerName: t.supplier_name || 'Nhà cung cấp',
+                orderDate: t.expected_date || t.created_at,
+                totalAmount: t.total_amount || 0,
+                status: t.status,
+                driverName: t.assigned_driver || t.driver_name || '',
+                completedAt: t.completed_at || t.updated_at,
+                address: t.supplier_address || 'Sunco',
+                products: t.items || [],
+                orderType: 'import'
+            }));
+            console.log(`📦 Found ${importOrders.length} completed import tickets`);
+        } catch (importErr) {
+            console.warn('⚠️ Could not fetch import tickets:', importErr.message);
+        }
+
+        // Combine export and import orders
+        const allOrders = [...mappedExportOrders, ...importOrders];
+
+        // Sort by date descending (newest first)
+        allOrders.sort((a, b) => {
+            const dateA = new Date(a.orderDate || 0);
+            const dateB = new Date(b.orderDate || 0);
+            return dateB - dateA;
+        });
+
+        const total = allOrders.length;
+        const totalPages = Math.ceil(total / limit);
+        const paginatedOrders = allOrders.slice(offset, offset + limit);
 
         res.json({
             error: false,
-            data: mappedOrders,
+            data: paginatedOrders,
             total,
             totalPages,
             currentPage: page

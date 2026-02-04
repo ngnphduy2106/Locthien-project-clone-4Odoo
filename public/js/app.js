@@ -1822,14 +1822,25 @@ window.switchMyOrdersTab = switchMyOrdersTab;
 function filterMyOrders() {
     const searchInput = document.getElementById('my-orders-search');
     const sortSelect = document.getElementById('my-orders-sort');
+    const dateFilter = document.getElementById('my-orders-date-filter');
 
     const query = (searchInput?.value || '').toLowerCase().trim();
     const sortValue = sortSelect?.value || 'date-desc';
+    const filterDate = dateFilter?.value || '';
 
-    console.log('🔍 Filtering My Orders:', { query, sortValue });
+    console.log('🔍 Filtering My Orders:', { query, sortValue, filterDate });
 
     // Get all orders from state
     let orders = [...(state.myOrders || [])];
+
+    // Filter by date
+    if (filterDate) {
+        const selectedDate = new Date(filterDate).toDateString();
+        orders = orders.filter(order => {
+            const orderDate = new Date(order.ngay || order.sale_order_date || order.expected_date || 0).toDateString();
+            return orderDate === selectedDate;
+        });
+    }
 
     // Filter by search query
     if (query) {
@@ -1927,6 +1938,16 @@ function filterMyOrders() {
 
 // Export filterMyOrders
 window.filterMyOrders = filterMyOrders;
+
+// Clear date filter for My Orders
+function clearMyOrdersDateFilter() {
+    const dateFilter = document.getElementById('my-orders-date-filter');
+    if (dateFilter) {
+        dateFilter.value = '';
+        filterMyOrders();
+    }
+}
+window.clearMyOrdersDateFilter = clearMyOrdersDateFilter;
 
 // === ORDER HISTORY ===
 async function loadOrderHistory() {
