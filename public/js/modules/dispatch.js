@@ -6,6 +6,9 @@ const DispatchModule = {
     orders: [],
     currentTab: 'pending',
     employees: [],
+    // Render cache for faster tab switching
+    _renderCache: { pending: null, delivering: null, completed: null },
+    _cacheVersion: 0,
 
     // Khởi tạo module
     init() {
@@ -61,6 +64,9 @@ const DispatchModule = {
                 }
 
                 this.orders = data.orders || [];
+                // Invalidate render cache when data changes
+                this._cacheVersion++;
+                this._renderCache = { pending: null, delivering: null, completed: null };
             } else {
                 this.loadMockOrders();
             }
@@ -197,22 +203,31 @@ const DispatchModule = {
         this.renderOrdersList(filteredOrders);
     },
 
-    // Render orders list
+    // Render orders list (with caching for faster tab switching)
     renderOrdersList(orders) {
         const listContainer = document.getElementById('dispatch-orders-list');
         if (!listContainer) return;
 
+        // Check cache first for faster tab switching
+        const tab = this.currentTab;
+        if (this._renderCache[tab] !== null) {
+            listContainer.innerHTML = this._renderCache[tab];
+            return;
+        }
+
         if (orders.length === 0) {
-            listContainer.innerHTML = `
+            const html = `
                 <div class="empty-state">
                     <i class="bi bi-inbox"></i>
                     <p>Không có đơn hàng nào</p>
                 </div>
             `;
+            this._renderCache[tab] = html;
+            listContainer.innerHTML = html;
             return;
         }
 
-        listContainer.innerHTML = orders.map(order => `
+        const html = orders.map(order => `
             <div class="order-card" onclick="DispatchModule.viewOrderDetail('${order.id || order.order_id}')">
                 <div class="order-header">
                     <div>
@@ -232,6 +247,9 @@ const DispatchModule = {
                 </div>
             </div>
         `).join('');
+
+        this._renderCache[tab] = html;
+        listContainer.innerHTML = html;
     },
 
     // Get action button based on status

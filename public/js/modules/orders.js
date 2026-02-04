@@ -5,6 +5,8 @@
 const OrdersModule = {
     orders: [],
     currentTab: 'pending',
+    // Render cache for faster tab switching
+    _renderCache: { pending: null, delivering: null, completed: null },
 
     // Khởi tạo module
     init() {
@@ -45,6 +47,8 @@ const OrdersModule = {
             }
 
             this.orders = data.orders || [];
+            // Invalidate render cache when data changes
+            this._renderCache = { pending: null, delivering: null, completed: null };
             this.renderOrders();
         } catch (error) {
             console.error('Error loading orders:', error);
@@ -84,24 +88,34 @@ const OrdersModule = {
         this.renderOrders();
     },
 
-    // Render danh sách đơn hàng
+    // Render danh sách đơn hàng (with caching for faster tab switching)
     renderOrders() {
         const container = document.getElementById('orders-list');
         if (!container) return;
 
+        const tab = this.currentTab;
+
+        // Check cache first for faster tab switching
+        if (this._renderCache[tab] !== null) {
+            container.innerHTML = this._renderCache[tab];
+            return;
+        }
+
         const filteredOrders = this.filterOrdersByTab();
 
         if (filteredOrders.length === 0) {
-            container.innerHTML = `
+            const html = `
                 <div class="empty-state">
                     <i class="bi bi-inbox"></i>
                     <p>Không có đơn hàng nào</p>
                 </div>
             `;
+            this._renderCache[tab] = html;
+            container.innerHTML = html;
             return;
         }
 
-        container.innerHTML = filteredOrders.map(order => `
+        const html = filteredOrders.map(order => `
             <div class="order-card" onclick="OrdersModule.viewOrderDetail('${order.id || order.order_id}')">
                 <div class="order-header">
                     <div>
@@ -123,6 +137,9 @@ const OrdersModule = {
                 </div>
             </div>
         `).join('');
+
+        this._renderCache[tab] = html;
+        container.innerHTML = html;
     },
 
     // Filter orders by tab
