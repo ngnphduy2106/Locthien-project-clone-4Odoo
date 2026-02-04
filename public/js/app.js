@@ -2662,7 +2662,7 @@ function assignDriver(orderId) {
                 
                 <!-- Add Driver Form -->
                 <div style="border:1px dashed var(--border); padding:12px; border-radius:8px;">
-                    <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end;">
+                    <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end; margin-bottom:12px;">
                         <div style="flex:1; min-width:150px;">
                             <label class="form-label" style="font-size:12px;">Chọn tài xế</label>
                             <select id="new-driver-select" class="form-control" onchange="onNewDriverChange(this)">
@@ -2681,14 +2681,35 @@ function assignDriver(orderId) {
                                 <input type="text" id="external-driver-plate" class="form-control" placeholder="Biển số...">
                             </div>
                         </div>
-                        <div style="width:100px;">
-                            <label class="form-label" style="font-size:12px;">Số lượng (kg)</label>
-                            <input type="number" id="new-driver-qty" class="form-control" placeholder="SL" value="">
-                        </div>
-                        <button class="btn btn-primary" onclick="addDriverAssignmentRow()" style="height:38px;">
-                            <i class="bi bi-plus"></i> Thêm
-                        </button>
                     </div>
+                    
+                    <!-- Product Selection for this driver -->
+                    <div style="margin-bottom:12px;">
+                        <label class="form-label" style="font-size:12px; color:var(--primary);">📦 Chọn sản phẩm & số lượng cho tài xế này:</label>
+                        <div id="new-driver-products" style="background:var(--card-bg); border-radius:6px; overflow:hidden;">
+                            ${products.map((p, idx) => `
+                                <div style="display:flex; align-items:center; gap:8px; padding:8px 12px; border-bottom:1px solid var(--border);">
+                                    <input type="checkbox" id="assign-prod-${idx}" checked style="width:18px; height:18px;">
+                                    <div style="flex:1;">
+                                        <div style="font-weight:500; font-size:13px;">${p.name || p.product || '-'}</div>
+                                        <div style="font-size:11px; color:var(--text-muted);">Còn lại: <span id="remain-prod-${idx}">${p.qty || p.quantity || 0}</span> ${p.unit || 'kg'}</div>
+                                    </div>
+                                    <input type="number" id="assign-qty-${idx}" class="form-control" 
+                                        value="${p.qty || p.quantity || 0}" 
+                                        data-code="${p.code || ''}"
+                                        data-name="${p.name || p.product || ''}"
+                                        data-unit="${p.unit || 'kg'}"
+                                        data-max="${p.qty || p.quantity || 0}"
+                                        style="width:100px; padding:6px; font-size:13px; text-align:center;">
+                                    <span style="font-size:12px; color:var(--text-muted);">${p.unit || 'kg'}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                    
+                    <button class="btn btn-primary" onclick="addDriverAssignmentRow()" style="width:100%;">
+                        <i class="bi bi-plus"></i> Thêm tài xế với sản phẩm đã chọn
+                    </button>
                 </div>
                 
                 <!-- Summary -->
@@ -2730,7 +2751,6 @@ function onNewDriverChange(selectEl) {
 // Add driver to assignment list
 function addDriverAssignmentRow() {
     const select = window.$('#new-driver-select');
-    const qtyInput = window.$('#new-driver-qty');
     const externalName = window.$('#external-driver-name');
     const externalPlate = window.$('#external-driver-plate');
 
@@ -2754,36 +2774,108 @@ function addDriverAssignmentRow() {
         plate = selectedOption?.getAttribute('data-plate') || '';
     }
 
-    const qty = parseFloat(qtyInput?.value) || 0;
-    if (qty <= 0) {
-        alert('Vui lòng nhập số lượng hợp lệ!');
+    // Collect selected products with quantities
+    const assignedProducts = [];
+    let totalQty = 0;
+
+    // Get current order products count
+    const order = state.currentOrder;
+    const products = order?.products || order?.cart || order?.chiTiet || [];
+    let parsedProducts = products;
+    if (typeof products === 'string') {
+        try { parsedProducts = JSON.parse(products); } catch (e) { parsedProducts = []; }
+    }
+
+    parsedProducts.forEach((p, idx) => {
+        const checkbox = window.$(`#assign-prod-${idx}`);
+        const qtyInput = window.$(`#assign-qty-${idx}`);
+
+        if (checkbox?.checked && qtyInput) {
+            const qty = parseFloat(qtyInput.value) || 0;
+            if (qty > 0) {
+                assignedProducts.push({
+                    code: qtyInput.dataset.code || p.code || '',
+                    name: qtyInput.dataset.name || p.name || p.product || '',
+                    qty: qty,
+                    unit: qtyInput.dataset.unit || p.unit || 'kg'
+                });
+                totalQty += qty;
+            }
+        }
+    });
+
+    if (assignedProducts.length === 0) {
+        alert('Vui lòng chọn ít nhất 1 sản phẩm với số lượng > 0!');
         return;
     }
 
-    // Add to list
+    // Add to list with products
     const isExternal = select?.value === '__EXTERNAL__';
     state.driverAssignments.push({
         driver_name: driverName,
         plate: plate,
-        qty: qty,
-        type: isExternal ? 'external' : 'internal',  // Backend reads this field
-        is_external: isExternal  // Keep for UI display
+        qty: totalQty,
+        products: assignedProducts, // NEW: custom products for this driver
+        type: isExternal ? 'external' : 'internal',
+        is_external: isExternal
     });
 
-    // Reset form
+    // Reset form - reset qty inputs and checkboxes
     select.value = '';
-    qtyInput.value = '';
     if (externalName) externalName.value = '';
     if (externalPlate) externalPlate.value = '';
     window.$('#external-driver-fields')?.classList.add('hidden');
+
+    // Update remaining quantities display
+    updateRemainingQuantities();
 
     renderDriverAssignmentsList();
     updateQtySummaryDisplay();
 }
 
+// Update remaining quantities after adding driver
+function updateRemainingQuantities() {
+    const order = state.currentOrder;
+    const products = order?.products || order?.cart || order?.chiTiet || [];
+    let parsedProducts = products;
+    if (typeof products === 'string') {
+        try { parsedProducts = JSON.parse(products); } catch (e) { parsedProducts = []; }
+    }
+
+    parsedProducts.forEach((p, idx) => {
+        const originalQty = Number(p.qty || p.quantity || 0);
+
+        // Calculate already assigned for this product
+        let assignedQty = 0;
+        state.driverAssignments.forEach(a => {
+            if (a.products) {
+                const prod = a.products.find(ap => ap.code === (p.code || '') || ap.name === (p.name || p.product));
+                if (prod) assignedQty += prod.qty;
+            }
+        });
+
+        const remaining = originalQty - assignedQty;
+
+        // Update remaining display
+        const remainEl = window.$(`#remain-prod-${idx}`);
+        if (remainEl) {
+            remainEl.textContent = remaining.toFixed(0);
+            remainEl.style.color = remaining < 0 ? 'var(--danger)' : (remaining === 0 ? 'var(--success)' : '');
+        }
+
+        // Update default value in input
+        const qtyInput = window.$(`#assign-qty-${idx}`);
+        if (qtyInput) {
+            qtyInput.value = Math.max(0, remaining);
+            qtyInput.dataset.max = remaining;
+        }
+    });
+}
+
 // Remove driver from list
 function removeDriverAssignmentRow(idx) {
     state.driverAssignments.splice(idx, 1);
+    updateRemainingQuantities();
     renderDriverAssignmentsList();
     updateQtySummaryDisplay();
 }
@@ -2799,16 +2891,28 @@ function renderDriverAssignmentsList() {
     }
 
     container.innerHTML = state.driverAssignments.map((a, idx) => `
-        <div style="display:flex; align-items:center; gap:12px; padding:10px; background:var(--card-bg); border-radius:6px; margin-bottom:8px; border-left:3px solid ${a.is_external ? 'var(--warning)' : 'var(--primary)'};"> 
-            <div style="flex:1;">
-                <strong>${a.driver_name}</strong>
-                ${a.is_external ? '<span style="font-size:11px; background:var(--warning); color:#000; padding:2px 6px; border-radius:4px; margin-left:6px;">Tài xế ngoài</span>' : ''}
-                <br><small style="color:var(--text-muted);">🚗 ${a.plate || 'Chưa có biển số'}</small>
+        <div style="background:var(--card-bg); border-radius:6px; margin-bottom:8px; border-left:3px solid ${a.is_external ? 'var(--warning)' : 'var(--primary)'}; overflow:hidden;">
+            <div style="display:flex; align-items:center; gap:12px; padding:10px;"> 
+                <div style="flex:1;">
+                    <strong>${a.driver_name}</strong>
+                    ${a.is_external ? '<span style="font-size:11px; background:var(--warning); color:#000; padding:2px 6px; border-radius:4px; margin-left:6px;">Tài xế ngoài</span>' : ''}
+                    <br><small style="color:var(--text-muted);">🚗 ${a.plate || 'Chưa có biển số'}</small>
+                </div>
+                <div style="font-weight:600; color:var(--primary);">${formatNumber(a.qty)} kg</div>
+                <button onclick="removeDriverAssignmentRow(${idx})" style="background:var(--danger); color:white; border:none; border-radius:4px; width:28px; height:28px; cursor:pointer;">
+                    <i class="bi bi-x"></i>
+                </button>
             </div>
-            <div style="font-weight:600; color:var(--primary);">${formatNumber(a.qty)} kg</div>
-            <button onclick="removeDriverAssignmentRow(${idx})" style="background:var(--danger); color:white; border:none; border-radius:4px; width:28px; height:28px; cursor:pointer;">
-                <i class="bi bi-x"></i>
-            </button>
+            ${a.products && a.products.length > 0 ? `
+                <div style="background:rgba(0,0,0,0.03); padding:8px 12px; font-size:12px;">
+                    ${a.products.map(p => `
+                        <div style="display:flex; justify-content:space-between; margin-bottom:2px;">
+                            <span style="color:var(--text-secondary);">📦 ${p.name}</span>
+                            <span style="font-weight:500;">${formatNumber(p.qty)} ${p.unit}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            ` : ''}
         </div>
     `).join('');
 }
@@ -6118,6 +6222,7 @@ function showDriverCompletionModal(orderId, assignmentId = null) {
     // Store order for submission - include assignmentId if passed
     let assignedQty = null;
     let assignmentData = null;
+    let assignedProducts = null;
 
     if (assignmentId) {
         order.assignment_id = assignmentId;
@@ -6134,7 +6239,20 @@ function showDriverCompletionModal(orderId, assignmentId = null) {
             assignedQty = Number(assignmentData.assigned_qty);
         }
 
-        console.log(`🔀 Split order detected - assignedQty: ${assignedQty}, assignmentData:`, assignmentData);
+        // Check for custom assigned_products  
+        if (assignmentData && assignmentData.assigned_products) {
+            assignedProducts = assignmentData.assigned_products;
+            if (typeof assignedProducts === 'string') {
+                try { assignedProducts = JSON.parse(assignedProducts); } catch (e) { assignedProducts = null; }
+            }
+        } else if (order.assigned_products) {
+            assignedProducts = order.assigned_products;
+            if (typeof assignedProducts === 'string') {
+                try { assignedProducts = JSON.parse(assignedProducts); } catch (e) { assignedProducts = null; }
+            }
+        }
+
+        console.log(`🔀 Split order detected - assignedQty: ${assignedQty}, assignedProducts:`, assignedProducts);
     }
 
     state.currentCompletionOrder = order;
@@ -6147,44 +6265,57 @@ function showDriverCompletionModal(orderId, assignmentId = null) {
         modalTitle.innerHTML = `<i class="bi bi-check-circle" style="color:var(--success);"></i> Xác nhận hoàn thành`;
     }
 
-    // Get products list and initialize completion cart
-    let products = order.products || order.cart || order.chiTiet || [];
-    if (typeof products === 'string') {
-        try { products = JSON.parse(products); } catch (e) { products = []; }
-    }
-
-    // Calculate total original qty for proportional split
-    let totalOriginalQty = 0;
-    products.forEach(p => {
-        totalOriginalQty += Number(p.qty || p.quantity || 0);
-    });
-
-    // Initialize completion cart with products for editing
-    // If this is a split order with assigned_qty, scale product quantities proportionally
-    state.completionCart = products.map((p, idx) => {
-        let productQty = Number(p.qty || p.quantity || 0);
-
-        // For split orders: if assigned_qty is less than total, it's a partial order
-        // Scale all product quantities proportionally
-        if (assignedQty !== null && totalOriginalQty > 0 && assignedQty < totalOriginalQty) {
-            // Calculate proportional qty for this split
-            const ratio = assignedQty / totalOriginalQty;
-            productQty = Math.round(productQty * ratio * 100) / 100;
-            console.log(`   Product ${idx}: ${p.name || p.product} scaled from ${p.qty || p.quantity} to ${productQty} (ratio: ${ratio.toFixed(2)})`);
-        } else if (assignedQty !== null && products.length === 1) {
-            // Single product order: use assigned_qty directly
-            productQty = assignedQty;
-        }
-
-        return {
-            code: p.code || p.product_code || '',
-            name: p.name || p.product || p.productName || '-',
-            planQty: productQty,
-            actualQty: productQty, // Default to planned qty
+    // PRIORITY 1: Use assigned_products if available (custom split)
+    if (assignedProducts && Array.isArray(assignedProducts) && assignedProducts.length > 0) {
+        console.log('📦 Using custom assigned_products from assignment');
+        state.completionCart = assignedProducts.map(p => ({
+            code: p.code || '',
+            name: p.name || p.product || '-',
+            planQty: Number(p.qty || p.quantity || 0),
+            actualQty: Number(p.qty || p.quantity || 0),
             unit: p.unit || 'Kg',
             note: ''
-        };
-    });
+        }));
+    } else {
+        // PRIORITY 2: Get products from order and scale if needed
+        let products = order.products || order.cart || order.chiTiet || [];
+        if (typeof products === 'string') {
+            try { products = JSON.parse(products); } catch (e) { products = []; }
+        }
+
+        // Calculate total original qty for proportional split
+        let totalOriginalQty = 0;
+        products.forEach(p => {
+            totalOriginalQty += Number(p.qty || p.quantity || 0);
+        });
+
+        // Initialize completion cart with products for editing
+        // If this is a split order with assigned_qty, scale product quantities proportionally
+        state.completionCart = products.map((p, idx) => {
+            let productQty = Number(p.qty || p.quantity || 0);
+
+            // For split orders: if assigned_qty is less than total, it's a partial order
+            // Scale all product quantities proportionally
+            if (assignedQty !== null && totalOriginalQty > 0 && assignedQty < totalOriginalQty) {
+                // Calculate proportional qty for this split
+                const ratio = assignedQty / totalOriginalQty;
+                productQty = Math.round(productQty * ratio * 100) / 100;
+                console.log(`   Product ${idx}: ${p.name || p.product} scaled from ${p.qty || p.quantity} to ${productQty} (ratio: ${ratio.toFixed(2)})`);
+            } else if (assignedQty !== null && products.length === 1) {
+                // Single product order: use assigned_qty directly
+                productQty = assignedQty;
+            }
+
+            return {
+                code: p.code || p.product_code || '',
+                name: p.name || p.product || p.productName || '-',
+                planQty: productQty,
+                actualQty: productQty, // Default to planned qty
+                unit: p.unit || 'Kg',
+                note: ''
+            };
+        });
+    }
 
     // Use state.completionCart for display (already has scaled qty for split orders)
     const productsHtml = state.completionCart.length > 0

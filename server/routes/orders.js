@@ -1272,6 +1272,7 @@ router.post('/:id/assign-multi', async (req, res) => {
             driver_type: a.type || 'internal',
             plate: a.plate || '',
             assigned_qty: Number(a.qty) || 0,
+            assigned_products: a.products || null, // NEW: custom products per driver
             status: 'pending',
             note: a.note || ''
         }));
