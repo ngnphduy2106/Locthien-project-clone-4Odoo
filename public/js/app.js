@@ -3354,7 +3354,13 @@ async function submitDelivery() {
             unit: item.unit || 'kg'
         }));
 
-        // Prepare payload with BOTH order data AND images
+        // Collect shell products as local_items
+        const localItems = (state.deliveryCart || []).filter(item => item.isShell).map(item => ({
+            name: item.product,
+            qty: Number(item.qty || 0)
+        }));
+
+        // STEP 1: Complete the order
         const completePayload = {
             type: 'XUAT',
             warehouse: warehouse,
@@ -3362,26 +3368,49 @@ async function submitDelivery() {
             driver_name: driverName,
             plate: plate,
             cart: cart,
+            local_items: localItems,
             delivery_note: note || `Hoàn thành bởi ${driverName}`,
-            sender: driverName,
-            images: validImages // Include images directly in the complete request
+            sender: driverName
         };
 
-        console.log('📤 Complete order with images:', {
+        console.log('📤 Step 1: Complete order:', {
             orderId: order.id,
             cartItems: cart.length,
-            imageCount: validImages.length
+            localItems: localItems.length
         });
 
         const completeRes = await api.completeOrder(order.id, completePayload);
 
-        hideLoading();
-
         if (completeRes.error) {
+            hideLoading();
             alert('Lỗi hoàn thành đơn: ' + (completeRes.msg || completeRes.message));
             return;
         }
 
+        // STEP 2: Add proof images using separate API (like import flow)
+        if (validImages.length > 0) {
+            console.log(`📸 Step 2: Adding ${validImages.length} proof images...`);
+
+            try {
+                const imageRes = await fetch(`/api/orders/${order.id}/add-proof-images`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ images: validImages })
+                });
+
+                const imageData = await imageRes.json();
+
+                if (imageData.error) {
+                    console.warn('⚠️ Image save warning:', imageData.msg);
+                } else {
+                    console.log('✅ Proof images saved:', imageData.msg);
+                }
+            } catch (imgErr) {
+                console.error('Image upload error:', imgErr.message);
+            }
+        }
+
+        hideLoading();
         alert(completeRes.msg || 'Đã hoàn thành đơn hàng!');
         closeDeliveryModal();
 
