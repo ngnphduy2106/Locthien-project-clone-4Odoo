@@ -964,19 +964,56 @@ router.post('/:id/complete', async (req, res) => {
             const ticketId = prefix + ts.short;
 
             // Prepare actual delivered products for DB update
-            const updatedProducts = cart.filter(c => !c.isShell).map(item => ({
+            let updatedProducts = cart.filter(c => !c.isShell).map(item => ({
                 code: item.product?.code || item.product?.id || item.code || '',
                 name: item.product?.name || item.name || item.product || '',
                 qty: Number(item.weight_kg || item.qty || 0),
                 unit: item.unit || 'Kg'
             }));
 
+            // For multi-driver orders: combine products from ALL assignments
+            if (isMultiDriverOrder && allDriversCompleted && allAssignments.length > 0) {
+                console.log(`📦 Combining cart from ${allAssignments.length} driver assignments...`);
+
+                const combinedProducts = {};
+
+                // Collect assigned_products from all assignments
+                allAssignments.forEach(assign => {
+                    const products = assign.assigned_products || [];
+                    const actualQtyRatio = assign.actual_qty && assign.assigned_qty
+                        ? assign.actual_qty / assign.assigned_qty
+                        : 1;
+
+                    if (Array.isArray(products)) {
+                        products.forEach(p => {
+                            const key = p.code || p.name;
+                            // Use actual_qty ratio to adjust quantities
+                            const adjustedQty = Number(p.qty || 0) * actualQtyRatio;
+
+                            if (!combinedProducts[key]) {
+                                combinedProducts[key] = {
+                                    code: p.code || '',
+                                    name: p.name || '',
+                                    qty: 0,
+                                    unit: p.unit || 'Kg'
+                                };
+                            }
+                            combinedProducts[key].qty += adjustedQty;
+                        });
+                    }
+                });
+
+                // Convert to array
+                updatedProducts = Object.values(combinedProducts);
+                console.log(`✅ Combined ${updatedProducts.length} products:`, updatedProducts.map(p => `${p.name}: ${p.qty}${p.unit}`));
+            }
+
             // Update order status AND products + Set initial sync status
             await db.updateOrder(id, {
                 status: CONFIG.STATUS.DELIVERED,
                 delivery_status: 'Đã giao hàng',
-                taiXe: driver_name,
-                bienSo: plate,
+                taiXe: isMultiDriverOrder ? firstDriverName : driver_name,
+                bienSo: isMultiDriverOrder && firstDriverPlate ? firstDriverPlate : plate,
                 cart: updatedProducts,
                 local_items: local_items || [],
                 delivery_note: note || delivery_note || '',
