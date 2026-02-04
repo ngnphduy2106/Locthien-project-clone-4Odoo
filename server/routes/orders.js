@@ -95,6 +95,29 @@ router.get('/export-tickets', async (req, res) => {
     }
 });
 
+// GET /api/orders/assignment/:id - Get single assignment with assigned_products
+router.get('/assignment/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { createClient } = await import('@supabase/supabase-js');
+        const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+        const { data, error } = await supabase
+            .from('order_driver_assignments')
+            .select('*')
+            .eq('id', id)
+            .single();
+
+        if (error) {
+            return res.json(createResponse(true, 'Không tìm thấy assignment!'));
+        }
+
+        res.json({ error: false, data });
+    } catch (e) {
+        res.json(createResponse(true, e.message));
+    }
+});
+
 // GET /api/orders/my/:driverName - Get orders for driver (both export and import)
 // Supports multi-driver splitting via order_driver_assignments table
 router.get('/my/:driverName', async (req, res) => {
@@ -193,6 +216,9 @@ router.get('/my/:driverName', async (req, res) => {
                     const isSplitOrder = allAssignments && allAssignments.length > 1;
                     const completedCount = allAssignments?.filter(a => a.status === 'completed').length || 0;
                     const totalCount = allAssignments?.length || 1;
+
+                    // DEBUG: Log what we're returning to frontend
+                    console.log(`🚀 Returning to frontend - assignment_id: ${assign.id}, assigned_products:`, assign.assigned_products);
 
                     myOrders.push({
                         ...order,

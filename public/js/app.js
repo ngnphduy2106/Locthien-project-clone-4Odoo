@@ -6224,7 +6224,7 @@ function removeCompletionImage(idx) {
 }
 
 // Show driver completion modal
-function showDriverCompletionModal(orderId, assignmentId = null) {
+async function showDriverCompletionModal(orderId, assignmentId = null) {
     console.log(`🎯 showDriverCompletionModal called - orderId: ${orderId}, assignmentId: ${assignmentId}`);
 
     // Find order from all lists - PRIORITY: MyOrdersModule first (has assigned_products)
@@ -6250,11 +6250,6 @@ function showDriverCompletionModal(orderId, assignmentId = null) {
         return;
     }
 
-    console.log(`✅ Order found:`, order.id, order.soDon);
-    console.log(`🔍 Order keys:`, Object.keys(order));
-    console.log(`🔍 order.assigned_products:`, order.assigned_products);
-    console.log(`🔍 order.assignment_id:`, order.assignment_id);
-
     // Reset images and local items
     completionImages = [];
     completionLocalItems = [];
@@ -6270,13 +6265,28 @@ function showDriverCompletionModal(orderId, assignmentId = null) {
         if (typeof assignedProducts === 'string') {
             try { assignedProducts = JSON.parse(assignedProducts); } catch (e) { assignedProducts = null; }
         }
-        console.log(`✅ Found assigned_products directly on order:`, assignedProducts);
     }
 
     // Use assignmentId from order if not passed
     if (!assignmentId && order.assignment_id) {
         assignmentId = order.assignment_id;
-        console.log(`📌 Using assignment_id from order: ${assignmentId}`);
+    }
+
+    // If no assigned_products but we have assignment_id, fetch from API
+    if (!assignedProducts && assignmentId) {
+        try {
+            const resp = await fetch(`/api/orders/assignment/${assignmentId}`);
+            const data = await resp.json();
+            if (!data.error && data.data?.assigned_products) {
+                assignedProducts = data.data.assigned_products;
+                if (typeof assignedProducts === 'string') {
+                    try { assignedProducts = JSON.parse(assignedProducts); } catch (e) { assignedProducts = null; }
+                }
+                console.log(`📦 Fetched assigned_products from API:`, assignedProducts);
+            }
+        } catch (e) {
+            console.error('Error fetching assignment:', e);
+        }
     }
 
     if (assignmentId) {
