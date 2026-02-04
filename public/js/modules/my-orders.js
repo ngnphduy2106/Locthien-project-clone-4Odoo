@@ -328,11 +328,26 @@ const MyOrdersModule = {
         console.log('View order detail:', order);
         const typeLabel = orderType === 'import' ? 'Đơn nhập' : 'Đơn xuất';
 
-        // Build product list
-        const products = order.products || order.cart || [];
+        // Build product list - prioritize assigned_products for split orders
+        let products = order.products || order.cart || [];
+
+        // For split orders: show only driver's assigned products
+        if (order.assigned_products) {
+            let assignedProducts = order.assigned_products;
+            if (typeof assignedProducts === 'string') {
+                try { assignedProducts = JSON.parse(assignedProducts); } catch (e) { assignedProducts = null; }
+            }
+            if (Array.isArray(assignedProducts) && assignedProducts.length > 0) {
+                products = assignedProducts;
+            }
+        }
+
         const productsList = products.map(p =>
             `• ${p.name || p.code}: ${p.qty || p.amount || 0} ${p.unit || 'kg'}`
         ).join('\n') || 'Chưa có sản phẩm';
+
+        // Show split order indicator if applicable
+        const splitBadge = order.is_split_order ? `<div style="margin-bottom: 0.5rem; padding: 4px 8px; background: #fef3c7; color: #92400e; border-radius: 4px; font-size: 0.8rem; display: inline-block;">📦 Phần của bạn ${order.split_progress || ''}</div>` : '';
 
         // Format amount
         const amount = (order.sale_order_amount || order.total || order.amount || 0).toLocaleString('vi-VN');
@@ -376,7 +391,8 @@ const MyOrdersModule = {
                         
                         <!-- Sản phẩm -->
                         <div style="margin-bottom: 1rem;">
-                            <div style="font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary);">📋 Sản phẩm</div>
+                            ${splitBadge}
+                            <div style="font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary);">📋 Sản phẩm ${order.is_split_order ? '(phần của bạn)' : ''}</div>
                             <div style="background: var(--bg-tertiary); padding: 0.75rem; border-radius: 8px; font-size: 0.9rem; white-space: pre-line;">
                                 ${productsList}
                             </div>
