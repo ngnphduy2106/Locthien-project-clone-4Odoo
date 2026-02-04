@@ -1982,13 +1982,35 @@ function filterMyOrders() {
     // Get all orders from state
     let orders = [...(state.myOrders || [])];
 
-    // Filter by date
+    // Filter by date (expects dd/mm/yyyy format)
     if (filterDate) {
-        const selectedDate = new Date(filterDate).toDateString();
-        orders = orders.filter(order => {
-            const orderDate = new Date(order.ngay || order.sale_order_date || order.expected_date || 0).toDateString();
-            return orderDate === selectedDate;
-        });
+        // Parse dd/mm/yyyy input
+        const dmyMatch = filterDate.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+        if (dmyMatch) {
+            const filterDay = parseInt(dmyMatch[1]);
+            const filterMonth = parseInt(dmyMatch[2]);
+            const filterYear = parseInt(dmyMatch[3]);
+
+            orders = orders.filter(order => {
+                // Parse order date from ngay (dd/mm/yyyy) or ISO formats
+                const orderDateStr = order.ngay || order.date || '';
+                const orderDmyMatch = orderDateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+                if (orderDmyMatch) {
+                    return parseInt(orderDmyMatch[1]) === filterDay &&
+                        parseInt(orderDmyMatch[2]) === filterMonth &&
+                        parseInt(orderDmyMatch[3]) === filterYear;
+                }
+                // Fallback: try ISO date from DB fields
+                const rawDate = order.expected_date || order.sale_order_date || order.created_at || '';
+                const isoMatch = String(rawDate).match(/^(\d{4})-(\d{2})-(\d{2})/);
+                if (isoMatch) {
+                    return parseInt(isoMatch[3]) === filterDay &&
+                        parseInt(isoMatch[2]) === filterMonth &&
+                        parseInt(isoMatch[1]) === filterYear;
+                }
+                return false;
+            });
+        }
     }
 
     // Filter by search query
