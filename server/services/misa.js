@@ -96,8 +96,9 @@ export const syncMisaProducts = async () => {
             const json = await response.json();
 
             // Log total count if available
-            const totalCount = json.TotalCount || json.total_count || json.Total || 'unknown';
-            console.log(`📦 MISA Products Response (Page ${page}): total=${totalCount}, data_length=${json.data?.length || json.Data?.length || 0}`);
+            const totalCount = json.TotalCount || json.total_count || json.Total || 0;
+            const pageSize = 100;
+            console.log(`📦 MISA Products Response (Page ${page}): TotalCount=${totalCount}, data_length=${json.data?.length || json.Data?.length || 0}`);
 
             const success = json.Success || json.success;
             const data = json.Data || json.data;
@@ -137,11 +138,14 @@ export const syncMisaProducts = async () => {
                 }
 
                 totalSynced += data.length;
-                page++;
 
-                // Continue if we got a full page (100 items)
-                if (data.length < 100) {
-                    console.log(`📦 Got ${data.length} items (less than 100), stopping pagination.`);
+                // Calculate if more pages exist based on TotalCount
+                const expectedPages = totalCount > 0 ? Math.ceil(totalCount / pageSize) : 1;
+                if (page < expectedPages) {
+                    page++;
+                    console.log(`📄 Moving to page ${page} of ${expectedPages} (totalCount: ${totalCount})`);
+                } else {
+                    console.log(`📦 Reached last page (${page}/${expectedPages}). Total synced: ${totalSynced}`);
                     hasMore = false;
                 }
             } else {
