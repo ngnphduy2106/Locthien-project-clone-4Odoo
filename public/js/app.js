@@ -3109,12 +3109,6 @@ function openDeliveryModal(orderId) {
                     <label>Khách hàng:</label>
                     <span>${order.khach || order.account_name || '-'}</span>
                 </div>
-            </div>
-            
-            <h4 style="margin:20px 0 12px; font-size:14px; color:var(--text-secondary);">Sản phẩm giao</h4>
-            <div id="delivery-cart-list"></div>
-            
-                </div>
                 <div class="detail-row">
                     <label>Tài xế:</label>
                     <span><strong>${order.driver_name || order.taiXe || order.driver || state.user?.name || 'Chưa phân công'}</strong></span>
@@ -3124,6 +3118,9 @@ function openDeliveryModal(orderId) {
                     <span>${order.plate || order.bienSo || order.vehicle_plate || 'Chưa có'}</span>
                 </div>
             </div>
+            
+            <h4 style="margin:20px 0 12px; font-size:14px; color:var(--text-secondary);">Sản phẩm giao</h4>
+            <div id="delivery-cart-list"></div>
             
             <div class="form-group" style="margin-top:16px;">
                 <label class="form-label">Kho xuất</label>
@@ -3406,6 +3403,10 @@ window.openDeliveryModal = openDeliveryModal;
 window.closeDeliveryModal = closeDeliveryModal;
 window.submitDelivery = submitDelivery;
 window.handleImageSelect = handleImageSelect;
+window.updateCartQty = updateCartQty;
+window.updateCartNote = updateCartNote;
+window.removeCartItem = removeCartItem;
+window.renderDeliveryCart = renderDeliveryCart;
 
 // === START ORDER (DRIVER) ===
 async function startOrder(orderId, assignmentId = null) {
