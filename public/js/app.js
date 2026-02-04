@@ -3337,9 +3337,12 @@ async function submitDelivery() {
     const whRadio = document.querySelector('input[name="del-wh"]:checked');
     const warehouse = whRadio?.value || 'LT1';
 
-    // Get driver info
-    const driverName = order.driver_name || order.taiXe || state.user?.name || 'Driver';
-    const plate = order.plate || order.bienSo || state.user?.plate || '';
+    // Get driver info - IMPORTANT: Use order's assigned driver, NOT logged-in user
+    // For external drivers, the assignment data should contain the correct driver name
+    const driverName = order.driver_name || order.taiXe || order.driver || order.custom_field13 ||
+        (order.assignments?.[0]?.driver_name) || 'Chưa phân công';
+    const plate = order.plate || order.bienSo || order.custom_field14 ||
+        (order.assignments?.[0]?.plate) || '';
 
     showLoading('Đang xử lý...');
 
