@@ -4,132 +4,182 @@
 
 import { Router } from 'express';
 import { createResponse } from '../config.js';
+import db from '../db/index.js';
 
 const router = Router();
 
-// Published Google Sheet URL for CSV
+// Published Google Sheet URL for CSV (fallback)
 const SUPPLIERS_SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQHE8bULpw50dV6pdQwGgLyeVU1YA9ZB9XMZWgqNcZvdBtN-VQBy0rsgdzkUtE7HspeYdVpVCRkxw4L/pub?output=csv';
-
-// Cache for suppliers
-let suppliersCache = null;
-let cacheTime = 0;
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 // GET /api/suppliers - Get list of suppliers
 router.get('/', async (req, res) => {
     try {
-        const now = Date.now();
+        // First try database
+        let suppliers = await db.getSuppliers();
 
-        // Return cached data if valid
-        if (suppliersCache && (now - cacheTime) < CACHE_DURATION) {
-            return res.json({
-                error: false,
-                data: suppliersCache,
-                cached: true
-            });
+        // If no suppliers in DB, fetch from Google Sheet
+        if (!suppliers || suppliers.length === 0) {
+            console.log('📊 No suppliers in DB, fetching from Google Sheet...');
+            suppliers = await fetchSuppliersFromSheet();
         }
-
-        // Fetch from Google Sheet
-        const suppliers = await fetchSuppliersFromSheet();
-
-        // Update cache
-        suppliersCache = suppliers;
-        cacheTime = now;
 
         res.json({
             error: false,
-            data: suppliers,
-            cached: false
+            data: suppliers.map(s => ({
+                id: s.id || s.name,
+                name: s.name,
+                address: s.address || '',
+                phone: s.phone || '',
+                email: s.email || '',
+                note: s.note || '',
+                active: s.active !== false
+            }))
         });
-
     } catch (e) {
         console.error('Suppliers fetch error:', e.message);
-
-        // Return cached data if available even if expired
-        if (suppliersCache) {
-            return res.json({
-                error: false,
-                data: suppliersCache,
-                cached: true,
-                stale: true
-            });
-        }
-
-        // Return hardcoded fallback if no cache
         res.json({
             error: false,
-            data: getHardcodedSuppliers(),
-            fallback: true
+            data: getHardcodedSuppliers()
         });
     }
 });
 
-// Fetch suppliers from Google Sheet
+// POST /api/suppliers - Add new supplier
+router.post('/', async (req, res) => {
+    try {
+        const { name, address, phone, email, note } = req.body;
+
+        if (!name || !name.trim()) {
+            return res.status(400).json(createResponse(true, 'Tên nhà cung cấp là bắt buộc'));
+        }
+
+        const supplier = {
+            id: `SUP-${Date.now()}`,
+            name: name.trim(),
+            address: address?.trim() || '',
+            phone: phone?.trim() || '',
+            email: email?.trim() || '',
+            note: note?.trim() || '',
+            active: true
+        };
+
+        const result = await db.addSupplier(supplier);
+
+        if (result) {
+            res.json(createResponse(false, 'Thêm nhà cung cấp thành công', result));
+        } else {
+            res.status(500).json(createResponse(true, 'Không thể thêm nhà cung cấp'));
+        }
+    } catch (e) {
+        console.error('Add supplier error:', e.message);
+        res.status(500).json(createResponse(true, e.message));
+    }
+});
+
+// PUT /api/suppliers/:id - Update supplier
+router.put('/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, address, phone, email, note, active } = req.body;
+
+        const updates = {};
+        if (name !== undefined) updates.name = name.trim();
+        if (address !== undefined) updates.address = address.trim();
+        if (phone !== undefined) updates.phone = phone.trim();
+        if (email !== undefined) updates.email = email.trim();
+        if (note !== undefined) updates.note = note.trim();
+        if (active !== undefined) updates.active = active;
+
+        const result = await db.updateSupplier(id, updates);
+
+        if (result) {
+            res.json(createResponse(false, 'Cập nhật nhà cung cấp thành công', result));
+        } else {
+            res.status(404).json(createResponse(true, 'Không tìm thấy nhà cung cấp'));
+        }
+    } catch (e) {
+        console.error('Update supplier error:', e.message);
+        res.status(500).json(createResponse(true, e.message));
+    }
+});
+
+// DELETE /api/suppliers/:id - Delete supplier
+router.delete('/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const result = await db.deleteSupplier(id);
+
+        if (result) {
+            res.json(createResponse(false, 'Xóa nhà cung cấp thành công'));
+        } else {
+            res.status(404).json(createResponse(true, 'Không tìm thấy nhà cung cấp'));
+        }
+    } catch (e) {
+        console.error('Delete supplier error:', e.message);
+        res.status(500).json(createResponse(true, e.message));
+    }
+});
+
+// POST /api/suppliers/import-sheet - Import suppliers from Google Sheet to DB
+router.post('/import-sheet', async (req, res) => {
+    try {
+        const sheetSuppliers = await fetchSuppliersFromSheet();
+        let imported = 0;
+
+        for (const s of sheetSuppliers) {
+            const supplier = {
+                id: `SHEET-${s.name.replace(/\s+/g, '-').substring(0, 20)}-${Date.now()}`,
+                name: s.name,
+                address: s.address || '',
+                active: true
+            };
+            const result = await db.addSupplier(supplier);
+            if (result) imported++;
+        }
+
+        res.json(createResponse(false, `Import thành công ${imported}/${sheetSuppliers.length} nhà cung cấp`));
+    } catch (e) {
+        console.error('Import sheet error:', e.message);
+        res.status(500).json(createResponse(true, e.message));
+    }
+});
+
+// ===============================================
+// HELPER FUNCTIONS
+// ===============================================
+
 async function fetchSuppliersFromSheet() {
     const response = await fetch(SUPPLIERS_SHEET_URL);
-    if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-    }
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
     const csvText = await response.text();
-    // Handle both \r\n and \n
     const lines = csvText.split(/\r?\n/).filter(line => line.trim());
-
     if (lines.length === 0) return [];
 
-    // Header debugging
-    const headers = parseCSVLine(lines[0]);
-    console.log('📊 Supplier Sheet Headers:', JSON.stringify(headers));
-
-    // Skip header row
     const dataLines = lines.slice(1);
-
-    // Extract unique supplier names from column 6 (index 5) = "Đối Tượng"
     const supplierSet = new Set();
 
     for (const line of dataLines) {
         const columns = parseCSVLine(line);
-        const supplierName = columns[5]?.trim(); // Column F = Đối Tượng
-
-        if (supplierName &&
-            supplierName !== '' &&
-            !supplierName.toUpperCase().includes('NỘI BỘ') &&
-            supplierName.length > 1) {
+        const supplierName = columns[5]?.trim();
+        if (supplierName && supplierName !== '' && !supplierName.toUpperCase().includes('NỘI BỘ') && supplierName.length > 1) {
             supplierSet.add(supplierName);
         }
     }
 
-    // Convert to array of objects
-    const suppliers = Array.from(supplierSet).map(name => ({
-        name: name,
-        address: ''
-    }));
-
-    // Sort alphabetically
-    suppliers.sort((a, b) => a.name.localeCompare(b.name, 'vi'));
-
-    console.log(`📦 Loaded ${suppliers.length} unique suppliers from ${lines.length} rows`);
-
-    return suppliers;
+    return Array.from(supplierSet).map(name => ({ name, address: '' })).sort((a, b) => a.name.localeCompare(b.name, 'vi'));
 }
 
-// Robust CSV line parser (handles quotes and escaped commas)
 function parseCSVLine(line) {
     const result = [];
     let current = '';
     let inQuotes = false;
-
     for (let i = 0; i < line.length; i++) {
         const char = line[i];
-
         if (char === '"') {
-            if (inQuotes && line[i + 1] === '"') {
-                // Escaped quote "" -> "
-                current += '"';
-                i++;
-            } else {
-                inQuotes = !inQuotes;
-            }
+            if (inQuotes && line[i + 1] === '"') { current += '"'; i++; }
+            else { inQuotes = !inQuotes; }
         } else if (char === ',' && !inQuotes) {
             result.push(current.trim());
             current = '';
@@ -138,41 +188,22 @@ function parseCSVLine(line) {
         }
     }
     result.push(current.trim());
-
     return result;
 }
 
-// Hardcoded fallback suppliers
 function getHardcodedSuppliers() {
     return [
-        { name: 'AN PHÚ', address: '' },
-        { name: 'ANH ĐOÀN', address: '' },
-        { name: 'Cty CP XNK SX Hoá Chất Thuận Duyên', address: '' },
-        { name: 'Cty HD', address: '' },
-        { name: 'Cty Hd long an', address: '' },
-        { name: 'Cty trinh tuong', address: '' },
-        { name: 'Công Ty TNHH TM PT Hiền Phát', address: '' },
-        { name: 'CÔNG TY 28', address: '' },
-        { name: 'Dũng lộc', address: '' },
-        { name: 'Dvl', address: '' },
-        { name: 'GIA NGẠN', address: '' },
-        { name: 'Gia Ngạn', address: '' },
-        { name: 'Hoá Chất Trương Lộc', address: '' },
-        { name: 'Hyoshung', address: '' },
-        { name: 'LỘC THIÊN', address: '' },
-        { name: 'NGU KIM MINH VIỆT', address: '' },
-        { name: 'Nhà Máy Phát Thiên Phú', address: '' },
-        { name: 'Nhà máy vicaco', address: '' },
-        { name: 'Thep trang bang', address: '' },
-        { name: 'Trinh tường', address: '' },
-        { name: 'Trương Lộc', address: '' },
-        { name: 'Ve', address: '' },
-        { name: 'Vedan', address: '' },
-        { name: 'Vicaco biên hòa', address: '' },
-        { name: 'Wang Sheng', address: '' },
-        { name: 'Ý Cường Thịnh', address: '' },
-        { name: 'Ý CƯỜNG THỊNH', address: '' }
+        { id: 'HF-1', name: 'AN PHÚ', address: '' },
+        { id: 'HF-2', name: 'Công ty TNHH TM PT Hiền Phát', address: '' },
+        { id: 'HF-3', name: 'Cty CP XNK SX Hoá Chất Thuận Duyên', address: '' },
+        { id: 'HF-4', name: 'GIA NGẠN', address: '' },
+        { id: 'HF-5', name: 'Hoá Chất Trương Lộc', address: '' },
+        { id: 'HF-6', name: 'LỘC THIÊN', address: '' },
+        { id: 'HF-7', name: 'Nhà Máy Phát Thiên Phú', address: '' },
+        { id: 'HF-8', name: 'Vedan', address: '' },
+        { id: 'HF-9', name: 'Vicaco biên hòa', address: '' }
     ];
 }
 
 export default router;
+

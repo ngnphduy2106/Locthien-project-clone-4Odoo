@@ -110,6 +110,12 @@
                                 Lịch sử đơn hàng
                             </button>
                         </div>
+                        <div id="nav-suppliers" style="display:none;">
+                            <button class="nav-link" onclick="showSection('suppliers')">
+                                <i class="bi bi-building-add"></i>
+                                Nhà cung cấp
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -794,6 +800,62 @@
                     </div>
                 </section>
 
+                <!-- ==================== SUPPLIERS SECTION ==================== -->
+                <section id="section-suppliers" class="hidden">
+                    <div
+                        style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; flex-wrap:wrap; gap:12px;">
+                        <h2 class="page-heading" style="margin:0;">Quản lý Nhà cung cấp</h2>
+                        <div style="display:flex; gap:8px;">
+                            <button class="btn btn-primary" onclick="SuppliersModule.showAddModal()">
+                                <i class="bi bi-plus-lg"></i> Thêm NCC
+                            </button>
+                            <button class="btn btn-outline" onclick="SuppliersModule.importFromSheet()"
+                                title="Import từ Google Sheet">
+                                <i class="bi bi-cloud-download"></i>
+                            </button>
+                            <button class="btn btn-outline" onclick="SuppliersModule.loadSuppliers()" title="Làm mới">
+                                <i class="bi bi-arrow-clockwise"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Search -->
+                    <div style="margin-bottom:16px;">
+                        <div class="search-input" style="max-width:400px;">
+                            <i class="bi bi-search"></i>
+                            <input type="text" placeholder="Tìm kiếm nhà cung cấp..." id="supplier-search"
+                                oninput="SuppliersModule.filterSuppliers()">
+                        </div>
+                    </div>
+
+                    <!-- Suppliers Table -->
+                    <div class="card">
+                        <div class="card-body" style="padding:0;">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width:50px;">STT</th>
+                                        <th>Tên nhà cung cấp</th>
+                                        <th>Địa chỉ</th>
+                                        <th>Số điện thoại</th>
+                                        <th>Email</th>
+                                        <th style="width:120px; text-align:center;">Thao tác</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="suppliers-table-body">
+                                    <tr>
+                                        <td colspan="6" style="text-align:center; padding:40px; color:#6B7280;">Đang
+                                            tải...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Stats -->
+                    <div id="suppliers-stats" style="margin-top:12px; color:#6B7280; font-size:13px;"></div>
+                </section>
+
                 <!-- ==================== HR SECTION ==================== -->
                 <section id="section-hr" class="hidden">
                     <h2 class="page-heading">Quản lý Nhân sự</h2>
@@ -1196,15 +1258,73 @@
         </div>
     </div>
 
+    <!-- ==================== SUPPLIER MODAL ==================== -->
+    <div id="modal-supplier" class="modal-overlay hidden">
+        <div class="modal-content" style="max-width:500px;">
+            <div class="modal-header"
+                style="background:linear-gradient(135deg, #059669, #047857); color:#fff; padding:20px; border-radius:16px 16px 0 0;">
+                <h3 style="margin:0; font-size:18px;">
+                    <i class="bi bi-building-add"></i>
+                    <span id="supplier-modal-title">Thêm Nhà cung cấp</span>
+                </h3>
+                <button class="modal-close" onclick="SuppliersModule.closeModal()" style="color:#fff;">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+            <div class="modal-body" style="padding:24px;">
+                <input type="hidden" id="supplier-id">
+
+                <div class="form-group">
+                    <label class="form-label"><i class="bi bi-building"></i> Tên nhà cung cấp <span
+                            style="color:var(--danger);">*</span></label>
+                    <input type="text" id="supplier-name" class="form-control" placeholder="Nhập tên nhà cung cấp">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label"><i class="bi bi-geo-alt"></i> Địa chỉ</label>
+                    <input type="text" id="supplier-address" class="form-control" placeholder="Nhập địa chỉ">
+                </div>
+
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+                    <div class="form-group" style="margin:0;">
+                        <label class="form-label"><i class="bi bi-telephone"></i> Số điện thoại</label>
+                        <input type="text" id="supplier-phone" class="form-control" placeholder="VD: 0901234567">
+                    </div>
+                    <div class="form-group" style="margin:0;">
+                        <label class="form-label"><i class="bi bi-envelope"></i> Email</label>
+                        <input type="email" id="supplier-email" class="form-control"
+                            placeholder="VD: email@company.com">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label"><i class="bi bi-sticky"></i> Ghi chú</label>
+                    <textarea id="supplier-note" class="form-control" rows="2" placeholder="Ghi chú thêm..."></textarea>
+                </div>
+
+                <div style="display:flex; gap:12px; margin-top:24px;">
+                    <button class="btn btn-outline" onclick="SuppliersModule.closeModal()" style="flex:1;">
+                        <i class="bi bi-x"></i> Hủy
+                    </button>
+                    <button class="btn btn-primary" onclick="SuppliersModule.saveSupplier()"
+                        style="flex:2; background:linear-gradient(135deg, #059669, #047857);">
+                        <i class="bi bi-check-lg"></i> Lưu
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- ==================== SCRIPTS ==================== -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="/js/core.js?v=15"></script>
     <script src="/js/app-router.js?v=4"></script>
-    <script src="/js/api.js?v=17"></script>
+    <script src="/js/api.js?v=18"></script>
     <script src="/js/notifications.js?v=1"></script>
-    <script src="/js/app.js?v=24"></script>
+    <script src="/js/app.js?v=25"></script>
     <script src="/js/modules/create-order.js?v=1"></script>
     <script src="/js/modules/order-history.js?v=101"></script>
+    <script src="/js/modules/suppliers.js?v=1"></script>
 
 
 

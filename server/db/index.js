@@ -554,7 +554,99 @@ export const db = {
     // === MASTER DATA ===
     getTrucks: async () => { return mockData.trucks; },
     getCustomers: async () => { return mockData.customers; },
-    getSuppliers: async () => { return mockData.suppliers; }
+
+    // === SUPPLIERS (Nhà cung cấp) ===
+    getSuppliers: async () => {
+        const { useSupabase, useFirebase } = getMode();
+        if (useSupabase) {
+            const { data, error } = await supabase
+                .from('suppliers')
+                .select('*')
+                .order('name', { ascending: true });
+            if (error) {
+                console.error('Supabase getSuppliers error:', error.message);
+                return [];
+            }
+            return data || [];
+        }
+        if (useFirebase) {
+            const snapshot = await firebaseDb.ref('suppliers').once('value');
+            return snapshot.val() ? Object.values(snapshot.val()) : [];
+        }
+        return mockData.suppliers;
+    },
+
+    addSupplier: async (supplier) => {
+        const { useSupabase, useFirebase } = getMode();
+        const id = supplier.id || `SUP-${Date.now()}`;
+        const safeSupplier = { ...supplier, id };
+
+        if (useSupabase) {
+            const { data, error } = await supabase
+                .from('suppliers')
+                .upsert(safeSupplier, { onConflict: 'id' })
+                .select()
+                .single();
+            if (error) {
+                console.error('Supabase addSupplier error:', error.message);
+                return null;
+            }
+            return data;
+        }
+        if (useFirebase) {
+            const safeId = sanitizeId(id);
+            await firebaseDb.ref(`suppliers/${safeId}`).set(safeSupplier);
+            return safeSupplier;
+        }
+        mockData.suppliers.push(safeSupplier);
+        return safeSupplier;
+    },
+
+    updateSupplier: async (id, updates) => {
+        const { useSupabase, useFirebase } = getMode();
+
+        if (useSupabase) {
+            const { data, error } = await supabase
+                .from('suppliers')
+                .update(updates)
+                .eq('id', id)
+                .select()
+                .single();
+            if (error) {
+                console.error('Supabase updateSupplier error:', error.message);
+                return null;
+            }
+            return data;
+        }
+        if (useFirebase) {
+            const safeId = sanitizeId(id);
+            await firebaseDb.ref(`suppliers/${safeId}`).update(updates);
+            return { id, ...updates };
+        }
+        return null;
+    },
+
+    deleteSupplier: async (id) => {
+        const { useSupabase, useFirebase } = getMode();
+
+        if (useSupabase) {
+            const { error } = await supabase
+                .from('suppliers')
+                .delete()
+                .eq('id', id);
+            if (error) {
+                console.error('Supabase deleteSupplier error:', error.message);
+                return false;
+            }
+            return true;
+        }
+        if (useFirebase) {
+            const safeId = sanitizeId(id);
+            await firebaseDb.ref(`suppliers/${safeId}`).remove();
+            return true;
+        }
+        return false;
+    }
 };
 
 export default db;

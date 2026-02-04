@@ -197,6 +197,38 @@ const api = {
         return res.json();
     },
 
+    createSupplier: async (data) => {
+        const res = await fetch(`${API_BASE}/suppliers`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        return res.json();
+    },
+
+    updateSupplier: async (id, data) => {
+        const res = await fetch(`${API_BASE}/suppliers/${encodeURIComponent(id)}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        return res.json();
+    },
+
+    deleteSupplier: async (id) => {
+        const res = await fetch(`${API_BASE}/suppliers/${encodeURIComponent(id)}`, {
+            method: 'DELETE'
+        });
+        return res.json();
+    },
+
+    importSuppliersFromSheet: async () => {
+        const res = await fetch(`${API_BASE}/suppliers/import-sheet`, {
+            method: 'POST'
+        });
+        return res.json();
+    },
+
     // === IMPORTS ===
     createImport: async (data) => {
         // Map keys to match server/routes/imports.js

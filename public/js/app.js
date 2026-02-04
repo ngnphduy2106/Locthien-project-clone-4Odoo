@@ -185,6 +185,7 @@ function showSection(sectionId) {
         'create-order': 'Quản lý đơn hàng',
         'my-orders': 'Quản lý đơn hàng',
         'order-history': 'Lịch sử đơn hàng',
+        'suppliers': 'Nhà cung cấp',
         'hr': 'Nhân sự',
         'materials': 'Vật tư',
         'warehouse': 'Kho hàng',
@@ -239,6 +240,11 @@ function showSection(sectionId) {
             break;
         case 'warehouse':
             loadWarehouse();
+            break;
+        case 'suppliers':
+            if (window.SuppliersModule) {
+                SuppliersModule.loadSuppliers();
+            }
             break;
     }
 }
@@ -524,6 +530,10 @@ function applyRoleBasedUI(role) {
     const navUsers = window.$('#nav-users');
     if (navUsers) navUsers.style.display = isAdmin ? 'block' : 'none';
 
+    // Show nav-suppliers for admin
+    const navSuppliers = window.$('#nav-suppliers');
+    if (navSuppliers) navSuppliers.style.display = isAdmin ? 'block' : 'none';
+
     // Driver restrictions - hide all menus except "Đơn của tôi"
     if (isDriver) {
         console.log('🚚 Driver mode: Hiding admin menus');
@@ -539,6 +549,7 @@ function applyRoleBasedUI(role) {
         if (navDispatch) navDispatch.style.display = 'none';
         if (navCreateOrder) navCreateOrder.style.display = 'none';
         if (navOrderHistory) navOrderHistory.style.display = 'none';
+        if (navSuppliers) navSuppliers.style.display = 'none';
 
         // Hide HR, Materials, Warehouse
         const navHr = window.$('#nav-hr');
@@ -560,6 +571,7 @@ function applyRoleBasedUI(role) {
         if (navDispatch) navDispatch.style.display = 'none';
         if (navCreateOrder) navCreateOrder.style.display = 'none';
         if (navMyOrders) navMyOrders.style.display = 'none';
+        if (navSuppliers) navSuppliers.style.display = 'none';
 
         // Hide HR, Materials, Warehouse
         const navHr = window.$('#nav-hr');
