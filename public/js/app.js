@@ -1063,10 +1063,12 @@ function renderImportList() {
                     </div>
                     
                     <!-- ROW 2: Customer + Address + Buttons -->
-                    <div style="display:flex; align-items:center; gap:8px; width:100%;">
-                        <div style="flex:1; min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;">
-                            <span style="font-weight:500; color:var(--text-primary); font-size:11px;">${imp.supplier_name || 'NCC'}</span>
-                            <span style="font-size:9px; color:var(--text-muted); margin-left:6px;"><i class="bi bi-geo-alt" style="font-size:8px;"></i> ${imp.supplier_address || 'Sunco'}</span>
+                    <div style="display:flex; align-items:center; gap:8px; width:100%; overflow:hidden;">
+                        <div style="flex:1; min-width:0; overflow:hidden;">
+                            <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                                <span style="font-weight:500; color:var(--text-primary); font-size:11px;">${imp.supplier_name || 'NCC'}</span>
+                                <span style="font-size:9px; color:var(--text-muted); margin-left:6px;"><i class="bi bi-geo-alt" style="font-size:8px;"></i> ${imp.supplier_address || 'Sunco'}</span>
+                            </div>
                         </div>
                         <div style="display:flex; gap:4px; flex-shrink:0;" onclick="event.stopPropagation()">
                             <button class="btn btn-outline btn-sm" onclick="viewImportDetail('${imp.id}')" style="padding:3px 6px; font-size:9px;">
@@ -1285,10 +1287,12 @@ function renderDispatchOrders() {
                     </div>
                     
                     <!-- ROW 2: Customer + Address + Buttons -->
-                    <div style="display:flex; align-items:center; gap:8px; width:100%;">
-                        <div style="flex:1; min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;">
-                            <span style="font-weight:500; color:var(--text-primary); font-size:11px;">${customer}</span>
-                            <span style="font-size:9px; color:var(--text-muted); margin-left:6px;"><i class="bi bi-geo-alt" style="font-size:8px;"></i> ${address}</span>
+                    <div style="display:flex; align-items:center; gap:8px; width:100%; overflow:hidden;">
+                        <div style="flex:1; min-width:0; overflow:hidden;">
+                            <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                                <span style="font-weight:500; color:var(--text-primary); font-size:11px;">${customer}</span>
+                                <span style="font-size:9px; color:var(--text-muted); margin-left:6px;"><i class="bi bi-geo-alt" style="font-size:8px;"></i> ${address}</span>
+                            </div>
                         </div>
                         <div style="display:flex; gap:4px; flex-shrink:0;" onclick="event.stopPropagation()">
                             <button class="btn btn-outline btn-sm" onclick="viewOrderDetail('${orderId}')" style="padding:3px 6px; font-size:9px;">
@@ -1711,10 +1715,12 @@ function renderMyOrdersList(containerId, orders, type) {
                         </div>
                         
                         <!-- ROW 2: Customer + Address + Buttons -->
-                        <div style="display:flex; align-items:center; gap:8px; width:100%;">
-                            <div style="flex:1; min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;">
-                                <span style="font-weight:500; color:var(--text-primary); font-size:11px;">${order.khach || order.customerName || order.accountName || 'Khách hàng'}</span>
-                                <span style="font-size:9px; color:var(--text-muted); margin-left:6px;"><i class="bi bi-geo-alt" style="font-size:8px;"></i> ${order.diaChi || order.address || 'Sunco'}</span>
+                        <div style="display:flex; align-items:center; gap:8px; width:100%; overflow:hidden;">
+                            <div style="flex:1; min-width:0; overflow:hidden;">
+                                <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                                    <span style="font-weight:500; color:var(--text-primary); font-size:11px;">${order.khach || order.customerName || order.accountName || 'Khách hàng'}</span>
+                                    <span style="font-size:9px; color:var(--text-muted); margin-left:6px;"><i class="bi bi-geo-alt" style="font-size:8px;"></i> ${order.diaChi || order.address || 'Sunco'}</span>
+                                </div>
                             </div>
                             <div style="display:flex; gap:4px; flex-shrink:0;" onclick="event.stopPropagation()">
                                 <button class="btn btn-outline btn-sm" onclick="${viewFn}" style="padding:3px 6px; font-size:9px;">
