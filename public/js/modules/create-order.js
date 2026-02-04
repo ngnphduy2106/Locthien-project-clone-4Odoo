@@ -362,11 +362,17 @@ const CreateOrderModule = {
                 <!-- Right Column: Products -->
                 <div class="col-lg-7">
                     <div class="create-order-card">
-                        <div class="section-header">
-                            <div class="section-icon success">
-                                <i class="bi bi-box-seam"></i>
+                        <div class="section-header" style="justify-content: space-between;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <div class="section-icon success">
+                                    <i class="bi bi-box-seam"></i>
+                                </div>
+                                <span>Sản phẩm</span>
                             </div>
-                            <span>Sản phẩm</span>
+                            <button type="button" id="btn-sync-misa" class="btn btn-sm btn-outline-primary" 
+                                onclick="CreateOrderModule.syncMisaProducts()" style="font-size: 12px;">
+                                <i class="bi bi-arrow-repeat me-1"></i>Sync MISA
+                            </button>
                         </div>
 
                         <!-- Product List -->
