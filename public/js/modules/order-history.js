@@ -49,8 +49,8 @@ const OrderHistoryModule = {
     async loadHistory(page = 1) {
         try {
             // Check if current user is driver - filter by their name
-            const isDriver = (state.user?.role || '').toLowerCase() === 'driver';
-            const driverName = state.user?.name || '';
+            const isDriver = (window.state?.user?.role || '').toLowerCase() === 'driver';
+            const driverName = window.state?.user?.name || '';
 
             let url = `/api/reports/order-history?page=${page}&limit=${this.itemsPerPage}`;
 
@@ -425,14 +425,15 @@ const OrderHistoryModule = {
 
         // Use the global viewOrderDetail function if available
         if (typeof viewOrderDetail === 'function') {
-            // Store order in state.orders for viewOrderDetail to find
-            if (!state.orders) state.orders = {};
-            if (!state.orders.completed) state.orders.completed = [];
+            // Store order in window.state.orders for viewOrderDetail to find
+            if (!window.state) window.state = {};
+            if (!window.state.orders) window.state.orders = {};
+            if (!window.state.orders.completed) window.state.orders.completed = [];
 
             // Add to completed orders if not already there
-            const exists = state.orders.completed.find(o => o.id === order.id);
+            const exists = window.state.orders.completed.find(o => o.id === order.id);
             if (!exists) {
-                state.orders.completed.push(order);
+                window.state.orders.completed.push(order);
             }
 
             viewOrderDetail(order.id, { readonly: true });
