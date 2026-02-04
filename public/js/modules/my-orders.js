@@ -321,7 +321,7 @@ const MyOrdersModule = {
     },
 
     // Xem chi tiết
-    viewDetail(orderId, orderType = 'export') {
+    async viewDetail(orderId, orderType = 'export') {
         const order = this.orders.find(o => (o.id || o.order_id) === orderId);
         if (!order) return;
 
@@ -338,12 +338,29 @@ const MyOrdersModule = {
             `• ${p.name || p.code}: ${p.qty || p.amount || 0} ${p.unit || 'kg'}`
         ).join('\n') || 'Chưa có sản phẩm';
 
+        // Fetch driver's assigned quantity from API if needed
+        let isSplitOrder = order.is_split_order;
+        let driverAssignedQty = order.assigned_qty ? Number(order.assigned_qty) : null;
+
+        if (order.assignment_id && !driverAssignedQty) {
+            try {
+                const resp = await fetch(`/api/orders/assignment/${order.assignment_id}`);
+                const data = await resp.json();
+                if (!data.error && data.data) {
+                    driverAssignedQty = Number(data.data.assigned_qty) || null;
+                    isSplitOrder = true;
+                    console.log(`📦 Fetched assigned_qty from API: ${driverAssignedQty} kg`);
+                }
+            } catch (e) {
+                console.error('Error fetching assignment:', e);
+            }
+        }
+
         // Show split order badge with driver's assigned quantity
-        const isSplitOrder = order.is_split_order && order.assigned_qty;
-        const splitBadge = isSplitOrder
+        const splitBadge = (isSplitOrder && driverAssignedQty)
             ? `<div style="margin-bottom: 0.75rem; padding: 8px 12px; background: linear-gradient(135deg, #fef3c7, #fde68a); border-radius: 8px; font-weight: 600;">
                 <span style="color: #92400e;">📦 Phần của bạn:</span> 
-                <span style="color: #78350f; font-size: 1.1em;">${order.assigned_qty} kg</span>
+                <span style="color: #78350f; font-size: 1.1em;">${driverAssignedQty} kg</span>
                 ${order.split_progress ? `<span style="color: #a16207; font-size: 0.85em; margin-left: 8px;">(${order.split_progress})</span>` : ''}
                </div>`
             : '';

@@ -2271,10 +2271,24 @@ async function viewOrderDetail(orderId, options = {}) {
     }
     if (!Array.isArray(products)) products = [];
 
-    // For split orders: show driver's assigned quantity instead of total
-    // Just display assigned_qty as summary, products stay the same
-    const isSplitOrder = order.is_split_order && order.assigned_qty;
-    const driverAssignedQty = isSplitOrder ? Number(order.assigned_qty) : null;
+    // For split orders: fetch driver's assigned quantity from API
+    let isSplitOrder = order.is_split_order;
+    let driverAssignedQty = order.assigned_qty ? Number(order.assigned_qty) : null;
+
+    // If we have assignment_id but no assigned_qty, fetch from API
+    if (order.assignment_id && !driverAssignedQty) {
+        try {
+            const resp = await fetch(`/api/orders/assignment/${order.assignment_id}`);
+            const data = await resp.json();
+            if (!data.error && data.data) {
+                driverAssignedQty = Number(data.data.assigned_qty) || null;
+                isSplitOrder = true;
+                console.log(`📦 Fetched assigned_qty from API: ${driverAssignedQty} kg`);
+            }
+        } catch (e) {
+            console.error('Error fetching assignment:', e);
+        }
+    }
 
     console.log(`📦 Order ${order.soDon || order.id} has ${products.length} products, split: ${isSplitOrder}, assignedQty: ${driverAssignedQty}`);
 
