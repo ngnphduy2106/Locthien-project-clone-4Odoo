@@ -2261,7 +2261,20 @@ async function viewOrderDetail(orderId, options = {}) {
     }
 
     // Build products list HTML - handle ALL formats including JSON strings
+    // For split orders: prioritize assigned_products (driver's portion)
     let products = order.products || order.cart || order.chiTiet || order.sale_order_product_mappings || [];
+
+    // Check for assigned_products (split order - show only driver's portion)
+    if (order.assigned_products) {
+        let assignedProducts = order.assigned_products;
+        if (typeof assignedProducts === 'string') {
+            try { assignedProducts = JSON.parse(assignedProducts); } catch (e) { assignedProducts = null; }
+        }
+        if (Array.isArray(assignedProducts) && assignedProducts.length > 0) {
+            products = assignedProducts;
+            console.log('📦 Using assigned_products for split order:', products);
+        }
+    }
 
     // Parse JSON string if needed (database might return string)
     if (typeof products === 'string') {
