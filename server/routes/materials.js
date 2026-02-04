@@ -13,12 +13,40 @@ const router = Router();
 router.post('/sync-misa', async (req, res) => {
     try {
         console.log('📡 Manual MISA Product Sync requested...');
-        await syncMisaProducts();
+        const result = await syncMisaProducts();
+
+        if (result && result.success === false) {
+            return res.json(createResponse(true, result.error || 'MISA sync failed'));
+        }
+
         const materials = await db.getMaterials();
-        res.json(createResponse(false, `Đã đồng bộ ${materials.length} sản phẩm từ MISA!`, { count: materials.length }));
+        res.json(createResponse(false, `Đã đồng bộ ${result?.synced || 0} sản phẩm từ MISA! (Total in DB: ${materials.length})`, {
+            count: materials.length,
+            synced: result?.synced || 0
+        }));
     } catch (e) {
         console.error('MISA Sync Error:', e);
         res.json(createResponse(true, 'Lỗi đồng bộ MISA: ' + e.message));
+    }
+});
+
+// DELETE /api/materials/clear - Clear all materials (for resync)
+router.delete('/clear', async (req, res) => {
+    try {
+        console.log('🗑️ Clearing all materials...');
+        // Import supabase directly for this operation
+        const { supabase } = await import('../db/supabase.js');
+        const { error } = await supabase.from('materials').delete().neq('id', '');
+
+        if (error) {
+            console.error('Clear materials error:', error);
+            return res.json(createResponse(true, 'Lỗi xóa dữ liệu: ' + error.message));
+        }
+
+        res.json(createResponse(false, 'Đã xóa tất cả materials. Hãy sync lại từ MISA!'));
+    } catch (e) {
+        console.error('Clear materials error:', e);
+        res.json(createResponse(true, 'Lỗi: ' + e.message));
     }
 });
 
