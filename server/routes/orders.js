@@ -411,10 +411,13 @@ router.get('/my/:driverName', async (req, res) => {
                         // Date fields - extract directly from ISO string (no parsing)
                         ngay: (() => {
                             const raw = String(imp.expected_date || imp.created_at || '');
+                            console.log(`📅 Import ${imp.id} expected_date raw:`, imp.expected_date, '| created_at:', imp.created_at, '| raw string:', raw);
                             // ISO format: YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss
                             const parts = raw.split('T')[0].split('-');
                             if (parts.length === 3) {
-                                return `${parts[2]}/${parts[1]}/${parts[0]}`; // DD/MM/YYYY
+                                const result = `${parts[2]}/${parts[1]}/${parts[0]}`; // DD/MM/YYYY
+                                console.log(`📅 Import ${imp.id} formatted ngay:`, result);
+                                return result;
                             }
                             return raw;
                         })(),
