@@ -1327,7 +1327,7 @@ router.post('/:id/assign-multi', async (req, res) => {
 });
 
 
-// GET /api/orders/:id/proof-images - Get proof images from export ticket
+// GET /api/orders/:id/proof-images - Get proof images from export ticket OR order_driver_assignments
 router.get('/:id/proof-images', async (req, res) => {
     try {
         const { id } = req.params;
@@ -1336,7 +1336,30 @@ router.get('/:id/proof-images', async (req, res) => {
 
         console.log(`📸 Loading proof images for order: ${id}`);
 
-        // Try to find by order_id first
+        let allImages = [];
+        let ticketInfo = null;
+
+        // STEP 1: Check order_driver_assignments first (multi-driver orders)
+        try {
+            const { data: assignments } = await supabase
+                .from('order_driver_assignments')
+                .select('id, driver_name, proof_images, completed_at')
+                .eq('order_id', id)
+                .order('created_at', { ascending: false });
+
+            if (assignments && assignments.length > 0) {
+                for (const a of assignments) {
+                    if (a.proof_images && Array.isArray(a.proof_images) && a.proof_images.length > 0) {
+                        allImages = [...allImages, ...a.proof_images];
+                        console.log(`   Found ${a.proof_images.length} images from assignment (driver: ${a.driver_name})`);
+                    }
+                }
+            }
+        } catch (assignErr) {
+            console.warn('Assignment image lookup error:', assignErr.message);
+        }
+
+        // STEP 2: Also check export_tickets
         let { data, error } = await supabase
             .from('export_tickets')
             .select('ticket_no, images, created_at, driver_name')
@@ -1345,10 +1368,8 @@ router.get('/:id/proof-images', async (req, res) => {
             .limit(1)
             .single();
 
-        console.log(`   Search by order_id="${id}": ${data ? 'FOUND' : 'NOT FOUND'}`);
-
-        // If not found by order_id, try by order_no directly (frontend might pass soDon)
         if (error || !data) {
+            // Try by order_no
             const result = await supabase
                 .from('export_tickets')
                 .select('ticket_no, images, created_at, driver_name')
@@ -1359,11 +1380,10 @@ router.get('/:id/proof-images', async (req, res) => {
 
             if (!result.error && result.data) {
                 data = result.data;
-                console.log(`   Search by order_no="${id}": FOUND`);
             }
         }
 
-        // If still not found, try to get soDon from order and search by that
+        // If still not found, try soDon
         if (!data) {
             const orderInfo = await db.getOrder(id);
             if (orderInfo?.soDon) {
@@ -1377,20 +1397,36 @@ router.get('/:id/proof-images', async (req, res) => {
 
                 if (!result.error) {
                     data = result.data;
-                    console.log(`   Search by soDon="${orderInfo.soDon}": FOUND`);
                 }
             }
         }
 
-        console.log(`📸 Result: ${data?.images?.length || 0} images found`);
+        if (data) {
+            ticketInfo = {
+                ticket_no: data.ticket_no,
+                created_at: data.created_at,
+                driver_name: data.driver_name
+            };
 
+            if (data.images && Array.isArray(data.images)) {
+                // Merge with assignment images, avoid duplicates
+                for (const img of data.images) {
+                    if (!allImages.includes(img)) {
+                        allImages.push(img);
+                    }
+                }
+                console.log(`   Found ${data.images.length} images from export_ticket`);
+            }
+        }
+
+        console.log(`📸 Total: ${allImages.length} images found`);
 
         res.json({
             error: false,
-            images: data?.images || [],
-            ticket_no: data?.ticket_no || null,
-            created_at: data?.created_at || null,
-            driver_name: data?.driver_name || null
+            images: allImages,
+            ticket_no: ticketInfo?.ticket_no || null,
+            created_at: ticketInfo?.created_at || null,
+            driver_name: ticketInfo?.driver_name || null
         });
     } catch (e) {
         console.error('Get proof images error:', e.message);
