@@ -110,13 +110,13 @@ export const syncMisaProducts = async () => {
                             id: p.product_code, // Use code as ID for upsert
                             code: p.product_code,
                             name: p.product_name,
-                            unit: p.unit || '',
-                            price: Number(p.price || 0),
-                            sale_price: Number(p.price || 0),
-                            category: 'MISA CRM',
+                            unit: p.usage_unit || '', // MISA uses 'usage_unit' not 'unit'
+                            price: Number(p.unit_price || 0), // MISA uses 'unit_price' not 'price'
+                            sale_price: Number(p.unit_price || 0),
+                            category: p.product_category || 'MISA CRM', // Use actual category from MISA
                             type: 'MisaProduct',
-                            status: p.status === 2 ? 'INACTIVE' : 'ACTIVE',
-                            description: p.description || ''
+                            status: p.inactive === true ? 'INACTIVE' : 'ACTIVE', // MISA uses 'inactive' boolean
+                            description: p.description || p.sale_description || ''
                         };
 
                         await db.addMaterial(material);
