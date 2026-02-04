@@ -713,3 +713,6 @@ const CreateOrderModule = {
 
 // Đăng ký module
 AppRouter.registerModule('create-order', CreateOrderModule);
+
+// Export to window for onclick handlers in HTML
+window.CreateOrderModule = CreateOrderModule;
