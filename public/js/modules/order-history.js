@@ -8,7 +8,7 @@ const OrderHistoryModule = {
     currentPage: 1,
     itemsPerPage: 20,
     totalPages: 1,
-    useCardLayout: true, // Cards by default - toggle with button group
+    useCardLayout: false, // Table by default - toggle with button group
     searchQuery: '',
     dateFilter: null,
 

@@ -1428,27 +1428,110 @@ async function loadProductSuggestions() {
             return;
         }
 
-        // Ensure datalist exists in the DOM
+        // Store products globally for autofill lookup
+        state.misaProducts = products;
+
+        // === Populate CODE datalist (material-code-list) ===
+        let codeDatalist = window.$('#material-code-list');
+        if (!codeDatalist) {
+            codeDatalist = document.createElement('datalist');
+            codeDatalist.id = 'material-code-list';
+            document.body.appendChild(codeDatalist);
+        }
+        codeDatalist.innerHTML = products.map(p =>
+            `<option value="${p.code || ''}">${p.name}</option>`
+        ).join('');
+
+        // === Populate NAME datalist (material-name-list) ===
+        let nameDatalist = window.$('#material-name-list');
+        if (!nameDatalist) {
+            nameDatalist = document.createElement('datalist');
+            nameDatalist.id = 'material-name-list';
+            document.body.appendChild(nameDatalist);
+        }
+        nameDatalist.innerHTML = products.map(p =>
+            `<option value="${p.name}">${p.code || ''}</option>`
+        ).join('');
+
+        // === Also create product-misa-list for backward compatibility ===
         let datalist = window.$('#product-misa-list');
         if (!datalist) {
             datalist = document.createElement('datalist');
             datalist.id = 'product-misa-list';
             document.body.appendChild(datalist);
         }
-
-        const prodInput = window.$('#prod-name');
-        if (prodInput) {
-            prodInput.setAttribute('list', 'product-misa-list');
-            prodInput.setAttribute('autocomplete', 'off');
-        }
-
         datalist.innerHTML = products.map(p =>
             `<option value="${p.name}">${p.code ? p.code + ' - ' : ''}${p.name}</option>`
         ).join('');
 
-        console.log(`✅ Loaded ${products.length} MISA product suggestions`);
+        // Bind prod-code to material-code-list
+        const prodCodeInput = window.$('#prod-code');
+        if (prodCodeInput) {
+            prodCodeInput.setAttribute('list', 'material-code-list');
+            prodCodeInput.setAttribute('autocomplete', 'off');
+        }
+
+        // Bind prod-name to material-name-list
+        const prodNameInput = window.$('#prod-name');
+        if (prodNameInput) {
+            prodNameInput.setAttribute('list', 'material-name-list');
+            prodNameInput.setAttribute('autocomplete', 'off');
+        }
+
+        // === Setup autofill event handlers ===
+        setupProductAutofillEvents();
+
+        console.log(`✅ Loaded ${products.length} MISA product suggestions (code + name + legacy)`);
     } catch (e) {
         console.error('❌ Failed to load products suggestions:', e);
+    }
+}
+
+// Autofill: When code is selected/typed, fill name
+function onProductCodeChange(inputEl) {
+    const code = (inputEl?.value || '').trim();
+    if (!code || !state.misaProducts) return;
+
+    const product = state.misaProducts.find(p => p.code === code);
+    if (product) {
+        const nameInput = window.$('#prod-name');
+        if (nameInput && !nameInput.value) {
+            nameInput.value = product.name;
+            console.log(`✅ Autofilled name from code: ${code} → ${product.name}`);
+        }
+    }
+}
+
+// Autofill: When name is selected/typed, fill code
+function onProductNameChange(inputEl) {
+    const name = (inputEl?.value || '').trim();
+    if (!name || !state.misaProducts) return;
+
+    const product = state.misaProducts.find(p => p.name === name);
+    if (product && product.code) {
+        const codeInput = window.$('#prod-code');
+        if (codeInput && !codeInput.value) {
+            codeInput.value = product.code;
+            console.log(`✅ Autofilled code from name: ${name} → ${product.code}`);
+        }
+    }
+}
+
+// Setup autofill events (called once after suggestions are loaded)
+function setupProductAutofillEvents() {
+    const prodCode = window.$('#prod-code');
+    const prodName = window.$('#prod-name');
+
+    if (prodCode && !prodCode._autofillBound) {
+        prodCode.addEventListener('change', function () { onProductCodeChange(this); });
+        prodCode.addEventListener('blur', function () { onProductCodeChange(this); });
+        prodCode._autofillBound = true;
+    }
+
+    if (prodName && !prodName._autofillBound) {
+        prodName.addEventListener('change', function () { onProductNameChange(this); });
+        prodName.addEventListener('blur', function () { onProductNameChange(this); });
+        prodName._autofillBound = true;
     }
 }
 
