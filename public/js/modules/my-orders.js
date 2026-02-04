@@ -177,8 +177,16 @@ const MyOrdersModule = {
 
         // Helper to get sortable date from order
         const getOrderDate = (o) => {
-            // Check all possible date fields
-            let val = o.date || o.order_date || o.ngay || o.expected_date || o.created_at || o.sale_order_date || '';
+            // Priority 1: Use raw ISO date fields from DB if available (reliable sorting)
+            // This avoids ambiguity of d/m/y vs m/d/y formatting in strings
+            const rawDate = o.expected_date || o.created_at || o.order_date || o.sale_order_date || o.import_date;
+            if (rawDate) {
+                const d = new Date(rawDate);
+                if (!isNaN(d.getTime())) return d;
+            }
+
+            // Priority 2: Use 'ngay' or 'date' (formatted string or fallback)
+            let val = o.ngay || o.date || '';
             if (!val) return new Date(0);
 
             // Ensure string and clean
