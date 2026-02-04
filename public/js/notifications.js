@@ -284,16 +284,70 @@ async function markAllNotificationsRead() {
     }
 }
 
-// Update badge count
+// Update badge count (with PWA Badge API support for mobile home screen)
+let previousUnreadCount = 0;
+
 function updateNotificationBadge(count) {
     const badge = document.getElementById('notification-badge');
     if (!badge) return;
 
+    // Check if new notifications arrived
+    const hasNewNotifications = count > previousUnreadCount && previousUnreadCount !== 0;
+
     if (count > 0) {
         badge.textContent = count > 99 ? '99+' : count;
         badge.classList.remove('hidden');
+
+        // PWA Badge API - updates badge on home screen icon (mobile)
+        if ('setAppBadge' in navigator) {
+            navigator.setAppBadge(count).catch(err => console.log('Badge API error:', err));
+        }
+
+        // Play sound for NEW notifications only
+        if (hasNewNotifications) {
+            playNotificationSound();
+        }
     } else {
         badge.classList.add('hidden');
+
+        // Clear PWA badge
+        if ('clearAppBadge' in navigator) {
+            navigator.clearAppBadge().catch(err => { });
+        }
+    }
+
+    previousUnreadCount = count;
+}
+
+// Play notification sound effect
+function playNotificationSound() {
+    try {
+        // Use Web Audio API for better mobile support
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        const audioCtx = new AudioContext();
+
+        // Create a pleasant "ding" sound
+        const oscillator = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+
+        // Pleasant notification tone (C5 note)
+        oscillator.frequency.value = 523.25;
+        oscillator.type = 'sine';
+
+        // Fade in and out for smooth sound
+        gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+        gainNode.gain.linearRampToValueAtTime(0.3, audioCtx.currentTime + 0.05);
+        gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.3);
+
+        oscillator.start(audioCtx.currentTime);
+        oscillator.stop(audioCtx.currentTime + 0.3);
+
+        console.log('🔔 Notification sound played');
+    } catch (e) {
+        console.log('Could not play notification sound:', e.message);
     }
 }
 
