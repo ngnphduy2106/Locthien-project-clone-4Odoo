@@ -310,6 +310,50 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     });
+
+    // Bind static import order form elements (from index.html)
+    // These bindings are for elements that exist in static HTML, not dynamically rendered
+    const bindStaticImportOrderEvents = () => {
+        // Sync MISA button in static form
+        const btnSyncStatic = document.getElementById('btn-sync-misa-static');
+        if (btnSyncStatic && !btnSyncStatic._bound) {
+            btnSyncStatic.addEventListener('click', async () => {
+                if (window.CreateOrderModule && typeof window.CreateOrderModule.syncMisaProducts === 'function') {
+                    await window.CreateOrderModule.syncMisaProducts();
+                } else {
+                    console.error('CreateOrderModule not loaded yet');
+                    alert('Module chưa sẵn sàng, vui lòng thử lại!');
+                }
+            });
+            btnSyncStatic._bound = true;
+        }
+
+        // Product code input - autocomplete from MISA
+        const prodCode = document.getElementById('prod-code');
+        if (prodCode && !prodCode._bound) {
+            prodCode.addEventListener('input', function () {
+                if (window.CreateOrderModule && typeof window.CreateOrderModule.onProductCodeChange === 'function') {
+                    window.CreateOrderModule.onProductCodeChange(this);
+                }
+            });
+            prodCode._bound = true;
+        }
+
+        // Product name input - autocomplete from MISA
+        const prodName = document.getElementById('prod-name');
+        if (prodName && !prodName._bound) {
+            prodName.addEventListener('input', function () {
+                if (window.CreateOrderModule && typeof window.CreateOrderModule.onProductNameChange === 'function') {
+                    window.CreateOrderModule.onProductNameChange(this);
+                }
+            });
+            prodName._bound = true;
+        }
+    };
+
+    // Bind immediately and also after a short delay (for dynamic content)
+    bindStaticImportOrderEvents();
+    setTimeout(bindStaticImportOrderEvents, 1000);
 });
 
 // === AUTH ===

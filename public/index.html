@@ -456,9 +456,8 @@
                                     <i class="bi bi-plus-circle"></i>
                                     Thêm sản phẩm mới
                                 </div>
-                                <button id="btn-sync-misa" class="btn btn-sm"
-                                    style="background:rgba(255,255,255,0.2); color:white; border:1px solid rgba(255,255,255,0.3);"
-                                    onclick="CreateOrderModule.syncMisaProducts()">
+                                <button id="btn-sync-misa-static" class="btn btn-sm"
+                                    style="background:rgba(255,255,255,0.2); color:white; border:1px solid rgba(255,255,255,0.3);">
                                     <i class="bi bi-arrow-repeat me-1"></i>Sync MISA
                                 </button>
                             </div>
@@ -467,8 +466,7 @@
                                 <div class="form-group">
                                     <label class="form-label">Mã sản phẩm (MISA)</label>
                                     <input type="text" id="prod-code" class="form-control" placeholder="VD: HC001"
-                                        list="material-code-list" autocomplete="off"
-                                        oninput="CreateOrderModule.onProductCodeChange(this)">
+                                        list="material-code-list" autocomplete="off">
                                     <datalist id="material-code-list"></datalist>
                                 </div>
 
@@ -478,7 +476,7 @@
                                             style="color:var(--danger);">*</span></label>
                                     <input type="text" id="prod-name" class="form-control"
                                         placeholder="VD: Acid Sulfuric H2SO4" list="material-name-list"
-                                        autocomplete="off" oninput="CreateOrderModule.onProductNameChange(this)">
+                                        autocomplete="off">
                                     <datalist id="material-name-list"></datalist>
                                 </div>
 
