@@ -264,8 +264,7 @@ const DispatchModule = {
                     <div style="display:flex; align-items:center; gap:8px; width:100%; overflow:hidden;">
                         <div style="flex:1; min-width:0; overflow:hidden;">
                             <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                                <span style="font-weight:500; color:var(--text-primary); font-size:11px;">${customer}</span>
-                                <span style="font-size:9px; color:var(--text-muted); margin-left:6px;"><i class="bi bi-geo-alt" style="font-size:8px;"></i> ${address}</span>
+                                <span style="font-weight:500; color:var(--text-primary); font-size:12px;">${customer}</span>
                             </div>
                         </div>
                         <div style="display:flex; gap:4px; flex-shrink:0;" onclick="event.stopPropagation()">
