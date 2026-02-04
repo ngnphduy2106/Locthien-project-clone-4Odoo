@@ -177,14 +177,22 @@ const MyOrdersModule = {
 
         // Helper to get sortable date from order
         const getOrderDate = (o) => {
-            const dateStr = o.date || o.order_date || o.ngay || o.expected_date || o.created_at || o.sale_order_date || '';
-            if (!dateStr) return new Date(0);
-            // Handle d/m/yyyy or dd/mm/yyyy format
-            if (typeof dateStr === 'string' && dateStr.match(/^\d{1,2}\/\d{1,2}\/\d{4}$/)) {
-                const parts = dateStr.split('/');
-                return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+            // Check all possible date fields
+            let val = o.date || o.order_date || o.ngay || o.expected_date || o.created_at || o.sale_order_date || '';
+            if (!val) return new Date(0);
+
+            // Ensure string and clean
+            const str = String(val).trim();
+
+            // Handle dd/mm/yyyy or d/m/yyyy (allows / or - separator)
+            // Capture groups: 1=day, 2=month, 3=year
+            const dmy = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+            if (dmy) {
+                return new Date(parseInt(dmy[3]), parseInt(dmy[2]) - 1, parseInt(dmy[1]));
             }
-            const parsed = new Date(dateStr);
+
+            // Handle ISO or other formats
+            const parsed = new Date(str);
             return isNaN(parsed.getTime()) ? new Date(0) : parsed;
         };
 
