@@ -2216,17 +2216,15 @@ async function viewOrderDetail(orderId, options = {}) {
     console.log('viewOrderDetail called with:', orderId, isReadonly ? '(readonly)' : '');
     console.log('state.orders:', state.orders);
 
-    // Find order from state - PRIORITY: MyOrdersModule first (has assigned_products)
-    const myOrdersModuleOrders = window.MyOrdersModule?.orders || [];
+    // Find order from state - try multiple matching approaches including exports and myOrders
     const allOrders = [
-        ...myOrdersModuleOrders,  // Priority: has assigned_products for split orders
         ...(state.orders.pending || []),
         ...(state.orders.assigned || []),
         ...(state.orders.completed || []),
         ...(state.orders.exports || []),
-        ...(state.myOrders || [])
+        ...(state.myOrders || [])  // Include driver's orders
     ];
-    console.log('allOrders count:', allOrders.length, '(MyOrdersModule:', myOrdersModuleOrders.length, ')');
+    console.log('allOrders count:', allOrders.length);
 
     // More robust matching: try id, soDon, sale_order_no with case-insensitive comparison
     const searchId = String(orderId).toLowerCase().trim();
@@ -2265,64 +2263,27 @@ async function viewOrderDetail(orderId, options = {}) {
     // Build products list HTML - handle ALL formats including JSON strings
     let products = order.products || order.cart || order.chiTiet || order.sale_order_product_mappings || [];
 
-    // Parse if string
+    // Parse JSON string if needed (database might return string)
     if (typeof products === 'string') {
-        try { products = JSON.parse(products); } catch (e) { products = []; }
-    }
-    if (!Array.isArray(products)) products = [];
-
-    // For split orders: fetch driver's assigned quantity from API
-    let isSplitOrder = order.is_split_order;
-    let driverAssignedQty = order.assigned_qty ? Number(order.assigned_qty) : null;
-    let actualProducts = null;  // Actual delivered products for this driver
-    let combinedDrivers = null; // All driver names combined
-    let combinedPlates = null;  // All plates combined
-
-    // If we have assignment_id, fetch full assignment data from API
-    if (order.assignment_id) {
         try {
-            const resp = await fetch(`/api/orders/assignment/${order.assignment_id}`);
-            const data = await resp.json();
-            if (!data.error && data.data) {
-                driverAssignedQty = Number(data.data.assigned_qty) || driverAssignedQty;
-                isSplitOrder = true;
-
-                // Use actual_products if order is completed, otherwise assigned_products
-                if (data.data.actual_products && Array.isArray(data.data.actual_products) && data.data.actual_products.length > 0) {
-                    actualProducts = data.data.actual_products;
-                    console.log(`📦 Using actual_products for completed order:`, actualProducts);
-                }
-                console.log(`📦 Fetched from API: assignedQty=${driverAssignedQty}, hasActual=${!!actualProducts}`);
-            }
+            products = JSON.parse(products);
         } catch (e) {
-            console.error('Error fetching assignment:', e);
+            console.error('Failed to parse products JSON:', e, products);
+            products = [];
         }
     }
 
-    // Fetch ALL assignments for this order to get combined driver names
-    const orderId = order.soDon || order.id || order.sale_order_no;
-    try {
-        const assignResp = await fetch(`/api/orders/${orderId}/assignments`);
-        const assignData = await assignResp.json();
-        if (!assignData.error && assignData.combined && assignData.combined.count > 1) {
-            combinedDrivers = assignData.combined.drivers;
-            combinedPlates = assignData.combined.plates;
-            isSplitOrder = true;
-            console.log(`👥 Multi-driver order: ${combinedDrivers} | ${combinedPlates}`);
-        }
-    } catch (e) {
-        console.error('Error fetching assignments:', e);
+    // Ensure it's an array
+    if (!Array.isArray(products)) {
+        console.warn('Products is not an array:', products);
+        products = [];
     }
 
-    // For completed split orders: show actual delivered products instead of original
-    if (actualProducts && actualProducts.length > 0) {
-        products = actualProducts;
-    }
-
-    console.log(`📦 Order ${order.soDon || order.id} has ${products.length} products, split: ${isSplitOrder}, assignedQty: ${driverAssignedQty}`);
+    console.log(`📦 Order ${order.soDon || order.id} has ${products.length} products:`, products);
 
     // Check if current user is a driver (hide price info)
     const isDriver = (state.user?.role || '').toLowerCase() === 'driver';
+
     const productsHtml = products.length > 0
         ? products.map(p => `
             <tr>
@@ -2338,6 +2299,22 @@ async function viewOrderDetail(orderId, options = {}) {
     const modal = window.$('#modal-order-detail');
     const modalBody = window.$('#modal-order-body');
     const modalTitle = window.$('#modal-order-title');
+
+    // Fetch combined driver names for multi-driver orders
+    let combinedDrivers = null;
+    let combinedPlates = null;
+    const orderId = order.soDon || order.id || order.sale_order_no;
+    try {
+        const assignResp = await fetch(`/api/orders/${orderId}/assignments`);
+        const assignData = await assignResp.json();
+        if (!assignData.error && assignData.combined && assignData.combined.count > 1) {
+            combinedDrivers = assignData.combined.drivers;
+            combinedPlates = assignData.combined.plates;
+            console.log(`👥 Multi-driver order: ${combinedDrivers} | ${combinedPlates}`);
+        }
+    } catch (e) {
+        console.log('No multi-driver data:', e.message);
+    }
 
     if (modalTitle) modalTitle.textContent = `Chi tiết đơn hàng #${order.soDon || order.sale_order_no || order.id}`;
 
@@ -2376,12 +2353,6 @@ async function viewOrderDetail(orderId, options = {}) {
                     <label>Biển số xe:</label>
                     <span>${combinedPlates || order.plate || order.bienSo || order.vehicle_plate || 'Chưa có'}</span>
                 </div>
-                ${isSplitOrder ? `
-                <div class="detail-row" style="background: linear-gradient(135deg, #fef3c7, #fde68a); padding: 10px; border-radius: 8px; margin: 8px 0;">
-                    <label style="color: #92400e; font-weight: 600;">📦 Phần của bạn:</label>
-                    <span style="color: #78350f; font-weight: 700; font-size: 1.1em;">${driverAssignedQty} kg</span>
-                </div>
-                ` : ''}
                 ${!isDriver ? `
                 <div class="detail-row">
                     <label>Tổng tiền:</label>
@@ -3987,16 +3958,11 @@ window.sendImportChatMessage = sendImportChatMessage;
 
 let driverAssignments = [];
 let currentOrderTotalQty = 0;
-let currentOrderProducts = [];  // Store products for proportional split
 let currentModalOrderId = null;
 
 function initDriverAssignments(order) {
     driverAssignments = [];
-    currentOrderProducts = order.products || order.cart || [];
-    if (typeof currentOrderProducts === 'string') {
-        try { currentOrderProducts = JSON.parse(currentOrderProducts); } catch (e) { currentOrderProducts = []; }
-    }
-    currentOrderTotalQty = currentOrderProducts.reduce((sum, p) => sum + Number(p.qty || p.quantity || 0), 0);
+    currentOrderTotalQty = (order.products || order.cart || []).reduce((sum, p) => sum + Number(p.qty || p.quantity || 0), 0);
 
     if (order.taiXe || order.driver) {
         driverAssignments.push({
