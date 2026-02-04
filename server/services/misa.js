@@ -117,10 +117,8 @@ export const syncMisaProducts = async () => {
                             name: p.product_name,
                             unit: p.usage_unit || '', // MISA uses 'usage_unit' not 'unit'
                             price: Number(p.unit_price || 0), // MISA uses 'unit_price' not 'price'
-                            sale_price: Number(p.unit_price || 0),
+                            saleprice: Number(p.unit_price || 0), // Supabase uses 'saleprice' not 'sale_price'
                             category: p.product_category || 'MISA CRM', // Use actual category from MISA
-                            type: 'MisaProduct',
-                            status: p.inactive === true ? 'INACTIVE' : 'ACTIVE', // MISA uses 'inactive' boolean
                             description: p.description || p.sale_description || ''
                         };
 
