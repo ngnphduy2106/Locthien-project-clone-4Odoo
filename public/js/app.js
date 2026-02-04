@@ -1710,7 +1710,7 @@ function renderMyOrdersList(containerId, orders, type) {
                                 ${orderId}
                                 ${isImport ? '<span style="background:#4CAF50; color:white; padding:1px 4px; border-radius:3px; font-size:8px; margin-left:2px;">Nhập</span>' : ''}
                             </span>
-                            <span style="font-size:10px; color:var(--text-secondary); white-space:nowrap;">${formatDate(order.ngay || order.sale_order_date || order.createdAt)}</span>
+                            <span style="font-size:10px; color:var(--text-secondary); white-space:nowrap;">${formatDate(order.ngay || order.sale_order_date || order.expected_date || order.createdAt)}</span>
                             <span style="background:${statusColors[type]}20; color:${statusColors[type]}; padding:2px 5px; border-radius:6px; font-size:9px; font-weight:500; white-space:nowrap;">${statusTexts[type]}</span>
                             <div style="display:flex; gap:3px; flex-shrink:0;" onclick="event.stopPropagation()">
                                 <button class="btn btn-outline btn-sm" onclick="${viewFn}" style="padding:2px; font-size:9px; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center;">
