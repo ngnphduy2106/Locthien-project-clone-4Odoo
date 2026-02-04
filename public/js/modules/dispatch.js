@@ -253,8 +253,8 @@ const DispatchModule = {
                     position: relative;
                 " onmouseenter="this.style.opacity='0.9'" onmouseleave="this.style.opacity='1'">
                     
-                    <!-- ROW 1: PO + Date + Status + BUTTONS + Driver -->
-                    <div style="display:flex; align-items:center; gap:6px; flex-wrap:nowrap;">
+                    <!-- ROW 1: PO + Date + Status + BUTTONS -->
+                    <div style="display:flex; align-items:center; gap:6px; flex-wrap:nowrap; width:100%;">
                         <span style="font-weight:600; color:var(--primary); font-size:11px; white-space:nowrap;">${orderId}</span>
                         <span style="font-size:10px; color:var(--text-secondary); white-space:nowrap;">${date ? new Date(date).toLocaleDateString('vi-VN') : 'N/A'}</span>
                         <span class="badge badge-${this.getStatusClass(status)}" style="font-size:9px; padding:2px 5px; white-space:nowrap;">${status}</span>
@@ -264,13 +264,13 @@ const DispatchModule = {
                             </button>
                             ${this.getActionButton(order)}
                         </div>
-                        <span style="font-size:10px; color:var(--info); margin-left:auto; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:80px;">${driver || ''}</span>
+                        ${driver ? `<span style="font-size:10px; color:var(--info); margin-left:auto; white-space:nowrap;">${driver}</span>` : ''}
                     </div>
                     
                     <!-- ROW 2: Customer + Address -->
-                    <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                    <div style="display:flex; align-items:center; gap:8px; width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                         <span style="font-weight:500; color:var(--text-primary); font-size:12px;">${customer}</span>
-                        <span style="font-size:10px; color:var(--text-muted); margin-left:8px;"><i class="bi bi-geo-alt" style="font-size:9px;"></i> ${address}</span>
+                        <span style="font-size:10px; color:var(--text-muted);"><i class="bi bi-geo-alt" style="font-size:9px;"></i> ${address}</span>
                     </div>
                 </div>`;
         }).join('')}

@@ -1051,8 +1051,8 @@ function renderImportList() {
                 " onmouseenter="this.style.opacity='0.9'" onmouseleave="this.style.opacity='1'">
                     ${getUnreadBadgeHtml(imp.id, 'import')}
                     
-                    <!-- ROW 1: PO + Date + Status + BUTTONS + Driver -->
-                    <div style="display:flex; align-items:center; gap:6px; flex-wrap:nowrap;">
+                    <!-- ROW 1: PO + Date + Status + BUTTONS -->
+                    <div style="display:flex; align-items:center; gap:6px; flex-wrap:nowrap; width:100%;">
                         <span style="font-weight:600; color:#16a34a; font-size:11px; white-space:nowrap;">
                             ${imp.ticket_no || imp.id}
                             <span style="background:#4CAF50; color:white; padding:1px 4px; border-radius:3px; font-size:8px; margin-left:2px;">Nhập</span>
@@ -1074,13 +1074,13 @@ function renderImportList() {
                                 </button>
                             ` : ''}
                         </div>
-                        <span style="font-size:10px; color:var(--info); margin-left:auto; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:80px;">${imp.assigned_driver || imp.driver_name || ''}</span>
+                        ${(imp.assigned_driver || imp.driver_name) ? `<span style="font-size:10px; color:var(--info); margin-left:auto; white-space:nowrap;">${imp.assigned_driver || imp.driver_name}</span>` : ''}
                     </div>
                     
                     <!-- ROW 2: Customer + Address -->
-                    <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                    <div style="display:flex; align-items:center; gap:8px; width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                         <span style="font-weight:500; color:var(--text-primary); font-size:12px;">${imp.supplier_name || 'NCC'}</span>
-                        <span style="font-size:10px; color:var(--text-muted); margin-left:8px;"><i class="bi bi-geo-alt" style="font-size:9px;"></i> ${imp.supplier_address || 'Sunco'}</span>
+                        <span style="font-size:10px; color:var(--text-muted);"><i class="bi bi-geo-alt" style="font-size:9px;"></i> ${imp.supplier_address || 'Sunco'}</span>
                     </div>
                 </div>
             `).join('')}
@@ -1274,8 +1274,8 @@ function renderDispatchOrders() {
                 " onmouseenter="this.style.opacity='0.9'" onmouseleave="this.style.opacity='1'">
                     ${getUnreadBadgeHtml(orderId, 'export')}
                     
-                    <!-- ROW 1: PO + Date + Status + BUTTONS + Driver -->
-                    <div style="display:flex; align-items:center; gap:6px; flex-wrap:nowrap;">
+                    <!-- ROW 1: PO + Date + Status + BUTTONS -->
+                    <div style="display:flex; align-items:center; gap:6px; flex-wrap:nowrap; width:100%;">
                         <span style="font-weight:600; color:var(--primary); font-size:11px; white-space:nowrap;">${orderNo}</span>
                         <span style="font-size:10px; color:var(--text-secondary); white-space:nowrap;">${formatDate(date)}</span>
                         <span class="badge badge-${getStatusBadge(status)}" style="font-size:9px; padding:2px 5px; white-space:nowrap;">${getStatusText(status)}</span>
@@ -1294,13 +1294,13 @@ function renderDispatchOrders() {
                                 </button>
                             ` : ''}
                         </div>
-                        <span style="font-size:10px; color:var(--info); margin-left:auto; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:80px;">${driver || ''}</span>
+                        ${driver ? `<span style="font-size:10px; color:var(--info); margin-left:auto; white-space:nowrap;">${driver}</span>` : ''}
                     </div>
                     
                     <!-- ROW 2: Customer + Address -->
-                    <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                    <div style="display:flex; align-items:center; gap:8px; width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                         <span style="font-weight:500; color:var(--text-primary); font-size:12px;">${customer}</span>
-                        <span style="font-size:10px; color:var(--text-muted); margin-left:8px;"><i class="bi bi-geo-alt" style="font-size:9px;"></i> ${address}</span>
+                        <span style="font-size:10px; color:var(--text-muted);"><i class="bi bi-geo-alt" style="font-size:9px;"></i> ${address}</span>
                     </div>
                 </div>`;
     }).join('')}
@@ -1694,8 +1694,8 @@ function renderMyOrdersList(containerId, orders, type) {
                     " onmouseenter="this.style.opacity='0.95'" onmouseleave="this.style.opacity='1'">
                         ${chatBadge}
                         
-                        <!-- ROW 1: PO + Date + Status + BUTTONS + Split badge -->
-                        <div style="display:flex; align-items:center; gap:6px; flex-wrap:nowrap;">
+                        <!-- ROW 1: PO + Date + Status + BUTTONS -->
+                        <div style="display:flex; align-items:center; gap:6px; flex-wrap:nowrap; width:100%;">
                             <span style="font-weight:600; color:var(--primary); font-size:11px; white-space:nowrap;">
                                 ${orderId}
                                 ${isImport ? '<span style="background:#4CAF50; color:white; padding:1px 4px; border-radius:3px; font-size:8px; margin-left:2px;">Nhập</span>' : ''}
@@ -1722,9 +1722,9 @@ function renderMyOrdersList(containerId, orders, type) {
                         </div>
                         
                         <!-- ROW 2: Customer + Address -->
-                        <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                        <div style="display:flex; align-items:center; gap:8px; width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                             <span style="font-weight:500; color:var(--text-primary); font-size:12px;">${order.khach || order.customerName || order.accountName || 'Khách hàng'}</span>
-                            <span style="font-size:10px; color:var(--text-muted); margin-left:8px;"><i class="bi bi-geo-alt" style="font-size:9px;"></i> ${order.diaChi || order.address || 'Sunco'}</span>
+                            <span style="font-size:10px; color:var(--text-muted);"><i class="bi bi-geo-alt" style="font-size:9px;"></i> ${order.diaChi || order.address || 'Sunco'}</span>
                         </div>
                     </div>
                 `;
