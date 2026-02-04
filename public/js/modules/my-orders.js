@@ -177,35 +177,36 @@ const MyOrdersModule = {
 
         // Helper to get sortable date from order
         const getOrderDate = (o) => {
-            const dateStr = o.date || o.order_date || o.ngay || o.expected_date || o.created_at || '';
+            const dateStr = o.date || o.order_date || o.ngay || o.expected_date || o.created_at || o.sale_order_date || '';
             if (!dateStr) return new Date(0);
-            // Handle dd/mm/yyyy format
-            if (typeof dateStr === 'string' && dateStr.includes('/')) {
+
+            // Handle dd/mm/yyyy format (e.g., "31/12/2025")
+            if (typeof dateStr === 'string' && dateStr.match(/^\d{1,2}\/\d{1,2}\/\d{4}$/)) {
                 const parts = dateStr.split('/');
-                if (parts.length === 3) {
-                    return new Date(parts[2], parts[1] - 1, parts[0]);
-                }
+                return new Date(parts[2], parseInt(parts[1]) - 1, parseInt(parts[0]));
             }
-            return new Date(dateStr);
+
+            // Handle ISO format or other parseable formats
+            const parsed = new Date(dateStr);
+            return isNaN(parsed.getTime()) ? new Date(0) : parsed;
         };
 
         // Helper to get sortable order code (extract number from code like PO00035.25 or N1045)
         const getOrderCode = (o) => {
             const code = o.soDon || o.id || '';
-            // Extract numbers for comparison
-            const match = code.match(/(\d+)/);
-            return match ? parseInt(match[1]) : 0;
+            // Extract ALL digits and use as number
+            const digits = code.replace(/\D/g, '');
+            return digits ? parseInt(digits) : 0;
         };
 
         // Sort function: by date DESC, then by code DESC
         const sortOrders = (orders) => {
-            return orders.sort((a, b) => {
+            return [...orders].sort((a, b) => {
                 const dateA = getOrderDate(a);
                 const dateB = getOrderDate(b);
                 // Sort by date descending (newest first)
-                if (dateB.getTime() !== dateA.getTime()) {
-                    return dateB.getTime() - dateA.getTime();
-                }
+                const timeDiff = dateB.getTime() - dateA.getTime();
+                if (timeDiff !== 0) return timeDiff;
                 // If same date, sort by code descending
                 return getOrderCode(b) - getOrderCode(a);
             });
