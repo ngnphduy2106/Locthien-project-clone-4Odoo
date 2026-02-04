@@ -6227,15 +6227,17 @@ function removeCompletionImage(idx) {
 function showDriverCompletionModal(orderId, assignmentId = null) {
     console.log(`🎯 showDriverCompletionModal called - orderId: ${orderId}, assignmentId: ${assignmentId}`);
 
-    // Find order from all lists
+    // Find order from all lists - PRIORITY: MyOrdersModule first (has assigned_products)
+    const myOrdersModuleOrders = window.MyOrdersModule?.orders || [];
     const allOrders = [
+        ...myOrdersModuleOrders,  // Priority: check MyOrdersModule first
         ...(state.orders?.pending || []),
         ...(state.orders?.assigned || []),
         ...(state.orders?.completed || []),
         ...(state.myOrders || [])
     ];
 
-    console.log(`📋 Searching in ${allOrders.length} orders`);
+    console.log(`📋 Searching in ${allOrders.length} orders (MyOrdersModule: ${myOrdersModuleOrders.length})`);
 
     const order = allOrders.find(o =>
         o.id == orderId || o.soDon == orderId || o.sale_order_no == orderId
@@ -6249,6 +6251,9 @@ function showDriverCompletionModal(orderId, assignmentId = null) {
     }
 
     console.log(`✅ Order found:`, order.id, order.soDon);
+    console.log(`🔍 Order keys:`, Object.keys(order));
+    console.log(`🔍 order.assigned_products:`, order.assigned_products);
+    console.log(`🔍 order.assignment_id:`, order.assignment_id);
 
     // Reset images and local items
     completionImages = [];
@@ -6258,6 +6263,21 @@ function showDriverCompletionModal(orderId, assignmentId = null) {
     let assignedQty = null;
     let assignmentData = null;
     let assignedProducts = null;
+
+    // FIRST: Check if order directly has assigned_products (from MyOrdersModule)
+    if (order.assigned_products) {
+        assignedProducts = order.assigned_products;
+        if (typeof assignedProducts === 'string') {
+            try { assignedProducts = JSON.parse(assignedProducts); } catch (e) { assignedProducts = null; }
+        }
+        console.log(`✅ Found assigned_products directly on order:`, assignedProducts);
+    }
+
+    // Use assignmentId from order if not passed
+    if (!assignmentId && order.assignment_id) {
+        assignmentId = order.assignment_id;
+        console.log(`📌 Using assignment_id from order: ${assignmentId}`);
+    }
 
     if (assignmentId) {
         order.assignment_id = assignmentId;
@@ -6274,21 +6294,18 @@ function showDriverCompletionModal(orderId, assignmentId = null) {
             assignedQty = Number(assignmentData.assigned_qty);
         }
 
-        // Check for custom assigned_products  
-        if (assignmentData && assignmentData.assigned_products) {
-            assignedProducts = assignmentData.assigned_products;
-            if (typeof assignedProducts === 'string') {
-                try { assignedProducts = JSON.parse(assignedProducts); } catch (e) { assignedProducts = null; }
-            }
-        } else if (order.assigned_products) {
-            assignedProducts = order.assigned_products;
-            if (typeof assignedProducts === 'string') {
-                try { assignedProducts = JSON.parse(assignedProducts); } catch (e) { assignedProducts = null; }
+        // Check for custom assigned_products from assignment data (if not already found)
+        if (!assignedProducts) {
+            if (assignmentData && assignmentData.assigned_products) {
+                assignedProducts = assignmentData.assigned_products;
+                if (typeof assignedProducts === 'string') {
+                    try { assignedProducts = JSON.parse(assignedProducts); } catch (e) { assignedProducts = null; }
+                }
             }
         }
-
-        console.log(`🔀 Split order detected - assignedQty: ${assignedQty}, assignedProducts:`, assignedProducts);
     }
+
+    console.log(`🔀 Split order detected - assignedQty: ${assignedQty}, assignedProducts:`, assignedProducts);
 
     state.currentCompletionOrder = order;
 
