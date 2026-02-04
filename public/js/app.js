@@ -1032,15 +1032,15 @@ function renderImportList() {
         return;
     }
 
-    // Compact row-based layout for imports
+    // Compact 2-row layout for imports
     container.innerHTML = `
         <div class="compact-order-list" style="display:flex; flex-direction:column; gap:4px;">
             ${imports.map(imp => `
                 <div class="compact-order-row" onclick="viewImportDetail('${imp.id}')" style="
                     display: flex;
-                    align-items: center;
-                    gap: 8px;
-                    padding: 8px 12px;
+                    flex-wrap: wrap;
+                    gap: 4px 8px;
+                    padding: 6px 10px;
                     background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
                     border-radius: 6px;
                     cursor: pointer;
@@ -1051,64 +1051,38 @@ function renderImportList() {
                 " onmouseenter="this.style.opacity='0.9'" onmouseleave="this.style.opacity='1'">
                     ${getUnreadBadgeHtml(imp.id, 'import')}
                     
-                    <!-- Ticket No -->
-                    <div style="min-width: 90px; font-weight: 600; color: #16a34a; font-size: 11px;">
-                        ${imp.ticket_no || imp.id}
-                        <span style="background:#4CAF50; color:white; padding:1px 4px; border-radius:3px; font-size:9px; margin-left:2px;">Nhập</span>
-                    </div>
-                    
-                    <!-- Supplier (flex-grow) -->
-                    <div style="flex: 1; min-width: 0;">
-                        <div style="font-weight: 500; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px;">
-                            ${imp.supplier_name || 'NCC'}
-                        </div>
-                        <div style="font-size: 10px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                            <i class="bi bi-geo-alt" style="font-size: 9px;"></i> ${imp.supplier_address || 'Sunco'}
-                        </div>
-                    </div>
-                    
-                    <!-- Date -->
-                    <div style="min-width: 70px; font-size: 10px; color: var(--text-secondary); text-align: center;">
-                        ${formatDate(imp.expected_date || imp.created_at)}
-                    </div>
-                    
-                    <!-- Driver -->
-                    <div style="min-width: 80px; font-size: 10px; color: var(--text-secondary); text-align: center;">
-                        ${imp.assigned_driver || imp.driver_name ? `<span style="color: var(--info);">${imp.assigned_driver || imp.driver_name}</span>` : '<span style="opacity:0.5;">—</span>'}
-                    </div>
-                    
-                    <!-- Status Badge -->
-                    <div style="min-width: 75px; text-align: center;">
-                        <span class="badge badge-${getStatusBadge(imp.status)}" style="font-size: 9px; padding: 2px 6px;">
-                            ${getStatusText(imp.status)}
+                    <!-- ROW 1: PO + Date + Status + Driver -->
+                    <div style="display:flex; align-items:center; gap:8px; width:100%; flex-wrap:wrap;">
+                        <span style="font-weight:600; color:#16a34a; font-size:11px;">
+                            ${imp.ticket_no || imp.id}
+                            <span style="background:#4CAF50; color:white; padding:1px 4px; border-radius:3px; font-size:8px; margin-left:2px;">Nhập</span>
                         </span>
+                        <span style="font-size:10px; color:var(--text-secondary);">${formatDate(imp.expected_date || imp.created_at)}</span>
+                        <span class="badge badge-${getStatusBadge(imp.status)}" style="font-size:9px; padding:2px 5px;">${getStatusText(imp.status)}</span>
+                        <span style="font-size:10px; color:var(--info); margin-left:auto;">${imp.assigned_driver || imp.driver_name || '—'}</span>
                     </div>
                     
-                    <!-- Actions -->
-                    <div style="display: flex; gap: 4px;" onclick="event.stopPropagation()">
-                        <button class="btn btn-outline btn-sm" onclick="viewImportDetail('${imp.id}')" style="padding: 3px 6px; font-size: 10px;">
-                            <i class="bi bi-eye"></i>
-                        </button>
-                        ${(state.currentDispatchTab === 'pending' || state.currentDispatchTab === 'assigned') && isAdminRole() ? `
-                            <button class="btn btn-warning btn-sm" onclick="editImport('${imp.id}')" style="padding: 3px 6px; font-size: 10px;">
-                                <i class="bi bi-pencil"></i>
+                    <!-- ROW 2: Customer + Address + Buttons -->
+                    <div style="display:flex; align-items:center; gap:8px; width:100%;">
+                        <div style="flex:1; min-width:0;">
+                            <span style="font-weight:500; color:var(--text-primary); font-size:11px;">${imp.supplier_name || 'NCC'}</span>
+                            <span style="font-size:9px; color:var(--text-muted); margin-left:6px;"><i class="bi bi-geo-alt" style="font-size:8px;"></i> ${imp.supplier_address || 'Sunco'}</span>
+                        </div>
+                        <div style="display:flex; gap:4px;" onclick="event.stopPropagation()">
+                            <button class="btn btn-outline btn-sm" onclick="viewImportDetail('${imp.id}')" style="padding:3px 6px; font-size:9px;">
+                                <i class="bi bi-eye"></i>
                             </button>
-                        ` : ''}
-                        ${state.currentDispatchTab === 'pending' ? `
-                            <button class="btn btn-info btn-sm" onclick="assignImportDriver('${imp.id}')" style="padding: 3px 6px; font-size: 10px;">
-                                <i class="bi bi-person-plus"></i>
-                            </button>
-                        ` : ''}
-                        ${state.currentDispatchTab === 'assigned' && isAdminRole() ? `
-                            <button class="btn btn-success btn-sm" onclick="adminCompleteImport('${imp.id}')" style="padding: 3px 6px; font-size: 10px;">
-                                <i class="bi bi-check"></i>
-                            </button>
-                        ` : ''}
-                        ${(state.currentDispatchTab === 'pending' || state.currentDispatchTab === 'assigned') && isAdminRole() ? `
-                            <button class="btn btn-danger btn-sm" onclick="deleteImportTicket('${imp.id}')" style="padding: 3px 6px; font-size: 10px;" title="Xóa">
-                                <i class="bi bi-trash"></i>
-                            </button>
-                        ` : ''}
+                            ${state.currentDispatchTab === 'pending' ? `
+                                <button class="btn btn-info btn-sm" onclick="assignImportDriver('${imp.id}')" style="padding:3px 6px; font-size:9px;">
+                                    <i class="bi bi-person-plus"></i>
+                                </button>
+                            ` : ''}
+                            ${state.currentDispatchTab === 'assigned' && isAdminRole() ? `
+                                <button class="btn btn-success btn-sm" onclick="adminCompleteImport('${imp.id}')" style="padding:3px 6px; font-size:9px;">
+                                    <i class="bi bi-check"></i>
+                                </button>
+                            ` : ''}
+                        </div>
                     </div>
                 </div>
             `).join('')}
@@ -1686,7 +1660,7 @@ function renderMyOrdersList(containerId, orders, type) {
         return;
     }
 
-    // Compact row-based layout
+    // Compact 2-row layout
     container.innerHTML = `
         <div class="compact-order-list" style="display:flex; flex-direction:column; gap:4px;">
             ${orders.map(order => {
@@ -1721,9 +1695,9 @@ function renderMyOrdersList(containerId, orders, type) {
         return `
                     <div class="compact-order-row" onclick="${viewFn}" style="
                         display: flex;
-                        align-items: center;
-                        gap: 8px;
-                        padding: 8px 12px;
+                        flex-wrap: wrap;
+                        gap: 4px 8px;
+                        padding: 6px 10px;
                         background: ${bgColor};
                         border-radius: 6px;
                         cursor: pointer;
@@ -1733,58 +1707,39 @@ function renderMyOrdersList(containerId, orders, type) {
                     " onmouseenter="this.style.opacity='0.95'" onmouseleave="this.style.opacity='1'">
                         ${chatBadge}
                         
-                        <!-- Order ID + Badges -->
-                        <div style="min-width: 140px;">
-                            <div style="font-weight: 600; color: var(--primary); font-size: 11px; display: flex; align-items: center; gap: 4px; flex-wrap: wrap;">
+                        <!-- ROW 1: PO + Date + Status + Split badge -->
+                        <div style="display:flex; align-items:center; gap:8px; width:100%; flex-wrap:wrap;">
+                            <span style="font-weight:600; color:var(--primary); font-size:11px;">
                                 ${orderId}
-                                ${isImport ? '<span style="background:#4CAF50; color:white; padding:1px 4px; border-radius:3px; font-size:9px;">Nhập</span>' : ''}
-                                ${isSplit ? `<span style="background:#8B5CF6; color:white; padding:1px 4px; border-radius:3px; font-size:9px;">🔀 ${splitProgress || 'Chia'}</span>` : ''}
-                            </div>
-                            ${isSplit && order.assigned_qty ? `<div style="font-size:9px; color:#8B5CF6;">${order.assigned_qty}kg (của bạn)</div>` : ''}
-                        </div>
-                        
-                        <!-- Customer (flex-grow) -->
-                        <div style="flex: 1; min-width: 0;">
-                            <div style="font-weight: 500; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px;">
-                                ${order.khach || order.customerName || order.accountName || 'Khách hàng'}
-                            </div>
-                            <div style="font-size: 10px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                                <i class="bi bi-geo-alt" style="font-size: 9px;"></i> ${order.diaChi || order.address || 'Sunco'}
-                            </div>
-                        </div>
-                        
-                        <!-- Date -->
-                        <div style="min-width: 70px; font-size: 10px; color: var(--text-secondary); text-align: center;">
-                            ${formatDate(order.ngay || order.sale_order_date || order.createdAt)}
-                        </div>
-                        
-                        <!-- Products count -->
-                        <div style="min-width: 50px; font-size: 10px; color: var(--text-muted); text-align: center;">
-                            <i class="bi bi-box-seam" style="font-size:9px;"></i> ${(order.cart || order.products || []).length || 0}
-                        </div>
-                        
-                        <!-- Status Badge -->
-                        <div style="min-width: 70px; text-align: center;">
-                            <span style="background: ${statusColors[type]}20; color: ${statusColors[type]}; padding: 2px 6px; border-radius: 8px; font-size: 9px; font-weight: 500;">
-                                ${statusTexts[type]}
+                                ${isImport ? '<span style="background:#4CAF50; color:white; padding:1px 4px; border-radius:3px; font-size:8px; margin-left:2px;">Nhập</span>' : ''}
+                                ${isSplit ? `<span style="background:#8B5CF6; color:white; padding:1px 4px; border-radius:3px; font-size:8px; margin-left:2px;">🔀 ${splitProgress || 'Chia'}</span>` : ''}
                             </span>
+                            <span style="font-size:10px; color:var(--text-secondary);">${formatDate(order.ngay || order.sale_order_date || order.createdAt)}</span>
+                            <span style="background:${statusColors[type]}20; color:${statusColors[type]}; padding:2px 5px; border-radius:6px; font-size:9px; font-weight:500;">${statusTexts[type]}</span>
+                            ${isSplit && order.assigned_qty ? `<span style="font-size:9px; color:#8B5CF6;">${order.assigned_qty}kg</span>` : ''}
                         </div>
                         
-                        <!-- Actions -->
-                        <div style="display: flex; gap: 4px;" onclick="event.stopPropagation()">
-                            <button class="btn btn-outline btn-sm" onclick="${viewFn}" style="padding: 3px 6px; font-size: 10px;">
-                                <i class="bi bi-eye"></i>
-                            </button>
-                            ${type === 'pending' ? `
-                                <button class="btn btn-warning btn-sm" onclick="${startFn}" style="padding: 3px 6px; font-size: 10px; background:linear-gradient(135deg, #f59e0b, #d97706); color:white; border:none;">
-                                    <i class="bi bi-play-circle"></i>
+                        <!-- ROW 2: Customer + Address + Buttons -->
+                        <div style="display:flex; align-items:center; gap:8px; width:100%;">
+                            <div style="flex:1; min-width:0;">
+                                <span style="font-weight:500; color:var(--text-primary); font-size:11px;">${order.khach || order.customerName || order.accountName || 'Khách hàng'}</span>
+                                <span style="font-size:9px; color:var(--text-muted); margin-left:6px;"><i class="bi bi-geo-alt" style="font-size:8px;"></i> ${order.diaChi || order.address || 'Sunco'}</span>
+                            </div>
+                            <div style="display:flex; gap:4px;" onclick="event.stopPropagation()">
+                                <button class="btn btn-outline btn-sm" onclick="${viewFn}" style="padding:3px 6px; font-size:9px;">
+                                    <i class="bi bi-eye"></i>
                                 </button>
-                            ` : ''}
-                            ${type === 'delivering' ? `
-                                <button class="btn btn-success btn-sm" onclick="${completeFn}" style="padding: 3px 6px; font-size: 10px; background:linear-gradient(135deg, #10b981, #059669); border:none;">
-                                    <i class="bi bi-check"></i>
-                                </button>
-                            ` : ''}
+                                ${type === 'pending' ? `
+                                    <button class="btn btn-warning btn-sm" onclick="${startFn}" style="padding:3px 6px; font-size:9px; background:linear-gradient(135deg, #f59e0b, #d97706); color:white; border:none;">
+                                        <i class="bi bi-play-circle"></i>
+                                    </button>
+                                ` : ''}
+                                ${type === 'delivering' ? `
+                                    <button class="btn btn-success btn-sm" onclick="${completeFn}" style="padding:3px 6px; font-size:9px; background:linear-gradient(135deg, #10b981, #059669); border:none;">
+                                        <i class="bi bi-check"></i>
+                                    </button>
+                                ` : ''}
+                            </div>
                         </div>
                     </div>
                 `;
