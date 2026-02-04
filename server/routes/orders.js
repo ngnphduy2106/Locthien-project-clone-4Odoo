@@ -1339,13 +1339,36 @@ router.get('/:id/proof-images', async (req, res) => {
         let allImages = [];
         let ticketInfo = null;
 
-        // STEP 1: Check order_driver_assignments first (multi-driver orders)
+        // First, try to get the actual order to find correct UUID
+        let orderUuid = id;
+        let orderSoDon = id;
+        const orderInfo = await db.getOrder(id);
+        if (orderInfo) {
+            orderUuid = orderInfo.id || id;
+            orderSoDon = orderInfo.soDon || orderInfo.sale_order_no || id;
+            console.log(`   Resolved order: UUID=${orderUuid}, soDon=${orderSoDon}`);
+        }
+
+        // STEP 1: Check order_driver_assignments (search by UUID)
         try {
-            const { data: assignments } = await supabase
+            let { data: assignments } = await supabase
                 .from('order_driver_assignments')
                 .select('id, driver_name, proof_images, completed_at')
-                .eq('order_id', id)
+                .eq('order_id', orderUuid)
                 .order('created_at', { ascending: false });
+
+            // If not found by UUID, also try soDon in case order_id was stored as soDon
+            if (!assignments || assignments.length === 0) {
+                const result = await supabase
+                    .from('order_driver_assignments')
+                    .select('id, driver_name, proof_images, completed_at')
+                    .eq('order_id', orderSoDon)
+                    .order('created_at', { ascending: false });
+
+                if (result.data && result.data.length > 0) {
+                    assignments = result.data;
+                }
+            }
 
             if (assignments && assignments.length > 0) {
                 for (const a of assignments) {
