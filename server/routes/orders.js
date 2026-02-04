@@ -865,12 +865,22 @@ router.post('/:id/complete', async (req, res) => {
             console.log(`📍 Source-of-truth order_id: "${actualOrderId}" (URL param was: "${id}")`);
 
             // STEP 2: Update this assignment as completed
+            // Save actual_products = cart with REAL delivered quantities
+            const actualProducts = (cart || []).filter(c => !c.isShell).map(item => ({
+                code: item.product?.code || item.code || '',
+                name: item.product?.name || item.name || item.product || '',
+                qty: Number(item.weight_kg || item.qty || 0),
+                unit: item.unit || 'Kg'
+            }));
             console.log(`🔧 Updating assignment id: ${assignment_id} to status: completed`);
+            console.log(`📊 Saving actual_products:`, actualProducts);
+
             const { data: updateResult, error: updateErr } = await supabase
                 .from('order_driver_assignments')
                 .update({
                     status: 'completed',
                     actual_qty: myActualQty,
+                    actual_products: actualProducts,  // NEW: store actual delivered products
                     local_items: local_items || [],
                     delivery_note: note || delivery_note || '',
                     proof_images: images || [],
@@ -1003,14 +1013,17 @@ router.post('/:id/complete', async (req, res) => {
 
                 const combinedProducts = {};
 
-                // Collect assigned_products from all assignments - use actual quantities directly
+                // Collect ACTUAL delivered products from all assignments
+                // Priority: actual_products (real delivered) > assigned_products (original)
                 allAssignments.forEach(assign => {
-                    const products = assign.assigned_products || [];
+                    // Use actual_products if available (real delivered quantities)
+                    // Fallback to assigned_products if actual not saved yet
+                    const products = assign.actual_products || assign.assigned_products || [];
+                    console.log(`📋 Assignment ${assign.id?.slice(-8)}: using ${assign.actual_products ? 'actual_products' : 'assigned_products'}`);
 
                     if (Array.isArray(products)) {
                         products.forEach(p => {
                             const key = p.code || p.name;
-                            // Use assigned quantity directly (integer)
                             const qty = Math.round(Number(p.qty || 0));
 
                             if (!combinedProducts[key]) {
@@ -1031,7 +1044,7 @@ router.post('/:id/complete', async (req, res) => {
                     ...p,
                     qty: Math.round(p.qty)  // Ensure integer
                 }));
-                console.log(`✅ Combined ${updatedProducts.length} products:`, updatedProducts.map(p => `${p.name}: ${p.qty}${p.unit}`));
+                console.log(`✅ Combined ${updatedProducts.length} products (from actual_products):`, updatedProducts.map(p => `${p.name}: ${p.qty}${p.unit}`));
             }
 
             // Update order status AND products + Set initial sync status
