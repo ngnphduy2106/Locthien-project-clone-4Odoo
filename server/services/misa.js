@@ -77,6 +77,8 @@ export const syncMisaProducts = async () => {
     let page = 1;
     let hasMore = true;
     let totalSynced = 0;
+    let saveSuccess = 0;
+    let saveFailed = 0;
     let errors = [];
 
     try {
@@ -92,7 +94,10 @@ export const syncMisaProducts = async () => {
             });
 
             const json = await response.json();
-            console.log(`📦 MISA Products Response (Page ${page}):`, JSON.stringify(json).substring(0, 500));
+
+            // Log total count if available
+            const totalCount = json.TotalCount || json.total_count || json.Total || 'unknown';
+            console.log(`📦 MISA Products Response (Page ${page}): total=${totalCount}, data_length=${json.data?.length || json.Data?.length || 0}`);
 
             const success = json.Success || json.success;
             const data = json.Data || json.data;
@@ -119,8 +124,15 @@ export const syncMisaProducts = async () => {
                             description: p.description || p.sale_description || ''
                         };
 
-                        await db.addMaterial(material);
+                        const result = await db.addMaterial(material);
+                        if (result) {
+                            saveSuccess++;
+                        } else {
+                            saveFailed++;
+                            console.warn(`⚠️ Material ${p.product_code} returned null from addMaterial`);
+                        }
                     } catch (err) {
+                        saveFailed++;
                         console.error(`❌ Failed to add material ${p.product_code}:`, err.message);
                         errors.push({ code: p.product_code, error: err.message });
                     }
@@ -128,13 +140,19 @@ export const syncMisaProducts = async () => {
 
                 totalSynced += data.length;
                 page++;
+
+                // Continue if we got a full page (100 items)
+                if (data.length < 100) {
+                    console.log(`📦 Got ${data.length} items (less than 100), stopping pagination.`);
+                    hasMore = false;
+                }
             } else {
                 console.log(`📦 Page ${page} returned no data or failed. Stopping.`);
                 hasMore = false;
             }
         }
-        console.log(`✅ MISA Product Sync Complete. Total: ${totalSynced}, Errors: ${errors.length}`);
-        return { success: true, synced: totalSynced, errors };
+        console.log(`✅ MISA Product Sync Complete. Fetched: ${totalSynced}, Saved: ${saveSuccess}, Failed: ${saveFailed}`);
+        return { success: true, synced: totalSynced, saved: saveSuccess, failed: saveFailed, errors };
     } catch (e) {
         console.error('❌ MISA Product Sync Error:', e.message);
         return { success: false, error: e.message, synced: totalSynced };

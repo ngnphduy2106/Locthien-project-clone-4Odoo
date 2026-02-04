@@ -446,11 +446,24 @@ export const db = {
 
     addMaterial: async (material) => {
         const { useSupabase, useFirebase } = getMode();
+
+        // Debug: Log which mode is being used
+        if (!useSupabase && !useFirebase) {
+            console.warn('⚠️ addMaterial: Neither Supabase nor Firebase enabled, using mock data');
+        }
+
         if (useSupabase) {
             const id = sanitizeId(material.id || material.code);
             const safeMaterial = { ...material, id };
+
             const { data, error } = await supabase.from('materials').upsert(safeMaterial, { onConflict: 'id' }).select().single();
-            if (error) console.error('Supabase addMaterial error:', error);
+
+            if (error) {
+                console.error('❌ Supabase addMaterial error:', error.message, error.details, error.hint);
+                console.error('❌ Failed material data:', JSON.stringify(safeMaterial).substring(0, 200));
+                return null; // Return null on error
+            }
+
             return data || safeMaterial;
         }
         if (useFirebase) {
