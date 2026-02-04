@@ -273,7 +273,12 @@ const MyOrdersModule = {
                 </div>
                 <div class="order-info">
                     <div><i class="bi bi-geo-alt"></i> ${order.address || order.delivery_address || order.diaChi || ''}</div>
-                    <div><i class="bi bi-calendar"></i> ${order.ngay || order.date || order.order_date || 'N/A'}</div>
+                    <div><i class="bi bi-calendar"></i> ${(() => {
+                const dateVal = order.expected_date || order.created_at || order.ngay || order.date || order.order_date;
+                if (!dateVal) return 'N/A';
+                const d = new Date(dateVal);
+                return isNaN(d.getTime()) ? (order.ngay || dateVal) : d.toLocaleDateString('vi-VN');
+            })()}</div>
                     ${order.completedDate || order.completed_at ? `<div><i class="bi bi-check-circle"></i> Hoàn thành: ${order.completedDate || order.completed_at}</div>` : ''}
                 </div>
                 <div class="order-footer">
