@@ -1404,12 +1404,39 @@ router.post('/:id/add-proof-images', async (req, res) => {
         const { id } = req.params;
         const { images } = req.body;
 
+        console.log(`📸 Add proof images for order: ${id}, images count: ${images?.length || 0}`);
+
         if (!images || !Array.isArray(images) || images.length === 0) {
             return res.json(createResponse(true, 'Vui lòng chọn ít nhất 1 ảnh!'));
         }
 
         const { createClient } = await import('@supabase/supabase-js');
         const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+        // Also save to order_driver_assignments if any exist for this order
+        try {
+            const { data: assignments } = await supabase
+                .from('order_driver_assignments')
+                .select('id, proof_images')
+                .eq('order_id', id)
+                .order('created_at', { ascending: false })
+                .limit(1);
+
+            if (assignments && assignments.length > 0) {
+                const assignment = assignments[0];
+                const existingImages = assignment.proof_images || [];
+                const updatedImages = [...existingImages, ...images].slice(0, 10);
+
+                await supabase
+                    .from('order_driver_assignments')
+                    .update({ proof_images: updatedImages })
+                    .eq('id', assignment.id);
+
+                console.log(`✅ Updated order_driver_assignments with ${updatedImages.length} images`);
+            }
+        } catch (assignErr) {
+            console.warn('Assignment image update skipped:', assignErr.message);
+        }
 
         // Find existing export ticket
         let { data: ticket, error } = await supabase
@@ -1451,13 +1478,15 @@ router.post('/:id/add-proof-images', async (req, res) => {
                 warehouse: 'LT1',
                 products: orderInfo?.cart || [],
                 images: images.slice(0, 10), // Max 10 images
-                note: 'Ảnh bổ sung bởi Admin'
+                note: 'Ảnh bổ sung'
             });
 
             if (insertError) {
+                console.error('Export ticket insert error:', insertError.message);
                 return res.json(createResponse(true, 'Lỗi tạo phiếu: ' + insertError.message));
             }
 
+            console.log(`✅ Created export_ticket with ${images.length} images`);
             return res.json(createResponse(false, `Đã thêm ${images.length} ảnh chứng minh!`));
         }
 
@@ -1481,6 +1510,7 @@ router.post('/:id/add-proof-images', async (req, res) => {
             return res.json(createResponse(true, 'Lỗi cập nhật: ' + updateError.message));
         }
 
+        console.log(`✅ Updated export_ticket with ${updatedImages.length} images`);
         res.json(createResponse(false, `Đã thêm ${newImages.length} ảnh (${updatedImages.length}/10)!`));
 
     } catch (e) {
