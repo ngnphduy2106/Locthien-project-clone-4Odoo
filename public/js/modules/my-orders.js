@@ -107,6 +107,33 @@ const MyOrdersModule = {
                 driver: 'Nguyễn Văn A',
                 assignedTo: 'me',
                 completedDate: '2024-07-27 16:30'
+            },
+            // Mock Import Orders for testing date format
+            {
+                id: 'IMP001',
+                soDon: 'N9999',
+                customer: 'Test Import - Expected Feb 4',
+                khach: 'Test Import - Expected Feb 4',
+                address: 'Địa chỉ test',
+                status: 'Hoàn thành',
+                type: 'import',
+                expected_date: '2026-02-04',   // ISO: Feb 4th
+                ngay: '04/02/2026',            // Expected display: DD/MM/YYYY
+                total: 100,
+                assignedTo: 'me'
+            },
+            {
+                id: 'IMP002',
+                soDon: 'N9998',
+                customer: 'Test Import - Expected Feb 3',
+                khach: 'Test Import - Expected Feb 3',
+                address: 'Địa chỉ test 2',
+                status: 'Đang giao',
+                type: 'import',
+                expected_date: '2026-02-03',   // ISO: Feb 3rd  
+                ngay: '03/02/2026',            // Expected display: DD/MM/YYYY
+                total: 200,
+                assignedTo: 'me'
             }
         ];
         this.renderOrders();
