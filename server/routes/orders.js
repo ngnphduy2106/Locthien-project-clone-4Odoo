@@ -1003,18 +1003,15 @@ router.post('/:id/complete', async (req, res) => {
 
                 const combinedProducts = {};
 
-                // Collect assigned_products from all assignments
+                // Collect assigned_products from all assignments - use actual quantities directly
                 allAssignments.forEach(assign => {
                     const products = assign.assigned_products || [];
-                    const actualQtyRatio = assign.actual_qty && assign.assigned_qty
-                        ? assign.actual_qty / assign.assigned_qty
-                        : 1;
 
                     if (Array.isArray(products)) {
                         products.forEach(p => {
                             const key = p.code || p.name;
-                            // Use actual_qty ratio to adjust quantities
-                            const adjustedQty = Number(p.qty || 0) * actualQtyRatio;
+                            // Use assigned quantity directly (integer)
+                            const qty = Math.round(Number(p.qty || 0));
 
                             if (!combinedProducts[key]) {
                                 combinedProducts[key] = {
@@ -1024,13 +1021,16 @@ router.post('/:id/complete', async (req, res) => {
                                     unit: p.unit || 'Kg'
                                 };
                             }
-                            combinedProducts[key].qty += adjustedQty;
+                            combinedProducts[key].qty += qty;
                         });
                     }
                 });
 
-                // Convert to array
-                updatedProducts = Object.values(combinedProducts);
+                // Convert to array with integer quantities
+                updatedProducts = Object.values(combinedProducts).map(p => ({
+                    ...p,
+                    qty: Math.round(p.qty)  // Ensure integer
+                }));
                 console.log(`✅ Combined ${updatedProducts.length} products:`, updatedProducts.map(p => `${p.name}: ${p.qty}${p.unit}`));
             }
 
@@ -1124,22 +1124,20 @@ router.post('/:id/complete', async (req, res) => {
                     if (cart.length === 1 || originalProducts.length === 1) {
                         // Single product - use totalActualQty
                         misaCart = [{
-                            product_code: cart[0]?.product?.code || cart[0]?.product?.id || cart[0]?.code || originalProducts[0]?.code || '',
+                            product_code: updatedProducts[0]?.code || cart[0]?.product?.code || cart[0]?.code || originalProducts[0]?.code || '',
                             warehouse,
-                            unit: cart[0]?.unit || 'kg',
-                            qty: totalActualQty
+                            unit: updatedProducts[0]?.unit || cart[0]?.unit || 'kg',
+                            qty: Math.round(updatedProducts[0]?.qty || totalActualQty)
                         }];
                     } else {
-                        // Multiple products - sum quantities from all driver assignments
-                        // Get all proof_images for display
-                        const allProofImages = allAssignments.flatMap(a => a.proof_images || []);
-                        console.log(`📸 Multi-driver: Combined ${allProofImages.length} proof images from all drivers`);
+                        // Multiple products - use COMBINED updatedProducts from all drivers
+                        console.log(`� Multi-driver MISA sync: Using combined products:`, updatedProducts);
 
-                        misaCart = cart.filter(item => !item.isShell).map(item => ({
-                            product_code: item.product?.code || item.product?.id || item.code || item.product || '',
+                        misaCart = updatedProducts.map(item => ({
+                            product_code: item.code || '',
                             warehouse,
                             unit: item.unit || 'kg',
-                            qty: Number(item.weight_kg || item.qty || 0)
+                            qty: Math.round(item.qty || 0)
                         }));
                     }
                 } else {
