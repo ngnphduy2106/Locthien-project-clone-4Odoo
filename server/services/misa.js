@@ -95,8 +95,12 @@ export const syncMisaProducts = async () => {
 
             const json = await response.json();
 
-            // Log total count if available
-            const totalCount = json.TotalCount || json.total_count || json.Total || 0;
+            // Log ALL response keys to find correct pagination field
+            console.log(`🔍 MISA Response Keys:`, Object.keys(json));
+            console.log(`🔍 MISA Full Response (first 800 chars):`, JSON.stringify(json).substring(0, 800));
+
+            // Log total count if available - try multiple possible field names
+            const totalCount = json.TotalCount || json.total_count || json.Total || json.total || json.TotalRecord || json.total_record || 0;
             const pageSize = 100;
             console.log(`📦 MISA Products Response (Page ${page}): TotalCount=${totalCount}, data_length=${json.data?.length || json.Data?.length || 0}`);
 
