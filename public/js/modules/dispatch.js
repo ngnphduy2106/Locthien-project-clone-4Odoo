@@ -227,53 +227,79 @@ const DispatchModule = {
             return;
         }
 
-        const html = orders.map(order => `
-            <div class="order-card" onclick="DispatchModule.viewOrderDetail('${order.id || order.order_id}')">
-                <div class="order-header">
-                    <div>
-                        <div class="order-id">#${order.id || order.order_id}</div>
-                        <div class="order-customer">${order.customer || order.customer_name || 'N/A'}</div>
+        // 2-row compact format matching imports
+        const html = `<div class="compact-order-list" style="display:flex; flex-direction:column; gap:4px;">
+            ${orders.map(order => {
+            const orderId = order.id || order.order_id || order.soDon || order.orderCode;
+            const date = order.date || order.order_date || order.ngay;
+            const customer = order.customer || order.customer_name || order.khach || 'N/A';
+            const address = order.address || order.delivery_address || order.diaChi || 'Sunco';
+            const driver = order.driver || order.driver_name || order.assigned_driver || '';
+            const status = order.status || 'Chờ xử lý';
+            const borderColor = status === 'Hoàn thành' || status === 'COMPLETED' || status === 'DONE' ? 'var(--success)' :
+                status === 'Đang giao' || status === 'DELIVERING' || status === 'Đang thực hiện' ? 'var(--info)' : 'var(--warning)';
+
+            return `
+                <div class="compact-order-row" onclick="DispatchModule.viewOrderDetail('${orderId}')" style="
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 4px 8px;
+                    padding: 6px 10px;
+                    background: var(--card-bg);
+                    border-radius: 6px;
+                    cursor: pointer;
+                    border-left: 3px solid ${borderColor};
+                    transition: all 0.15s ease;
+                " onmouseenter="this.style.opacity='0.9'" onmouseleave="this.style.opacity='1'">
+                    
+                    <!-- ROW 1: PO + Date + Status + Driver -->
+                    <div style="display:flex; align-items:center; gap:8px; width:100%; flex-wrap:wrap;">
+                        <span style="font-weight:600; color:var(--primary); font-size:11px;">${orderId}</span>
+                        <span style="font-size:10px; color:var(--text-secondary);">${date ? new Date(date).toLocaleDateString('vi-VN') : 'N/A'}</span>
+                        <span class="badge badge-${this.getStatusClass(status)}" style="font-size:9px; padding:2px 5px;">${status}</span>
+                        <span style="font-size:10px; color:var(--info); margin-left:auto;">${driver || '—'}</span>
                     </div>
-                    <span class="status-badge ${this.getStatusClass(order.status)}">${order.status}</span>
-                </div>
-                <div class="order-info">
-                    <div><i class="bi bi-calendar"></i> ${order.date || order.order_date ? new Date(order.date || order.order_date).toLocaleDateString('vi-VN') : 'N/A'}</div>
-                    <div><i class="bi bi-geo-alt"></i> ${order.address || order.delivery_address || 'N/A'}</div>
-                    ${order.driver || order.driver_name ? `<div><i class="bi bi-truck"></i> ${order.driver || order.driver_name} - ${order.plate || order.vehicle_plate || ''}</div>` : ''}
-                </div>
-                <div class="order-footer">
-                    <div class="order-total">${(order.total || order.total_amount || 0).toLocaleString('vi-VN')} VNĐ</div>
-                    ${this.getActionButton(order)}
-                </div>
-            </div>
-        `).join('');
+                    
+                    <!-- ROW 2: Customer + Address + Buttons -->
+                    <div style="display:flex; align-items:center; gap:8px; width:100%;">
+                        <div style="flex:1; min-width:0;">
+                            <span style="font-weight:500; color:var(--text-primary); font-size:11px;">${customer}</span>
+                            <span style="font-size:9px; color:var(--text-muted); margin-left:6px;"><i class="bi bi-geo-alt" style="font-size:8px;"></i> ${address}</span>
+                        </div>
+                        <div style="display:flex; gap:4px;" onclick="event.stopPropagation()">
+                            <button class="btn btn-outline btn-sm" onclick="DispatchModule.viewOrderDetail('${orderId}')" style="padding:3px 6px; font-size:9px;">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                            ${this.getActionButton(order)}
+                        </div>
+                    </div>
+                </div>`;
+        }).join('')}
+        </div>`;
 
         this._renderCache[tab] = html;
         listContainer.innerHTML = html;
     },
 
-    // Get action button based on status
+    // Get action button based on status (compact icon buttons)
     getActionButton(order) {
         const status = order.status;
+        const orderId = order.id || order.order_id || order.soDon || order.orderCode;
 
         if (status === 'Chờ xử lý' || status === 'PENDING' || status === 'NEW' || status === 'Chưa thực hiện') {
             return `
-                <button class="btn-view" onclick="event.stopPropagation(); DispatchModule.showAssignDriverModal('${order.id || order.order_id}')">
-                    <i class="bi bi-person-plus"></i> Gán tài xế
+                <button class="btn btn-info btn-sm" onclick="event.stopPropagation(); DispatchModule.showAssignDriverModal('${orderId}')" style="padding:3px 6px; font-size:9px;">
+                    <i class="bi bi-person-plus"></i>
                 </button>
             `;
         } else if (status === 'Đang giao' || status === 'DELIVERING' || status === 'IN_PROGRESS' || status === 'Đang thực hiện') {
             return `
-                <button class="btn-view" onclick="event.stopPropagation(); DispatchModule.viewOrderDetail('${order.id || order.order_id}')">
-                    Xem chi tiết <i class="bi bi-arrow-right"></i>
+                <button class="btn btn-success btn-sm" onclick="event.stopPropagation(); DispatchModule.viewOrderDetail('${orderId}')" style="padding:3px 6px; font-size:9px;">
+                    <i class="bi bi-check"></i>
                 </button>
             `;
         } else {
-            return `
-                <button class="btn-view" onclick="event.stopPropagation(); DispatchModule.viewOrderDetail('${order.id || order.order_id}')">
-                    Xem chi tiết <i class="bi bi-arrow-right"></i>
-                </button>
-            `;
+            return '';
         }
     },
 
