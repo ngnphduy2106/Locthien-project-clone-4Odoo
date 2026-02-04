@@ -175,9 +175,45 @@ const MyOrdersModule = {
                 s === 'hoàn thành' || s === 'completed' || s === 'đã thực hiện';
         };
 
-        // Group by status
-        const delivering = this.orders.filter(o => isDelivering(o));
-        const completed = this.orders.filter(o => isCompleted(o));
+        // Helper to get sortable date from order
+        const getOrderDate = (o) => {
+            const dateStr = o.date || o.order_date || o.ngay || o.expected_date || o.created_at || '';
+            if (!dateStr) return new Date(0);
+            // Handle dd/mm/yyyy format
+            if (typeof dateStr === 'string' && dateStr.includes('/')) {
+                const parts = dateStr.split('/');
+                if (parts.length === 3) {
+                    return new Date(parts[2], parts[1] - 1, parts[0]);
+                }
+            }
+            return new Date(dateStr);
+        };
+
+        // Helper to get sortable order code (extract number from code like PO00035.25 or N1045)
+        const getOrderCode = (o) => {
+            const code = o.soDon || o.id || '';
+            // Extract numbers for comparison
+            const match = code.match(/(\d+)/);
+            return match ? parseInt(match[1]) : 0;
+        };
+
+        // Sort function: by date DESC, then by code DESC
+        const sortOrders = (orders) => {
+            return orders.sort((a, b) => {
+                const dateA = getOrderDate(a);
+                const dateB = getOrderDate(b);
+                // Sort by date descending (newest first)
+                if (dateB.getTime() !== dateA.getTime()) {
+                    return dateB.getTime() - dateA.getTime();
+                }
+                // If same date, sort by code descending
+                return getOrderCode(b) - getOrderCode(a);
+            });
+        };
+
+        // Group by status and sort
+        const delivering = sortOrders(this.orders.filter(o => isDelivering(o)));
+        const completed = sortOrders(this.orders.filter(o => isCompleted(o)));
 
         container.innerHTML = `
             <div class="stats-grid" style="margin-bottom: 24px;">
