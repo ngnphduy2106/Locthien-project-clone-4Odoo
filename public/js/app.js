@@ -7361,11 +7361,35 @@ function showImportCompletionModal(importId, assignmentId = null) {
         try { products = JSON.parse(products); } catch (e) { products = []; }
     }
 
+    // Store products in state for submission with actual quantities
+    state.completionImportProducts = products.map((p, idx) => ({
+        ...p,
+        actualQty: p.qty || p.quantity || 0  // Default actual = planned
+    }));
+
     const productsHtml = products.length > 0
-        ? products.map(p => `
-            <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--border);">
-                <span>${p.name || p.product || p.productName || '-'}</span>
-                <span style="font-weight:600;">${p.qty || p.quantity || 0} ${p.unit || 'Kg'}</span>
+        ? products.map((p, idx) => `
+            <div style="background:var(--card-bg); padding:12px; border-radius:8px; margin-bottom:8px; border-left:3px solid var(--success);">
+                <div style="font-weight:600; color:var(--success); margin-bottom:8px;">
+                    ${p.name || p.product || p.productName || '-'}
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
+                    <div>
+                        <div style="font-size:11px; color:var(--text-muted);">Yêu cầu</div>
+                        <div style="font-weight:600;">${p.qty || p.quantity || 0} ${p.unit || 'Kg'}</div>
+                    </div>
+                    <div>
+                        <div style="font-size:11px; color:var(--text-muted);">Thực tế</div>
+                        <input type="number" id="import-actual-qty-${idx}" class="form-control" 
+                            style="padding:6px 8px; font-size:13px;"
+                            value="${p.qty || p.quantity || 0}" 
+                            onchange="updateImportCompletionQty(${idx}, this.value)">
+                    </div>
+                    <div>
+                        <div style="font-size:11px; color:var(--text-muted);">Đơn vị</div>
+                        <div style="font-weight:600; padding-top:6px;">${p.unit || 'Kg'}</div>
+                    </div>
+                </div>
             </div>
         `).join('')
         : '<p style="color:var(--text-muted);">Không có sản phẩm</p>';
@@ -7393,7 +7417,7 @@ function showImportCompletionModal(importId, assignmentId = null) {
                 <h4 style="font-size:14px; color:var(--text-secondary); margin-bottom:12px;">
                     <i class="bi bi-box-seam"></i> Sản phẩm nhập
                 </h4>
-                <div style="background:var(--body-bg); padding:12px; border-radius:8px; max-height:150px; overflow-y:auto;">
+                <div style="max-height:200px; overflow-y:auto;">
                     ${productsHtml}
                 </div>
             </div>
@@ -7473,6 +7497,16 @@ function showImportCompletionModal(importId, assignmentId = null) {
     loadImportProofImages(imp.id);
 }
 
+// Update import completion product quantity when user edits input
+function updateImportCompletionQty(index, value) {
+    if (state.completionImportProducts && state.completionImportProducts[index]) {
+        state.completionImportProducts[index].actualQty = Number(value) || 0;
+        console.log(`Updated product ${index} actual qty to ${value}`);
+    }
+}
+// Export for inline onclick
+window.updateImportCompletionQty = updateImportCompletionQty;
+
 // Submit import completion
 async function submitImportCompletion() {
     const imp = state.currentCompletionImport;
@@ -7498,6 +7532,14 @@ async function submitImportCompletion() {
         const driverName = user.name || user.fullName || 'Driver';
         const plate = user.plate || '';
 
+        // Build actual products from state with edited quantities
+        const actualProducts = (state.completionImportProducts || []).map(p => ({
+            name: p.name || p.product || p.productName || '',
+            code: p.code || p.material_code || '',
+            qty: Number(p.actualQty || p.qty || 0),
+            unit: p.unit || 'Kg'
+        }));
+
         const res = await fetch(`/api/imports/${imp.id}/complete`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
@@ -7506,6 +7548,7 @@ async function submitImportCompletion() {
                 plate,
                 note: deliveryNote,
                 local_items: completionLocalItems,
+                actual_products: actualProducts,  // Include actual products with edited quantities
                 admin_completed: isAdminRole(),
                 // Multi-driver support
                 assignment_id: imp.assignment_id || null
