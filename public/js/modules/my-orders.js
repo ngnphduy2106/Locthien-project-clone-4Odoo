@@ -419,7 +419,7 @@ const MyOrdersModule = {
         // Check if current user is admin
         const userStr = localStorage.getItem('user');
         const user = userStr ? JSON.parse(userStr) : {};
-        const isAdmin = (user.role || '').toLowerCase() === 'admin';
+        const isAdmin = (user.role || '').toLowerCase() === 'admin' || (user.role || '').toLowerCase() === 'tester';
 
         // Build product list - show all products (same for everyone)
         let products = order.products || order.cart || [];

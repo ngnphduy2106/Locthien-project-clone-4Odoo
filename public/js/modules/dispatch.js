@@ -24,7 +24,8 @@ const DispatchModule = {
             if (window.api) {
                 const data = await window.api.getEmployees();
                 if (!data.error) {
-                    this.employees = (data.employees || []).filter(e => e.role === 'DRIVER');
+                    // Include ASSISTANT as they work like drivers (without plate)
+                    this.employees = (data.employees || []).filter(e => e.role === 'DRIVER' || e.role === 'ASSISTANT');
                 }
             }
         } catch (error) {

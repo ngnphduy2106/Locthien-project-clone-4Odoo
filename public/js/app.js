@@ -143,9 +143,9 @@ window.alert = function (msg) {
 function isAdminRole() {
     const role = (state.user?.role || '').toLowerCase().trim();
     console.log('🔍 DEBUG isAdminRole - role:', role, '| user:', state.user);
-    // Only return true for actual admin roles
-    const adminRoles = ['admin', 'quản lý', 'manager', 'quan ly', 'administrator', 'nhanvien', 'nhân viên', 'staff'];
-    return adminRoles.includes(role) || role.includes('admin') || role.includes('quản') || role.includes('quan');
+    // Only return true for actual admin roles (TESTER also has admin privileges)
+    const adminRoles = ['admin', 'tester', 'quản lý', 'manager', 'quan ly', 'administrator', 'nhanvien', 'nhân viên', 'staff'];
+    return adminRoles.includes(role) || role.includes('admin') || role.includes('quản') || role.includes('quan') || role.includes('tester');
 }
 
 // === SECTION NAVIGATION ===
@@ -532,8 +532,8 @@ window.initDatePickers = initDatePickers;
 function applyRoleBasedUI(role) {
     // Normalize role to lowercase for comparison
     const normalizedRole = (role || '').toLowerCase();
-    const isAdmin = normalizedRole === 'admin';
-    const isDriver = normalizedRole === 'driver';
+    const isAdmin = normalizedRole === 'admin' || normalizedRole === 'tester';  // TESTER = ADMIN privileges
+    const isDriver = normalizedRole === 'driver' || normalizedRole === 'assistant';  // ASSISTANT = DRIVER privileges
     const isAccountant = normalizedRole === 'accountant' || normalizedRole === 'kế toán' || normalizedRole === 'ke toan' || normalizedRole === 'ketoan';
 
     console.log('🔐 Applying role-based UI:', { role, normalizedRole, isAdmin, isDriver, isAccountant });
