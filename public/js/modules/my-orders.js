@@ -210,8 +210,9 @@ const MyOrdersModule = {
                 const str = String(rawDate);
                 const isoMatch = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
                 if (isoMatch) {
-                    // Create date from parts (local timezone, no UTC shift)
-                    return new Date(parseInt(isoMatch[1]), parseInt(isoMatch[2]) - 1, parseInt(isoMatch[3]));
+                    const d = new Date(parseInt(isoMatch[1]), parseInt(isoMatch[2]) - 1, parseInt(isoMatch[3]));
+                    console.log(`🔢 Sort [${o.soDon || o.id}] ISO:`, rawDate, '→', d.toLocaleDateString('vi-VN'));
+                    return d;
                 }
             }
 
@@ -223,10 +224,13 @@ const MyOrdersModule = {
             // Handle dd/mm/yyyy
             const dmy = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
             if (dmy) {
-                return new Date(parseInt(dmy[3]), parseInt(dmy[2]) - 1, parseInt(dmy[1]));
+                const d = new Date(parseInt(dmy[3]), parseInt(dmy[2]) - 1, parseInt(dmy[1]));
+                console.log(`🔢 Sort [${o.soDon || o.id}] DMY:`, val, '→', d.toLocaleDateString('vi-VN'));
+                return d;
             }
 
             // Fallback
+            console.log(`🔢 Sort [${o.soDon || o.id}] Fallback:`, str);
             const parsed = new Date(str);
             return isNaN(parsed.getTime()) ? new Date(0) : parsed;
         };
