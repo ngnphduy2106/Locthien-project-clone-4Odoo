@@ -488,7 +488,8 @@ const MyOrdersModule = {
 
         // Build multi-driver assignment section for ADMIN
         let multiDriverHtml = '';
-        if (isAdmin && allAssignments.length > 1) {
+        if (isAdmin && allAssignments.length >= 1) {
+            console.log(`🔍 my-orders Admin view: allAssignments.length = ${allAssignments.length}`, allAssignments);
             multiDriverHtml = `
             <div style="margin-bottom: 1rem; padding: 0.75rem; background: linear-gradient(135deg, #f3e8ff, #e9d5ff); border-radius: 8px; border-left: 3px solid #8B5CF6;">
                 <div style="font-weight: 600; margin-bottom: 0.5rem; color: #7c3aed; font-size: 0.85rem;">👥 Phân công tài xế (${allAssignments.length} người)</div>
@@ -543,62 +544,62 @@ const MyOrdersModule = {
 
         // Build detail modal HTML
         const modalHtml = `
-            <div class="modal-overlay" id="my-order-detail-modal" onclick="if(event.target === this) this.remove()">
-                <div class="modal-content" style="max-width: 500px; max-height: 85vh; overflow-y: auto;">
-                    <div class="modal-header">
-                        <h3>📦 ${typeLabel} ${order.soDon || orderId}</h3>
-                        <button onclick="document.getElementById('my-order-detail-modal').remove()" class="btn-close">&times;</button>
-                    </div>
-                    <div class="modal-body" style="padding: 1rem;">
-                        <!-- Thông tin khách hàng -->
-                        <div style="margin-bottom: 1rem; padding: 0.75rem; background: var(--bg-tertiary); border-radius: 8px;">
-                            <div style="font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary);">
-                                👤 ${order.customer || order.customer_name || order.khach || 'Khách hàng'}
-                            </div>
-                            <div style="color: var(--text-secondary); font-size: 0.9rem;">
-                                📍 ${order.address || order.delivery_address || order.diaChi || 'Chưa có địa chỉ'}
-                            </div>
-                            ${order.phone ? `<div style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.25rem;">📞 <a href="tel:${order.phone}" style="color: var(--primary-color);">${order.phone}</a></div>` : ''}
+                < div class="modal-overlay" id = "my-order-detail-modal" onclick = "if(event.target === this) this.remove()" >
+                    <div class="modal-content" style="max-width: 500px; max-height: 85vh; overflow-y: auto;">
+                        <div class="modal-header">
+                            <h3>📦 ${typeLabel} ${order.soDon || orderId}</h3>
+                            <button onclick="document.getElementById('my-order-detail-modal').remove()" class="btn-close">&times;</button>
                         </div>
-                        
-                        <!-- Ghi chú từ MISA (nếu có) -->
-                        ${order.misa_note ? `
+                        <div class="modal-body" style="padding: 1rem;">
+                            <!-- Thông tin khách hàng -->
+                            <div style="margin-bottom: 1rem; padding: 0.75rem; background: var(--bg-tertiary); border-radius: 8px;">
+                                <div style="font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary);">
+                                    👤 ${order.customer || order.customer_name || order.khach || 'Khách hàng'}
+                                </div>
+                                <div style="color: var(--text-secondary); font-size: 0.9rem;">
+                                    📍 ${order.address || order.delivery_address || order.diaChi || 'Chưa có địa chỉ'}
+                                </div>
+                                ${order.phone ? `<div style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.25rem;">📞 <a href="tel:${order.phone}" style="color: var(--primary-color);">${order.phone}</a></div>` : ''}
+                            </div>
+
+                            <!-- Ghi chú từ MISA (nếu có) -->
+                            ${order.misa_note ? `
                         <div style="margin-bottom: 1rem; padding: 0.75rem; background: #fffbeb; border-radius: 8px; border-left: 3px solid #f59e0b;">
                             <div style="font-weight: 600; margin-bottom: 0.25rem; color: #92400e; font-size: 0.8rem;">📝 GHI CHÚ TỪ MISA</div>
                             <div style="color: #78350f;">${order.misa_note}</div>
                         </div>
                         ` : ''}
-                        
-                        <!-- Người tạo đơn -->
-                        ${order.creator_name ? `
+
+                            <!-- Người tạo đơn -->
+                            ${order.creator_name ? `
                         <div style="margin-bottom: 1rem; padding: 0.75rem; background: #eff6ff; border-radius: 8px; border-left: 3px solid #3b82f6;">
                             <div style="font-weight: 600; margin-bottom: 0.25rem; color: #1e40af; font-size: 0.8rem;">👔 NGƯỜI TẠO ĐƠN</div>
                             <div style="color: #1e3a8a;">${order.creator_name}</div>
                             <div style="font-size: 0.75rem; color: #6b7280; margin-top: 0.25rem;">Liên hệ người này nếu cần hỗ trợ</div>
                         </div>
                         ` : ''}
-                        
-                        <!-- Multi-driver assignment section (ADMIN only) -->
-                        ${multiDriverHtml}
-                        
-                        <!-- Sản phẩm -->
-                        <div style="margin-bottom: 1rem;">
-                            ${splitBadge}
-                            <div style="font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary);">📋 Danh sách sản phẩm</div>
-                            <div style="background: var(--bg-tertiary); padding: 0.75rem; border-radius: 8px; font-size: 0.9rem; white-space: pre-line;">
-                                ${productsList}
+
+                            <!-- Multi-driver assignment section (ADMIN only) -->
+                            ${multiDriverHtml}
+
+                            <!-- Sản phẩm -->
+                            <div style="margin-bottom: 1rem;">
+                                ${splitBadge}
+                                <div style="font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary);">📋 Danh sách sản phẩm</div>
+                                <div style="background: var(--bg-tertiary); padding: 0.75rem; border-radius: 8px; font-size: 0.9rem; white-space: pre-line;">
+                                    ${productsList}
+                                </div>
+                            </div>
+
+                            <!-- Tổng tiền -->
+                            <div style="text-align: right; padding: 0.75rem; background: linear-gradient(135deg, #10b981, #059669); border-radius: 8px; color: white;">
+                                <div style="font-size: 0.8rem; opacity: 0.9;">Tổng giá trị</div>
+                                <div style="font-size: 1.25rem; font-weight: 700;">${amount} VNĐ</div>
                             </div>
                         </div>
-                        
-                        <!-- Tổng tiền -->
-                        <div style="text-align: right; padding: 0.75rem; background: linear-gradient(135deg, #10b981, #059669); border-radius: 8px; color: white;">
-                            <div style="font-size: 0.8rem; opacity: 0.9;">Tổng giá trị</div>
-                            <div style="font-size: 1.25rem; font-weight: 700;">${amount} VNĐ</div>
-                        </div>
                     </div>
-                </div>
-            </div>
-        `;
+            </div >
+    `;
 
         // Remove existing modal if any
         const existing = document.getElementById('my-order-detail-modal');

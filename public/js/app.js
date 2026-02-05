@@ -2518,7 +2518,10 @@ async function viewOrderDetail(orderId, options = {}) {
                 if (isDriver) return ''; // Drivers don't need to see other drivers
 
                 const allAssignments = order.all_assignments || [];
-                if (allAssignments.length > 1) {
+                console.log(`🔍 Admin view: allAssignments.length = ${allAssignments.length}`, allAssignments);
+
+                // Show for any order with assignments (1 or more drivers)
+                if (allAssignments.length >= 1) {
                     return `
             <div style="margin:20px 0; padding:16px; background:linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%); border-radius:12px; border-left:4px solid #8B5CF6;">
                 <div style="font-size:13px; color:#7c3aed; font-weight:600; margin-bottom:12px;">
