@@ -732,8 +732,10 @@ router.put('/:id/assign', async (req, res) => {
 
         // Send Telegram notification to DRIVER group (async, don't block response)
         try {
+            console.log(`📨 [TELEGRAM DEBUG] Starting Telegram notification for order ${id}, driver: ${driverName}`);
             const { sendTelegramMessage } = await import('../services/telegram.js');
             const orderInfo = await db.getOrder(id);
+            console.log(`📨 [TELEGRAM DEBUG] Order info retrieved:`, { soDon: orderInfo?.soDon, khach: orderInfo?.khach });
 
             let msg = `🚛 <b>PHÂN CÔNG TÀI XẾ</b>\n`;
             msg += `#${orderInfo?.soDon || orderInfo?.sale_order_no || id}\n`;
@@ -744,10 +746,11 @@ router.put('/:id/assign', async (req, res) => {
             msg += `🔢 Biển số: ${plate || 'Chưa có'}\n`;
             if (note) msg += `📝 Ghi chú: ${note}\n`;
 
+            console.log(`📨 [TELEGRAM DEBUG] Calling sendTelegramMessage to DRIVER group...`);
             await sendTelegramMessage(msg, 'DRIVER');
             console.log(`📬 Telegram DRIVER notification sent for order ${id}`);
         } catch (tgErr) {
-            console.error('Telegram notification error:', tgErr.message);
+            console.error('❌ Telegram notification error:', tgErr.message, tgErr.stack);
         }
 
         // Create in-app notification for driver
