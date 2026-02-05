@@ -302,7 +302,7 @@ const DispatchModule = {
         }
     },
 
-    // Filter orders by tab
+    // Filter orders by tab (with sorting: date DESC, customer name ASC)
     filterOrdersByTab() {
         const statusMap = {
             'pending': ['Chờ xử lý', 'PENDING', 'NEW', 'Chưa thực hiện'],
@@ -311,8 +311,36 @@ const DispatchModule = {
         };
 
         const validStatuses = statusMap[this.currentTab] || [];
+        const filtered = this.orders.filter(o => validStatuses.includes(o.status));
 
-        return this.orders.filter(o => validStatuses.includes(o.status));
+        // Sort by date DESC, then customer name ASC
+        const parseDateValue = (o) => {
+            // Priority 1: ngay field (DD/MM/YYYY)
+            const ngay = o.ngay || o.date || '';
+            if (ngay) {
+                const dmyMatch = String(ngay).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+                if (dmyMatch) {
+                    return new Date(parseInt(dmyMatch[3]), parseInt(dmyMatch[2]) - 1, parseInt(dmyMatch[1])).getTime();
+                }
+            }
+            // Priority 2: ISO dates
+            const isoDate = o.expected_date || o.created_at || o.sale_order_date || o.order_date || '';
+            if (isoDate) {
+                const isoMatch = String(isoDate).match(/^(\d{4})-(\d{2})-(\d{2})/);
+                if (isoMatch) {
+                    return new Date(parseInt(isoMatch[1]), parseInt(isoMatch[2]) - 1, parseInt(isoMatch[3])).getTime();
+                }
+            }
+            return 0;
+        };
+        const getCustomerName = (o) => (o.khach || o.customer || o.customer_name || o.account_name || '').toLowerCase();
+
+        return [...filtered].sort((a, b) => {
+            const dateA = parseDateValue(a);
+            const dateB = parseDateValue(b);
+            if (dateB !== dateA) return dateB - dateA; // Newest first
+            return getCustomerName(a).localeCompare(getCustomerName(b)); // Then A-Z
+        });
     },
 
     // Switch tab
