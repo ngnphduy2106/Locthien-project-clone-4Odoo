@@ -1,8 +1,11 @@
 -- Add missing columns to order_messages table
 -- Required for: import ticket chat, image support, read tracking
 
--- Add import_ticket_id for import ticket messages
-ALTER TABLE order_messages ADD COLUMN IF NOT EXISTS import_ticket_id TEXT;
+-- Drop import_ticket_id if it exists (might be wrong type)
+ALTER TABLE order_messages DROP COLUMN IF EXISTS import_ticket_id;
+
+-- Add import_ticket_id as TEXT (not UUID!)
+ALTER TABLE order_messages ADD COLUMN import_ticket_id TEXT;
 
 -- Add image column for image messages
 ALTER TABLE order_messages ADD COLUMN IF NOT EXISTS image TEXT;
