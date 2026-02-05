@@ -125,11 +125,30 @@ router.get('/:orderId/assignments', async (req, res) => {
         const { createClient } = await import('@supabase/supabase-js');
         const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
-        const { data, error } = await supabase
+        console.log(`📦 Fetching assignments for order: ${orderId}`);
+
+        // Query by order_id first (primary key)
+        let { data, error } = await supabase
             .from('order_driver_assignments')
             .select('*')
             .eq('order_id', orderId)
             .order('created_at', { ascending: true });
+
+        // If no results, try searching by sale_order_no (soDon)
+        if ((!data || data.length === 0) && !error) {
+            console.log(`⚠️ No assignments found by order_id, trying sale_order_no...`);
+            const result = await supabase
+                .from('order_driver_assignments')
+                .select('*')
+                .eq('sale_order_no', orderId)
+                .order('created_at', { ascending: true });
+
+            data = result.data;
+            error = result.error;
+        }
+
+        console.log(`📦 Found ${data?.length || 0} assignments for ${orderId}:`,
+            data?.map(a => ({ id: a.id, driver: a.driver_name, qty: a.assigned_qty })));
 
         if (error) {
             return res.json(createResponse(true, error.message));
