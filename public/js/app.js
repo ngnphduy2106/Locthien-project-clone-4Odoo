@@ -2225,17 +2225,23 @@ function formatCurrencyBillion(amount) {
 function formatDate(dateStr) {
     if (!dateStr) return '-';
     const str = String(dateStr);
+    console.log(`📅 formatDate input:`, dateStr, '| str:', str);
     // Parse ISO format YYYY-MM-DD directly to avoid UTC timezone issues
     const isoMatch = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
     if (isoMatch) {
-        return `${isoMatch[3]}/${isoMatch[2]}/${isoMatch[1]}`; // DD/MM/YYYY
+        const result = `${isoMatch[3]}/${isoMatch[2]}/${isoMatch[1]}`; // DD/MM/YYYY
+        console.log(`📅 formatDate ISO match:`, isoMatch, '| result:', result);
+        return result;
     }
     // Fallback for other formats
+    console.log(`📅 formatDate using fallback new Date() for:`, str);
     const d = new Date(str);
     if (isNaN(d.getTime())) return str;
     const day = String(d.getDate()).padStart(2, '0');
     const month = String(d.getMonth() + 1).padStart(2, '0');
-    return `${day}/${month}/${d.getFullYear()}`;
+    const result = `${day}/${month}/${d.getFullYear()}`;
+    console.log(`📅 formatDate fallback result:`, result);
+    return result;
 }
 
 function getStatusBadge(status) {
