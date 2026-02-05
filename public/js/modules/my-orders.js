@@ -235,18 +235,39 @@ const MyOrdersModule = {
             return isNaN(parsed.getTime()) ? new Date(0) : parsed;
         };
 
-        // Helper to get sortable order code
-        const getOrderCode = (o) => {
-            const code = o.soDon || o.id || '';
-            const digits = code.replace(/\D/g, '');
-            return digits ? parseInt(digits) : 0;
+        // Helper to get customer name for sorting
+        const getCustomerName = (o) => {
+            return (o.khach || o.customer || o.account_name || o.customer_name || '').toLowerCase();
         };
 
-        // Sort: date DESC, then code DESC
+        // Simple date parser: returns timestamp from DD/MM/YYYY or ISO format
+        const parseDateValue = (o) => {
+            // First try ngay field (already formatted DD/MM/YYYY by backend)
+            const ngay = o.ngay || o.date || '';
+            if (ngay) {
+                const dmyMatch = String(ngay).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+                if (dmyMatch) {
+                    return new Date(parseInt(dmyMatch[3]), parseInt(dmyMatch[2]) - 1, parseInt(dmyMatch[1])).getTime();
+                }
+            }
+            // Then try ISO dates from DB
+            const isoDate = o.expected_date || o.created_at || o.sale_order_date || '';
+            if (isoDate) {
+                const isoMatch = String(isoDate).match(/^(\d{4})-(\d{2})-(\d{2})/);
+                if (isoMatch) {
+                    return new Date(parseInt(isoMatch[1]), parseInt(isoMatch[2]) - 1, parseInt(isoMatch[3])).getTime();
+                }
+            }
+            return 0;
+        };
+
+        // Sort: date DESC, then customer name ASC
         const sortOrders = (orders) => {
             return [...orders].sort((a, b) => {
-                const timeDiff = getOrderDate(b).getTime() - getOrderDate(a).getTime();
-                return timeDiff !== 0 ? timeDiff : getOrderCode(b) - getOrderCode(a);
+                const dateA = parseDateValue(a);
+                const dateB = parseDateValue(b);
+                if (dateB !== dateA) return dateB - dateA; // Newest first
+                return getCustomerName(a).localeCompare(getCustomerName(b)); // Then by name A-Z
             });
         };
 
