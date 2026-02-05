@@ -2397,16 +2397,17 @@ async function viewOrderDetail(orderId, options = {}) {
     // Check if current user is a driver (hide price info)
     const isDriver = (state.user?.role || '').toLowerCase() === 'driver';
 
+    // Products HTML - only used for admin view now (drivers see simplified view)
     const productsHtml = products.length > 0
         ? products.map(p => `
             <tr>
                 <td>${p.name || p.productName || p.product_name || '-'}</td>
                 <td>${p.qty || p.quantity || p.amount || 0}</td>
                 <td>${p.unit || 'kg'}</td>
-                ${!isDriver ? `<td>${formatCurrency(p.total || p.to_currency || p.price || 0)}</td>` : ''}
+                <td>${formatCurrency(p.total || p.to_currency || p.price || 0)}</td>
             </tr>
         `).join('')
-        : `<tr><td colspan="${isDriver ? 3 : 4}" style="text-align:center; color:var(--text-muted);">Không có sản phẩm</td></tr>`;
+        : `<tr><td colspan="4" style="text-align:center; color:var(--text-muted);">Không có sản phẩm</td></tr>`;
 
     // Show modal - use correct IDs matching index.html
     const modal = window.$('#modal-order-detail');
@@ -2561,6 +2562,27 @@ async function viewOrderDetail(orderId, options = {}) {
             </div>
             ` : '')}
             
+            ${isDriver ? `
+            <!-- DRIVER VIEW: Show only assigned quantity -->
+            <h4 style="margin: 24px 0 12px; font-size:14px; color:var(--text-secondary);">Phần hàng được giao cho bạn</h4>
+            <div style="padding:16px; background:linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); border-radius:12px; border-left:4px solid #10b981;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="font-size:14px; color:#065f46;">
+                        <i class="bi bi-box-seam"></i> Tổng SL cần giao:
+                    </span>
+                    <span style="font-size:20px; font-weight:700; color:#047857;">
+                        ${order.assigned_qty || order.total_qty || order.amount || 'Xem phân công'} kg
+                    </span>
+                </div>
+                ${order.delivery_note ? `
+                <div style="margin-top:12px; padding-top:12px; border-top:1px solid #a7f3d0;">
+                    <span style="font-size:12px; color:#059669; font-weight:500;">Ghi chú:</span>
+                    <span style="font-size:13px; color:#065f46;"> ${order.delivery_note}</span>
+                </div>
+                ` : ''}
+            </div>
+            ` : `
+            <!-- ADMIN VIEW: Full product list -->
             <h4 style="margin: 24px 0 12px; font-size:14px; color:var(--text-secondary);">Danh sách sản phẩm</h4>
             <table class="data-table" style="width:100%;">
                 <thead>
@@ -2568,13 +2590,14 @@ async function viewOrderDetail(orderId, options = {}) {
                         <th>Sản phẩm</th>
                         <th>SL</th>
                         <th>Đơn vị</th>
-                        ${!isDriver ? '<th>Giá</th>' : ''}
+                        <th>Giá</th>
                     </tr>
                 </thead>
                 <tbody>
                     ${productsHtml}
                 </tbody>
             </table>
+            `}
             
             ${(() => {
                 // Safe parse local_items - might be JSON string from DB
