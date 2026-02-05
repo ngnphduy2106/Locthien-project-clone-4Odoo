@@ -508,6 +508,17 @@ function initDatePickers() {
             }
         });
     }
+
+    // My Orders date filter
+    const myOrdersDateFilter = document.getElementById('my-orders-date-filter');
+    if (myOrdersDateFilter) {
+        flatpickr(myOrdersDateFilter, {
+            ...flatpickrConfig,
+            onChange: function (selectedDates, dateStr) {
+                filterMyOrders();
+            }
+        });
+    }
 }
 window.initDatePickers = initDatePickers;
 
@@ -2017,14 +2028,14 @@ function filterMyOrders() {
     // Get all orders from state
     let orders = [...(state.myOrders || [])];
 
-    // Filter by date (native date input returns YYYY-MM-DD)
+    // Filter by date (Flatpickr returns dd/mm/yyyy format)
     if (filterDate) {
-        // Parse YYYY-MM-DD from native date input
-        const isoFilterMatch = filterDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-        if (isoFilterMatch) {
-            const filterYear = parseInt(isoFilterMatch[1]);
-            const filterMonth = parseInt(isoFilterMatch[2]);
-            const filterDay = parseInt(isoFilterMatch[3]);
+        // Parse dd/mm/yyyy from Flatpickr
+        const dmyMatch = filterDate.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+        if (dmyMatch) {
+            const filterDay = parseInt(dmyMatch[1]);
+            const filterMonth = parseInt(dmyMatch[2]);
+            const filterYear = parseInt(dmyMatch[3]);
 
             orders = orders.filter(order => {
                 // Parse order date from ngay (dd/mm/yyyy) format
