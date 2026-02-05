@@ -1987,47 +1987,18 @@ function switchMyOrdersTab(tab) {
     if (selectedContent) selectedContent.classList.remove('hidden');
 
     // Update tab button states
-    const tabBtns = ['my-tab-pending', 'my-tab-delivering', 'my-tab-completed'];
-    tabBtns.forEach(id => {
-        const btn = window.$(`#${id}`);
-        if (btn) btn.classList.remove('active');
-    });
 
-    const activeBtn = window.$(`#my-tab-${tab}`);
-    if (activeBtn) activeBtn.classList.add('active');
-
-    console.log(`📑 Switched to My Orders tab: ${tab}`);
-}
-
-// Export switchMyOrdersTab
-window.switchMyOrdersTab = switchMyOrdersTab;
-
-// Filter and sort My Orders
-function filterMyOrders() {
-    const searchInput = document.getElementById('my-orders-search');
-    const sortSelect = document.getElementById('my-orders-sort');
-    const dateFilter = document.getElementById('my-orders-date-filter');
-
-    const query = (searchInput?.value || '').toLowerCase().trim();
-    const sortValue = sortSelect?.value || 'date-desc';
-    const filterDate = dateFilter?.value || '';
-
-    console.log('🔍 Filtering My Orders:', { query, sortValue, filterDate });
-
-    // Get all orders from state
-    let orders = [...(state.myOrders || [])];
-
-    // Filter by date (expects dd/mm/yyyy format)
+    // Filter by date (native date input returns YYYY-MM-DD)
     if (filterDate) {
-        // Parse dd/mm/yyyy input
-        const dmyMatch = filterDate.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-        if (dmyMatch) {
-            const filterDay = parseInt(dmyMatch[1]);
-            const filterMonth = parseInt(dmyMatch[2]);
-            const filterYear = parseInt(dmyMatch[3]);
+        // Parse YYYY-MM-DD from native date input
+        const isoFilterMatch = filterDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (isoFilterMatch) {
+            const filterYear = parseInt(isoFilterMatch[1]);
+            const filterMonth = parseInt(isoFilterMatch[2]);
+            const filterDay = parseInt(isoFilterMatch[3]);
 
             orders = orders.filter(order => {
-                // Parse order date from ngay (dd/mm/yyyy) or ISO formats
+                // Parse order date from ngay (dd/mm/yyyy) format
                 const orderDateStr = order.ngay || order.date || '';
                 const orderDmyMatch = orderDateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
                 if (orderDmyMatch) {
