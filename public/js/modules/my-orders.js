@@ -314,7 +314,8 @@ const MyOrdersModule = {
 
     // Render order card
     renderOrderCard(order, isDelivering = false) {
-        const orderId = order.id || order.order_id;
+        // Use assignment_id for split orders to uniquely identify each driver's assignment
+        const orderId = order.assignment_id || order.id || order.order_id;
         const orderType = order.type || 'export';
         const typeBadge = orderType === 'import'
             ? '<span class="type-badge import" style="background:#4CAF50; color:white; padding:2px 8px; border-radius:4px; font-size:11px; margin-left:8px;">Nhập</span>'
@@ -426,10 +427,15 @@ const MyOrdersModule = {
 
     // Xem chi tiết
     async viewDetail(orderId, orderType = 'export') {
-        const order = this.orders.find(o => (o.id || o.order_id) === orderId);
+        // For split orders, orderId may be assignment_id - try to find by that first
+        let order = this.orders.find(o => o.assignment_id === orderId);
+        // Fallback to order.id or order_id
+        if (!order) {
+            order = this.orders.find(o => (o.id || o.order_id) === orderId);
+        }
         if (!order) return;
 
-        console.log('View order detail:', order);
+        console.log('View order detail:', order, `(found by ${order.assignment_id === orderId ? 'assignment_id' : 'order_id'})`);
         const typeLabel = orderType === 'import' ? 'Đơn nhập' : 'Đơn xuất';
 
         // Check if current user is admin
