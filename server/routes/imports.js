@@ -125,7 +125,7 @@ router.post('/', async (req, res) => {
             if (expected_date) msg += `📅 Ngày dự kiến: ${expected_date}\n`;
             msg += `\n🔔 @sales - Vui lòng điều phối`;
 
-            await sendTelegramMessage(msg);
+            await sendTelegramMessage(msg, 'NHAP');
         } catch (tgErr) {
             console.error('Telegram Error:', tgErr.message);
         }
@@ -296,7 +296,7 @@ router.post('/:id/assign-multi', async (req, res) => {
                 msg += `${i + 1}. ${a.driver_name} ${typeLabel} - ${a.qty}kg\n`;
             });
 
-            await sendTelegramMessage(msg);
+            await sendTelegramMessage(msg, 'NHAP');
         } catch (teleErr) {
             console.error('Telegram notification error:', teleErr.message);
         }

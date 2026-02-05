@@ -496,7 +496,7 @@ const performSync = async () => {
 
             msg += `\n🔔 @sales (Vào Điều Phối gán tài xế)`;
 
-            await sendTelegramMessage(msg);
+            await sendTelegramMessage(msg, 'XUAT');
 
             // Create in-app notification for ADMIN
             try {

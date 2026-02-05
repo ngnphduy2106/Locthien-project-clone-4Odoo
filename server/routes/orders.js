@@ -1472,7 +1472,7 @@ router.post('/:id/assign-multi', async (req, res) => {
 
             msg += `\n🔔 @sales`;
 
-            await sendTelegramMessage(msg);
+            await sendTelegramMessage(msg, 'XUAT');
         } catch (tgErr) {
             console.error('Telegram Error:', tgErr.message);
         }
