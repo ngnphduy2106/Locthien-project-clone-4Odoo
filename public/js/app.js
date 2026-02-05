@@ -5095,6 +5095,9 @@ async function viewImportDetail(importId) {
 
         // Load proof images
         loadImportProofImages(imp.id);
+
+        // Auto-load chat messages (was requiring manual refresh before)
+        loadImportChat(imp.ticket_no || imp.id);
     }
 
     if (modal) modal.classList.remove('hidden');
