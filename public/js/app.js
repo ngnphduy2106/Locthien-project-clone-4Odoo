@@ -4105,9 +4105,9 @@ async function loadImportChat(importId) {
     container.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding:20px;"><i class="bi bi-chat-dots"></i> Đang tải...</div>';
 
     try {
-        // Use import_ prefix for chat room ID
-        const chatRoomId = `import_${String(importId)}`;
-        const res = await fetch(`/api/chat/${encodeURIComponent(chatRoomId)}/messages`);
+        // Use ?type=import for import ticket messages
+        const chatRoomId = String(importId);
+        const res = await fetch(`/api/chat/${encodeURIComponent(chatRoomId)}/messages?type=import`);
         const data = await res.json();
 
         if (data.error) {
@@ -4164,8 +4164,9 @@ async function sendImportChatMessage() {
     }
 
     try {
-        const chatRoomId = `import_${String(currentChatOrderId)}`;
-        const res = await fetch(`/api/chat/${encodeURIComponent(chatRoomId)}/messages`, {
+        // Use ?type=import for import ticket messages
+        const chatRoomId = String(currentChatOrderId);
+        const res = await fetch(`/api/chat/${encodeURIComponent(chatRoomId)}/messages?type=import`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
