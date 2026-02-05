@@ -332,6 +332,7 @@ const MyOrdersModule = {
                 </div>
                 <div class="order-info">
                     <div><i class="bi bi-geo-alt"></i> ${order.address || order.delivery_address || order.diaChi || ''}</div>
+                    ${order.taiXe ? `<div><i class="bi bi-person-badge"></i> <strong style="color:#8B5CF6;">${order.taiXe}</strong> ${order.bienSo ? `(${order.bienSo})` : ''}</div>` : ''}
                     <div><i class="bi bi-calendar"></i> ${typeof formatDate === 'function' ? formatDate(order.expected_date || order.created_at || order.ngay) : (order.ngay || 'N/A')}</div>
                     ${order.completedDate || order.completed_at ? `<div><i class="bi bi-check-circle"></i> Hoàn thành: ${order.completedDate || order.completed_at}</div>` : ''}
                 </div>
