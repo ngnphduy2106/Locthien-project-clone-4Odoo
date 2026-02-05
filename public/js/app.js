@@ -1759,19 +1759,54 @@ async function loadMyOrders() {
         if (deliveringBadge) deliveringBadge.textContent = delivering.length;
         if (completedBadge) completedBadge.textContent = completed.length;
 
+        // === SORT ORDERS: date DESC, then customer name ASC ===
+        const sortByDateDesc = (orders) => {
+            const parseDateValue = (o) => {
+                // First try ngay field (DD/MM/YYYY)
+                const ngay = o.ngay || o.date || '';
+                if (ngay) {
+                    const dmyMatch = String(ngay).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+                    if (dmyMatch) {
+                        return new Date(parseInt(dmyMatch[3]), parseInt(dmyMatch[2]) - 1, parseInt(dmyMatch[1])).getTime();
+                    }
+                }
+                // Then try ISO dates
+                const isoDate = o.expected_date || o.created_at || o.sale_order_date || '';
+                if (isoDate) {
+                    const isoMatch = String(isoDate).match(/^(\d{4})-(\d{2})-(\d{2})/);
+                    if (isoMatch) {
+                        return new Date(parseInt(isoMatch[1]), parseInt(isoMatch[2]) - 1, parseInt(isoMatch[3])).getTime();
+                    }
+                }
+                return 0;
+            };
+            const getCustomerName = (o) => (o.khach || o.customer || o.account_name || '').toLowerCase();
+
+            return [...orders].sort((a, b) => {
+                const dateA = parseDateValue(a);
+                const dateB = parseDateValue(b);
+                if (dateB !== dateA) return dateB - dateA; // Newest first
+                return getCustomerName(a).localeCompare(getCustomerName(b)); // Then A-Z
+            });
+        };
+
+        const sortedPending = sortByDateDesc(pending);
+        const sortedDelivering = sortByDateDesc(delivering);
+        const sortedCompleted = sortByDateDesc(completed);
+
         // Render lists IMMEDIATELY (fast first paint)
-        renderMyOrdersList('my-orders-pending-list', pending, 'pending');
-        renderMyOrdersList('my-orders-delivering-list', delivering, 'delivering');
-        renderMyOrdersList('my-orders-completed-list', completed, 'completed');
+        renderMyOrdersList('my-orders-pending-list', sortedPending, 'pending');
+        renderMyOrdersList('my-orders-delivering-list', sortedDelivering, 'delivering');
+        renderMyOrdersList('my-orders-completed-list', sortedCompleted, 'completed');
 
         console.timeEnd('⏱️ loadMyOrders');
 
         // === LAZY LOAD UNREAD COUNTS (non-blocking, update badges after) ===
         loadUnreadCounts().then(() => {
             // Re-render to update chat badges after unread counts loaded
-            renderMyOrdersList('my-orders-pending-list', pending, 'pending');
-            renderMyOrdersList('my-orders-delivering-list', delivering, 'delivering');
-            renderMyOrdersList('my-orders-completed-list', completed, 'completed');
+            renderMyOrdersList('my-orders-pending-list', sortedPending, 'pending');
+            renderMyOrdersList('my-orders-delivering-list', sortedDelivering, 'delivering');
+            renderMyOrdersList('my-orders-completed-list', sortedCompleted, 'completed');
             console.log('💬 Chat badges updated');
         }).catch(e => console.warn('Chat badge load error:', e));
 
