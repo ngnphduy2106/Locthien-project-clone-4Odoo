@@ -596,6 +596,21 @@ const MyOrdersModule = {
                             <!-- Multi-driver assignment section (ADMIN only) -->
                             ${multiDriverHtml}
 
+                            <!-- Combined delivery notes from all drivers -->
+                            ${(() => {
+                const notesArr = allAssignments
+                    .filter(a => a.delivery_note && a.delivery_note.trim())
+                    .map(a => `${a.driver_name}: ${a.delivery_note}`);
+                if (notesArr.length === 0) return '';
+                const combinedNotes = notesArr.join(' | ');
+                return `
+                            <div style="margin-bottom: 1rem; padding: 0.75rem; background: linear-gradient(135deg, #ecfdf5, #d1fae5); border-radius: 8px; border-left: 3px solid #10b981;">
+                                <div style="font-weight: 600; margin-bottom: 0.25rem; color: #059669; font-size: 0.8rem;">📝 GHI CHÚ GIAO HÀNG</div>
+                                <div style="color: #065f46; font-size: 0.9rem; line-height: 1.5;">${combinedNotes}</div>
+                            </div>
+                                `;
+            })()}
+
                             <!-- Sản phẩm -->
                             <div style="margin-bottom: 1rem;">
                                 ${splitBadge}
