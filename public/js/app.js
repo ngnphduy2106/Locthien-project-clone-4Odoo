@@ -2224,24 +2224,29 @@ function formatCurrencyBillion(amount) {
 
 function formatDate(dateStr) {
     if (!dateStr) return '-';
-    const str = String(dateStr);
-    console.log(`📅 formatDate input:`, dateStr, '| str:', str);
+    const str = String(dateStr).trim();
+
+    // If already in DD/MM/YYYY format, return as-is (don't re-parse)
+    const dmyMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (dmyMatch) {
+        // Ensure proper zero-padding
+        const day = dmyMatch[1].padStart(2, '0');
+        const month = dmyMatch[2].padStart(2, '0');
+        return `${day}/${month}/${dmyMatch[3]}`;
+    }
+
     // Parse ISO format YYYY-MM-DD directly to avoid UTC timezone issues
     const isoMatch = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
     if (isoMatch) {
-        const result = `${isoMatch[3]}/${isoMatch[2]}/${isoMatch[1]}`; // DD/MM/YYYY
-        console.log(`📅 formatDate ISO match:`, isoMatch, '| result:', result);
-        return result;
+        return `${isoMatch[3]}/${isoMatch[2]}/${isoMatch[1]}`; // DD/MM/YYYY
     }
-    // Fallback for other formats
-    console.log(`📅 formatDate using fallback new Date() for:`, str);
+
+    // Fallback for other formats (use with caution)
     const d = new Date(str);
     if (isNaN(d.getTime())) return str;
     const day = String(d.getDate()).padStart(2, '0');
     const month = String(d.getMonth() + 1).padStart(2, '0');
-    const result = `${day}/${month}/${d.getFullYear()}`;
-    console.log(`📅 formatDate fallback result:`, result);
-    return result;
+    return `${day}/${month}/${d.getFullYear()}`;
 }
 
 function getStatusBadge(status) {
