@@ -5125,6 +5125,7 @@ async function assignImportDriver(importId) {
     if (!Array.isArray(products)) products = [];
     const totalQty = products.reduce((sum, p) => sum + (parseFloat(p.qty || p.quantity || p.amount || 0)), 0);
     state.currentImportTotalQty = totalQty;
+    state.currentImportProducts = products; // Store for product selection UI
 
     // Init driver assignments array for import
     state.importDriverAssignments = [];
@@ -5167,7 +5168,7 @@ async function assignImportDriver(importId) {
                 
                 <!-- Add Driver Form -->
                 <div style="border:1px dashed var(--border); padding:12px; border-radius:8px;">
-                    <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end;">
+                    <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end; margin-bottom:12px;">
                         <div style="flex:1; min-width:150px;">
                             <label class="form-label" style="font-size:12px;">Chọn tài xế</label>
                             <select id="import-new-driver-select" class="form-control" onchange="onImportDriverChange(this)">
@@ -5186,14 +5187,35 @@ async function assignImportDriver(importId) {
                                 <input type="text" id="import-external-driver-plate" class="form-control" placeholder="Biển số...">
                             </div>
                         </div>
-                        <div style="width:100px;">
-                            <label class="form-label" style="font-size:12px;">Số lượng (kg)</label>
-                            <input type="number" id="import-new-driver-qty" class="form-control" placeholder="SL" value="">
-                        </div>
-                        <button class="btn btn-primary" onclick="addImportDriverAssignmentRow()" style="height:38px;">
-                            <i class="bi bi-plus"></i> Thêm
-                        </button>
                     </div>
+                    
+                    <!-- Product Selection for this driver -->
+                    <div style="margin-bottom:12px;">
+                        <label class="form-label" style="font-size:12px; color:var(--success);">📦 Chọn sản phẩm & số lượng cho tài xế này:</label>
+                        <div id="import-new-driver-products" style="background:var(--card-bg); border-radius:6px; overflow:hidden;">
+                            ${products.map((p, idx) => `
+                                <div style="display:flex; align-items:center; gap:8px; padding:8px 12px; border-bottom:1px solid var(--border);">
+                                    <input type="checkbox" id="import-assign-prod-${idx}" checked style="width:18px; height:18px;">
+                                    <div style="flex:1;">
+                                        <div style="font-weight:500; font-size:13px;">${p.name || p.product || '-'}</div>
+                                        <div style="font-size:11px; color:var(--text-muted);">Còn lại: <span id="import-remain-prod-${idx}">${p.qty || p.quantity || 0}</span> ${p.unit || 'kg'}</div>
+                                    </div>
+                                    <input type="number" id="import-assign-qty-${idx}" class="form-control" 
+                                        value="${p.qty || p.quantity || 0}" 
+                                        data-code="${p.code || ''}"
+                                        data-name="${p.name || p.product || ''}"
+                                        data-unit="${p.unit || 'kg'}"
+                                        data-max="${p.qty || p.quantity || 0}"
+                                        style="width:100px; padding:6px; font-size:13px; text-align:center;">
+                                    <span style="font-size:12px; color:var(--text-muted);">${p.unit || 'kg'}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                    
+                    <button class="btn btn-primary" onclick="addImportDriverAssignmentRow()" style="width:100%;">
+                        <i class="bi bi-plus"></i> Thêm tài xế với sản phẩm đã chọn
+                    </button>
                 </div>
                 
                 <!-- Summary -->
@@ -5235,15 +5257,15 @@ function onImportDriverChange(selectEl) {
 // Add driver to import assignment list
 function addImportDriverAssignmentRow() {
     const select = window.$('#import-new-driver-select');
-    const qtyInput = window.$('#import-new-driver-qty');
     const externalName = window.$('#import-external-driver-name');
     const externalPlate = window.$('#import-external-driver-plate');
 
     let driverName = select?.value;
     let plate = '';
+    const isExternal = driverName === '__EXTERNAL__';
 
     // Handle external driver
-    if (driverName === '__EXTERNAL__') {
+    if (isExternal) {
         driverName = externalName?.value?.trim();
         plate = externalPlate?.value?.trim() || '';
         if (!driverName) {
@@ -5259,26 +5281,71 @@ function addImportDriverAssignmentRow() {
         plate = selectedOption?.getAttribute('data-plate') || '';
     }
 
-    const qty = parseFloat(qtyInput?.value) || 0;
-    if (qty <= 0) {
-        alert('Vui lòng nhập số lượng hợp lệ!');
+    // Collect products from checkboxes (matching export form logic)
+    const products = state.currentImportProducts || [];
+    const selectedProducts = [];
+    let totalQty = 0;
+
+    products.forEach((p, idx) => {
+        const checkbox = window.$(`#import-assign-prod-${idx}`);
+        const qtyInput = window.$(`#import-assign-qty-${idx}`);
+
+        if (checkbox?.checked) {
+            const qty = parseFloat(qtyInput?.value) || 0;
+            if (qty > 0) {
+                selectedProducts.push({
+                    code: qtyInput?.getAttribute('data-code') || p.code || '',
+                    name: qtyInput?.getAttribute('data-name') || p.name || p.product || '',
+                    qty: qty,
+                    unit: qtyInput?.getAttribute('data-unit') || p.unit || 'kg'
+                });
+                totalQty += qty;
+            }
+        }
+    });
+
+    if (selectedProducts.length === 0 || totalQty <= 0) {
+        alert('Vui lòng chọn ít nhất 1 sản phẩm với số lượng > 0!');
         return;
     }
 
-    // Add to list
+    // Add to list with products
     state.importDriverAssignments.push({
         driver_name: driverName,
         plate: plate,
-        qty: qty,
-        is_external: select?.value === '__EXTERNAL__'
+        qty: totalQty,
+        products: selectedProducts,
+        is_external: isExternal
     });
 
-    // Reset form
+    // Update remaining quantities in form
+    products.forEach((p, idx) => {
+        const checkbox = window.$(`#import-assign-prod-${idx}`);
+        const qtyInput = window.$(`#import-assign-qty-${idx}`);
+        const remainSpan = window.$(`#import-remain-prod-${idx}`);
+
+        if (checkbox?.checked && qtyInput) {
+            const usedQty = parseFloat(qtyInput.value) || 0;
+            const maxQty = parseFloat(qtyInput.getAttribute('data-max')) || 0;
+            const newMax = maxQty - usedQty;
+
+            qtyInput.setAttribute('data-max', Math.max(0, newMax));
+            qtyInput.value = Math.max(0, newMax);
+            if (remainSpan) remainSpan.textContent = formatNumber(Math.max(0, newMax));
+
+            // Uncheck if no remaining
+            if (newMax <= 0) {
+                checkbox.checked = false;
+            }
+        }
+    });
+
+    // Reset driver selection
     select.value = '';
-    qtyInput.value = '';
     if (externalName) externalName.value = '';
     if (externalPlate) externalPlate.value = '';
     window.$('#import-external-driver-fields')?.classList.add('hidden');
+    window.$('#import-external-driver-fields').style.display = 'none';
 
     renderImportDriverAssignmentsList();
     updateImportQtySummaryDisplay();
@@ -5302,16 +5369,29 @@ function renderImportDriverAssignmentsList() {
     }
 
     container.innerHTML = state.importDriverAssignments.map((a, idx) => `
-        <div style="display:flex; align-items:center; gap:12px; padding:10px; background:var(--card-bg); border-radius:6px; margin-bottom:8px; border-left:3px solid ${a.is_external ? 'var(--warning)' : 'var(--success)'};">
-            <div style="flex:1;">
-                <strong>${a.driver_name}</strong>
-                ${a.is_external ? '<span style="font-size:11px; background:var(--warning); color:#000; padding:2px 6px; border-radius:4px; margin-left:6px;">Tài xế ngoài</span>' : ''}
-                <br><small style="color:var(--text-muted);">🚗 ${a.plate || 'Chưa có biển số'}</small>
+        <div style="padding:12px; background:var(--card-bg); border-radius:8px; margin-bottom:8px; border-left:3px solid ${a.is_external ? 'var(--warning)' : 'var(--success)'};">
+            <div style="display:flex; align-items:center; gap:12px; margin-bottom:8px;">
+                <div style="flex:1;">
+                    <strong>${a.driver_name}</strong>
+                    ${a.is_external ? '<span style="font-size:11px; background:var(--warning); color:#000; padding:2px 6px; border-radius:4px; margin-left:6px;">Tài xế ngoài</span>' : ''}
+                    <br><small style="color:var(--text-muted);">🚗 ${a.plate || 'Chưa có biển số'}</small>
+                </div>
+                <div style="font-weight:600; color:var(--success);">${formatNumber(a.qty)} kg</div>
+                <button onclick="removeImportDriverAssignmentRow(${idx})" style="background:var(--danger); color:white; border:none; border-radius:4px; width:28px; height:28px; cursor:pointer;">
+                    <i class="bi bi-x"></i>
+                </button>
             </div>
-            <div style="font-weight:600; color:var(--success);">${formatNumber(a.qty)} kg</div>
-            <button onclick="removeImportDriverAssignmentRow(${idx})" style="background:var(--danger); color:white; border:none; border-radius:4px; width:28px; height:28px; cursor:pointer;">
-                <i class="bi bi-x"></i>
-            </button>
+            ${a.products && a.products.length > 0 ? `
+                <div style="background:var(--body-bg); border-radius:6px; padding:8px; font-size:12px;">
+                    <div style="font-weight:500; color:var(--primary); margin-bottom:4px;">📦 Sản phẩm:</div>
+                    ${a.products.map(p => `
+                        <div style="display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px solid var(--border);">
+                            <span>${p.name}</span>
+                            <span style="font-weight:600;">${formatNumber(p.qty)} ${p.unit}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            ` : ''}
         </div>
     `).join('');
 }
