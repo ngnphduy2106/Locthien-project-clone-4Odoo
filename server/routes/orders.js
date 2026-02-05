@@ -1289,6 +1289,22 @@ router.post('/:id/complete', async (req, res) => {
                     console.error('Admin notification error:', notifyErr.message);
                 }
 
+                // Send Telegram notification for order completion
+                try {
+                    const { sendTelegramMessage } = await import('../services/telegram.js');
+                    const orderNo = orderInfo?.soDon || orderInfo?.sale_order_no || id;
+                    const money = (orderInfo?.sale_order_amount || 0).toLocaleString('vi-VN');
+
+                    let msg = `✅ <b>ĐƠN ĐÃ HOÀN THÀNH</b>\n`;
+                    msg += `📦 Mã: <b>#${orderNo}</b>\n`;
+                    msg += `👤 Khách: ${orderInfo?.khach || 'N/A'}\n`;
+                    msg += `🚛 Tài xế: ${driver_name}\n`;
+                    msg += `💰 Tổng: <b>${money} VNĐ</b>`;
+
+                    await sendTelegramMessage(msg, 'XUAT');
+                } catch (tgErr) {
+                    console.error('Telegram completion error:', tgErr.message);
+                }
                 return res.json(createResponse(!syncResult.success, syncResult.success ? 'Hoàn thành!' : 'Đã lưu cục bộ nhưng CRM lỗi' + syncStatusMsg, { ticketId, crmStatus: crmSyncStatus }));
 
             } catch (syncErr) {
@@ -1472,7 +1488,7 @@ router.post('/:id/assign-multi', async (req, res) => {
 
             msg += `\n🔔 @sales`;
 
-            await sendTelegramMessage(msg, 'XUAT');
+            await sendTelegramMessage(msg, 'DRIVER');
         } catch (tgErr) {
             console.error('Telegram Error:', tgErr.message);
         }
