@@ -2508,7 +2508,9 @@ async function viewOrderDetail(orderId, options = {}) {
             ` : ''}
             
             ${(() => {
-                // Multi-driver assignment section
+                // Multi-driver assignment section - ONLY for ADMIN (hide from drivers)
+                if (isDriver) return ''; // Drivers don't need to see other drivers
+
                 const allAssignments = order.all_assignments || [];
                 if (allAssignments.length > 1) {
                     return `
@@ -2563,17 +2565,28 @@ async function viewOrderDetail(orderId, options = {}) {
             ` : '')}
             
             ${isDriver ? `
-            <!-- DRIVER VIEW: Show only assigned quantity -->
+            <!-- DRIVER VIEW: Show products with quantities (no price) -->
             <h4 style="margin: 24px 0 12px; font-size:14px; color:var(--text-secondary);">Phần hàng được giao cho bạn</h4>
             <div style="padding:16px; background:linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); border-radius:12px; border-left:4px solid #10b981;">
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <span style="font-size:14px; color:#065f46;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; padding-bottom:12px; border-bottom:1px solid #a7f3d0;">
+                    <span style="font-size:14px; color:#065f46; font-weight:600;">
                         <i class="bi bi-box-seam"></i> Tổng SL cần giao:
                     </span>
                     <span style="font-size:20px; font-weight:700; color:#047857;">
-                        ${order.assigned_qty || order.total_qty || order.amount || 'Xem phân công'} kg
+                        ${order.assigned_qty || order.total_qty || order.amount || '---'} kg
                     </span>
                 </div>
+                <!-- Product list for driver -->
+                ${products.length > 0 ? `
+                <div style="display:flex; flex-direction:column; gap:8px;">
+                    ${products.map(p => `
+                    <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; background:white; border-radius:8px;">
+                        <span style="font-weight:500; color:#065f46;">${p.name || p.productName || p.product_name || 'Sản phẩm'}</span>
+                        <span style="font-weight:600; color:#047857;">${p.qty || p.quantity || p.amount || 0} ${p.unit || 'kg'}</span>
+                    </div>
+                    `).join('')}
+                </div>
+                ` : ''}
                 ${order.delivery_note ? `
                 <div style="margin-top:12px; padding-top:12px; border-top:1px solid #a7f3d0;">
                     <span style="font-size:12px; color:#059669; font-weight:500;">Ghi chú:</span>
