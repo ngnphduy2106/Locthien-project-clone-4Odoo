@@ -1473,6 +1473,7 @@ router.post('/:id/assign-multi', async (req, res) => {
 
         // Send Telegram notification
         try {
+            console.log(`📨 Sending Telegram for multi-driver order ${id}...`);
             const { sendTelegramMessage } = await import('../services/telegram.js');
             const orderInfo = await db.getOrder(id);
 
@@ -1488,9 +1489,11 @@ router.post('/:id/assign-multi', async (req, res) => {
 
             msg += `\n🔔 @sales`;
 
+            console.log(`📤 Telegram message to DRIVER group:\n${msg}`);
             await sendTelegramMessage(msg, 'DRIVER');
+            console.log(`✅ Telegram DRIVER notification sent for multi-driver order ${id}`);
         } catch (tgErr) {
-            console.error('Telegram Error:', tgErr.message);
+            console.error('❌ Telegram Error in multi-driver assign:', tgErr.message);
         }
 
         res.json(createResponse(false, `Đã phân công ${assignments.length} tài xế!`));
