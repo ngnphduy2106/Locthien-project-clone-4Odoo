@@ -424,14 +424,33 @@ const MyOrdersModule = {
         console.log('View order detail:', order);
         const typeLabel = orderType === 'import' ? 'Đơn nhập' : 'Đơn xuất';
 
+        // Check if current user is admin
+        const userStr = localStorage.getItem('user');
+        const user = userStr ? JSON.parse(userStr) : {};
+        const isAdmin = (user.role || '').toLowerCase() === 'admin';
+
         // Build product list - show all products (same for everyone)
         let products = order.products || order.cart || [];
         if (typeof products === 'string') {
             try { products = JSON.parse(products); } catch (e) { products = []; }
         }
 
+        // Fetch all assignments for this order
+        let allAssignments = [];
+        const orderNo = order.soDon || order.sale_order_no || orderId;
+        try {
+            const assignResp = await fetch(`/api/orders/${orderNo}/assignments`);
+            const assignData = await assignResp.json();
+            if (!assignData.error && assignData.data && Array.isArray(assignData.data)) {
+                allAssignments = assignData.data;
+                console.log(`📦 Loaded ${allAssignments.length} assignments for order ${orderNo}`);
+            }
+        } catch (e) {
+            console.log('No assignments data:', e.message);
+        }
+
         // Fetch driver's assigned quantity and actual products from API
-        let isSplitOrder = order.is_split_order;
+        let isSplitOrder = order.is_split_order || allAssignments.length > 1;
         let driverAssignedQty = order.assigned_qty ? Number(order.assigned_qty) : null;
 
         if (order.assignment_id) {
@@ -458,14 +477,66 @@ const MyOrdersModule = {
             `• ${p.name || p.code}: ${p.qty || p.amount || 0} ${p.unit || 'kg'}`
         ).join('\n') || 'Chưa có sản phẩm';
 
-        // Show split order badge with driver's assigned quantity
-        const splitBadge = (isSplitOrder && driverAssignedQty)
+        // Show split order badge with driver's assigned quantity (for drivers only)
+        const splitBadge = (!isAdmin && isSplitOrder && driverAssignedQty)
             ? `<div style="margin-bottom: 0.75rem; padding: 8px 12px; background: linear-gradient(135deg, #fef3c7, #fde68a); border-radius: 8px; font-weight: 600;">
                 <span style="color: #92400e;">📦 Phần của bạn:</span> 
                 <span style="color: #78350f; font-size: 1.1em;">${driverAssignedQty} kg</span>
                 ${order.split_progress ? `<span style="color: #a16207; font-size: 0.85em; margin-left: 8px;">(${order.split_progress})</span>` : ''}
                </div>`
             : '';
+
+        // Build multi-driver assignment section for ADMIN
+        let multiDriverHtml = '';
+        if (isAdmin && allAssignments.length > 1) {
+            multiDriverHtml = `
+            <div style="margin-bottom: 1rem; padding: 0.75rem; background: linear-gradient(135deg, #f3e8ff, #e9d5ff); border-radius: 8px; border-left: 3px solid #8B5CF6;">
+                <div style="font-weight: 600; margin-bottom: 0.5rem; color: #7c3aed; font-size: 0.85rem;">👥 Phân công tài xế (${allAssignments.length} người)</div>
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                    ${allAssignments.map(a => {
+                // Parse assigned_products for this driver
+                let driverProducts = [];
+                if (a.assigned_products) {
+                    driverProducts = typeof a.assigned_products === 'string'
+                        ? JSON.parse(a.assigned_products)
+                        : a.assigned_products;
+                }
+
+                const statusBg = a.status === 'completed' ? 'background:#dcfce7; color:#16a34a;' :
+                    a.status === 'delivering' ? 'background:#dbeafe; color:#2563eb;' :
+                        'background:#fef3c7; color:#d97706;';
+                const statusText = a.status === 'completed' ? '✓ Hoàn thành' :
+                    a.status === 'delivering' ? 'Đang giao' : 'Chờ nhận';
+
+                return `
+                        <div style="background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-bottom: 1px solid #e5e7eb;">
+                                <div>
+                                    <span style="font-weight: 600; font-size: 13px;">${a.driver_name || 'Tài xế'}</span>
+                                    ${a.plate ? `<span style="color: #666; font-size: 11px; margin-left: 6px;">🚚 ${a.plate}</span>` : ''}
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <span style="color: #8B5CF6; font-weight: 700; font-size: 13px;">${a.assigned_qty || 0}kg</span>
+                                    <span style="font-size: 10px; padding: 3px 8px; border-radius: 10px; ${statusBg}">${statusText}</span>
+                                </div>
+                            </div>
+                            ${driverProducts.length > 0 ? `
+                            <div style="padding: 6px 12px; background: #faf5ff; font-size: 11px;">
+                                ${driverProducts.map(p => `
+                                <div style="display: flex; justify-content: space-between; color: #4c1d95; padding: 2px 0;">
+                                    <span>${p.name || p.productName || 'Sản phẩm'}</span>
+                                    <span style="font-weight: 600;">${p.qty || p.quantity || 0} ${p.unit || 'kg'}</span>
+                                </div>
+                                `).join('')}
+                            </div>
+                            ` : ''}
+                        </div>
+                        `;
+            }).join('')}
+                </div>
+            </div>
+            `;
+        }
 
         // Format amount
         const amount = (order.sale_order_amount || order.total || order.amount || 0).toLocaleString('vi-VN');
@@ -506,6 +577,9 @@ const MyOrdersModule = {
                             <div style="font-size: 0.75rem; color: #6b7280; margin-top: 0.25rem;">Liên hệ người này nếu cần hỗ trợ</div>
                         </div>
                         ` : ''}
+                        
+                        <!-- Multi-driver assignment section (ADMIN only) -->
+                        ${multiDriverHtml}
                         
                         <!-- Sản phẩm -->
                         <div style="margin-bottom: 1rem;">
