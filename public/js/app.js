@@ -2564,7 +2564,40 @@ async function viewOrderDetail(orderId, options = {}) {
             </div>
             ` : '')}
             
-            ${isDriver ? `
+            ${isDriver ? (() => {
+                // Find current driver's assignment to get their specific products
+                const currentDriverName = (state.user?.name || state.user?.full_name || '').toLowerCase();
+                const currentDriverId = state.user?.id;
+                const allAssignments = order.all_assignments || [];
+
+                // Find this driver's assignment
+                let myAssignment = allAssignments.find(a =>
+                    (a.driver_id && a.driver_id === currentDriverId) ||
+                    (a.driver_name && a.driver_name.toLowerCase() === currentDriverName)
+                );
+
+                // If no match found but order has assigned_products directly, use that
+                let driverProducts = [];
+                if (myAssignment && myAssignment.assigned_products) {
+                    // Parse if JSON string
+                    driverProducts = typeof myAssignment.assigned_products === 'string'
+                        ? JSON.parse(myAssignment.assigned_products)
+                        : myAssignment.assigned_products;
+                } else if (order.assigned_products) {
+                    // Direct from order assignment
+                    driverProducts = typeof order.assigned_products === 'string'
+                        ? JSON.parse(order.assigned_products)
+                        : order.assigned_products;
+                }
+
+                // Final fallback: if still no products, this might be a single-driver order
+                if (!driverProducts.length && allAssignments.length <= 1) {
+                    driverProducts = products; // Use full product list for single-driver orders
+                }
+
+                const assignedQty = myAssignment?.assigned_qty || order.assigned_qty || order.total_qty || '---';
+
+                return `
             <!-- DRIVER VIEW: Show products with quantities (no price) -->
             <h4 style="margin: 24px 0 12px; font-size:14px; color:var(--text-secondary);">Phần hàng được giao cho bạn</h4>
             <div style="padding:16px; background:linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); border-radius:12px; border-left:4px solid #10b981;">
@@ -2573,20 +2606,20 @@ async function viewOrderDetail(orderId, options = {}) {
                         <i class="bi bi-box-seam"></i> Tổng SL cần giao:
                     </span>
                     <span style="font-size:20px; font-weight:700; color:#047857;">
-                        ${order.assigned_qty || order.total_qty || order.amount || '---'} kg
+                        ${assignedQty} kg
                     </span>
                 </div>
                 <!-- Product list for driver -->
-                ${products.length > 0 ? `
+                ${driverProducts.length > 0 ? `
                 <div style="display:flex; flex-direction:column; gap:8px;">
-                    ${products.map(p => `
+                    ${driverProducts.map(p => `
                     <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; background:white; border-radius:8px;">
                         <span style="font-weight:500; color:#065f46;">${p.name || p.productName || p.product_name || 'Sản phẩm'}</span>
                         <span style="font-weight:600; color:#047857;">${p.qty || p.quantity || p.amount || 0} ${p.unit || 'kg'}</span>
                     </div>
                     `).join('')}
                 </div>
-                ` : ''}
+                ` : `<div style="text-align:center; color:#6b7280; font-size:13px;">Xem chi tiết phân công từ điều phối</div>`}
                 ${order.delivery_note ? `
                 <div style="margin-top:12px; padding-top:12px; border-top:1px solid #a7f3d0;">
                     <span style="font-size:12px; color:#059669; font-weight:500;">Ghi chú:</span>
@@ -2594,7 +2627,8 @@ async function viewOrderDetail(orderId, options = {}) {
                 </div>
                 ` : ''}
             </div>
-            ` : `
+                `;
+            })() : `
             <!-- ADMIN VIEW: Full product list -->
             <h4 style="margin: 24px 0 12px; font-size:14px; color:var(--text-secondary);">Danh sách sản phẩm</h4>
             <table class="data-table" style="width:100%;">
