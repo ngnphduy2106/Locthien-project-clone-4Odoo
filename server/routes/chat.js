@@ -221,7 +221,7 @@ router.post('/:id/messages', async (req, res) => {
 
         if (error) {
             console.error('Chat insert error:', error);
-            return res.json(createResponse(true, 'Lỗi gửi tin nhắn'));
+            return res.json(createResponse(true, `Lỗi gửi tin nhắn: ${error.message || error.code || JSON.stringify(error)}`));
         }
 
         // Create notification for message recipient
