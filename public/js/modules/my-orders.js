@@ -387,37 +387,15 @@ const MyOrdersModule = {
                 return;
             }
 
-            // For IMPORT orders - confirm and complete directly
-            if (!confirm('Xác nhận hoàn thành đơn nhập này?')) {
-                return;
+            // For IMPORT orders - use the new import delivery modal with image upload
+            if (typeof openImportDeliveryModal === 'function') {
+                openImportDeliveryModal(orderId);
+            } else if (typeof window.openImportDeliveryModal === 'function') {
+                window.openImportDeliveryModal(orderId);
+            } else {
+                console.error('openImportDeliveryModal function not found!');
+                alert('Lỗi: Không tìm thấy form hoàn thành đơn nhập!');
             }
-
-            const products = order?.products || order?.items || [];
-
-            // Get driver info from localStorage
-            const userStr = localStorage.getItem('user');
-            const user = userStr ? JSON.parse(userStr) : {};
-            const driverName = user.name || user.fullName || localStorage.getItem('userName') || 'Driver';
-
-            // Import ticket completion - use Supabase imports API
-            const response = await fetch(`/api/imports/${orderId}/complete`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    actual_products: products,
-                    note: `Hoàn thành bởi ${driverName}`
-                })
-            });
-
-            const data = await response.json();
-
-            if (data.error) {
-                alert('Lỗi: ' + data.msg);
-                return;
-            }
-
-            alert('✅ Đã hoàn thành đơn nhập!');
-            this.loadMyOrders(); // Reload
 
         } catch (error) {
             console.error('Error completing order:', error);

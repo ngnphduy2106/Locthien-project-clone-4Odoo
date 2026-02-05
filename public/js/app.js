@@ -3839,6 +3839,360 @@ window.updateCartNote = updateCartNote;
 window.removeCartItem = removeCartItem;
 window.renderDeliveryCart = renderDeliveryCart;
 
+// === IMPORT DELIVERY MODAL (HOÀN THÀNH ĐƠN NHẬP) ===
+// Mirrors export delivery modal structure for consistency
+
+function openImportDeliveryModal(importId) {
+    // Search in all import lists
+    const allImports = [
+        ...(window.MyOrdersModule?.orders?.filter(o => o.orderType === 'import') || []),
+        ...(state.imports?.pending || []),
+        ...(state.imports?.assigned || []),
+        ...(state.imports?.completed || [])
+    ];
+
+    const findImport = (list) => list.find(o => {
+        const oIdStr = String(o.id || o.order_id);
+        const searchIdStr = String(importId);
+        return oIdStr === searchIdStr ||
+            o.id === importId ||
+            o.ticket_no === importId;
+    });
+
+    const imp = findImport(allImports);
+
+    if (!imp) {
+        console.error('Import not found for delivery modal:', importId);
+        alert('Không tìm thấy phiếu nhập!');
+        return;
+    }
+
+    state.currentImportDelivery = imp;
+
+    // Parse products
+    let products = imp.products || imp.cart || [];
+    if (typeof products === 'string') {
+        try { products = JSON.parse(products); } catch (e) { products = []; }
+    }
+    if (!Array.isArray(products)) products = [];
+
+    // Check for assigned products (for split imports)
+    if (imp.assigned_products) {
+        let assignedProducts = imp.assigned_products;
+        if (typeof assignedProducts === 'string') {
+            try { assignedProducts = JSON.parse(assignedProducts); } catch (e) { assignedProducts = null; }
+        }
+        if (Array.isArray(assignedProducts) && assignedProducts.length > 0) {
+            products = assignedProducts;
+        }
+    }
+
+    state.importDeliveryCart = products.map(p => ({
+        product: p.name || p.productName || p.product_name || '',
+        code: p.code || p.product_code || '',
+        planQty: p.qty || p.quantity || p.amount || 0,
+        qty: p.qty || p.quantity || p.amount || 0,
+        unit: p.unit || 'Kg',
+        note: ''
+    }));
+
+    state.importSelectedImages = [];
+
+    // Render modal
+    const modal = window.$('#modal-order-detail');
+    const modalBody = window.$('#modal-order-body');
+    const modalTitle = window.$('#modal-order-title');
+
+    if (modalTitle) modalTitle.textContent = 'Xác nhận nhập hàng';
+
+    if (modalBody) {
+        modalBody.innerHTML = `
+            <div class="order-detail-grid" style="margin-bottom:20px;">
+                <div class="detail-row">
+                    <label>Mã phiếu:</label>
+                    <span><strong>#${imp.ticket_no || imp.id}</strong></span>
+                </div>
+                <div class="detail-row">
+                    <label>Nhà cung cấp:</label>
+                    <span>${imp.supplier_name || '-'}</span>
+                </div>
+                <div class="detail-row">
+                    <label>Tài xế:</label>
+                    <span><strong>${imp.assigned_driver || imp.driver_name || state.user?.name || 'Chưa phân công'}</strong></span>
+                </div>
+                <div class="detail-row">
+                    <label>Biển số:</label>
+                    <span>${imp.assigned_plate || imp.plate || 'Chưa có'}</span>
+                </div>
+            </div>
+            
+            <h4 style="margin:20px 0 12px; font-size:14px; color:var(--text-secondary);">Sản phẩm nhập</h4>
+            <div id="import-delivery-cart-list"></div>
+            
+            <div class="form-group" style="margin-top:16px;">
+                <label class="form-label">Kho nhập</label>
+                <div style="display:flex; gap:16px;">
+                    <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                        <input type="radio" name="import-wh" value="LT1" checked> Kho LT1
+                    </label>
+                    <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                        <input type="radio" name="import-wh" value="LT2"> Kho LT2
+                    </label>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label" style="display:flex; align-items:center; gap:6px;">
+                    <i class="bi bi-images"></i> Ảnh chứng minh nhập hàng
+                    <span id="import-delivery-images-count" style="font-size:12px; color:var(--text-muted);"></span>
+                </label>
+                <div id="import-img-preview-area" style="display:flex; flex-wrap:wrap; gap:8px; min-height:80px; padding:12px; background:var(--body-bg); border-radius:8px; border:1px dashed var(--border); margin-bottom:12px;">
+                    <div style="text-align:center; width:100%; color:var(--text-muted); padding:20px;">
+                        <i class="bi bi-camera" style="font-size:24px;"></i>
+                        <p style="margin-top:8px;">Chưa có ảnh</p>
+                    </div>
+                </div>
+                <label style="display:inline-flex; align-items:center; gap:8px; padding:8px 16px; background:var(--success); color:white; border-radius:8px; cursor:pointer; font-size:13px;">
+                    <i class="bi bi-plus-circle"></i> Thêm ảnh
+                    <input type="file" id="inp-import-del-img" accept="image/*" multiple onchange="handleImportImageSelect(this)" style="display:none;">
+                </label>
+                <span style="margin-left:8px; font-size:12px; color:var(--text-muted);">Tối đa 10 ảnh</span>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Ghi chú</label>
+                <textarea id="inp-import-del-note" class="form-control" rows="2" placeholder="Ghi chú khi nhận hàng...">${imp.note || ''}</textarea>
+            </div>
+            
+            <div style="display:flex; gap:12px; margin-top:24px;">
+                <button class="btn btn-outline" onclick="closeImportDeliveryModal()">Hủy</button>
+                <button class="btn btn-success" onclick="submitImportDelivery()">
+                    <i class="bi bi-check-lg"></i> Hoàn thành nhập
+                </button>
+            </div>
+        `;
+    }
+
+    renderImportDeliveryCart();
+    if (modal) modal.classList.remove('hidden');
+}
+
+function closeImportDeliveryModal() {
+    hide('modal-order-detail');
+    state.currentImportDelivery = null;
+    state.importDeliveryCart = [];
+    state.importSelectedImages = [];
+}
+
+function renderImportDeliveryCart() {
+    const list = window.$('#import-delivery-cart-list');
+    if (!list) return;
+
+    if (!state.importDeliveryCart || !state.importDeliveryCart.length) {
+        list.innerHTML = '<div style="text-align:center; padding:20px; color:var(--text-muted);">Không có sản phẩm</div>';
+        return;
+    }
+
+    list.innerHTML = state.importDeliveryCart.map((item, idx) => `
+        <div style="background:var(--body-bg); padding:12px; border-radius:8px; margin-bottom:8px; border-left:3px solid var(--success);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                <div style="font-weight:600; color:var(--success);">${item.product}</div>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
+                <div>
+                    <div style="font-size:11px; color:var(--text-muted);">Yêu cầu</div>
+                    <div style="font-weight:600;">${item.planQty || 0} ${item.unit}</div>
+                </div>
+                <div>
+                    <div style="font-size:11px; color:var(--text-muted);">Thực tế</div>
+                    <input type="number" class="form-control" style="padding:6px 8px; font-size:13px;"
+                        value="${item.qty}" onchange="updateImportCartQty(${idx}, this.value)">
+                </div>
+                <div>
+                    <div style="font-size:11px; color:var(--text-muted);">Ghi chú</div>
+                    <input type="text" class="form-control" style="padding:6px 8px; font-size:13px;"
+                        placeholder="..." value="${item.note || ''}" onchange="updateImportCartNote(${idx}, this.value)">
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function updateImportCartQty(idx, val) {
+    if (state.importDeliveryCart && state.importDeliveryCart[idx]) {
+        state.importDeliveryCart[idx].qty = Number(val);
+    }
+}
+
+function updateImportCartNote(idx, val) {
+    if (state.importDeliveryCart && state.importDeliveryCart[idx]) {
+        state.importDeliveryCart[idx].note = val;
+    }
+}
+
+function handleImportImageSelect(input) {
+    const files = input.files;
+    if (!files || !files.length) return;
+
+    const previewArea = window.$('#import-img-preview-area');
+    const counter = window.$('#import-delivery-images-count');
+    if (!previewArea) return;
+
+    state.importSelectedImages = state.importSelectedImages || [];
+
+    if (state.importSelectedImages.length >= 10) {
+        alert('Đã đạt giới hạn 10 ảnh!');
+        return;
+    }
+
+    if (state.importSelectedImages.length === 0) {
+        previewArea.innerHTML = '';
+    }
+
+    Array.from(files).forEach(file => {
+        if (state.importSelectedImages.length >= 10) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const base64 = e.target.result;
+            const idx = state.importSelectedImages.length;
+            state.importSelectedImages.push(base64);
+
+            const imgDiv = document.createElement('div');
+            imgDiv.id = `import-img-preview-${idx}`;
+            imgDiv.style.cssText = 'position:relative; display:inline-block;';
+            imgDiv.innerHTML = `
+                <img src="${base64}" style="width:80px; height:80px; object-fit:cover; border-radius:8px; border:2px solid var(--success);">
+                <button onclick="removeImportDeliveryImage(${idx})" style="position:absolute; top:-8px; right:-8px; background:var(--danger); color:white; border:none; border-radius:50%; width:20px; height:20px; cursor:pointer; font-size:12px;">×</button>
+            `;
+            previewArea.appendChild(imgDiv);
+
+            if (counter) {
+                counter.textContent = `${state.importSelectedImages.length}/10 ảnh`;
+            }
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+function removeImportDeliveryImage(idx) {
+    state.importSelectedImages[idx] = null;
+    const imgDiv = document.getElementById(`import-img-preview-${idx}`);
+    if (imgDiv) imgDiv.remove();
+
+    const validCount = state.importSelectedImages.filter(img => img !== null).length;
+    const counter = window.$('#import-delivery-images-count');
+    if (counter) {
+        counter.textContent = validCount > 0 ? `${validCount}/10 ảnh` : '';
+    }
+
+    const previewArea = window.$('#import-img-preview-area');
+    if (validCount === 0 && previewArea) {
+        previewArea.innerHTML = `
+            <div style="text-align:center; width:100%; color:var(--text-muted); padding:20px;">
+                <i class="bi bi-camera" style="font-size:24px;"></i>
+                <p style="margin-top:8px;">Chưa có ảnh</p>
+            </div>
+        `;
+    }
+}
+
+async function submitImportDelivery() {
+    const validImages = (state.importSelectedImages || []).filter(img => img !== null);
+    if (!validImages.length) {
+        if (!confirm('Cảnh báo: Chưa có ảnh chứng minh. Tiếp tục?')) return;
+    }
+
+    const imp = state.currentImportDelivery;
+    if (!imp) {
+        alert('Không tìm thấy phiếu nhập!');
+        return;
+    }
+
+    const noteEl = window.$('#inp-import-del-note');
+    const note = noteEl?.value || '';
+
+    const whRadio = document.querySelector('input[name="import-wh"]:checked');
+    const warehouse = whRadio?.value || 'LT1';
+
+    const driverName = imp.assigned_driver || imp.driver_name || state.user?.name || 'Tài xế';
+    const plate = imp.assigned_plate || imp.plate || '';
+
+    showLoading('Đang xử lý...');
+
+    try {
+        // Build actual products from cart
+        const actualProducts = (state.importDeliveryCart || []).map(item => ({
+            name: item.product,
+            code: item.code || '',
+            qty: Number(item.qty || 0),
+            unit: item.unit || 'kg',
+            note: item.note || ''
+        }));
+
+        // Complete import
+        const response = await fetch(`/api/imports/${imp.id}/complete`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                actual_products: actualProducts,
+                warehouse: warehouse,
+                note: note || `Hoàn thành bởi ${driverName}`,
+                driver_name: driverName,
+                plate: plate
+            })
+        });
+
+        const data = await response.json();
+
+        if (data.error) {
+            hideLoading();
+            alert('Lỗi hoàn thành: ' + (data.msg || data.message));
+            return;
+        }
+
+        // Add proof images
+        if (validImages.length > 0) {
+            try {
+                const imageRes = await fetch(`/api/imports/${imp.id}/add-proof-images`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ images: validImages })
+                });
+                const imageData = await imageRes.json();
+                if (imageData.error) {
+                    console.warn('Image save warning:', imageData.msg);
+                }
+            } catch (imgErr) {
+                console.error('Image upload error:', imgErr.message);
+            }
+        }
+
+        hideLoading();
+        alert(data.msg || 'Đã hoàn thành nhập hàng!');
+        closeImportDeliveryModal();
+
+        // Reload
+        if (window.MyOrdersModule?.loadMyOrders) window.MyOrdersModule.loadMyOrders();
+        if (typeof loadImports === 'function') loadImports();
+
+    } catch (e) {
+        hideLoading();
+        console.error('Submit import delivery error:', e);
+        alert('Lỗi kết nối: ' + e.message);
+    }
+}
+
+// Export import delivery functions
+window.openImportDeliveryModal = openImportDeliveryModal;
+window.closeImportDeliveryModal = closeImportDeliveryModal;
+window.submitImportDelivery = submitImportDelivery;
+window.handleImportImageSelect = handleImportImageSelect;
+window.updateImportCartQty = updateImportCartQty;
+window.updateImportCartNote = updateImportCartNote;
+window.renderImportDeliveryCart = renderImportDeliveryCart;
+window.removeImportDeliveryImage = removeImportDeliveryImage;
+
 // === START ORDER (DRIVER) ===
 async function startOrder(orderId, assignmentId = null) {
     if (!confirm('Xác nhận nhận đơn này?')) return;
