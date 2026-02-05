@@ -2422,13 +2422,19 @@ async function viewOrderDetail(orderId, options = {}) {
     try {
         const assignResp = await fetch(`/api/orders/${orderNo}/assignments`);
         const assignData = await assignResp.json();
-        if (!assignData.error && assignData.combined) {
-            if (assignData.combined.count > 1) {
+        if (!assignData.error) {
+            // Save assignments to order for driver view to use
+            if (assignData.data && Array.isArray(assignData.data)) {
+                order.all_assignments = assignData.data;
+                console.log(`📦 Saved ${assignData.data.length} assignments to order.all_assignments`);
+            }
+
+            if (assignData.combined && assignData.combined.count > 1) {
                 combinedDrivers = assignData.combined.drivers;
                 combinedPlates = assignData.combined.plates;
             }
             // Always get notes if available
-            if (assignData.combined.notes) {
+            if (assignData.combined?.notes) {
                 combinedNotes = assignData.combined.notes;
             }
             console.log(`👥 Order assignments: drivers=${combinedDrivers}, notes=${combinedNotes}`);
