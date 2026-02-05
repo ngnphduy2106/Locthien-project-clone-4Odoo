@@ -1987,6 +1987,35 @@ function switchMyOrdersTab(tab) {
     if (selectedContent) selectedContent.classList.remove('hidden');
 
     // Update tab button states
+    const tabBtns = ['my-tab-pending', 'my-tab-delivering', 'my-tab-completed'];
+    tabBtns.forEach(id => {
+        const btn = window.$(`#${id}`);
+        if (btn) btn.classList.remove('active');
+    });
+
+    const activeBtn = window.$(`#my-tab-${tab}`);
+    if (activeBtn) activeBtn.classList.add('active');
+
+    console.log(`📑 Switched to My Orders tab: ${tab}`);
+}
+
+// Export switchMyOrdersTab
+window.switchMyOrdersTab = switchMyOrdersTab;
+
+// Filter and sort My Orders
+function filterMyOrders() {
+    const searchInput = document.getElementById('my-orders-search');
+    const sortSelect = document.getElementById('my-orders-sort');
+    const dateFilter = document.getElementById('my-orders-date-filter');
+
+    const query = (searchInput?.value || '').toLowerCase().trim();
+    const sortValue = sortSelect?.value || 'date-desc';
+    const filterDate = dateFilter?.value || '';
+
+    console.log('🔍 Filtering My Orders:', { query, sortValue, filterDate });
+
+    // Get all orders from state
+    let orders = [...(state.myOrders || [])];
 
     // Filter by date (native date input returns YYYY-MM-DD)
     if (filterDate) {
