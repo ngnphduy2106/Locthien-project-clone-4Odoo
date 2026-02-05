@@ -73,6 +73,13 @@ const MyOrdersModule = {
 
             this.orders = data.data || [];
             console.log(`📋 My Orders loaded: ${this.orders.length} (exports + imports)`);
+            console.log(`📋 Orders driver info:`, this.orders.map(o => ({
+                id: o.id,
+                soDon: o.soDon,
+                taiXe: o.taiXe,
+                assignment_id: o.assignment_id,
+                driver_name: o.driver_name
+            })));
 
             // Load unread counts before rendering
             await this.loadUnreadCounts();
