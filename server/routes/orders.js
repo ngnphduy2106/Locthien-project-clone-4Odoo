@@ -158,10 +158,10 @@ router.get('/:orderId/assignments', async (req, res) => {
         const allDrivers = (data || []).map(a => a.driver_name).filter(Boolean).join(' và ');
         const allPlates = (data || []).map(a => a.plate).filter(Boolean).join(' và ');
 
-        // Combine delivery notes from all drivers
+        // Combine delivery notes from all drivers (column is 'note' in database)
         const allNotes = (data || [])
-            .filter(a => a.delivery_note && a.delivery_note.trim())
-            .map(a => `${a.driver_name}: ${a.delivery_note}`)
+            .filter(a => a.note && a.note.trim())
+            .map(a => `${a.driver_name}: ${a.note}`)
             .join(' | ');
 
         res.json({
