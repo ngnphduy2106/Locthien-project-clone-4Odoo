@@ -409,6 +409,12 @@ async function handleLogin() {
 function doLogout() {
     localStorage.removeItem('LT_SESSION');
     state.user = null;
+    // Clear cached orders to prevent stale data on next login
+    state.myOrders = [];
+    state.orders = [];
+    state.dispatchOrders = [];
+    // Invalidate cache to force fresh API calls on next login
+    state._cache = {};
     hide('view-app');
     show('view-login');
 }
