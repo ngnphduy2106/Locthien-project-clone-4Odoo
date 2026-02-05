@@ -1904,17 +1904,17 @@ function renderMyOrdersList(containerId, orders, type) {
                             <span style="font-size:10px; color:var(--text-secondary); white-space:nowrap;">${formatDate(order.ngay || order.sale_order_date || order.expected_date || order.createdAt)}</span>
                             <span style="background:${statusColors[type]}20; color:${statusColors[type]}; padding:2px 5px; border-radius:6px; font-size:9px; font-weight:500; white-space:nowrap;">${statusTexts[type]}</span>
                             <div style="display:flex; gap:3px; flex-shrink:0;" onclick="event.stopPropagation()">
-                                <button class="btn btn-outline btn-sm" onclick="${viewFn}" style="padding:2px; font-size:9px; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center;">
-                                    <i class="bi bi-eye"></i>
+                                <button class="btn btn-outline btn-sm" onclick="${viewFn}" style="padding:3px 8px; font-size:10px; border-radius:6px; display:flex; align-items:center; gap:3px;">
+                                    <i class="bi bi-eye"></i> Chi tiết
                                 </button>
                                 ${type === 'pending' ? `
-                                    <button class="btn btn-warning btn-sm" onclick="${startFn}" style="padding:2px; font-size:9px; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg, #f59e0b, #d97706); color:white; border:none;">
-                                        <i class="bi bi-play-circle"></i>
+                                    <button class="btn btn-warning btn-sm" onclick="${startFn}" style="padding:3px 8px; font-size:10px; border-radius:6px; display:flex; align-items:center; gap:3px; background:linear-gradient(135deg, #f59e0b, #d97706); color:white; border:none;">
+                                        <i class="bi bi-play-circle"></i> Nhận đơn
                                     </button>
                                 ` : ''}
                                 ${type === 'delivering' ? `
-                                    <button class="btn btn-success btn-sm" onclick="${completeFn}" style="padding:2px; font-size:9px; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg, #10b981, #059669); border:none;">
-                                        <i class="bi bi-check"></i>
+                                    <button class="btn btn-success btn-sm" onclick="${completeFn}" style="padding:3px 8px; font-size:10px; border-radius:6px; display:flex; align-items:center; gap:3px; background:linear-gradient(135deg, #10b981, #059669); border:none;">
+                                        <i class="bi bi-check-circle"></i> Hoàn thành
                                     </button>
                                 ` : ''}
                             </div>
@@ -5959,13 +5959,7 @@ async function editImport(importId) {
             <div style="display:flex; gap:8px; margin-top:16px; padding:12px; background:var(--body-bg); border-radius:8px;">
                 <input type="text" id="add-imp-product-name" class="form-control" placeholder="Tên sản phẩm..." style="flex:2;" list="imp-products-list">
                 <input type="number" id="add-imp-product-qty" class="form-control" placeholder="SL" value="1" style="width:80px;">
-                <select id="add-imp-product-unit" class="form-control" style="width:100px;">
-                    <option value="Kg">Kg</option>
-                    <option value="Lít">Lít</option>
-                    <option value="Can">Can</option>
-                    <option value="Phuy">Phuy</option>
-                    <option value="Tank">Tank</option>
-                </select>
+                <input type="text" id="add-imp-product-unit" class="form-control" value="Kg" readonly style="width:80px; background:var(--body-bg); color:var(--text-secondary); text-align:center;">
                 <button type="button" class="btn btn-primary btn-sm" onclick="addImportProduct()">
                     <i class="bi bi-plus"></i> Thêm
                 </button>
