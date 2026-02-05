@@ -2524,25 +2524,50 @@ async function viewOrderDetail(orderId, options = {}) {
                 <div style="font-size:13px; color:#7c3aed; font-weight:600; margin-bottom:12px;">
                     <i class="bi bi-people"></i> Phân công tài xế (${allAssignments.length} người)
                 </div>
-                <div style="display:flex; flex-direction:column; gap:8px;">
-                    ${allAssignments.map(a => `
-                        <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 12px; background:white; border-radius:8px;">
-                            <div>
-                                <span style="font-weight:600;">${a.driver_name || 'Tài xế'}</span>
-                                ${a.plate ? `<span style="color:#666; font-size:12px; margin-left:8px;">🚚 ${a.plate}</span>` : ''}
+                <div style="display:flex; flex-direction:column; gap:12px;">
+                    ${allAssignments.map(a => {
+                        // Parse assigned_products for this driver
+                        let driverProducts = [];
+                        if (a.assigned_products) {
+                            driverProducts = typeof a.assigned_products === 'string'
+                                ? JSON.parse(a.assigned_products)
+                                : a.assigned_products;
+                        }
+
+                        return `
+                        <div style="background:white; border-radius:10px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+                            <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 16px; border-bottom:1px solid #e5e7eb;">
+                                <div>
+                                    <span style="font-weight:600; font-size:14px;">${a.driver_name || 'Tài xế'}</span>
+                                    ${a.plate ? `<span style="color:#666; font-size:12px; margin-left:8px;">🚚 ${a.plate}</span>` : ''}
+                                </div>
+                                <div style="display:flex; align-items:center; gap:12px;">
+                                    <span style="color:#8B5CF6; font-weight:700; font-size:15px;">${a.assigned_qty || 0}kg</span>
+                                    <span class="badge" style="font-size:11px; padding:4px 10px; border-radius:12px; ${a.status === 'completed' ? 'background:#dcfce7; color:#16a34a;' :
+                                a.status === 'delivering' ? 'background:#dbeafe; color:#2563eb;' :
+                                    'background:#fef3c7; color:#d97706;'
+                            }">${a.status === 'completed' ? '✓ Hoàn thành' :
+                                a.status === 'delivering' ? 'Đang giao' :
+                                    'Chờ nhận'
+                            }</span>
+                                </div>
                             </div>
-                            <div style="display:flex; align-items:center; gap:12px;">
-                                <span style="color:#8B5CF6; font-weight:600;">${a.assigned_qty || 0}kg</span>
-                                <span class="badge" style="font-size:11px; ${a.status === 'completed' ? 'background:#dcfce7; color:#16a34a;' :
-                            a.status === 'delivering' ? 'background:#dbeafe; color:#2563eb;' :
-                                'background:#fef3c7; color:#d97706;'
-                        }">${a.status === 'completed' ? '✓ Hoàn thành' :
-                            a.status === 'delivering' ? 'Đang giao' :
-                                'Chờ nhận'
-                        }</span>
+                            ${driverProducts.length > 0 ? `
+                            <div style="padding:10px 16px; background:#faf5ff;">
+                                <div style="font-size:11px; color:#7c3aed; font-weight:500; margin-bottom:6px;">Sản phẩm được giao:</div>
+                                <div style="display:flex; flex-direction:column; gap:4px;">
+                                    ${driverProducts.map(p => `
+                                    <div style="display:flex; justify-content:space-between; font-size:12px; color:#4c1d95;">
+                                        <span>${p.name || p.productName || p.product_name || 'Sản phẩm'}</span>
+                                        <span style="font-weight:600;">${p.qty || p.quantity || 0} ${p.unit || 'kg'}</span>
+                                    </div>
+                                    `).join('')}
+                                </div>
                             </div>
+                            ` : ''}
                         </div>
-                    `).join('')}
+                        `;
+                    }).join('')}
                 </div>
             </div>
                     `;
