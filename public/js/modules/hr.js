@@ -599,9 +599,11 @@ const HRModule = {
         const roleMap = {
             'ADMIN': 'Quản trị',
             'DRIVER': 'Tài xế',
+            'ASSISTANT': 'Trợ lý',
             'WAREHOUSE': 'Nhân viên kho',
             'SALES': 'Kinh doanh',
-            'MANAGER': 'Quản lý'
+            'MANAGER': 'Quản lý',
+            'TESTER': 'Kiểm thử'
         };
         return roleMap[role] || role;
     },

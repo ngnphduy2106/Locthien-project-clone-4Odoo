@@ -8,10 +8,21 @@ import db from '../db/index.js';
 
 const router = Router();
 
-// GET /api/hr/employees
+// GET /api/hr/employees - Load from users table (unified with login accounts)
 router.get('/employees', async (req, res) => {
     try {
-        const employees = await db.getEmployees();
+        // Use getUsers instead of getEmployees to show accounts from users table
+        const users = await db.getUsers();
+        // Map to expected HR format
+        const employees = users.map(u => ({
+            id: u.id,
+            fullName: u.fullName || u.fullname || u.username,
+            phone: u.phone || u.username,
+            role: u.role,
+            plate: u.plate || '',
+            status: u.status || 'ACTIVE',
+            baseSalary: u.baseSalary || u.basesalary || 0
+        }));
         res.json(createResponse(false, 'OK', employees));
     } catch (e) {
         res.json(createResponse(true, e.message));
