@@ -487,7 +487,6 @@ const performSync = async () => {
             msg += `📦 Mã: <b>${saleOrderNo}</b>\n`;
             msg += `📅 Ngày: ${item.sale_order_date || 'N/A'}\n`;
             msg += `👤 Khách: ${item.account_name || 'N/A'}\n`;
-            msg += `💰 Tổng: <b>${money} VNĐ</b>\n`;
             msg += `📍 Địa chỉ: ${mappedOrder.shipping_address || 'N/A'}\n`;
 
             if (productsList) {

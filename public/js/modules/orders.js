@@ -130,7 +130,7 @@ const OrdersModule = {
                     ${order.driver || order.driver_name ? `<div><i class="bi bi-truck"></i> ${order.driver || order.driver_name} - ${order.plate || order.vehicle_plate || ''}</div>` : ''}
                 </div>
                 <div class="order-footer">
-                    <div class="order-total">${(order.total || order.total_amount || 0).toLocaleString('vi-VN')} VNĐ</div>
+                    ${!isDispatcherRole() ? `<div class="order-total">${(order.total || order.total_amount || 0).toLocaleString('vi-VN')} VNĐ</div>` : ''}
                     <button class="btn-view" onclick="event.stopPropagation(); OrdersModule.viewOrderDetail('${order.id || order.order_id}')">
                         Xem chi tiết <i class="bi bi-arrow-right"></i>
                     </button>
@@ -199,7 +199,9 @@ const OrdersModule = {
         let details = `Chi tiết đơn hàng ${orderId}\n\n`;
         details += `Khách hàng: ${order.customer || order.customer_name}\n`;
         details += `Địa chỉ: ${order.address || order.delivery_address}\n`;
-        details += `Tổng tiền: ${(order.total || order.total_amount || 0).toLocaleString('vi-VN')} VNĐ\n`;
+        if (!isDispatcherRole()) {
+            details += `Tổng tiền: ${(order.total || order.total_amount || 0).toLocaleString('vi-VN')} VNĐ\n`;
+        }
         details += `Trạng thái: ${order.status}\n`;
         if (order.driver || order.driver_name) {
             details += `Tài xế: ${order.driver || order.driver_name}\n`;
@@ -249,7 +251,7 @@ const OrdersModule = {
                     <div><i class="bi bi-geo-alt"></i> ${order.address || order.delivery_address}</div>
                 </div>
                 <div class="order-footer">
-                    <div class="order-total">${(order.total || order.total_amount || 0).toLocaleString('vi-VN')} VNĐ</div>
+                    ${!isDispatcherRole() ? `<div class="order-total">${(order.total || order.total_amount || 0).toLocaleString('vi-VN')} VNĐ</div>` : ''}
                 </div>
             </div>
         `).join('');

@@ -128,7 +128,11 @@ export const db = {
     getOrders: async (includeDeleted = false) => {
         const { useSupabase, useFirebase } = getMode();
         if (useSupabase) {
-            let query = supabase.from('orders').select('*').order('sale_order_date', { ascending: false });
+            // Sort by sale_order_date first (newest orders first), then by created_date (newest created first)
+            // This ensures local orders created on the same date are sorted correctly
+            let query = supabase.from('orders').select('*')
+                .order('sale_order_date', { ascending: false, nullsFirst: false })
+                .order('created_date', { ascending: false, nullsFirst: false });
 
             // Filter out cancelled orders by default (soft-deleted from MISA)
             if (!includeDeleted) {
@@ -169,7 +173,9 @@ export const db = {
                     creator_name: o.owner_name || '', // Người tạo đơn (để tài xế liên lạc)
                     // Products
                     products: products,
-                    cart: products
+                    cart: products,
+                    // Pin status for sorting
+                    is_pinned: o.is_pinned || false
                 };
             });
         }
@@ -648,6 +654,100 @@ export const db = {
         if (useFirebase) {
             const safeId = sanitizeId(id);
             await firebaseDb.ref(`suppliers/${safeId}`).remove();
+            return true;
+        }
+        return false;
+    },
+
+    // === CUSTOMERS (Khách hàng) ===
+    getCustomers: async () => {
+        const { useSupabase, useFirebase } = getMode();
+        if (useSupabase) {
+            const { data, error } = await supabase
+                .from('customers')
+                .select('*')
+                .order('name', { ascending: true });
+            if (error) {
+                console.error('Supabase getCustomers error:', error.message);
+                return [];
+            }
+            return data || [];
+        }
+        if (useFirebase) {
+            const snapshot = await firebaseDb.ref('customers').once('value');
+            return snapshot.val() ? Object.values(snapshot.val()) : [];
+        }
+        return mockData.customers || [];
+    },
+
+    addCustomer: async (customer) => {
+        const { useSupabase, useFirebase } = getMode();
+        const id = customer.id || `CUS-${Date.now()}`;
+        const safeCustomer = { ...customer, id };
+
+        if (useSupabase) {
+            const { data, error } = await supabase
+                .from('customers')
+                .upsert(safeCustomer, { onConflict: 'id' })
+                .select()
+                .single();
+            if (error) {
+                console.error('Supabase addCustomer error:', error.message);
+                return null;
+            }
+            return data;
+        }
+        if (useFirebase) {
+            const safeId = sanitizeId(id);
+            await firebaseDb.ref(`customers/${safeId}`).set(safeCustomer);
+            return safeCustomer;
+        }
+        mockData.customers = mockData.customers || [];
+        mockData.customers.push(safeCustomer);
+        return safeCustomer;
+    },
+
+    updateCustomer: async (id, updates) => {
+        const { useSupabase, useFirebase } = getMode();
+
+        if (useSupabase) {
+            const { data, error } = await supabase
+                .from('customers')
+                .update(updates)
+                .eq('id', id)
+                .select()
+                .single();
+            if (error) {
+                console.error('Supabase updateCustomer error:', error.message);
+                return null;
+            }
+            return data;
+        }
+        if (useFirebase) {
+            const safeId = sanitizeId(id);
+            await firebaseDb.ref(`customers/${safeId}`).update(updates);
+            return { id, ...updates };
+        }
+        return null;
+    },
+
+    deleteCustomer: async (id) => {
+        const { useSupabase, useFirebase } = getMode();
+
+        if (useSupabase) {
+            const { error } = await supabase
+                .from('customers')
+                .delete()
+                .eq('id', id);
+            if (error) {
+                console.error('Supabase deleteCustomer error:', error.message);
+                return false;
+            }
+            return true;
+        }
+        if (useFirebase) {
+            const safeId = sanitizeId(id);
+            await firebaseDb.ref(`customers/${safeId}`).remove();
             return true;
         }
         return false;

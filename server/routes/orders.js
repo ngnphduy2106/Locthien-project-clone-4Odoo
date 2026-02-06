@@ -70,6 +70,31 @@ router.get('/', async (req, res) => {
     }
 });
 
+// PUT /api/orders/:id/pin - Toggle pin status for order
+router.put('/:id/pin', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { is_pinned } = req.body;
+
+        const { createClient } = await import('@supabase/supabase-js');
+        const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+        const { error } = await supabase
+            .from('orders')
+            .update({ is_pinned: is_pinned === true })
+            .eq('id', id);
+
+        if (error) {
+            return res.json(createResponse(true, 'Lỗi ghim đơn: ' + error.message));
+        }
+
+        console.log(`📌 Order ${id} pinned: ${is_pinned}`);
+        res.json(createResponse(false, is_pinned ? 'Đã ghim đơn hàng!' : 'Đã bỏ ghim đơn hàng!'));
+    } catch (e) {
+        res.json(createResponse(true, e.message));
+    }
+});
+
 // GET /api/orders/export-tickets - Get recent export tickets
 router.get('/export-tickets', async (req, res) => {
     try {
@@ -1301,8 +1326,7 @@ router.post('/:id/complete', async (req, res) => {
                     let msg = `✅ <b>ĐƠN ĐÃ HOÀN THÀNH</b>\n`;
                     msg += `📦 Mã: <b>#${orderNo}</b>\n`;
                     msg += `👤 Khách: ${orderInfo?.khach || 'N/A'}\n`;
-                    msg += `🚛 Tài xế: ${driver_name}\n`;
-                    msg += `💰 Tổng: <b>${money} VNĐ</b>`;
+                    msg += `🚛 Tài xế: ${driver_name}`;
 
                     await sendTelegramMessage(msg, 'XUAT');
                 } catch (tgErr) {
@@ -1437,6 +1461,19 @@ router.post('/:id/assign-multi', async (req, res) => {
         const { createClient } = await import('@supabase/supabase-js');
         const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
+        // Check existing assignments to determine notification type
+        const { data: existingAssignments } = await supabase
+            .from('order_driver_assignments')
+            .select('id, assigned_qty')
+            .eq('order_id', id);
+
+        const hadPreviousAssignments = existingAssignments && existingAssignments.length > 0;
+        const previousTotalQty = hadPreviousAssignments
+            ? existingAssignments.reduce((sum, a) => sum + (a.assigned_qty || 0), 0)
+            : 0;
+
+        console.log(`📊 Previous assignments: ${existingAssignments?.length || 0}, total qty: ${previousTotalQty}kg`);
+
         // Delete existing assignments for this order
         const { error: delErr } = await supabase.from('order_driver_assignments').delete().eq('order_id', id);
         if (delErr) console.error('Delete existing assignments error:', delErr.message);
@@ -1480,7 +1517,15 @@ router.post('/:id/assign-multi', async (req, res) => {
             const { sendTelegramMessage } = await import('../services/telegram.js');
             const orderInfo = await db.getOrder(id);
 
-            let msg = `🚛 <b>PHÂN CÔNG NHIỀU TÀI XẾ</b>\n`;
+            // Determine notification type based on previous assignments
+            // hadPreviousAssignments = true => this is a CHANGE (thay đổi)
+            // hadPreviousAssignments = false => this is NEW assignment (phân công mới)
+            let notificationType = 'PHÂN CÔNG NHIỀU TÀI XẾ';
+            if (hadPreviousAssignments) {
+                notificationType = 'THAY ĐỔI TÀI XẾ';
+            }
+
+            let msg = `🚛 <b>${notificationType}</b>\n`;
             msg += `#${orderInfo?.soDon || id}\n`;
             msg += `👤 KH: ${orderInfo?.khach || ''}\n\n`;
             msg += `<b>Danh sách tài xế:</b>\n`;
@@ -1866,6 +1911,94 @@ router.post('/:id/chat', async (req, res) => {
         if (error) return res.json(createResponse(true, error.message));
         res.json(createResponse(false, 'Đã gửi!'));
     } catch (e) {
+        res.json(createResponse(true, e.message));
+    }
+});
+
+// ===============================================
+// POST /api/orders/local - Create LOCAL export order (không sync MISA)
+// Tạo đơn xuất ngoài chỉ lưu database
+// ===============================================
+router.post('/local', async (req, res) => {
+    try {
+        const { customer_name, customer_address, products, expected_date, warehouse, description, note, created_by } = req.body;
+
+        console.log('📤 Create Local Export - Received body:', JSON.stringify({ customer_name, description, note }, null, 2));
+
+        if (!customer_name || !products || !products.length) {
+            return res.json(createResponse(true, 'Thiếu thông tin khách hàng hoặc sản phẩm'));
+        }
+
+        const { createClient } = await import('@supabase/supabase-js');
+        const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+        const ts = getTimestamp();
+        const orderNo = 'X' + ts.short;  // Prefix X for export
+
+        const totalQty = products.reduce((sum, p) => sum + Number(p.qty || 0), 0);
+        const totalAmount = products.reduce((sum, p) => sum + Number(p.total || p.qty * (p.price || 0) || 0), 0);
+
+        // Insert to orders table (local order)
+        // Using actual column names from orders table schema
+        const { data, error } = await supabase
+            .from('orders')
+            .insert({
+                id: orderNo,
+                sale_order_no: orderNo,
+                // Fix: Handle empty string - use today if expected_date is null, undefined, or empty
+                sale_order_date: (expected_date && expected_date.trim()) || new Date().toISOString().split('T')[0],
+                account_name: customer_name,
+                shipping_address: customer_address || '',
+                list_product: products,  // Correct column name
+                sale_order_amount: totalAmount,
+                deadline_date: expected_date || null,  // Correct column name
+                status: 'Chưa thực hiện',
+                delivery_status: 'Chưa giao hàng',
+                description: description || '',  // Mô tả + ghi chú
+                delivery_note: note || '',  // Ghi chú giao hàng
+                is_local: true,  // Flag đánh dấu đơn local (không sync MISA)
+                created_by: created_by || 'Admin',
+                created_date: new Date().toISOString()
+            })
+            .select()
+            .single();
+
+        if (error) {
+            console.error('❌ Create local export error:', error.message);
+            return res.json(createResponse(true, 'Lỗi tạo đơn: ' + error.message));
+        }
+
+        console.log(`✅ Created local export order: ${orderNo}`);
+
+        // Send Telegram notification
+        try {
+            const { sendTelegramMessage } = await import('../services/telegram.js');
+            const productsList = (products || [])
+                .map(p => `- ${p.name}: ${p.qty} ${p.unit || 'Kg'}`)
+                .join('\n');
+
+            let msg = `📤 <b>ĐƠN XUẤT MỚI (NỘI BỘ)</b>\n`;
+            msg += `📦 Mã: <b>${orderNo}</b>\n`;
+            msg += `👤 Khách: ${customer_name}\n`;
+            msg += `📍 Địa chỉ: ${customer_address || 'N/A'}\n`;
+            if (productsList) {
+                msg += `\n📋 <b>Sản phẩm:</b>\n${productsList}\n`;
+            }
+            msg += `\n🔔 @sales (Vào Điều Phối gán tài xế)`;
+
+            await sendTelegramMessage(msg, 'NOTIFY');
+        } catch (tgErr) {
+            console.error('Telegram Error:', tgErr.message);
+        }
+
+        res.json({
+            error: false,
+            msg: 'Tạo đơn xuất thành công! Mã: ' + orderNo,
+            data
+        });
+
+    } catch (e) {
+        console.error('❌ Create local export error:', e.message);
         res.json(createResponse(true, e.message));
     }
 });

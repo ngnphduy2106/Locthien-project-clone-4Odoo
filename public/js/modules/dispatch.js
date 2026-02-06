@@ -260,6 +260,9 @@ const DispatchModule = {
                         <span style="font-size:10px; color:var(--text-secondary); white-space:nowrap;">${date ? new Date(date).toLocaleDateString('vi-VN') : 'N/A'}</span>
                         <span class="badge badge-${this.getStatusClass(status)}" style="font-size:9px; padding:2px 5px; white-space:nowrap;">${status}</span>
                         <div style="display:flex; gap:3px; flex-shrink:0;" onclick="event.stopPropagation()">
+                            <button class="btn ${order.is_pinned ? 'btn-warning' : 'btn-outline'} btn-sm" onclick="event.stopPropagation(); DispatchModule.togglePin('${orderId}', ${!order.is_pinned})" style="padding:2px; font-size:9px; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center;" title="${order.is_pinned ? 'Bỏ ghim' : 'Ghim đơn'}">
+                                <i class="bi bi-pin${order.is_pinned ? '-fill' : ''}"></i>
+                            </button>
                             <button class="btn btn-outline btn-sm" onclick="DispatchModule.viewOrderDetail('${orderId}')" style="padding:2px; font-size:9px; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center;">
                                 <i class="bi bi-eye"></i>
                             </button>
@@ -303,7 +306,7 @@ const DispatchModule = {
         }
     },
 
-    // Filter orders by tab (with sorting: date DESC, customer name ASC)
+    // Filter orders by tab (with sorting: pinned → today → future → past, then created_date DESC)
     filterOrdersByTab() {
         const statusMap = {
             'pending': ['Chờ xử lý', 'PENDING', 'NEW', 'Chưa thực hiện'],
@@ -314,33 +317,52 @@ const DispatchModule = {
         const validStatuses = statusMap[this.currentTab] || [];
         const filtered = this.orders.filter(o => validStatuses.includes(o.status));
 
-        // Sort by date DESC, then customer name ASC
-        const parseDateValue = (o) => {
-            // Priority 1: ngay field (DD/MM/YYYY)
+        // Get today's date string (YYYY-MM-DD)
+        const today = new Date().toISOString().split('T')[0];
+
+        // Parse order date to YYYY-MM-DD format
+        const getOrderDate = (o) => {
             const ngay = o.ngay || o.date || '';
             if (ngay) {
                 const dmyMatch = String(ngay).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
                 if (dmyMatch) {
-                    return new Date(parseInt(dmyMatch[3]), parseInt(dmyMatch[2]) - 1, parseInt(dmyMatch[1])).getTime();
+                    return `${dmyMatch[3]}-${dmyMatch[2].padStart(2, '0')}-${dmyMatch[1].padStart(2, '0')}`;
                 }
             }
-            // Priority 2: ISO dates
-            const isoDate = o.expected_date || o.created_at || o.sale_order_date || o.order_date || '';
+            const isoDate = o.sale_order_date || o.expected_date || '';
             if (isoDate) {
                 const isoMatch = String(isoDate).match(/^(\d{4})-(\d{2})-(\d{2})/);
-                if (isoMatch) {
-                    return new Date(parseInt(isoMatch[1]), parseInt(isoMatch[2]) - 1, parseInt(isoMatch[3])).getTime();
-                }
+                if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
             }
+            return '';
+        };
+
+        // Get created_date timestamp for secondary sorting
+        const getCreatedTime = (o) => {
+            const created = o.created_date || o.created_at || '';
+            if (created) return new Date(created).getTime();
             return 0;
         };
-        const getCustomerName = (o) => (o.khach || o.customer || o.customer_name || o.account_name || '').toLowerCase();
+
+        // Sort priority: 1=pinned, 2=today, 3=future, 4=past
+        const getSortGroup = (o) => {
+            if (o.is_pinned) return 1;  // Pinned always first
+            const orderDate = getOrderDate(o);
+            if (orderDate === today) return 2;  // Today
+            if (orderDate > today) return 3;    // Future
+            return 4;                           // Past
+        };
 
         return [...filtered].sort((a, b) => {
-            const dateA = parseDateValue(a);
-            const dateB = parseDateValue(b);
-            if (dateB !== dateA) return dateB - dateA; // Newest first
-            return getCustomerName(a).localeCompare(getCustomerName(b)); // Then A-Z
+            // First by group (pinned → today → future → past)
+            const groupA = getSortGroup(a);
+            const groupB = getSortGroup(b);
+            if (groupA !== groupB) return groupA - groupB;
+
+            // Within same group: sort by created_date DESC (newest first)
+            const createdA = getCreatedTime(a);
+            const createdB = getCreatedTime(b);
+            return createdB - createdA;
         });
     },
 
@@ -359,6 +381,25 @@ const DispatchModule = {
 
         const filteredOrders = this.filterOrdersByTab();
         this.renderOrdersList(filteredOrders);
+    },
+
+    // Toggle pin status for an order
+    async togglePin(orderId, isPinned) {
+        try {
+            if (window.api) {
+                const res = await window.api.pinOrder(orderId, isPinned);
+                if (res.error) {
+                    alert('Lỗi: ' + res.msg);
+                    return;
+                }
+                // Invalidate cache and reload orders
+                this._renderCache = { pending: null, delivering: null, completed: null };
+                await this.loadOrders();
+            }
+        } catch (error) {
+            console.error('Error toggling pin:', error);
+            alert('Không thể ghim/bỏ ghim đơn hàng');
+        }
     },
 
     // Get status class

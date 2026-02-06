@@ -411,9 +411,12 @@ const HRModule = {
                         </label>
                         <select id="emp-role" class="hr-form-input">
                             <option value="DRIVER">Tài xế</option>
+                            <option value="ASSISTANT">Trợ lý</option>
                             <option value="WAREHOUSE">Nhân viên kho</option>
                             <option value="SALES">Kinh doanh</option>
+                            <option value="DISPATCHER">Điều phối</option>
                             <option value="ADMIN">Quản trị</option>
+                            <option value="TESTER">Kiểm thử</option>
                         </select>
                     </div>
 

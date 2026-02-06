@@ -189,9 +189,11 @@ function showSection(sectionId) {
         'dashboard': 'Tổng quan',
         'dispatch': 'Quản lý đơn hàng',
         'create-order': 'Quản lý đơn hàng',
+        'create-export': 'Quản lý đơn hàng',
         'my-orders': 'Quản lý đơn hàng',
         'order-history': 'Lịch sử đơn hàng',
         'suppliers': 'Nhà cung cấp',
+        'merge-orders': 'Ghép Đơn PO',
         'hr': 'Nhân sự',
         'materials': 'Vật tư',
         'warehouse': 'Kho hàng',
@@ -216,6 +218,17 @@ function showSection(sectionId) {
                 loadDashboard();
                 state._cache.dashboard = Date.now();
             }
+            // Hide money info for DISPATCHER role
+            if (isDispatcherRole()) {
+                const moneyStatCard = window.$('#money-stat-card');
+                const moneyChartCard = window.$('#money-chart-card');
+                const topCustomersCard = window.$('#top-customers-card');
+                const topDriversCard = window.$('#top-drivers-card');
+                if (moneyStatCard) moneyStatCard.style.display = 'none';
+                if (moneyChartCard) moneyChartCard.style.display = 'none';
+                if (topCustomersCard) topCustomersCard.style.display = 'none';
+                if (topDriversCard) topDriversCard.style.display = 'none';
+            }
             break;
         case 'dispatch':
             if (!isCacheValid('dispatch')) {
@@ -228,6 +241,12 @@ function showSection(sectionId) {
             break;
         case 'create-order':
             initCreateOrder();
+            break;
+        case 'create-export':
+            initCreateExport();
+            break;
+        case 'merge-orders':
+            loadMergeOrdersSection();
             break;
         case 'my-orders':
             if (!isCacheValid('myOrders')) {
@@ -250,6 +269,11 @@ function showSection(sectionId) {
         case 'suppliers':
             if (window.SuppliersModule) {
                 SuppliersModule.loadSuppliers();
+            }
+            break;
+        case 'customers':
+            if (window.CustomersModule) {
+                CustomersModule.loadCustomers();
             }
             break;
     }
@@ -563,6 +587,10 @@ function applyRoleBasedUI(role) {
     const navSuppliers = window.$('#nav-suppliers');
     if (navSuppliers) navSuppliers.style.display = isAdmin ? 'block' : 'none';
 
+    // Show nav-customers for admin
+    const navCustomers = window.$('#nav-customers');
+    if (navCustomers) navCustomers.style.display = isAdmin ? 'block' : 'none';
+
     // Driver restrictions - hide all menus except "Đơn của tôi"
     if (isDriver) {
         console.log('🚚 Driver mode: Hiding admin menus');
@@ -579,6 +607,7 @@ function applyRoleBasedUI(role) {
         if (navCreateOrder) navCreateOrder.style.display = 'none';
         if (navOrderHistory) navOrderHistory.style.display = 'none';
         if (navSuppliers) navSuppliers.style.display = 'none';
+        if (navCustomers) navCustomers.style.display = 'none';
 
         // Hide HR, Materials, Warehouse
         const navHr = window.$('#nav-hr');
@@ -1107,6 +1136,33 @@ function renderImportList() {
         });
     }
 
+    // Sort imports: pinned → today → future → past, then by created_at DESC
+    const today = new Date().toISOString().split('T')[0];
+    const getImportDate = (imp) => {
+        const dateStr = imp.expected_date || imp.created_at || '';
+        const isoMatch = String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+        return '';
+    };
+    const getImportCreatedTime = (imp) => {
+        const created = imp.created_at || '';
+        if (created) return new Date(created).getTime();
+        return 0;
+    };
+    const getImportSortGroup = (imp) => {
+        if (imp.is_pinned) return 1;
+        const impDate = getImportDate(imp);
+        if (impDate === today) return 2;
+        if (impDate > today) return 3;
+        return 4;
+    };
+    imports = [...imports].sort((a, b) => {
+        const groupA = getImportSortGroup(a);
+        const groupB = getImportSortGroup(b);
+        if (groupA !== groupB) return groupA - groupB;
+        return getImportCreatedTime(b) - getImportCreatedTime(a);
+    });
+
     if (imports.length === 0) {
         container.innerHTML = `
             <div style="text-align:center; padding:60px; color:var(--text-muted);">
@@ -1145,6 +1201,9 @@ function renderImportList() {
                         <span style="font-size:10px; color:var(--text-secondary); white-space:nowrap;">${formatDate(imp.expected_date || imp.created_at)}</span>
                         <span class="badge badge-${getStatusBadge(imp.status)}" style="font-size:9px; padding:2px 5px; white-space:nowrap;">${getStatusText(imp.status)}</span>
                         <div style="display:flex; gap:3px; flex-shrink:0;" onclick="event.stopPropagation()">
+                            <button class="btn ${imp.is_pinned ? 'btn-warning' : 'btn-outline'} btn-sm" onclick="toggleImportPin('${imp.id}', ${!imp.is_pinned})" style="padding:2px; font-size:9px; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center;" title="${imp.is_pinned ? 'Bỏ ghim' : 'Ghim đơn'}">
+                                <i class="bi bi-pin${imp.is_pinned ? '-fill' : ''}"></i>
+                            </button>
                             <button class="btn btn-outline btn-sm" onclick="viewImportDetail('${imp.id}')" style="padding:2px; font-size:9px; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center;">
                                 <i class="bi bi-eye"></i>
                             </button>
@@ -1297,27 +1356,49 @@ function renderDispatchOrders() {
         });
     }
 
-    // Sort orders: by order number descending (newest first), then by date descending
-    orders = [...orders].sort((a, b) => {
-        // Extract numeric part from order number (e.g., PO4100136821.25 -> 4100136821)
-        const getOrderNum = (order) => {
-            const orderNo = order.soDon || order.sale_order_no || order.id || '';
-            const match = String(orderNo).match(/(\d+)/);
-            return match ? parseInt(match[1], 10) : 0;
-        };
+    // Sort orders: pinned → today → future → past, then by created_date DESC
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
 
-        const numA = getOrderNum(a);
-        const numB = getOrderNum(b);
-
-        // First sort by order number descending (higher number = newer)
-        if (numB !== numA) {
-            return numB - numA;
+    // Parse order date to YYYY-MM-DD format
+    const getOrderDate = (order) => {
+        const dateStr = order.ngay || order.sale_order_date || '';
+        // Handle DD/MM/YYYY format
+        const dmyMatch = String(dateStr).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+        if (dmyMatch) {
+            return `${dmyMatch[3]}-${dmyMatch[2].padStart(2, '0')}-${dmyMatch[1].padStart(2, '0')}`;
         }
+        // Handle YYYY-MM-DD format
+        const isoMatch = String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+        return '';
+    };
 
-        // Then sort by date descending (newer date first)
-        const dateA = a.ngay || a.sale_order_date || '';
-        const dateB = b.ngay || b.sale_order_date || '';
-        return dateB.localeCompare(dateA);
+    // Get created_date timestamp for secondary sorting
+    const getCreatedTime = (order) => {
+        const created = order.created_date || order.created_at || '';
+        if (created) return new Date(created).getTime();
+        return 0;
+    };
+
+    // Sort priority: 1=pinned, 2=today, 3=future, 4=past
+    const getSortGroup = (order) => {
+        if (order.is_pinned) return 1;  // Pinned always first
+        const orderDate = getOrderDate(order);
+        if (orderDate === today) return 2;  // Today
+        if (orderDate > today) return 3;    // Future
+        return 4;                           // Past
+    };
+
+    orders = [...orders].sort((a, b) => {
+        // First by group (pinned → today → future → past)
+        const groupA = getSortGroup(a);
+        const groupB = getSortGroup(b);
+        if (groupA !== groupB) return groupA - groupB;
+
+        // Within same group: sort by created_date DESC (newest first)
+        const createdA = getCreatedTime(a);
+        const createdB = getCreatedTime(b);
+        return createdB - createdA;
     });
 
     if (orders.length === 0) {
@@ -1365,6 +1446,9 @@ function renderDispatchOrders() {
                         <span style="font-size:10px; color:var(--text-secondary); white-space:nowrap;">${formatDate(date)}</span>
                         <span class="badge badge-${getStatusBadge(status)}" style="font-size:9px; padding:2px 5px; white-space:nowrap;">${getStatusText(status)}</span>
                         <div style="display:flex; gap:3px; flex-shrink:0;" onclick="event.stopPropagation()">
+                            <button class="btn ${order.is_pinned ? 'btn-warning' : 'btn-outline'} btn-sm" onclick="toggleOrderPin('${orderId}', ${!order.is_pinned})" style="padding:2px; font-size:9px; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center;" title="${order.is_pinned ? 'Bỏ ghim' : 'Ghim đơn'}">
+                                <i class="bi bi-pin${order.is_pinned ? '-fill' : ''}"></i>
+                            </button>
                             <button class="btn btn-outline btn-sm" onclick="viewOrderDetail('${orderId}')" style="padding:2px; font-size:9px; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center;">
                                 <i class="bi bi-eye"></i>
                             </button>
@@ -1391,6 +1475,42 @@ function renderDispatchOrders() {
     }).join('')}
         </div>
     `;
+}
+
+// Toggle pin status for an order
+async function toggleOrderPin(orderId, isPinned) {
+    try {
+        if (window.api) {
+            const res = await window.api.pinOrder(orderId, isPinned);
+            if (res.error) {
+                alert('Lỗi: ' + res.msg);
+                return;
+            }
+            // Reload dispatch orders to reflect change
+            loadOrders();
+        }
+    } catch (error) {
+        console.error('Error toggling pin:', error);
+        alert('Không thể ghim/bỏ ghim đơn hàng');
+    }
+}
+
+// Toggle pin status for an import ticket
+async function toggleImportPin(importId, isPinned) {
+    try {
+        if (window.api) {
+            const res = await window.api.pinImport(importId, isPinned);
+            if (res.error) {
+                alert('Lỗi: ' + res.msg);
+                return;
+            }
+            // Reload import tickets to reflect change
+            loadImportTickets();
+        }
+    } catch (error) {
+        console.error('Error toggling import pin:', error);
+        alert('Không thể ghim/bỏ ghim phiếu nhập');
+    }
 }
 
 
@@ -1714,7 +1834,7 @@ async function submitOrder() {
     const date = window.$('#order-date').value;
     const customer = window.$('#order-customer').value.trim();
     const address = window.$('#order-address').value.trim();
-    const note = window.$('#order-note')?.value?.trim() || '';  // New note field
+    const description = window.$('#order-description')?.value?.trim() || '';  // Description/Note field
 
     if (!customer || state.orderProducts.length === 0) {
         alert('Vui lòng nhập đầy đủ thông tin và thêm ít nhất 1 sản phẩm');
@@ -1729,7 +1849,7 @@ async function submitOrder() {
             supplier: customer,
             address,
             products: state.orderProducts,
-            note  // Include note in API call
+            description  // Include description in API call
         });
 
         hideLoading();
@@ -1746,6 +1866,318 @@ async function submitOrder() {
         alert('Lỗi kết nối');
     }
 }
+
+// ===============================================
+// CREATE EXPORT ORDER (Đơn xuất ngoài - Local)
+// ===============================================
+
+// State for export products
+state.exportProducts = state.exportProducts || [];
+
+function initCreateExport() {
+    state.exportProducts = [];
+    state.exportMaterials = state.exportMaterials || [];  // Store MISA materials for export
+    state.exportCustomers = state.exportCustomers || [];  // Store customers for export
+    const dateEl = window.$('#export-date');
+    if (dateEl) dateEl.value = new Date().toISOString().split('T')[0];
+    window.$('#export-customer') && (window.$('#export-customer').value = '');
+    window.$('#export-address') && (window.$('#export-address').value = '');
+    window.$('#export-description') && (window.$('#export-description').value = '');
+    window.$('#export-prod-code') && (window.$('#export-prod-code').value = '');
+    window.$('#export-prod-name') && (window.$('#export-prod-name').value = '');
+    window.$('#export-prod-qty') && (window.$('#export-prod-qty').value = 1);
+    window.$('#export-prod-price') && (window.$('#export-prod-price').value = 0);
+    renderExportProducts();
+    updateExportSummary();
+    calculateExportPrice();
+    loadExportMaterials();  // Load MISA materials
+    loadCustomerSuggestions(); // Load customers for autocomplete
+}
+window.initCreateExport = initCreateExport;
+
+// Load materials from MISA for export form
+async function loadExportMaterials() {
+    try {
+        const response = await fetch('/api/materials');
+        const data = await response.json();
+        if (!data.error && data.data) {
+            state.exportMaterials = data.data;
+            updateExportMaterialsDatalist();
+            console.log(`🧪 Export: Loaded ${state.exportMaterials.length} materials from MISA`);
+        }
+    } catch (e) {
+        console.error('Failed to load materials for export:', e);
+    }
+}
+window.loadExportMaterials = loadExportMaterials;
+
+// Load customers for autocomplete in export form
+async function loadCustomerSuggestions() {
+    try {
+        const response = await fetch('/api/customers');
+        const data = await response.json();
+        if (!data.error && data.data) {
+            state.exportCustomers = data.data;
+            updateExportCustomerDatalist();
+            console.log(`👥 Export: Loaded ${state.exportCustomers.length} customers`);
+        }
+    } catch (e) {
+        console.error('Failed to load customers:', e);
+    }
+}
+window.loadCustomerSuggestions = loadCustomerSuggestions;
+
+// Update customer datalist for export form
+function updateExportCustomerDatalist() {
+    const datalist = window.$('#export-customer-list');
+    if (!datalist) return;
+
+    const customers = state.exportCustomers || [];
+    datalist.innerHTML = customers
+        .sort((a, b) => a.name.localeCompare(b.name, 'vi'))
+        .map(c => `<option value="${c.name}">${c.name}</option>`)
+        .join('');
+}
+window.updateExportCustomerDatalist = updateExportCustomerDatalist;
+
+// Sync products from MISA for export
+async function syncExportMisaProducts() {
+    const btn = window.$('#btn-export-sync-misa');
+    try {
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Đang đồng bộ...';
+        }
+
+        const response = await fetch('/api/materials/sync-misa', { method: 'POST' });
+        const data = await response.json();
+
+        if (data.error) {
+            alert('❌ Lỗi: ' + data.msg);
+        } else {
+            alert(`✅ ${data.msg}`);
+            await loadExportMaterials();  // Reload materials list
+        }
+    } catch (e) {
+        alert('❌ Lỗi đồng bộ: ' + e.message);
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-arrow-repeat"></i> Sync MISA';
+        }
+    }
+}
+window.syncExportMisaProducts = syncExportMisaProducts;
+
+// Update materials datalist for export form
+function updateExportMaterialsDatalist() {
+    const codeList = window.$('#export-material-code-list');
+    const nameList = window.$('#export-material-name-list');
+
+    if (codeList && state.exportMaterials) {
+        codeList.innerHTML = state.exportMaterials.map(m =>
+            `<option value="${m.code}">${m.name}</option>`
+        ).join('');
+    }
+    if (nameList && state.exportMaterials) {
+        nameList.innerHTML = state.exportMaterials.map(m =>
+            `<option value="${m.name}">${m.code}</option>`
+        ).join('');
+    }
+}
+
+// Autofill: when code selected, fill name
+function onExportProductCodeChange(codeInput) {
+    const code = codeInput.value.trim();
+    const material = (state.exportMaterials || []).find(m => m.code === code);
+    if (material) {
+        const nameInput = window.$('#export-prod-name');
+        if (nameInput) nameInput.value = material.name;
+    }
+}
+window.onExportProductCodeChange = onExportProductCodeChange;
+
+// Autofill: when name selected, fill code
+function onExportProductNameChange(nameInput) {
+    const name = nameInput.value.trim();
+    const material = (state.exportMaterials || []).find(m => m.name === name);
+    if (material) {
+        const codeInput = window.$('#export-prod-code');
+        if (codeInput) codeInput.value = material.code;
+    }
+}
+window.onExportProductNameChange = onExportProductNameChange;
+
+
+function calculateExportPrice() {
+    const qty = Number(window.$('#export-prod-qty')?.value) || 0;
+    const price = Number(window.$('#export-prod-price')?.value) || 0;
+    const vatPercent = Number(window.$('#export-prod-vat')?.value) || 0;
+
+    const subtotal = qty * price;
+    const vatAmount = subtotal * (vatPercent / 100);
+    const total = subtotal + vatAmount;
+
+    window.$('#export-calc-subtotal') && (window.$('#export-calc-subtotal').textContent = formatCurrency(subtotal));
+    window.$('#export-calc-vat-amount') && (window.$('#export-calc-vat-amount').textContent = formatCurrency(vatAmount));
+    window.$('#export-calc-total') && (window.$('#export-calc-total').textContent = formatCurrency(total));
+}
+window.calculateExportPrice = calculateExportPrice;
+
+function addExportProduct() {
+    const code = window.$('#export-prod-code')?.value?.trim() || '';
+    const name = window.$('#export-prod-name')?.value?.trim();
+    const qty = Number(window.$('#export-prod-qty')?.value) || 0;
+    const unit = window.$('#export-prod-unit')?.value || 'Kg';
+    const price = Number(window.$('#export-prod-price')?.value) || 0;
+    const vatPercent = Number(window.$('#export-prod-vat')?.value) || 0;
+
+    if (!name) {
+        alert('Vui lòng nhập tên sản phẩm');
+        return;
+    }
+    if (qty <= 0) {
+        alert('Số lượng phải > 0');
+        return;
+    }
+
+    const subtotal = qty * price;
+    const vatAmount = subtotal * (vatPercent / 100);
+    const total = subtotal + vatAmount;
+
+    state.exportProducts.push({
+        code,  // Mã sản phẩm MISA
+        name,
+        qty,
+        unit,
+        price,
+        vatPercent,
+        subtotal,
+        vatAmount,
+        total
+    });
+
+    // Clear form
+    window.$('#export-prod-code').value = '';
+    window.$('#export-prod-name').value = '';
+    window.$('#export-prod-qty').value = 1;
+    window.$('#export-prod-price').value = 0;
+    calculateExportPrice();
+
+    renderExportProducts();
+    updateExportSummary();
+}
+window.addExportProduct = addExportProduct;
+
+function removeExportProduct(index) {
+    state.exportProducts.splice(index, 1);
+    renderExportProducts();
+    updateExportSummary();
+}
+window.removeExportProduct = removeExportProduct;
+
+function renderExportProducts() {
+    const container = window.$('#export-products-list');
+    const badge = window.$('#export-product-count-badge');
+
+    if (!container) return;
+
+    if (state.exportProducts.length === 0) {
+        container.innerHTML = `
+            <div style="text-align:center; padding:40px 20px; color:var(--text-muted);">
+                <i class="bi bi-inbox" style="font-size:48px; opacity:0.5;"></i>
+                <h4 style="margin-top:16px; font-weight:500;">Chưa có sản phẩm nào</h4>
+                <p style="font-size:14px;">Thêm sản phẩm từ form bên trái</p>
+            </div>
+        `;
+        if (badge) badge.textContent = '0 sản phẩm';
+        return;
+    }
+
+    if (badge) badge.textContent = `${state.exportProducts.length} sản phẩm`;
+
+    container.innerHTML = state.exportProducts.map((p, i) => `
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:12px; border-bottom:1px solid var(--border);">
+            <div style="flex:1;">
+                <div style="font-weight:600; color:var(--text-primary);">
+                    ${p.name}
+                    ${p.code ? `<span style="background:#e0e7ff; color:#4338ca; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:500; margin-left:6px;">${p.code}</span>` : ''}
+                    <span class="status-badge" style="background:var(--info-light); color:var(--info); font-size:11px;">${p.qty} ${p.unit || 'Kg'}</span>
+                </div>
+                <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">
+                    ${p.price ? formatCurrency(p.price) + '/' + (p.unit || 'Kg') : 'Chưa có giá'}
+                    ${p.vatPercent ? ' • VAT ' + p.vatPercent + '%' : ''}
+                </div>
+            </div>
+            <div style="text-align:right; margin-right:12px;">
+                <div style="font-weight:600; color:var(--primary);">${formatCurrency(p.total || 0)}</div>
+                <div style="font-size:11px; color:var(--text-muted);">Tổng</div>
+            </div>
+            <button class="btn btn-sm" style="color:var(--danger);" onclick="removeExportProduct(${i})">
+                <i class="bi bi-trash"></i>
+            </button>
+        </div>
+    `).join('');
+}
+
+function updateExportSummary() {
+    const summary = window.$('#export-order-summary');
+    if (!summary) return;
+
+    if (state.exportProducts.length === 0) {
+        summary.style.display = 'none';
+        return;
+    }
+
+    summary.style.display = 'block';
+
+    const subtotal = state.exportProducts.reduce((sum, p) => sum + (p.subtotal || 0), 0);
+    const vat = state.exportProducts.reduce((sum, p) => sum + (p.vatAmount || 0), 0);
+    const total = state.exportProducts.reduce((sum, p) => sum + (p.total || 0), 0);
+
+    window.$('#export-summary-subtotal') && (window.$('#export-summary-subtotal').textContent = formatCurrency(subtotal));
+    window.$('#export-summary-vat') && (window.$('#export-summary-vat').textContent = formatCurrency(vat));
+    window.$('#export-summary-total') && (window.$('#export-summary-total').textContent = formatCurrency(total));
+}
+
+async function submitExportOrder() {
+    const date = window.$('#export-date')?.value;
+    const customer = window.$('#export-customer')?.value?.trim();
+    const address = window.$('#export-address')?.value?.trim();
+    const description = window.$('#export-description')?.value?.trim() || '';
+
+    if (!customer || state.exportProducts.length === 0) {
+        alert('Vui lòng nhập đầy đủ thông tin và thêm ít nhất 1 sản phẩm');
+        return;
+    }
+
+    showLoading('Đang tạo đơn xuất...');
+
+    try {
+        const res = await api.createLocalExport({
+            date,
+            customer,
+            address,
+            products: state.exportProducts,
+            description
+        });
+
+        hideLoading();
+
+        if (res.success || res.data || !res.error) {
+            alert('Tạo đơn xuất thành công! ' + (res.msg || ''));
+            state.exportProducts = [];
+            initCreateExport();
+            showSection('dispatch');
+        } else {
+            alert('Lỗi: ' + (res.message || res.msg || 'Không thể tạo đơn'));
+        }
+    } catch (e) {
+        hideLoading();
+        alert('Lỗi kết nối');
+    }
+}
+window.submitExportOrder = submitExportOrder;
 
 // === MY ORDERS (DRIVER PORTAL) ===
 async function loadMyOrders() {
@@ -2411,17 +2843,20 @@ async function viewOrderDetail(orderId, options = {}) {
     // Check if current user is a driver (hide price info)
     const isDriver = (state.user?.role || '').toLowerCase() === 'driver';
 
-    // Products HTML - only used for admin view now (drivers see simplified view)
+    // Check if user should see prices (not driver and not dispatcher)
+    const hidePrice = isDriver || isDispatcherRole();
+
+    // Products HTML - only include price column if not dispatcher
     const productsHtml = products.length > 0
         ? products.map(p => `
             <tr>
                 <td>${p.name || p.productName || p.product_name || '-'}</td>
                 <td>${p.qty || p.quantity || p.amount || 0}</td>
                 <td>${p.unit || 'kg'}</td>
-                <td>${formatCurrency(p.total || p.to_currency || p.price || 0)}</td>
+                ${!hidePrice ? `<td>${formatCurrency(p.total || p.to_currency || p.price || 0)}</td>` : ''}
             </tr>
         `).join('')
-        : `<tr><td colspan="4" style="text-align:center; color:var(--text-muted);">Không có sản phẩm</td></tr>`;
+        : `<tr><td colspan="${hidePrice ? 3 : 4}" style="text-align:center; color:var(--text-muted);">Không có sản phẩm</td></tr>`;
 
     // Show modal - use correct IDs matching index.html
     const modal = window.$('#modal-order-detail');
@@ -2685,7 +3120,7 @@ async function viewOrderDetail(orderId, options = {}) {
                         <th>Sản phẩm</th>
                         <th>SL</th>
                         <th>Đơn vị</th>
-                        <th>Giá</th>
+                        ${!hidePrice ? '<th>Giá</th>' : ''}
                     </tr>
                 </thead>
                 <tbody>
@@ -5202,6 +5637,10 @@ async function viewImportDetail(importId) {
 
     console.log(`📦 Import ${imp.ticket_no || imp.id} has ${products.length} products:`, products);
 
+    // Check if user should see prices (not driver and not dispatcher)
+    const isDriver = (state.user?.role || '').toLowerCase() === 'driver';
+    const hidePrice = isDriver || isDispatcherRole();
+
     const productsHtml = products.length > 0
         ? products.map(p => {
             // Get the best available price values
@@ -5217,12 +5656,12 @@ async function viewImportDetail(importId) {
                     <td>${p.name || p.product || p.productName || '-'}</td>
                     <td style="text-align:center;">${qty}</td>
                     <td style="text-align:center;">${p.unit || 'Kg'}</td>
-                    <td style="text-align:right;">${formatCurrency(unitPrice)}</td>
-                    <td style="text-align:right; font-weight:600; color:var(--success);">${formatCurrency(total)}</td>
+                    ${!hidePrice ? `<td style="text-align:right;">${formatCurrency(unitPrice)}</td>` : ''}
+                    ${!hidePrice ? `<td style="text-align:right; font-weight:600; color:var(--success);">${formatCurrency(total)}</td>` : ''}
                 </tr>
             `;
         }).join('')
-        : '<tr><td colspan="5" style="text-align:center; color:var(--text-muted);">Không có sản phẩm</td></tr>';
+        : `<tr><td colspan="${hidePrice ? 3 : 5}" style="text-align:center; color:var(--text-muted);">Không có sản phẩm</td></tr>`;
 
     // Calculate total from products if not available
     const calculatedTotal = products.reduce((sum, p) => {
@@ -5264,6 +5703,10 @@ async function viewImportDetail(importId) {
                     <label>Địa chỉ:</label>
                     <span>${imp.supplier_address || 'Chưa có địa chỉ'}</span>
                 </div>
+                ${imp.description ? `<div class="detail-row">
+                    <label>Mô tả:</label>
+                    <span style="color:var(--info); font-style:italic;">${imp.description}</span>
+                </div>` : ''}
                 <div class="detail-row">
                     <label>Trạng thái:</label>
                     <span class="badge badge-${getStatusBadge(imp.status)}">${getStatusText(imp.status)}</span>
@@ -5276,10 +5719,10 @@ async function viewImportDetail(importId) {
                     <label>Biển số xe:</label>
                     <span>${imp.assigned_plate || imp.plate || imp.bienSo || 'Chưa có'}</span>
                 </div>
-                <div class="detail-row">
+                ${!hidePrice ? `<div class="detail-row">
                     <label>Tổng tiền:</label>
                     <span style="color:var(--success); font-weight:700; font-size:18px;">${formatCurrency(displayTotal)}</span>
-                </div>
+                </div>` : ''}
             </div>
             
             ${(() => {
@@ -5324,8 +5767,8 @@ async function viewImportDetail(importId) {
                         <th>Sản phẩm</th>
                         <th style="text-align:center;">SL</th>
                         <th style="text-align:center;">Đơn vị</th>
-                        <th style="text-align:right;">Đơn giá</th>
-                        <th style="text-align:right;">Thành tiền</th>
+                        ${!hidePrice ? '<th style="text-align:right;">Đơn giá</th>' : ''}
+                        ${!hidePrice ? '<th style="text-align:right;">Thành tiền</th>' : ''}
                     </tr>
                 </thead>
                 <tbody>
@@ -6142,6 +6585,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // Export for global access
 window.handleLogin = handleLogin;
 window.doLogout = doLogout;
+window.isDispatcherRole = isDispatcherRole;
 window.showSection = showSection;
 window.toggleSubmenu = toggleSubmenu;
 window.switchDispatchTab = switchDispatchTab;
@@ -6341,8 +6785,13 @@ function updateUserStats() {
 function getRoleBadge(role) {
     const roleMap = {
         'ADMIN': { text: 'Admin', color: 'danger' },
+        'DISPATCHER': { text: 'Điều phối', color: 'warning' },
         'DRIVER': { text: 'Tài xế', color: 'primary' },
-        'STAFF': { text: 'Nhân viên', color: 'info' }
+        'ASSISTANT': { text: 'Trợ lý', color: 'secondary' },
+        'WAREHOUSE': { text: 'Kho', color: 'success' },
+        'SALES': { text: 'Kinh doanh', color: 'info' },
+        'STAFF': { text: 'Nhân viên', color: 'info' },
+        'TESTER': { text: 'Kiểm thử', color: 'dark' }
     };
     const r = roleMap[role] || { text: role || '-', color: 'secondary' };
     return `<span class="badge badge-${r.color}">${r.text}</span>`;
@@ -6367,10 +6816,9 @@ function showCreateUserModal() {
 }
 
 function closeCreateUserModal(event) {
-    if (event && event.target && !event.target.closest('.modal-content')) {
-        // Clicked on overlay
-    } else if (event) {
-        return;
+    // Allow close from both button click and overlay click
+    if (event && event.target && event.target.closest('.modal-content') && !event.target.closest('.modal-close') && !event.target.closest('.btn')) {
+        return; // Clicked inside modal but not on close button or action button
     }
     const modal = window.$('#modal-create-user');
     if (modal) modal.classList.add('hidden');
@@ -6452,8 +6900,9 @@ async function editUser(userId) {
 
 // Close edit user modal
 function closeEditUserModal(event) {
-    if (event && event.target && !event.target.classList.contains('modal-overlay')) {
-        return;
+    // Allow close from both button click and overlay click
+    if (event && event.target && event.target.closest('.modal-content') && !event.target.closest('.modal-close') && !event.target.closest('.btn')) {
+        return; // Clicked inside modal but not on close button or action button
     }
     const modal = window.$('#modal-edit-user');
     if (modal) modal.classList.add('hidden');
@@ -8138,3 +8587,331 @@ window.loadImportProofImages = loadImportProofImages;
 window.viewImportProofImage = viewImportProofImage;
 window.handleAddImportProofImages = handleAddImportProofImages;
 window.deleteImportProofImage = deleteImportProofImage;
+
+// ===============================================
+// MERGE ORDERS FEATURE
+// ===============================================
+
+let selectedOrdersForMerge = new Set();
+
+// Load merge orders section when navigating to it
+async function loadMergeOrdersSection() {
+    selectedOrdersForMerge.clear();
+    updateMergeCount();
+    await Promise.all([
+        loadPendingOrdersForMerge(),
+        loadMergedOrdersList()
+    ]);
+}
+
+// Load pending orders for merge selection
+async function loadPendingOrdersForMerge() {
+    const container = window.$('#merge-orders-list');
+    if (!container) return;
+
+    container.innerHTML = `
+        <div style="text-align:center; padding:40px; color:var(--text-muted);">
+            <i class="bi bi-arrow-repeat spin" style="font-size:24px;"></i>
+            <p>Đang tải...</p>
+        </div>
+    `;
+
+    try {
+        const res = await fetch('/api/orders');
+        const data = await res.json();
+
+        if (data.error) {
+            container.innerHTML = `<p style="color:var(--danger); padding:20px;">Lỗi: ${data.msg}</p>`;
+            return;
+        }
+
+        // Filter pending orders only (not merged, not completed)
+        const pendingOrders = (data.pending || []).filter(o =>
+            o.status !== 'Đã ghép' && o.status !== 'Đã thực hiện' && o.status !== 'Hoàn thành'
+        );
+
+        if (pendingOrders.length === 0) {
+            container.innerHTML = `
+                <div style="text-align:center; padding:40px; color:var(--text-muted);">
+                    <i class="bi bi-inbox" style="font-size:32px; opacity:0.5;"></i>
+                    <p style="margin-top:12px;">Không có đơn chờ xử lý để ghép</p>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = pendingOrders.map(order => {
+            const checked = selectedOrdersForMerge.has(order.id);
+            const addr = order.diaChi || order.shipping_address || '';
+            const amount = Number(order.amount || order.sale_order_amount || 0);
+            return `
+                <div class="order-card" style="display:flex; gap:12px; align-items:flex-start; padding:12px; border-bottom:1px solid var(--border-color);">
+                    <input type="checkbox" 
+                        id="merge-cb-${order.id}" 
+                        ${checked ? 'checked' : ''} 
+                        onchange="toggleOrderForMerge('${order.id}')"
+                        style="width:20px; height:20px; cursor:pointer; margin-top:4px;">
+                    <div style="flex:1;">
+                        <div style="font-weight:600; color:var(--primary);">
+                            ${order.soDon || order.sale_order_no || 'N/A'}
+                        </div>
+                        <div style="font-size:13px; margin-top:4px;">
+                            <strong>${order.khach || order.account_name || ''}</strong>
+                        </div>
+                        <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">
+                            <i class="bi bi-geo-alt"></i> ${addr.substring(0, 60)}${addr.length > 60 ? '...' : ''}
+                        </div>
+                        <div style="font-size:12px; color:var(--success); margin-top:4px;">
+                            💰 ${amount.toLocaleString('vi-VN')}đ
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+    } catch (err) {
+        console.error('Load pending orders error:', err);
+        container.innerHTML = `<p style="color:var(--danger); padding:20px;">Lỗi tải đơn hàng</p>`;
+    }
+}
+
+// Toggle order selection for merge
+function toggleOrderForMerge(orderId) {
+    if (selectedOrdersForMerge.has(orderId)) {
+        selectedOrdersForMerge.delete(orderId);
+    } else {
+        selectedOrdersForMerge.add(orderId);
+    }
+    updateMergeCount();
+}
+
+// Update merge button count
+function updateMergeCount() {
+    const countEl = window.$('#merge-count');
+    const btnEl = window.$('#btn-merge-selected');
+    const count = selectedOrdersForMerge.size;
+
+    if (countEl) countEl.textContent = count;
+    if (btnEl) btnEl.disabled = count < 2;
+}
+
+// Select all pending orders
+function selectAllPendingOrders() {
+    const checkboxes = document.querySelectorAll('#merge-orders-list input[type="checkbox"]');
+    checkboxes.forEach(cb => {
+        const orderId = cb.id.replace('merge-cb-', '');
+        selectedOrdersForMerge.add(orderId);
+        cb.checked = true;
+    });
+    updateMergeCount();
+}
+
+// Deselect all orders
+function deselectAllPendingOrders() {
+    selectedOrdersForMerge.clear();
+    const checkboxes = document.querySelectorAll('#merge-orders-list input[type="checkbox"]');
+    checkboxes.forEach(cb => cb.checked = false);
+    updateMergeCount();
+}
+
+// Create merged order
+async function createMergedOrder() {
+    const orderIds = Array.from(selectedOrdersForMerge);
+    if (orderIds.length < 2) {
+        alert('Vui lòng chọn ít nhất 2 đơn để ghép!');
+        return;
+    }
+
+    if (!confirm(`Ghép ${orderIds.length} đơn thành 1 đơn giao?`)) {
+        return;
+    }
+
+    try {
+        const res = await fetch('/api/merged-orders', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                order_ids: orderIds,
+                created_by: window.currentUser?.fullName || 'Admin'
+            })
+        });
+        const data = await res.json();
+
+        if (data.error) {
+            alert('Lỗi: ' + data.msg);
+            return;
+        }
+
+        alert(data.msg || 'Ghép đơn thành công!');
+        selectedOrdersForMerge.clear();
+        loadMergeOrdersSection();
+
+    } catch (err) {
+        console.error('Create merged order error:', err);
+        alert('Không thể ghép đơn. Vui lòng thử lại.');
+    }
+}
+
+// Load merged orders list
+async function loadMergedOrdersList() {
+    const container = window.$('#merged-orders-list');
+    if (!container) return;
+
+    try {
+        const res = await fetch('/api/merged-orders');
+        const data = await res.json();
+
+        if (data.error || !data.data || data.data.length === 0) {
+            container.innerHTML = `
+                <div style="text-align:center; padding:30px; color:var(--text-muted);">
+                    <i class="bi bi-collection" style="font-size:24px; opacity:0.5;"></i>
+                    <p style="margin-top:8px;">Chưa có đơn ghép nào</p>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = data.data.map(merged => {
+            const statusColor = merged.status === 'completed' ? 'success' :
+                merged.status === 'assigned' ? 'warning' : 'secondary';
+            const statusText = merged.status === 'completed' ? 'Hoàn thành' :
+                merged.status === 'assigned' ? 'Đang giao' : 'Chờ điều phối';
+
+            return `
+                <div class="order-card" style="padding:12px; border-bottom:1px solid var(--border-color);">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                            <span style="font-weight:600; color:var(--primary); font-size:14px;">
+                                ${merged.merged_no}
+                            </span>
+                            <span class="badge badge-${statusColor}" style="margin-left:8px;">${statusText}</span>
+                            <span class="badge" style="background:linear-gradient(135deg, #7c3aed, #a855f7); color:white; margin-left:4px;">
+                                ${merged.total_stops} điểm
+                            </span>
+                        </div>
+                        <div style="display:flex; gap:8px;">
+                            <button class="btn btn-sm btn-outline" onclick="viewMergedOrderDetail('${merged.id}')">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                            ${merged.status === 'pending' ? `
+                                <button class="btn btn-sm btn-danger" onclick="cancelMergedOrder('${merged.id}')">
+                                    <i class="bi bi-x-lg"></i>
+                                </button>
+                            ` : ''}
+                        </div>
+                    </div>
+                    <div style="margin-top:8px; font-size:12px; color:var(--text-muted);">
+                        💰 ${Number(merged.total_amount || 0).toLocaleString('vi-VN')}đ
+                        ${merged.driver_name ? ` • 🚛 ${merged.driver_name}` : ''}
+                    </div>
+                    <div style="margin-top:6px; font-size:11px; color:var(--text-muted);">
+                        Các đơn: ${(merged.source_orders || []).map(s => s.sale_order_no).join(', ')}
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+    } catch (err) {
+        console.error('Load merged orders error:', err);
+    }
+}
+
+// View merged order detail
+async function viewMergedOrderDetail(mergedId) {
+    try {
+        const res = await fetch(`/api/merged-orders/${mergedId}`);
+        const data = await res.json();
+
+        if (data.error) {
+            alert('Lỗi: ' + data.msg);
+            return;
+        }
+
+        const merged = data.data;
+        const stops = merged.stops || [];
+
+        let stopsHtml = stops.map((stop, idx) => `
+            <div style="padding:12px; border:1px solid var(--border-color); border-radius:8px; margin-bottom:8px; ${stop.checked_in ? 'background:#d1fae5;' : ''}">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                        <strong>${idx + 1}. ${stop.sale_order_no || stop.soDon}</strong>
+                        ${stop.checked_in ? '<i class="bi bi-check-circle-fill" style="color:var(--success); margin-left:8px;"></i>' : ''}
+                    </div>
+                </div>
+                <div style="font-size:13px; margin-top:4px;">
+                    <i class="bi bi-person"></i> ${stop.account_name || stop.khach || ''}
+                </div>
+                <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">
+                    <i class="bi bi-geo-alt"></i> ${stop.shipping_address || stop.diaChi || ''}
+                </div>
+                ${stop.checked_in ? `
+                    <div style="font-size:11px; color:var(--success); margin-top:4px;">
+                        ✓ Check-in: ${new Date(stop.checked_in_at).toLocaleString('vi-VN')}
+                    </div>
+                ` : ''}
+            </div>
+        `).join('');
+
+        // Show modal with stops
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay';
+        modal.innerHTML = `
+            <div class="modal" style="max-width:600px;">
+                <div class="modal-header">
+                    <h3>${merged.merged_no} - Chi tiết đơn ghép</h3>
+                    <button class="btn-close" onclick="this.closest('.modal-overlay').remove()">×</button>
+                </div>
+                <div class="modal-body" style="max-height:70vh; overflow-y:auto;">
+                    <div style="display:flex; gap:12px; margin-bottom:16px; flex-wrap:wrap;">
+                        <span class="badge badge-primary">${merged.total_stops} điểm giao</span>
+                        <span class="badge badge-success">${merged.completed_stops || 0}/${merged.total_stops} hoàn thành</span>
+                        ${merged.driver_name ? `<span class="badge badge-warning">🚛 ${merged.driver_name}</span>` : ''}
+                    </div>
+                    <h4 style="margin-bottom:12px;">Các điểm giao:</h4>
+                    ${stopsHtml}
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+
+    } catch (err) {
+        console.error('View merged order error:', err);
+        alert('Không thể tải chi tiết đơn ghép');
+    }
+}
+
+// Cancel merged order
+async function cancelMergedOrder(mergedId) {
+    if (!confirm('Hủy đơn ghép này? Các đơn gốc sẽ được khôi phục.')) {
+        return;
+    }
+
+    try {
+        const res = await fetch(`/api/merged-orders/${mergedId}`, { method: 'DELETE' });
+        const data = await res.json();
+
+        if (data.error) {
+            alert('Lỗi: ' + data.msg);
+            return;
+        }
+
+        alert(data.msg || 'Đã hủy đơn ghép!');
+        loadMergeOrdersSection();
+
+    } catch (err) {
+        console.error('Cancel merged order error:', err);
+        alert('Không thể hủy đơn ghép');
+    }
+}
+
+// Export merge orders functions
+window.loadMergeOrdersSection = loadMergeOrdersSection;
+window.loadPendingOrdersForMerge = loadPendingOrdersForMerge;
+window.toggleOrderForMerge = toggleOrderForMerge;
+window.selectAllPendingOrders = selectAllPendingOrders;
+window.deselectAllPendingOrders = deselectAllPendingOrders;
+window.createMergedOrder = createMergedOrder;
+window.loadMergedOrdersList = loadMergedOrdersList;
+window.viewMergedOrderDetail = viewMergedOrderDetail;
+window.cancelMergedOrder = cancelMergedOrder;

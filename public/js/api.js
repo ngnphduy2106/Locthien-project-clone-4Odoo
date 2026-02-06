@@ -66,6 +66,42 @@ const api = {
         return res.json();
     },
 
+    // Create local export order (không sync MISA)
+    createLocalExport: async (data) => {
+        const payload = {
+            customer_name: data.customer || data.supplier || '',
+            customer_address: data.address || '',
+            expected_date: data.date || '',
+            products: data.products || [],
+            description: data.description || '',
+            note: data.note || ''
+        };
+        const res = await fetch(`${API_BASE}/orders/local`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        return res.json();
+    },
+
+    pinOrder: async (id, isPinned) => {
+        const res = await fetch(`${API_BASE}/orders/${id}/pin`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ is_pinned: isPinned })
+        });
+        return res.json();
+    },
+
+    pinImport: async (id, isPinned) => {
+        const res = await fetch(`${API_BASE}/imports/${id}/pin`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ is_pinned: isPinned })
+        });
+        return res.json();
+    },
+
     assignOrder: async (id, driverName, plate, note) => {
         const res = await fetch(`${API_BASE}/orders/${id}/assign`, {
             method: 'PUT',
@@ -237,7 +273,8 @@ const api = {
             supplier_address: data.address || '',
             expected_date: data.date || '',
             products: data.products || [],
-            note: data.note || ''
+            description: data.description || '',  // Mô tả khi tạo đơn
+            note: data.note || ''  // Ghi chú của tài xế
         };
         const res = await fetch(`${API_BASE}/imports`, {
             method: 'POST',
@@ -333,6 +370,44 @@ const api = {
 
     getProductHistory: async (productName) => {
         const res = await fetch(`${API_BASE}/warehouse/history/${encodeURIComponent(productName)}`);
+        return res.json();
+    },
+
+    // === CUSTOMERS (Khách hàng) ===
+    getCustomers: async () => {
+        const res = await fetch(`${API_BASE}/customers`);
+        return res.json();
+    },
+
+    createCustomer: async (data) => {
+        const res = await fetch(`${API_BASE}/customers`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        return res.json();
+    },
+
+    updateCustomer: async (id, data) => {
+        const res = await fetch(`${API_BASE}/customers/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        return res.json();
+    },
+
+    deleteCustomer: async (id) => {
+        const res = await fetch(`${API_BASE}/customers/${id}`, {
+            method: 'DELETE'
+        });
+        return res.json();
+    },
+
+    importCustomersFromSheet: async () => {
+        const res = await fetch(`${API_BASE}/customers/import-sheet`, {
+            method: 'POST'
+        });
         return res.json();
     }
 };

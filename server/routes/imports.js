@@ -83,7 +83,9 @@ router.get('/:id/assignments', async (req, res) => {
 // POST /api/imports - Create new import ticket
 router.post('/', async (req, res) => {
     try {
-        const { supplier_name, supplier_address, products, expected_date, warehouse, note, created_by } = req.body;
+        const { supplier_name, supplier_address, products, expected_date, warehouse, note, description, created_by } = req.body;
+
+        console.log('📥 Create Import - Received body:', JSON.stringify({ supplier_name, description, note }, null, 2));
 
         if (!supplier_name || !products || !products.length) {
             return res.json(createResponse(true, 'Thiếu thông tin nhà cung cấp hoặc sản phẩm'));
@@ -104,7 +106,8 @@ router.post('/', async (req, res) => {
                 total_qty: totalQty,
                 expected_date: expected_date || null,
                 warehouse: warehouse || 'LT1',
-                note: note || '',
+                description: description || '',  // Mô tả từ form tạo đơn
+                note: note || '',  // Ghi chú của tài xế (khi giao hàng)
                 status: 'pending',
                 created_by: created_by || 'Admin'
             })
@@ -176,6 +179,28 @@ router.put('/:id', async (req, res) => {
             data
         });
 
+    } catch (e) {
+        res.json(createResponse(true, e.message));
+    }
+});
+
+// PUT /api/imports/:id/pin - Toggle pin status for import ticket
+router.put('/:id/pin', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { is_pinned } = req.body;
+
+        const { error } = await getSupabase()
+            .from('import_tickets')
+            .update({ is_pinned: is_pinned === true })
+            .eq('id', id);
+
+        if (error) {
+            return res.json(createResponse(true, 'Lỗi ghim phiếu: ' + error.message));
+        }
+
+        console.log(`📌 Import ${id} pinned: ${is_pinned}`);
+        res.json(createResponse(false, is_pinned ? 'Đã ghim phiếu nhập!' : 'Đã bỏ ghim phiếu nhập!'));
     } catch (e) {
         res.json(createResponse(true, e.message));
     }

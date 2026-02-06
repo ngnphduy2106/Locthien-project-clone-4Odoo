@@ -5,12 +5,14 @@
 const CreateOrderModule = {
     orderProducts: [],
     suppliers: [],
+    customers: [], // Customers from DB
     materials: [], // MISA products with code + name
 
     // Khởi tạo module
     init() {
         console.log('Create Order Module initialized');
         this.loadSuppliers();
+        this.loadCustomers(); // Load customers
         this.loadMaterials(); // Load MISA products
         this.resetForm();
         this.renderForm();
@@ -137,14 +139,41 @@ const CreateOrderModule = {
         console.log('✅ Create Order event listeners bound');
     },
 
-    // Update supplier datalist
+    // Update supplier/customer datalist (combined)
     updateSupplierDatalist() {
         const datalist = document.getElementById('supplier-list');
         if (!datalist) return;
 
-        datalist.innerHTML = this.suppliers.map(s =>
-            `<option value="${s.name}">${s.name}</option>`
-        ).join('');
+        // Combine suppliers and customers, remove duplicates by name
+        const allNames = new Set();
+
+        // Add suppliers first
+        this.suppliers.forEach(s => allNames.add(s.name));
+
+        // Add customers
+        this.customers.forEach(c => allNames.add(c.name));
+
+        datalist.innerHTML = Array.from(allNames)
+            .sort((a, b) => a.localeCompare(b, 'vi'))
+            .map(name => `<option value="${name}">${name}</option>`)
+            .join('');
+
+        console.log(`📋 Updated datalist: ${allNames.size} suppliers/customers`);
+    },
+
+    // Load customers from API
+    async loadCustomers() {
+        try {
+            const response = await fetch('/api/customers');
+            const data = await response.json();
+            if (!data.error && data.data) {
+                this.customers = data.data;
+                this.updateSupplierDatalist();
+                console.log(`👥 Loaded ${this.customers.length} customers`);
+            }
+        } catch (e) {
+            console.error('Failed to load customers:', e);
+        }
     },
 
     // Reset form
@@ -371,6 +400,17 @@ const CreateOrderModule = {
                             </label>
                             <input type="text" id="order-address" class="form-control form-input-modern" 
                                 placeholder="Địa chỉ giao hàng">
+                        </div>
+
+                        <div class="form-group-modern">
+                            <label class="form-label-modern">
+                                <div class="label-icon">
+                                    <i class="bi bi-sticky"></i>
+                                </div>
+                                Ghi chú
+                            </label>
+                            <textarea id="order-note" class="form-control form-input-modern" rows="3"
+                                placeholder="Ghi chú cho đơn hàng (tùy chọn)" style="resize:vertical;"></textarea>
                         </div>
 
                         <div class="info-box">
@@ -686,6 +726,7 @@ const CreateOrderModule = {
         const date = document.getElementById('order-date').value;
         const customer = document.getElementById('order-customer').value.trim();
         const address = document.getElementById('order-address').value.trim();
+        const note = document.getElementById('order-note')?.value?.trim() || '';  // Get note from textarea
 
         if (!customer) {
             alert('Vui lòng nhập tên nhà cung cấp/khách hàng!');
@@ -709,7 +750,8 @@ const CreateOrderModule = {
                     customer: customer,
                     address: address,
                     products: this.orderProducts,
-                    type: 'IMPORT'
+                    type: 'IMPORT',
+                    note: note  // Include note in API call
                 })
             });
 

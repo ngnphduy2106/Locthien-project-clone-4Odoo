@@ -269,10 +269,16 @@ const OrderHistoryModule = {
         if (cardsContainer) cardsContainer.classList.add('hidden');
         if (tableContainer) tableContainer.classList.remove('hidden');
 
+        // Hide money column for DISPATCHER role
+        const hidePrice = window.isDispatcherRole ? window.isDispatcherRole() : false;
+        const thTotalAmount = document.getElementById('th-total-amount');
+        if (hidePrice && thTotalAmount) thTotalAmount.style.display = 'none';
+        if (!hidePrice && thTotalAmount) thTotalAmount.style.display = '';
+
         if (orders.length === 0) {
             container.innerHTML = `
                 <tr>
-                    <td colspan="7" style="text-align: center; padding: 40px; color: #8c8c8c;">
+                    <td colspan="${hidePrice ? 6 : 7}" style="text-align: center; padding: 40px; color: #8c8c8c;">
                         <i class="bi bi-inbox" style="font-size: 48px; display: block; margin-bottom: 12px;"></i>
                         Không tìm thấy đơn hàng
                     </td>
@@ -295,7 +301,7 @@ const OrderHistoryModule = {
                 <td><strong>${orderId}</strong></td>
                 <td>${customer}</td>
                 <td>${date ? new Date(date).toLocaleDateString('vi-VN') : 'N/A'}</td>
-                <td>${amount.toLocaleString('vi-VN')} VNĐ</td>
+                ${!hidePrice ? `<td>${amount.toLocaleString('vi-VN')} VNĐ</td>` : ''}
                 <td>
                     <span class="status-badge ${this.getStatusClass(status)}">
                         ${this.getStatusText(status)}

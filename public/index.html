@@ -104,6 +104,18 @@
                                 Tạo đơn nhập
                             </button>
                         </div>
+                        <div id="nav-create-export">
+                            <button class="nav-link" onclick="showSection('create-export')">
+                                <i class="bi bi-box-arrow-up"></i>
+                                Tạo đơn xuất
+                            </button>
+                        </div>
+                        <div id="nav-merge-orders" style="display:none;">
+                            <button class="nav-link" onclick="showSection('merge-orders')">
+                                <i class="bi bi-collection"></i>
+                                Ghép đơn
+                            </button>
+                        </div>
                         <div id="nav-my-orders">
                             <button class="nav-link" onclick="showSection('my-orders')">
                                 <i class="bi bi-person-badge"></i>
@@ -121,6 +133,12 @@
                             <button class="nav-link" onclick="showSection('suppliers')">
                                 <i class="bi bi-building-add"></i>
                                 Nhà cung cấp
+                            </button>
+                        </div>
+                        <div id="nav-customers" style="display:none;">
+                            <button class="nav-link" onclick="showSection('customers')">
+                                <i class="bi bi-people"></i>
+                                Khách hàng
                             </button>
                         </div>
                     </div>
@@ -259,7 +277,8 @@
                             </div>
                         </div>
 
-                        <div class="stat-card" style="background: linear-gradient(135deg, #51cf66, #40c057);">
+                        <div class="stat-card" id="money-stat-card"
+                            style="background: linear-gradient(135deg, #51cf66, #40c057);">
                             <div class="stat-card-content">
                                 <div class="stat-card-label" style="color:#fff; opacity:0.9;">Giá trị đơn hàng</div>
                                 <div class="stat-card-value" id="stat-order-value"
@@ -308,7 +327,7 @@
                             </div>
                         </div>
 
-                        <div class="chart-card">
+                        <div class="chart-card" id="money-chart-card">
                             <div class="chart-card-header">
                                 <h3 class="chart-card-title">Giá trị đơn hàng theo thời gian</h3>
                                 <p class="chart-card-subtitle" id="chart-value-subtitle">Dữ liệu tháng này</p>
@@ -334,7 +353,7 @@
                             </div>
                         </div>
 
-                        <div class="chart-card">
+                        <div class="chart-card" id="top-customers-card">
                             <div class="chart-card-header">
                                 <h3 class="chart-card-title">Top khách hàng</h3>
                             </div>
@@ -346,7 +365,7 @@
                             </div>
                         </div>
 
-                        <div class="chart-card">
+                        <div class="chart-card" id="top-drivers-card">
                             <div class="chart-card-header">
                                 <h3 class="chart-card-title">Top tài xế</h3>
                             </div>
@@ -421,6 +440,65 @@
                     </div>
                 </section>
 
+                <!-- ==================== MERGE ORDERS SECTION ==================== -->
+                <section id="section-merge-orders" class="hidden">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                        <h2 class="page-heading" style="margin-bottom:0;">Ghép Đơn PO</h2>
+                        <button class="btn btn-outline" onclick="showSection('dispatch')">
+                            <i class="bi bi-arrow-left"></i> Quay lại
+                        </button>
+                    </div>
+
+                    <!-- Instructions -->
+                    <div class="card"
+                        style="margin-bottom:16px; background:linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%);">
+                        <div class="card-body" style="padding:12px;">
+                            <p style="margin:0; color:#1e40af; font-size:13px;">
+                                <i class="bi bi-info-circle"></i>
+                                Chọn 2 hoặc nhiều đơn PO để ghép thành 1 đơn giao. Tài xế sẽ check-in tại từng địa chỉ.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Action Bar -->
+                    <div style="display:flex; gap:12px; margin-bottom:16px; flex-wrap:wrap; align-items:center;">
+                        <button class="btn btn-primary" id="btn-merge-selected" onclick="createMergedOrder()" disabled>
+                            <i class="bi bi-collection"></i> Ghép <span id="merge-count">0</span> đơn đã chọn
+                        </button>
+                        <button class="btn btn-outline" onclick="selectAllPendingOrders()">
+                            <i class="bi bi-check2-all"></i> Chọn tất cả
+                        </button>
+                        <button class="btn btn-outline" onclick="deselectAllPendingOrders()">
+                            <i class="bi bi-x-lg"></i> Bỏ chọn
+                        </button>
+                    </div>
+
+                    <!-- Pending Orders List -->
+                    <div class="card">
+                        <div class="card-header">
+                            <i class="bi bi-hourglass-split"></i> Đơn hàng chờ xử lý
+                        </div>
+                        <div class="card-body" id="merge-orders-list" style="padding:8px;">
+                            <!-- Pending orders will be rendered here -->
+                            <div style="text-align:center; padding:40px; color:var(--text-muted);">
+                                <i class="bi bi-arrow-repeat" style="font-size:24px;"></i>
+                                <p>Đang tải...</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Existing Merged Orders -->
+                    <div class="card" style="margin-top:24px;">
+                        <div class="card-header"
+                            style="background:linear-gradient(135deg, #7c3aed, #a855f7); color:white;">
+                            <i class="bi bi-collection-fill"></i> Đơn ghép đã tạo
+                        </div>
+                        <div class="card-body" id="merged-orders-list" style="padding:8px;">
+                            <!-- Merged orders will be rendered here -->
+                        </div>
+                    </div>
+                </section>
+
                 <!-- ==================== CREATE ORDER SECTION ==================== -->
                 <section id="section-create-order" class="hidden">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
@@ -455,6 +533,11 @@
                                     <input type="text" id="order-address" class="form-control"
                                         placeholder="Địa chỉ giao hàng">
                                 </div>
+                            </div>
+                            <div class="form-group" style="margin-top:16px;">
+                                <label class="form-label"><i class="bi bi-pencil-square"></i> Mô tả / Ghi chú</label>
+                                <textarea id="order-description" class="form-control" rows="2"
+                                    placeholder="Ghi chú cho đơn nhập (tuỳ chọn)" style="resize:vertical;"></textarea>
                             </div>
                         </div>
                     </div>
@@ -606,6 +689,197 @@
                             onclick="submitOrder()">
                             <i class="bi bi-check-circle"></i>
                             TẠO ĐƠN NHẬP
+                        </button>
+                    </div>
+                </section>
+
+                <!-- ==================== CREATE EXPORT SECTION ==================== -->
+                <section id="section-create-export" class="hidden">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
+                        <h2 class="page-heading" style="margin-bottom:0;">Tạo Đơn Xuất</h2>
+                        <div style="display:flex; gap:8px;">
+                            <button class="btn btn-outline" onclick="showSection('dispatch')">
+                                <i class="bi bi-arrow-left"></i> Quay lại
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Order Info Row -->
+                    <div class="card" style="margin-bottom:20px;">
+                        <div class="card-header"
+                            style="background:linear-gradient(135deg, #4dabf7, #228be6); color:white;">
+                            <i class="bi bi-clipboard-data"></i>
+                            Thông tin đơn xuất
+                        </div>
+                        <div class="card-body">
+                            <div style="display:grid; grid-template-columns:1fr 2fr 2fr; gap:16px;">
+                                <div class="form-group" style="margin:0;">
+                                    <label class="form-label"><i class="bi bi-calendar3"></i> Ngày</label>
+                                    <input type="date" id="export-date" class="form-control">
+                                </div>
+                                <div class="form-group" style="margin:0;">
+                                    <label class="form-label"><i class="bi bi-person"></i> Khách hàng</label>
+                                    <input type="text" id="export-customer" class="form-control"
+                                        placeholder="Tên khách hàng" list="export-customer-list" autocomplete="off">
+                                    <datalist id="export-customer-list"></datalist>
+                                </div>
+                                <div class="form-group" style="margin:0;">
+                                    <label class="form-label"><i class="bi bi-geo-alt"></i> Địa chỉ</label>
+                                    <input type="text" id="export-address" class="form-control"
+                                        placeholder="Địa chỉ giao hàng">
+                                </div>
+                            </div>
+                            <div class="form-group" style="margin-top:16px;">
+                                <label class="form-label"><i class="bi bi-pencil-square"></i> Mô tả / Ghi chú</label>
+                                <textarea id="export-description" class="form-control" rows="2"
+                                    placeholder="Ghi chú cho đơn xuất (tuỳ chọn)" style="resize:vertical;"></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Products Section -->
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
+                        <!-- Left: Add Product Form -->
+                        <div class="card">
+                            <div class="card-header"
+                                style="background:linear-gradient(135deg, #f59e0b, #d97706); color:white; display:flex; justify-content:space-between; align-items:center;">
+                                <div>
+                                    <i class="bi bi-plus-square"></i> Thêm sản phẩm mới
+                                </div>
+                                <button type="button" id="btn-export-sync-misa" class="btn btn-sm"
+                                    style="background:rgba(255,255,255,0.2); color:white; border:1px solid rgba(255,255,255,0.3);"
+                                    onclick="syncExportMisaProducts()">
+                                    <i class="bi bi-arrow-repeat"></i> Sync MISA
+                                </button>
+                            </div>
+                            <div class="card-body">
+                                <div class="form-group">
+                                    <label class="form-label">Mã sản phẩm (MISA)</label>
+                                    <input type="text" id="export-prod-code" class="form-control"
+                                        placeholder="VD: HC001" style="font-size:16px;" list="export-material-code-list"
+                                        onchange="onExportProductCodeChange(this)">
+                                    <datalist id="export-material-code-list"></datalist>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Tên sản phẩm <span style="color:red">*</span></label>
+                                    <input type="text" id="export-prod-name" class="form-control"
+                                        placeholder="VD: Acid Sulfuric H2SO4" style="font-size:16px;"
+                                        list="export-material-name-list" onchange="onExportProductNameChange(this)">
+                                    <datalist id="export-material-name-list"></datalist>
+                                </div>
+
+                                <div style="display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:12px;">
+                                    <div class="form-group">
+                                        <label class="form-label">Số lượng</label>
+                                        <input type="number" id="export-prod-qty" class="form-control" value="1"
+                                            onchange="calculateExportPrice()" style="font-size:16px;">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Đơn vị</label>
+                                        <select id="export-prod-unit" class="form-select" style="font-size:16px;">
+                                            <option value="Kg">Kg</option>
+                                            <option value="Can">Can</option>
+                                            <option value="Phuy">Phuy</option>
+                                            <option value="Lít">Lít</option>
+                                            <option value="Thùng">Thùng</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Đơn giá</label>
+                                        <input type="number" id="export-prod-price" class="form-control" value="0"
+                                            onchange="calculateExportPrice()" style="font-size:16px;">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">VAT</label>
+                                        <select id="export-prod-vat" class="form-select"
+                                            onchange="calculateExportPrice()" style="font-size:16px;">
+                                            <option value="0">0%</option>
+                                            <option value="5">5%</option>
+                                            <option value="8">8%</option>
+                                            <option value="10" selected>10%</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <!-- Calculation Display -->
+                                <div
+                                    style="background:linear-gradient(135deg, #e3f2fd, #bbdefb); padding:16px; border-radius:12px; margin-top:16px;">
+                                    <div
+                                        style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                                        <span style="color:var(--text-secondary);">Thành tiền:</span>
+                                        <span id="export-calc-subtotal" style="font-weight:600;">0đ</span>
+                                    </div>
+                                    <div
+                                        style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                                        <span style="color:var(--text-secondary);">Tiền VAT:</span>
+                                        <span id="export-calc-vat-amount"
+                                            style="font-weight:600; color:var(--info);">0đ</span>
+                                    </div>
+                                    <div
+                                        style="display:flex; justify-content:space-between; align-items:center; padding-top:8px; border-top:2px dashed #64b5f6;">
+                                        <span style="font-weight:600; color:var(--text-primary);">Tổng tiền:</span>
+                                        <span id="export-calc-total"
+                                            style="font-weight:700; color:var(--primary); font-size:20px;">0đ</span>
+                                    </div>
+                                </div>
+
+                                <!-- Add Button -->
+                                <button class="btn btn-primary" onclick="addExportProduct()"
+                                    style="width:100%; margin-top:16px; padding:14px; font-size:16px;">
+                                    <i class="bi bi-plus-lg"></i> THÊM SẢN PHẨM
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Right: Product List -->
+                        <div class="card">
+                            <div class="card-header"
+                                style="background:linear-gradient(135deg, #4dabf7, #228be6); color:white; display:flex; justify-content:space-between; align-items:center;">
+                                <span><i class="bi bi-box-seam"></i> Danh sách sản phẩm</span>
+                                <span class="badge"
+                                    style="background:rgba(255,255,255,0.2); padding:4px 12px; border-radius:20px;"
+                                    id="export-product-count-badge">0 sản phẩm</span>
+                            </div>
+                            <div class="card-body" style="min-height:300px; max-height:450px; overflow-y:auto;">
+                                <div id="export-products-list" class="product-list-empty">
+                                    <div style="text-align:center; padding:40px 20px; color:var(--text-muted);">
+                                        <i class="bi bi-inbox" style="font-size:48px; opacity:0.5;"></i>
+                                        <h4 style="margin-top:16px; font-weight:500;">Chưa có sản phẩm nào</h4>
+                                        <p style="font-size:14px;">Thêm sản phẩm từ form bên trái</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Order Summary Footer -->
+                            <div id="export-order-summary"
+                                style="display:none; background:linear-gradient(135deg, #e3f2fd, #bbdefb); padding:16px; border-top:1px solid var(--border);">
+                                <div
+                                    style="display:flex; justify-content:space-between; margin-bottom:6px; font-size:14px;">
+                                    <span>Tạm tính:</span>
+                                    <span id="export-summary-subtotal" style="font-weight:600;">0đ</span>
+                                </div>
+                                <div
+                                    style="display:flex; justify-content:space-between; margin-bottom:6px; font-size:14px;">
+                                    <span>Tổng VAT:</span>
+                                    <span id="export-summary-vat" style="font-weight:600; color:var(--info);">0đ</span>
+                                </div>
+                                <div
+                                    style="display:flex; justify-content:space-between; padding-top:10px; border-top:1px dashed var(--border);">
+                                    <span style="font-weight:700; font-size:16px;">TỔNG CỘNG:</span>
+                                    <span id="export-summary-total"
+                                        style="font-weight:700; color:var(--primary); font-size:22px;">0đ</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <div style="margin-top:24px; display:flex; justify-content:center;">
+                        <button class="btn btn-primary"
+                            style="padding:16px 48px; font-size:18px; background:linear-gradient(135deg, #4dabf7, #228be6);"
+                            onclick="submitExportOrder()">
+                            <i class="bi bi-check-circle"></i>
+                            TẠO ĐƠN XUẤT
                         </button>
                     </div>
                 </section>
@@ -775,7 +1049,7 @@
                                             <th>Mã Đơn</th>
                                             <th>Khách Hàng</th>
                                             <th>Ngày</th>
-                                            <th>Tổng Tiền</th>
+                                            <th id="th-total-amount">Tổng Tiền</th>
                                             <th>Trạng Thái</th>
                                             <th>Tài Xế</th>
                                             <th>Hoàn Thành</th>
@@ -855,6 +1129,62 @@
 
                     <!-- Stats -->
                     <div id="suppliers-stats" style="margin-top:12px; color:#6B7280; font-size:13px;"></div>
+                </section>
+
+                <!-- ==================== CUSTOMERS SECTION ==================== -->
+                <section id="section-customers" class="hidden">
+                    <div
+                        style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; flex-wrap:wrap; gap:12px;">
+                        <h2 class="page-heading" style="margin:0;">Quản lý Khách hàng</h2>
+                        <div style="display:flex; gap:8px;">
+                            <button class="btn btn-primary" onclick="CustomersModule.showAddModal()">
+                                <i class="bi bi-plus-lg"></i> Thêm KH
+                            </button>
+                            <button class="btn btn-outline" onclick="CustomersModule.importFromSheet()"
+                                title="Import từ Google Sheet">
+                                <i class="bi bi-cloud-download"></i>
+                            </button>
+                            <button class="btn btn-outline" onclick="CustomersModule.loadCustomers()" title="Làm mới">
+                                <i class="bi bi-arrow-clockwise"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Search -->
+                    <div style="margin-bottom:16px;">
+                        <div class="search-input" style="max-width:400px;">
+                            <i class="bi bi-search"></i>
+                            <input type="text" placeholder="Tìm kiếm khách hàng..." id="customer-search"
+                                oninput="CustomersModule.filterCustomers()">
+                        </div>
+                    </div>
+
+                    <!-- Customers Table -->
+                    <div class="card">
+                        <div class="card-body" style="padding:0;">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width:50px;">STT</th>
+                                        <th>Tên khách hàng</th>
+                                        <th>Địa chỉ</th>
+                                        <th>Số điện thoại</th>
+                                        <th>Email</th>
+                                        <th style="width:120px; text-align:center;">Thao tác</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="customers-table-body">
+                                    <tr>
+                                        <td colspan="6" style="text-align:center; padding:40px; color:#6B7280;">Đang
+                                            tải...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Stats -->
+                    <div id="customers-stats" style="margin-top:12px; color:#6B7280; font-size:13px;"></div>
                 </section>
 
                 <!-- ==================== HR SECTION ==================== -->
@@ -1159,8 +1489,11 @@
                         <label class="form-label"><i class="bi bi-shield"></i> Vai trò</label>
                         <select id="new-user-role" class="form-select">
                             <option value="DRIVER">Tài xế</option>
+                            <option value="ASSISTANT">Trợ lý</option>
                             <option value="STAFF">Nhân viên</option>
+                            <option value="DISPATCHER">Điều phối</option>
                             <option value="ADMIN">Admin</option>
+                            <option value="TESTER">Kiểm thử</option>
                         </select>
                     </div>
                     <div class="form-group" style="margin:0;">
@@ -1222,8 +1555,11 @@
                         <label class="form-label"><i class="bi bi-shield"></i> Vai trò</label>
                         <select id="edit-user-role" class="form-select">
                             <option value="DRIVER">Tài xế</option>
+                            <option value="ASSISTANT">Trợ lý</option>
                             <option value="STAFF">Nhân viên</option>
+                            <option value="DISPATCHER">Điều phối</option>
                             <option value="ADMIN">Admin</option>
+                            <option value="TESTER">Kiểm thử</option>
                         </select>
                     </div>
                     <div class="form-group" style="margin:0;">
@@ -1316,6 +1652,62 @@
         </div>
     </div>
 
+    <!-- ==================== CUSTOMER MODAL ==================== -->
+    <div id="modal-customer" class="modal-overlay hidden">
+        <div class="modal-content" style="max-width:500px;">
+            <div class="modal-header"
+                style="background:linear-gradient(135deg, #3B82F6, #2563EB); color:#fff; padding:20px; border-radius:16px 16px 0 0;">
+                <h3 style="margin:0; font-size:18px;">
+                    <i class="bi bi-people"></i>
+                    <span id="customer-modal-title">Thêm Khách hàng</span>
+                </h3>
+                <button class="modal-close" onclick="CustomersModule.closeModal()" style="color:#fff;">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+            <div class="modal-body" style="padding:24px;">
+                <input type="hidden" id="customer-id">
+
+                <div class="form-group">
+                    <label class="form-label"><i class="bi bi-person"></i> Tên khách hàng <span
+                            style="color:var(--danger);">*</span></label>
+                    <input type="text" id="customer-name" class="form-control" placeholder="Nhập tên khách hàng">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label"><i class="bi bi-geo-alt"></i> Địa chỉ</label>
+                    <input type="text" id="customer-address" class="form-control" placeholder="Nhập địa chỉ">
+                </div>
+
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+                    <div class="form-group" style="margin:0;">
+                        <label class="form-label"><i class="bi bi-telephone"></i> Số điện thoại</label>
+                        <input type="text" id="customer-phone" class="form-control" placeholder="VD: 0901234567">
+                    </div>
+                    <div class="form-group" style="margin:0;">
+                        <label class="form-label"><i class="bi bi-envelope"></i> Email</label>
+                        <input type="text" id="customer-email" class="form-control" placeholder="VD: email@gmail.com">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label"><i class="bi bi-sticky"></i> Ghi chú</label>
+                    <textarea id="customer-note" class="form-control" rows="2" placeholder="Ghi chú thêm..."></textarea>
+                </div>
+
+                <div style="display:flex; gap:12px; margin-top:24px;">
+                    <button class="btn btn-outline" onclick="CustomersModule.closeModal()" style="flex:1;">
+                        <i class="bi bi-x"></i> Hủy
+                    </button>
+                    <button class="btn btn-primary" onclick="CustomersModule.saveCustomer()"
+                        style="flex:2; background:linear-gradient(135deg, #3B82F6, #2563EB);">
+                        <i class="bi bi-check-lg"></i> Lưu
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- ==================== SCRIPTS ==================== -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="/js/core.js?v=15"></script>
@@ -1326,6 +1718,7 @@
     <script src="/js/modules/create-order.js?v=1"></script>
     <script src="/js/modules/order-history.js?v=101"></script>
     <script src="/js/modules/suppliers.js?v=1"></script>
+    <script src="/js/modules/customers.js?v=1"></script>
 
 
 
