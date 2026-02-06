@@ -143,9 +143,15 @@ window.alert = function (msg) {
 function isAdminRole() {
     const role = (state.user?.role || '').toLowerCase().trim();
     console.log('🔍 DEBUG isAdminRole - role:', role, '| user:', state.user);
-    // Only return true for actual admin roles (TESTER also has admin privileges)
-    const adminRoles = ['admin', 'tester', 'quản lý', 'manager', 'quan ly', 'administrator', 'nhanvien', 'nhân viên', 'staff'];
-    return adminRoles.includes(role) || role.includes('admin') || role.includes('quản') || role.includes('quan') || role.includes('tester');
+    // DISPATCHER has admin privileges (but can't see money - handled separately)
+    const adminRoles = ['admin', 'tester', 'dispatcher', 'quản lý', 'manager', 'quan ly', 'administrator', 'nhanvien', 'nhân viên', 'staff'];
+    return adminRoles.includes(role) || role.includes('admin') || role.includes('quản') || role.includes('quan') || role.includes('tester') || role.includes('dispatcher');
+}
+
+// Check if current user is DISPATCHER (admin without money visibility)
+function isDispatcherRole() {
+    const role = (state.user?.role || '').toLowerCase().trim();
+    return role === 'dispatcher' || role === 'điều phối';
 }
 
 // === SECTION NAVIGATION ===
@@ -532,15 +538,21 @@ window.initDatePickers = initDatePickers;
 function applyRoleBasedUI(role) {
     // Normalize role to lowercase for comparison
     const normalizedRole = (role || '').toLowerCase();
-    const isAdmin = normalizedRole === 'admin' || normalizedRole === 'tester';  // TESTER = ADMIN privileges
+    const isAdmin = normalizedRole === 'admin' || normalizedRole === 'tester' || normalizedRole === 'dispatcher';  // DISPATCHER = ADMIN privileges
+    const isDispatcher = normalizedRole === 'dispatcher';  // DISPATCHER can't see money
     const isDriver = normalizedRole === 'driver' || normalizedRole === 'assistant';  // ASSISTANT = DRIVER privileges
     const isAccountant = normalizedRole === 'accountant' || normalizedRole === 'kế toán' || normalizedRole === 'ke toan' || normalizedRole === 'ketoan';
 
-    console.log('🔐 Applying role-based UI:', { role, normalizedRole, isAdmin, isDriver, isAccountant });
+    console.log('🔐 Applying role-based UI:', { role, normalizedRole, isAdmin, isDispatcher, isDriver, isAccountant });
 
     // Hide/show elements with data-role="admin"
     document.querySelectorAll('[data-role="admin"]').forEach(el => {
         el.style.display = isAdmin ? '' : 'none';
+    });
+
+    // Hide money elements for DISPATCHER
+    document.querySelectorAll('.money-info, .price-info, [data-hide-dispatcher]').forEach(el => {
+        el.style.display = isDispatcher ? 'none' : '';
     });
 
     // Show nav-users for admin
@@ -1702,6 +1714,7 @@ async function submitOrder() {
     const date = window.$('#order-date').value;
     const customer = window.$('#order-customer').value.trim();
     const address = window.$('#order-address').value.trim();
+    const note = window.$('#order-note')?.value?.trim() || '';  // New note field
 
     if (!customer || state.orderProducts.length === 0) {
         alert('Vui lòng nhập đầy đủ thông tin và thêm ít nhất 1 sản phẩm');
@@ -1715,7 +1728,8 @@ async function submitOrder() {
             date,
             supplier: customer,
             address,
-            products: state.orderProducts
+            products: state.orderProducts,
+            note  // Include note in API call
         });
 
         hideLoading();
@@ -2480,8 +2494,8 @@ async function viewOrderDetail(orderId, options = {}) {
                     <label>Biển số xe:</label>
                     <span>${combinedPlates || order.plate || order.bienSo || order.vehicle_plate || 'Chưa có'}</span>
                 </div>
-                ${!isDriver ? `
-                <div class="detail-row">
+                ${!isDriver && !isDispatcherRole() ? `
+                <div class="detail-row money-info">
                     <label>Tổng tiền:</label>
                     <span style="color:var(--primary); font-weight:600;">${formatCurrency(order.amount || order.sale_order_amount || 0)}</span>
                 </div>

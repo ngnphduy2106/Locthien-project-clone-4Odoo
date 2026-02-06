@@ -598,6 +598,7 @@ const HRModule = {
     getRoleText(role) {
         const roleMap = {
             'ADMIN': 'Quản trị',
+            'DISPATCHER': 'Điều phối',
             'DRIVER': 'Tài xế',
             'ASSISTANT': 'Trợ lý',
             'WAREHOUSE': 'Nhân viên kho',

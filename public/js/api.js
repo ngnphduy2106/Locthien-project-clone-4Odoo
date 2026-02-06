@@ -236,7 +236,8 @@ const api = {
             supplier_name: data.supplier || data.customer || '',
             supplier_address: data.address || '',
             expected_date: data.date || '',
-            products: data.products || []
+            products: data.products || [],
+            note: data.note || ''
         };
         const res = await fetch(`${API_BASE}/imports`, {
             method: 'POST',
