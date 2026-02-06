@@ -1461,18 +1461,21 @@ router.post('/:id/assign-multi', async (req, res) => {
         const { createClient } = await import('@supabase/supabase-js');
         const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
-        // Check existing assignments to determine notification type
+        // Check existing assignments to determine notification type and get previous driver names
         const { data: existingAssignments } = await supabase
             .from('order_driver_assignments')
-            .select('id, assigned_qty')
+            .select('id, assigned_qty, driver_name, plate')
             .eq('order_id', id);
 
         const hadPreviousAssignments = existingAssignments && existingAssignments.length > 0;
+        const previousDrivers = hadPreviousAssignments
+            ? existingAssignments.map(a => a.driver_name).filter(Boolean)
+            : [];
         const previousTotalQty = hadPreviousAssignments
             ? existingAssignments.reduce((sum, a) => sum + (a.assigned_qty || 0), 0)
             : 0;
 
-        console.log(`📊 Previous assignments: ${existingAssignments?.length || 0}, total qty: ${previousTotalQty}kg`);
+        console.log(`📊 Previous assignments: ${existingAssignments?.length || 0}, drivers: ${previousDrivers.join(', ')}, total qty: ${previousTotalQty}kg`);
 
         // Delete existing assignments for this order
         const { error: delErr } = await supabase.from('order_driver_assignments').delete().eq('order_id', id);
@@ -1513,22 +1516,30 @@ router.post('/:id/assign-multi', async (req, res) => {
 
         // Send Telegram notification
         try {
-            console.log(`📨 Sending Telegram for multi-driver order ${id}...`);
+            console.log(`📨 Sending Telegram for ${assignments.length} driver assignment on order ${id}...`);
             const { sendTelegramMessage } = await import('../services/telegram.js');
             const orderInfo = await db.getOrder(id);
 
-            // Determine notification type based on previous assignments
-            // hadPreviousAssignments = true => this is a CHANGE (thay đổi)
-            // hadPreviousAssignments = false => this is NEW assignment (phân công mới)
-            let notificationType = 'PHÂN CÔNG NHIỀU TÀI XẾ';
+            // Determine notification type based on:
+            // 1. Number of drivers (1 vs multi)
+            // 2. Whether this is a new assignment or change
+            let notificationType;
             if (hadPreviousAssignments) {
                 notificationType = 'THAY ĐỔI TÀI XẾ';
+            } else {
+                notificationType = assignments.length > 1 ? 'PHÂN CÔNG NHIỀU TÀI XẾ' : 'PHÂN CÔNG TÀI XẾ';
             }
 
             let msg = `🚛 <b>${notificationType}</b>\n`;
             msg += `#${orderInfo?.soDon || id}\n`;
-            msg += `👤 KH: ${orderInfo?.khach || ''}\n\n`;
-            msg += `<b>Danh sách tài xế:</b>\n`;
+            msg += `👤 KH: ${orderInfo?.khach || ''}\n`;
+
+            // Show previous drivers if this is a change
+            if (hadPreviousAssignments && previousDrivers.length > 0) {
+                msg += `\n<b>Tài xế cũ:</b> ${previousDrivers.join(', ')}\n`;
+            }
+
+            msg += `\n<b>Danh sách tài xế${hadPreviousAssignments ? ' mới' : ''}:</b>\n`;
 
             assignments.forEach((a, i) => {
                 const typeLabel = a.type === 'external' ? '(Ngoài)' : '(NB)';
@@ -1539,9 +1550,9 @@ router.post('/:id/assign-multi', async (req, res) => {
 
             console.log(`📤 Telegram message to DRIVER group:\n${msg}`);
             await sendTelegramMessage(msg, 'DRIVER');
-            console.log(`✅ Telegram DRIVER notification sent for multi-driver order ${id}`);
+            console.log(`✅ Telegram DRIVER notification sent for order ${id}`);
         } catch (tgErr) {
-            console.error('❌ Telegram Error in multi-driver assign:', tgErr.message);
+            console.error('❌ Telegram Error in driver assign:', tgErr.message);
         }
 
         res.json(createResponse(false, `Đã phân công ${assignments.length} tài xế!`));

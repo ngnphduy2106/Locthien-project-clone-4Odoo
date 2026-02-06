@@ -197,6 +197,7 @@ function showSection(sectionId) {
         'hr': 'Nhân sự',
         'materials': 'Vật tư',
         'warehouse': 'Kho hàng',
+        'pending-orders': 'Đơn Đang Giao',
         'users': 'Quản lý tài khoản'
     };
     const headerTitle = window.$('#header-title');
@@ -274,6 +275,11 @@ function showSection(sectionId) {
         case 'customers':
             if (window.CustomersModule) {
                 CustomersModule.loadCustomers();
+            }
+            break;
+        case 'pending-orders':
+            if (window.PendingOrdersModule) {
+                PendingOrdersModule.init();
             }
             break;
     }
@@ -641,6 +647,46 @@ function applyRoleBasedUI(role) {
 
         // Also hide nav-users
         if (navUsers) navUsers.style.display = 'none';
+    }
+
+    // Viewer restrictions - only order-history and pending-orders
+    const isViewer = normalizedRole === 'viewer' || normalizedRole === 'xem' || normalizedRole === 'giám sát';
+    if (isViewer) {
+        console.log('👁️ Viewer mode: Showing only order history and pending orders');
+
+        // Hide dashboard
+        const navDashboard = window.$('#nav-dashboard');
+        if (navDashboard) navDashboard.style.display = 'none';
+
+        // Hide all order management items except order-history and pending-orders
+        const navDispatch = window.$('#nav-dispatch');
+        const navCreateOrder = window.$('#nav-create-order');  // Tạo đơn nhập
+        const navCreateExport = window.$('#nav-create-export');  // Tạo đơn xuất
+        const navMyOrders = window.$('#nav-my-orders');
+        const navMergeOrders = window.$('#nav-merge-orders');
+        if (navDispatch) navDispatch.style.display = 'none';
+        if (navCreateOrder) navCreateOrder.style.display = 'none';
+        if (navCreateExport) navCreateExport.style.display = 'none';
+        if (navMyOrders) navMyOrders.style.display = 'none';
+        if (navMergeOrders) navMergeOrders.style.display = 'none';
+        if (navSuppliers) navSuppliers.style.display = 'none';
+        if (navCustomers) navCustomers.style.display = 'none';
+
+        // Hide HR, Materials, Warehouse
+        const navHr = window.$('#nav-hr');
+        const navMaterials = window.$('#nav-materials');
+        const navWarehouse = window.$('#nav-warehouse');
+        if (navHr) navHr.style.display = 'none';
+        if (navMaterials) navMaterials.style.display = 'none';
+        if (navWarehouse) navWarehouse.style.display = 'none';
+
+        // Also hide nav-users
+        if (navUsers) navUsers.style.display = 'none';
+
+        // Auto-navigate to pending-orders on login (default for viewer)
+        setTimeout(() => {
+            showSection('pending-orders');
+        }, 100);
     }
 
     // Update my-orders badge for all roles
