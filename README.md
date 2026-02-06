@@ -237,7 +237,11 @@ loc-thien-scm/
 │       └── modules/
 │           ├── dispatch.js         # Order dispatch module
 │           ├── my-orders.js        # Driver orders module
-│           └── order-history.js    # Order history module
+│           ├── order-history.js    # Order history module
+│           ├── pending-orders.js   # Pending orders view module
+│           ├── create-order.js     # Create import order module
+│           ├── suppliers.js        # Supplier management module
+│           └── customers.js        # Customer management module
 ├── functions/                      # Netlify serverless functions
 └── src/                            # (Legacy) Google Apps Script code
 ```
@@ -303,10 +307,21 @@ loc-thien-scm/
 | 0901234567 | 234567 | ADMIN | Quản trị viên |
 | 0909876543 | 876543 | DRIVER | Tài xế |
 | 0905555555 | 555555 | STAFF | Nhân viên |
+| viewer@locthien.com | locthien@2024 | VIEWER | Chỉ xem Lịch sử + Đơn đang giao |
 
 ---
 
 ## 📝 Changelog
+
+### v2.2.0 (2026-02-06)
+- ✨ Thêm tab "Đơn Đang Giao" hiển thị đơn chưa giao, đang giao (cả xuất + nhập)
+- ✨ Thêm Role "Viewer" chỉ xem được Lịch sử và Đơn đang giao
+- ✨ Thêm chức năng "Tạo Đơn Xuất" (Local Export Orders với mã X prefix)
+- ✨ Thêm chức năng Pin đơn hàng (ưu tiên hiển thị)
+- ✨ Sắp xếp đơn: Pinned → Hôm nay → Tương lai → Quá khứ
+- ✨ Thêm Ghép Đơn PO (Merged Orders) - đang phát triển
+- 🐛 Fix thông báo Telegram: phân biệt 1 tài xế vs nhiều tài xế
+- 🐛 Fix thông báo thay đổi tài xế: hiển thị cả tài xế cũ
 
 ### v2.1.0 (2026-01-31)
 - ✨ Thêm toggle Card/Table view cho Lịch sử đơn hàng
