@@ -1935,6 +1935,8 @@ router.post('/local', async (req, res) => {
         const { customer_name, customer_address, products, expected_date, warehouse, description, note, created_by } = req.body;
 
         console.log('📤 Create Local Export - Received body:', JSON.stringify({ customer_name, description, note }, null, 2));
+        console.log('📦 Products received:', JSON.stringify(products, null, 2));
+        console.log('📦 Products count:', products?.length, 'Type:', typeof products);
 
         if (!customer_name || !products || !products.length) {
             return res.json(createResponse(true, 'Thiếu thông tin khách hàng hoặc sản phẩm'));
@@ -1951,35 +1953,40 @@ router.post('/local', async (req, res) => {
 
         // Insert to orders table (local order)
         // Using actual column names from orders table schema
+        const insertPayload = {
+            id: orderNo,
+            sale_order_no: orderNo,
+            // Fix: Handle empty string - use today if expected_date is null, undefined, or empty
+            sale_order_date: (expected_date && expected_date.trim()) || new Date().toISOString().split('T')[0],
+            account_name: customer_name,
+            shipping_address: customer_address || '',
+            sale_order_product_mappings: products,  // Same column as MISA orders for frontend compatibility
+            sale_order_amount: totalAmount,
+            deadline_date: expected_date || null,  // Correct column name
+            status: 'Chưa thực hiện',
+            delivery_status: 'Chưa giao hàng',
+            description: description || '',  // Mô tả + ghi chú
+            delivery_note: note || '',  // Ghi chú giao hàng
+            is_local: true,  // Flag đánh dấu đơn local (không sync MISA)
+            created_by: created_by || 'Admin',
+            created_date: new Date().toISOString()
+        };
+
+        console.log('🔄 Insert payload sale_order_product_mappings:', JSON.stringify(insertPayload.sale_order_product_mappings));
+
         const { data, error } = await supabase
             .from('orders')
-            .insert({
-                id: orderNo,
-                sale_order_no: orderNo,
-                // Fix: Handle empty string - use today if expected_date is null, undefined, or empty
-                sale_order_date: (expected_date && expected_date.trim()) || new Date().toISOString().split('T')[0],
-                account_name: customer_name,
-                shipping_address: customer_address || '',
-                list_product: products,  // Correct column name
-                sale_order_amount: totalAmount,
-                deadline_date: expected_date || null,  // Correct column name
-                status: 'Chưa thực hiện',
-                delivery_status: 'Chưa giao hàng',
-                description: description || '',  // Mô tả + ghi chú
-                delivery_note: note || '',  // Ghi chú giao hàng
-                is_local: true,  // Flag đánh dấu đơn local (không sync MISA)
-                created_by: created_by || 'Admin',
-                created_date: new Date().toISOString()
-            })
+            .insert(insertPayload)
             .select()
             .single();
 
         if (error) {
-            console.error('❌ Create local export error:', error.message);
+            console.error('❌ Create local export error:', error.message, error.details, error.hint);
             return res.json(createResponse(true, 'Lỗi tạo đơn: ' + error.message));
         }
 
         console.log(`✅ Created local export order: ${orderNo}`);
+        console.log('📦 Saved data sale_order_product_mappings:', JSON.stringify(data?.sale_order_product_mappings));
 
         // Send Telegram notification
         try {
