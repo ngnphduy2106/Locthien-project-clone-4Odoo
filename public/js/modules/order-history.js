@@ -20,7 +20,47 @@ const OrderHistoryModule = {
         // Attach button event listeners
         this.setupToggleButtons();
 
+        this.loadOverviewStats();
         this.loadHistory();
+    },
+
+    // Load commercial overview stats
+    async loadOverviewStats() {
+        try {
+            const response = await fetch('/api/reports/dashboard');
+            const data = await response.json();
+
+            if (data.error) {
+                console.error('Error loading dashboard stats:', data.msg);
+                return;
+            }
+
+            const stats = data.data || data;
+
+            // Total Orders
+            const totalEl = document.getElementById('history-stat-total');
+            if (totalEl) totalEl.textContent = (stats.totalOrders || 0).toLocaleString();
+
+            // Pending Orders
+            const pendingEl = document.getElementById('history-stat-pending');
+            if (pendingEl) pendingEl.textContent = (stats.pendingOrders || 0).toLocaleString();
+
+            // Completed Orders
+            const completedEl = document.getElementById('history-stat-completed');
+            if (completedEl) completedEl.textContent = (stats.completedTotal || 0).toLocaleString();
+
+            // Calculation rate
+            const total = stats.totalOrders || 0;
+            const completed = stats.completedTotal || 0;
+            const rate = total > 0 ? Math.round((completed / total) * 100) : 0;
+            const rateEl = document.getElementById('history-stat-rate');
+            if (rateEl) {
+                rateEl.innerHTML = `<i class="bi bi-check-circle"></i> ${rate}% tỷ lệ hoàn thành`;
+            }
+
+        } catch (error) {
+            console.error('Error loading overview stats:', error);
+        }
     },
 
     // Setup toggle button event listeners
@@ -186,6 +226,14 @@ const OrderHistoryModule = {
             const orderType = order.orderType || 'export';
             const isImport = orderType === 'import';
 
+            // Check permission to view price
+            const currentUser = window.state?.user || {};
+            const role = String(currentUser.role || '').toLowerCase();
+            const isAdmin = role === 'admin' || role === 'tester';
+            const isCreator = order.creatorName && currentUser.name && order.creatorName === currentUser.name;
+            const canViewPrice = isAdmin || isCreator;
+            const displayAmount = canViewPrice ? `${amount.toLocaleString('vi-VN')}đ` : '***';
+
             return `
                         <div class="compact-order-row" onclick="OrderHistoryModule.viewDetail('${orderId}')" style="
                             display: flex;
@@ -229,7 +277,7 @@ const OrderHistoryModule = {
                             
                             <!-- Amount -->
                             <div style="min-width: 100px; font-size: 12px; font-weight: 600; color: var(--text-primary); text-align: right;">
-                                ${amount.toLocaleString('vi-VN')}đ
+                                ${displayAmount}
                             </div>
                             
                             <!-- Status Badge -->
@@ -269,16 +317,14 @@ const OrderHistoryModule = {
         if (cardsContainer) cardsContainer.classList.add('hidden');
         if (tableContainer) tableContainer.classList.remove('hidden');
 
-        // Hide money column for DISPATCHER role
-        const hidePrice = window.isDispatcherRole ? window.isDispatcherRole() : false;
+        // Always show the Total Amount column header
         const thTotalAmount = document.getElementById('th-total-amount');
-        if (hidePrice && thTotalAmount) thTotalAmount.style.display = 'none';
-        if (!hidePrice && thTotalAmount) thTotalAmount.style.display = '';
+        if (thTotalAmount) thTotalAmount.style.display = '';
 
         if (orders.length === 0) {
             container.innerHTML = `
                 <tr>
-                    <td colspan="${hidePrice ? 6 : 7}" style="text-align: center; padding: 40px; color: #8c8c8c;">
+                    <td colspan="7" style="text-align: center; padding: 40px; color: #8c8c8c;">
                         <i class="bi bi-inbox" style="font-size: 48px; display: block; margin-bottom: 12px;"></i>
                         Không tìm thấy đơn hàng
                     </td>
@@ -296,12 +342,20 @@ const OrderHistoryModule = {
             const driver = order.driverName || order.driver_name || '-';
             const completedDate = order.completedAt || order.completed_at;
 
+            // Permission check
+            const currentUser = window.state?.user || {};
+            const role = String(currentUser.role || '').toLowerCase();
+            const isAdmin = role === 'admin' || role === 'tester';
+            const isCreator = order.creatorName && currentUser.name && order.creatorName === currentUser.name;
+            const canViewPrice = isAdmin || isCreator;
+            const displayAmount = canViewPrice ? `${amount.toLocaleString('vi-VN')} VNĐ` : '***';
+
             return `
             <tr onclick="OrderHistoryModule.viewDetail('${orderId}')" style="cursor:pointer;" class="history-row">
                 <td><strong>${orderId}</strong></td>
                 <td>${customer}</td>
                 <td>${date ? new Date(date).toLocaleDateString('vi-VN') : 'N/A'}</td>
-                ${!hidePrice ? `<td>${amount.toLocaleString('vi-VN')} VNĐ</td>` : ''}
+                <td>${displayAmount}</td>
                 <td>
                     <span class="status-badge ${this.getStatusClass(status)}">
                         ${this.getStatusText(status)}

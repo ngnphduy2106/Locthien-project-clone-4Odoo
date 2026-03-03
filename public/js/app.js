@@ -244,6 +244,11 @@ function showSection(sectionId) {
             initCreateOrder();
             break;
         case 'create-export':
+            // Block drivers from accessing export creation
+            if ((state.user?.role || '').toLowerCase() === 'driver' || (state.user?.role || '').toLowerCase() === 'assistant') {
+                alert('Tài khoản tài xế không có quyền tạo đơn xuất!');
+                return;
+            }
             initCreateExport();
             break;
         case 'merge-orders':
@@ -608,9 +613,11 @@ function applyRoleBasedUI(role) {
         // Hide order management items (keep only my-orders)
         const navDispatch = window.$('#nav-dispatch');
         const navCreateOrder = window.$('#nav-create-order');
+        const navCreateExport = window.$('#nav-create-export');
         const navOrderHistory = window.$('#nav-order-history');
         if (navDispatch) navDispatch.style.display = 'none';
         if (navCreateOrder) navCreateOrder.style.display = 'none';
+        if (navCreateExport) navCreateExport.style.display = 'none';
         if (navOrderHistory) navOrderHistory.style.display = 'none';
         if (navSuppliers) navSuppliers.style.display = 'none';
         if (navCustomers) navCustomers.style.display = 'none';
@@ -856,8 +863,11 @@ async function loadDashboard() {
         const elCompletedRate = window.$('#stat-completed-rate');
         const elUpdateTime = window.$('#dashboard-update-time');
 
+        const currentUser = window.state?.user || {};
+        const isAdmin = ['admin', 'tester'].includes(String(currentUser.role || '').toLowerCase());
+
         if (elOrderCount) elOrderCount.textContent = orderCount.toLocaleString('vi-VN');
-        if (elOrderValue) elOrderValue.textContent = formatCurrencyBillion(orderValue);
+        if (elOrderValue) elOrderValue.textContent = isAdmin ? formatCurrencyBillion(orderValue) : '***';
         if (elPendingCount) elPendingCount.textContent = pendingCount;
         if (elCompletedCount) elCompletedCount.textContent = completedCount;
         if (elCompletedRate) elCompletedRate.textContent = `${completedRate}% tỷ lệ hoàn thành`;
@@ -924,6 +934,17 @@ function loadOrdersTimeChart(orders, period) {
 function loadValueTimeChart(orders, period) {
     const ctx = window.$('#valueTimeChart');
     if (!ctx) return;
+
+    const currentUser = window.state?.user || {};
+    const isAdmin = ['admin', 'tester'].includes(String(currentUser.role || '').toLowerCase());
+
+    if (!isAdmin) {
+        if (ctx.parentElement && ctx.parentElement.classList.contains('chart-container')) {
+            ctx.parentElement.style.opacity = '0.3'; // Visually indicate it's restricted or just hide it
+            ctx.parentElement.title = 'Chỉ dành cho Quản trị viên';
+        }
+        return;
+    }
 
     if (window.valueTimeChartInstance) {
         window.valueTimeChartInstance.destroy();
@@ -1020,6 +1041,9 @@ function loadTopCustomers(orders) {
         return;
     }
 
+    const currentUser = window.state?.user || {};
+    const isAdmin = ['admin', 'tester'].includes(String(currentUser.role || '').toLowerCase());
+
     container.innerHTML = sorted.map(([name, stats], i) => `
         <div class="analytics-list-item">
             <span class="analytics-rank" style="background:#51cf66;">${i + 1}</span>
@@ -1027,7 +1051,7 @@ function loadTopCustomers(orders) {
                 <div class="analytics-name">${name}</div>
                 <div class="analytics-meta">${stats.count} đơn</div>
             </div>
-            <span class="analytics-value" style="color:var(--success);">${formatCurrencyBillion(stats.value)}</span>
+            <span class="analytics-value" style="color:var(--success);">${isAdmin ? formatCurrencyBillion(stats.value) : '***'}</span>
         </div>
     `).join('');
 }
@@ -1053,6 +1077,9 @@ function loadTopDrivers(completedOrders) {
         return;
     }
 
+    const currentUser = window.state?.user || {};
+    const isAdmin = ['admin', 'tester'].includes(String(currentUser.role || '').toLowerCase());
+
     container.innerHTML = sorted.map(([name, stats], i) => `
         <div class="analytics-list-item">
             <span class="analytics-rank" style="background:#845ef7;">${i + 1}</span>
@@ -1060,7 +1087,7 @@ function loadTopDrivers(completedOrders) {
                 <div class="analytics-name">${name}</div>
                 <div class="analytics-meta">${stats.count} chuyến</div>
             </div>
-            <span class="analytics-value" style="color:var(--text-muted);">${formatCurrency(stats.value)}</span>
+            <span class="analytics-value" style="color:var(--text-muted);">${isAdmin ? formatCurrency(stats.value) : '***'}</span>
         </div>
     `).join('');
 }
@@ -2886,11 +2913,14 @@ async function viewOrderDetail(orderId, options = {}) {
 
     console.log(`📦 Order ${order.soDon || order.id} has ${products.length} products:`, products);
 
-    // Check if current user is a driver (hide price info)
-    const isDriver = (state.user?.role || '').toLowerCase() === 'driver';
-
-    // Check if user should see prices (not driver and not dispatcher)
-    const hidePrice = isDriver || isDispatcherRole();
+    // Check permission to view price
+    const currentUser = window.state?.user || {};
+    const role = String(currentUser.role || '').toLowerCase();
+    const isAdmin = role === 'admin' || role === 'tester';
+    const creatorName = order.creator_name || order.creatorName || order.nhanVienTao || order.created_by || '';
+    const isCreator = creatorName && currentUser.name && creatorName === currentUser.name;
+    const canViewPrice = isAdmin || isCreator;
+    const hidePrice = !canViewPrice;
 
     // Products HTML - only include price column if not dispatcher
     const productsHtml = products.length > 0
@@ -2975,7 +3005,7 @@ async function viewOrderDetail(orderId, options = {}) {
                     <label>Biển số xe:</label>
                     <span>${combinedPlates || order.plate || order.bienSo || order.vehicle_plate || 'Chưa có'}</span>
                 </div>
-                ${!isDriver && !isDispatcherRole() ? `
+                ${!hidePrice ? `
                 <div class="detail-row money-info">
                     <label>Tổng tiền:</label>
                     <span style="color:var(--primary); font-weight:600;">${formatCurrency(order.amount || order.sale_order_amount || 0)}</span>
@@ -4258,30 +4288,52 @@ async function submitDelivery() {
         }));
 
         // STEP 1: Complete the order
-        const completePayload = {
-            type: 'XUAT',
-            warehouse: warehouse,
-            partner: order.khach || order.account_name || 'Khách hàng',
-            driver_name: driverName,
-            plate: plate,
-            cart: cart,
-            local_items: localItems,
-            delivery_note: note || `Hoàn thành bởi ${driverName}`,
-            sender: driverName
-        };
+        if (order.merged_order_no) {
+            console.log('📤 Step 1: Check-in Merged Trip Stop:', { orderNo: order.sale_order_no || order.id, tripNo: order.merged_order_no });
+            const completeResRaw = await fetch(`/api/merged-orders/${order.merged_order_no}/checkin`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    order_no: order.sale_order_no || order.id,
+                    note: note || `Hoàn thành bởi ${driverName}`,
+                    driver_name: driverName,
+                    plate: plate,
+                    cart: cart,
+                    actual_qty: cart.length === 1 ? cart[0].weight_kg : null
+                })
+            });
+            const completeRes = await completeResRaw.json();
+            if (completeRes.error) {
+                hideLoading();
+                alert('Lỗi check-in: ' + completeRes.msg);
+                return;
+            }
+        } else {
+            const completePayload = {
+                type: 'XUAT',
+                warehouse: warehouse,
+                partner: order.khach || order.account_name || 'Khách hàng',
+                driver_name: driverName,
+                plate: plate,
+                cart: cart,
+                local_items: localItems,
+                delivery_note: note || `Hoàn thành bởi ${driverName}`,
+                sender: driverName
+            };
 
-        console.log('📤 Step 1: Complete order:', {
-            orderId: order.id,
-            cartItems: cart.length,
-            localItems: localItems.length
-        });
+            console.log('📤 Step 1: Complete order:', {
+                orderId: order.id,
+                cartItems: cart.length,
+                localItems: localItems.length
+            });
 
-        const completeRes = await api.completeOrder(order.id, completePayload);
+            const completeRes = await api.completeOrder(order.id, completePayload);
 
-        if (completeRes.error) {
-            hideLoading();
-            alert('Lỗi hoàn thành đơn: ' + (completeRes.msg || completeRes.message));
-            return;
+            if (completeRes.error) {
+                hideLoading();
+                alert('Lỗi hoàn thành đơn: ' + (completeRes.msg || completeRes.message));
+                return;
+            }
         }
 
         // STEP 2: Add proof images using separate API (like import flow)
@@ -5683,9 +5735,14 @@ async function viewImportDetail(importId) {
 
     console.log(`📦 Import ${imp.ticket_no || imp.id} has ${products.length} products:`, products);
 
-    // Check if user should see prices (not driver and not dispatcher)
-    const isDriver = (state.user?.role || '').toLowerCase() === 'driver';
-    const hidePrice = isDriver || isDispatcherRole();
+    // Check permission to view price
+    const currentUser = window.state?.user || {};
+    const role = String(currentUser.role || '').toLowerCase();
+    const isAdmin = role === 'admin' || role === 'tester';
+    const creatorName = imp.creator_name || imp.creatorName || imp.nhanVienTao || imp.created_by || '';
+    const isCreator = creatorName && currentUser.name && creatorName === currentUser.name;
+    const canViewPrice = isAdmin || isCreator;
+    const hidePrice = !canViewPrice;
 
     const productsHtml = products.length > 0
         ? products.map(p => {
@@ -8671,9 +8728,9 @@ async function loadPendingOrdersForMerge() {
             return;
         }
 
-        // Filter pending orders only (not merged, not completed)
+        // Filter pending orders only (must be completely unassigned to ensure mutual exclusivity with split-orders)
         const pendingOrders = (data.pending || []).filter(o =>
-            o.status !== 'Đã ghép' && o.status !== 'Đã thực hiện' && o.status !== 'Hoàn thành'
+            o.status === 'Chưa thực hiện' && !o.taiXe && !o.driver && !o.custom_field13
         );
 
         if (pendingOrders.length === 0) {

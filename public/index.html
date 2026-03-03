@@ -997,6 +997,52 @@
 
                 <!-- ==================== ORDER HISTORY SECTION ==================== -->
                 <section id="section-order-history">
+                    <!-- Commercial Overview -->
+                    <div style="margin-bottom: 24px;">
+                        <h3 style="margin-bottom: 16px; font-size: 1.25rem; color: #1e293b; font-weight: 700;">Tổng quan
+                            thương mại</h3>
+                        <div class="stats-grid"
+                            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+
+                            <!-- Total Orders Card -->
+                            <div
+                                style="background: linear-gradient(135deg, #3b82f6, #60a5fa); border-radius: 12px; padding: 20px; color: white; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+                                <div style="font-size: 14px; opacity: 0.9; margin-bottom: 8px;">Số lượng đơn hàng</div>
+                                <div id="history-stat-total" style="font-size: 32px; font-weight: 700; line-height: 1;">
+                                    0</div>
+                                <div
+                                    style="font-size: 12px; opacity: 0.8; margin-top: 12px; display: flex; align-items: center; gap: 4px;">
+                                    <i class="bi bi-graph-up"></i> Tỷ lệ tăng trưởng --
+                                </div>
+                            </div>
+
+                            <!-- Pending Orders Card -->
+                            <div
+                                style="background: linear-gradient(135deg, #f97316, #fb923c); border-radius: 12px; padding: 20px; color: white; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+                                <div style="font-size: 14px; opacity: 0.9; margin-bottom: 8px;">Đơn chờ xử lý</div>
+                                <div id="history-stat-pending"
+                                    style="font-size: 32px; font-weight: 700; line-height: 1;">0</div>
+                                <div
+                                    style="font-size: 12px; opacity: 0.8; margin-top: 12px; display: flex; align-items: center; gap: 4px;">
+                                    <i class="bi bi-clock-history"></i> Cần phân tài xế
+                                </div>
+                            </div>
+
+                            <!-- Completed Orders Card -->
+                            <div
+                                style="background: linear-gradient(135deg, #8b5cf6, #a78bfa); border-radius: 12px; padding: 20px; color: white; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+                                <div style="font-size: 14px; opacity: 0.9; margin-bottom: 8px;">Đơn hoàn thành</div>
+                                <div id="history-stat-completed"
+                                    style="font-size: 32px; font-weight: 700; line-height: 1;">0</div>
+                                <div id="history-stat-rate"
+                                    style="font-size: 12px; opacity: 0.8; margin-top: 12px; display: flex; align-items: center; gap: 4px;">
+                                    <i class="bi bi-check-circle"></i> 0% tỷ lệ hoàn thành
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+
                     <div
                         style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; flex-wrap:wrap; gap:12px;">
                         <h2 class="page-heading" style="margin:0;">Lịch Sử Đơn Hàng</h2>

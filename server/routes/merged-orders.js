@@ -6,6 +6,8 @@
 import { Router } from 'express';
 import { createResponse, getTimestamp } from '../config.js';
 import { createClient } from '@supabase/supabase-js';
+import { updateMisaOrder } from '../services/misa.js';
+import db from '../db/index.js';
 
 const router = Router();
 
@@ -258,7 +260,7 @@ router.put('/:id/assign', async (req, res) => {
 router.post('/:id/checkin', async (req, res) => {
     try {
         const { id } = req.params;
-        const { order_no, note, driver_name, lat, lng } = req.body;
+        const { order_no, note, driver_name, plate, lat, lng, actual_qty, proof_image_urls, cart } = req.body;
 
         if (!order_no) {
             return res.json(createResponse(true, 'Thiếu mã đơn hàng!'));
@@ -266,16 +268,31 @@ router.post('/:id/checkin', async (req, res) => {
 
         const supabase = getSupabase();
 
+        // Handle human-readable merged_no (e.g. "M2603001") passed as ID
+        let mergedOrderId = id;
+        if (id.startsWith('M') && id.length < 20) {
+            const { data: mergedRow } = await supabase
+                .from('merged_orders')
+                .select('id')
+                .eq('merged_no', id)
+                .single();
+            if (mergedRow) {
+                mergedOrderId = mergedRow.id;
+            }
+        }
+
         // Record check-in using sale_order_no
         const { error: checkInError } = await supabase
             .from('merged_order_checkins')
             .upsert({
-                merged_order_id: id,
-                order_no: order_no,  // Using sale_order_no
+                merged_order_id: mergedOrderId,
+                order_no: order_no,
                 driver_name: driver_name || '',
                 note: note || '',
                 lat: lat || null,
                 lng: lng || null,
+                actual_qty: actual_qty || null,
+                proof_image_urls: proof_image_urls || [],
                 checked_in_at: new Date().toISOString()
             }, { onConflict: 'merged_order_id,order_no' });
 
@@ -283,11 +300,74 @@ router.post('/:id/checkin', async (req, res) => {
             return res.json(createResponse(true, 'Lỗi check-in: ' + checkInError.message));
         }
 
+        // Fetch original order info for MISA sync
+        const orderInfo = await db.getOrder(order_no);
+
         // Update individual order status by sale_order_no
         await supabase
             .from('orders')
-            .update({ status: 'Đã thực hiện' })
+            .update({
+                status: 'Đã thực hiện',
+                delivery_status: 'Đã giao hàng',
+                custom_field13: driver_name || orderInfo?.custom_field13,
+                custom_field14: plate || orderInfo?.custom_field14
+            })
             .eq('sale_order_no', order_no);
+
+        // SYNC TO MISA (If applicable)
+        let syncStatusMsg = '';
+        if (orderInfo && orderInfo.misa_id) {
+            try {
+                let misaCart = [];
+                if (cart && Array.isArray(cart)) {
+                    // Filter out shells and map quantities
+                    misaCart = cart.filter(item => !item.isShell).map(item => ({
+                        product_code: item.product?.code || item.product?.id || item.code || item.product || '',
+                        warehouse: item.warehouse || '',  // May be empty string if not provided
+                        unit: item.unit || 'kg',
+                        qty: Number(item.weight_kg || item.qty || 0)
+                    }));
+                } else if (orderInfo.products && Array.isArray(orderInfo.products)) {
+                    // Fallback to original order products if cart isn't sent
+                    misaCart = orderInfo.products.map(item => ({
+                        product_code: item.code || '',
+                        warehouse: '',
+                        unit: item.unit || 'kg',
+                        qty: Number(item.qty || 0)
+                    }));
+                }
+
+                // If no actual_qty in cart, use overall actual_qty if provided
+                if (misaCart.length === 1 && actual_qty) {
+                    misaCart[0].qty = actual_qty;
+                }
+
+                console.log(`📤 MISA Sync [Merged Trip] - Trip: ${id}, PO: ${order_no}, Driver: ${driver_name}`);
+
+                const syncResult = await updateMisaOrder(order_no, {
+                    misa_id: orderInfo.misa_id,
+                    delivery_status: 'Đã giao hàng',
+                    status: 'Đã thực hiện',
+                    driver: driver_name || orderInfo.custom_field13,
+                    plate: plate || orderInfo.custom_field14,
+                    cart: misaCart.length > 0 ? misaCart : undefined
+                });
+
+                if (syncResult.success) {
+                    syncStatusMsg = ' (Đã đồng bộ MISA)';
+                } else {
+                    syncStatusMsg = ` (⚠️ Lỗi MISA: ${syncResult.message})`;
+                    // Update DB with MISA error
+                    await db.updateOrder(order_no, {
+                        crm_sync_status: 'FAILED',
+                        sync_error: syncResult.message
+                    });
+                }
+            } catch (misaErr) {
+                console.error('MISA Sync Error during trip check-in:', misaErr.message);
+                syncStatusMsg = ' (Lỗi kết nối MISA)';
+            }
+        }
 
         // Check if all stops completed
         const { data: merged } = await supabase

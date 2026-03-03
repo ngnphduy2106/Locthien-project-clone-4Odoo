@@ -282,6 +282,36 @@ const MyOrdersModule = {
         const delivering = sortOrders(this.orders.filter(o => isDelivering(o)));
         const completed = sortOrders(this.orders.filter(o => isCompleted(o)));
 
+        // Helper to generate grouped HTML
+        const renderGroupedOrders = (orders, isDeliveringSection) => {
+            let html = '';
+            const normal = [];
+            const mergedMap = {};
+
+            orders.forEach(o => {
+                if (o.merged_order_no) {
+                    if (!mergedMap[o.merged_order_no]) mergedMap[o.merged_order_no] = [];
+                    mergedMap[o.merged_order_no].push(o);
+                } else {
+                    normal.push(o);
+                }
+            });
+
+            for (const [tripNo, trips] of Object.entries(mergedMap)) {
+                html += `
+                <div style="margin-bottom: 24px; padding: 12px; border: 2px dashed ${isDeliveringSection ? '#8B5CF6' : '#10B981'}; border-radius: 12px; background: ${isDeliveringSection ? '#faf5ff' : '#ecfdf5'};">
+                    <h4 style="color: ${isDeliveringSection ? '#7c3aed' : '#059669'}; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; font-size: 15px;">
+                        <i class="bi bi-link-45deg"></i> Chuyến Ghép: ${tripNo}
+                        <span style="font-size: 11px; font-weight: normal; background: ${isDeliveringSection ? '#8B5CF6' : '#10B981'}; color: white; padding: 2px 8px; border-radius: 12px;">${trips.length} điểm</span>
+                    </h4>
+                    ${trips.map(o => this.renderOrderCard(o, isDeliveringSection)).join('')}
+                </div>`;
+            }
+
+            html += normal.map(o => this.renderOrderCard(o, isDeliveringSection)).join('');
+            return html;
+        };
+
         container.innerHTML = `
             <div class="stats-grid" style="margin-bottom: 24px;">
                 <div class="stat-card">
@@ -302,12 +332,12 @@ const MyOrdersModule = {
 
             ${delivering.length > 0 ? `
                 <h3 style="margin-bottom: 16px;"><i class="bi bi-truck"></i> Đơn đang giao</h3>
-                ${delivering.map(order => this.renderOrderCard(order, true)).join('')}
+                ${renderGroupedOrders(delivering, true)}
             ` : ''}
 
             ${completed.length > 0 ? `
                 <h3 style="margin-top: 32px; margin-bottom: 16px;"><i class="bi bi-check-circle"></i> Đơn đã hoàn thành</h3>
-                ${completed.map(order => this.renderOrderCard(order, false)).join('')}
+                ${renderGroupedOrders(completed, false)}
             ` : ''}
         `;
     },

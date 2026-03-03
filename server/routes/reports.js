@@ -99,13 +99,23 @@ router.get('/dashboard', async (req, res) => {
         let pendingOrders = 0;
         let deliveringOrders = 0;
         let completedToday = 0;
+        let completedTotal = 0;
+        let cancelledTotal = 0;
 
-        const completedStatuses = ['Đã thực hiện', 'Đã hủy bỏ'].map(s => s.toLowerCase());
+        const completedStatuses = ['Đã thực hiện', 'Đã hủy bỏ', 'completed', 'hoàn thành', 'đã giao hàng', 'cancelled'];
+
+        let totalOrders = orders.length;
 
         for (const order of orders) {
             const s = String(order.status || '').trim().toLowerCase();
 
             if (completedStatuses.includes(s)) {
+                if (s === 'đã hủy bỏ' || s === 'cancelled') {
+                    cancelledTotal++;
+                } else {
+                    completedTotal++;
+                }
+
                 if (order.createdAt && new Date(order.createdAt).toDateString() === new Date().toDateString()) {
                     completedToday++;
                 }
@@ -113,7 +123,7 @@ router.get('/dashboard', async (req, res) => {
             }
 
             // Not completed
-            if (order.taiXe) {
+            if (order.taiXe || order.driver) {
                 deliveringOrders++; // Assigned / Delivering
             } else {
                 pendingOrders++; // Pending assignment
@@ -131,8 +141,11 @@ router.get('/dashboard', async (req, res) => {
         }
 
         res.json(createResponse(false, 'OK', {
+            totalOrders,
             pendingOrders,
             deliveringOrders,
+            completedTotal,
+            cancelledTotal,
             completedToday,
             totalStock: Math.round(totalStock),
             lowStockAlerts
@@ -182,7 +195,8 @@ router.get('/order-history', async (req, res) => {
             completedAt: o.completed_at || o.updated_at,
             address: o.diaChi || o.shipping_address || '',
             products: o.cart || o.products || [],
-            orderType: 'export'
+            orderType: 'export',
+            creatorName: o.creator_name || o.nhanVienTao || o.created_by || ''
         }));
 
         // === FETCH IMPORT TICKETS ===
@@ -215,7 +229,8 @@ router.get('/order-history', async (req, res) => {
                 completedAt: t.completed_at || t.updated_at,
                 address: t.supplier_address || 'Sunco',
                 products: t.items || [],
-                orderType: 'import'
+                orderType: 'import',
+                creatorName: t.creator_name || t.created_by || ''
             }));
             console.log(`📦 Found ${importOrders.length} completed import tickets`);
         } catch (importErr) {
