@@ -584,6 +584,23 @@ const MyOrdersModule = {
                                 ${order.phone ? `<div style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.25rem;">📞 <a href="tel:${order.phone}" style="color: var(--primary-color);">${order.phone}</a></div>` : ''}
                             </div>
 
+                            <!-- Thông tin vận chuyển -->
+                            <div style="margin-bottom: 1rem; padding: 0.75rem; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
+                                <div style="font-weight: 600; margin-bottom: 0.5rem; color: #475569;">🚚 Vận chuyển</div>
+                                <div style="color: #334155; font-size: 0.9rem; display: grid; grid-template-columns: 80px 1fr; gap: 4px;">
+                                    <span style="color: #64748b;">Tài xế:</span>
+                                    <span>${order.taiXe || order.driver_name || 'Chưa phân công'} ${order.bienSo || order.plate ? `(${order.bienSo || order.plate})` : ''}</span>
+                                    ${order.assistant_name || order.phuXe ? `
+                                    <span style="color: #64748b;">Phụ xe:</span>
+                                    <span>${order.assistant_name || order.phuXe}</span>
+                                    ` : ''}
+                                    ${order.delivery_time || order.deliveryTime ? `
+                                    <span style="color: #64748b;">T.Gian:</span>
+                                    <span>${order.delivery_time || order.deliveryTime}</span>
+                                    ` : ''}
+                                </div>
+                            </div>
+
                             <!-- Ghi chú từ MISA (nếu có) -->
                             ${order.misa_note ? `
                         <div style="margin-bottom: 1rem; padding: 0.75rem; background: #fffbeb; border-radius: 8px; border-left: 3px solid #f59e0b;">

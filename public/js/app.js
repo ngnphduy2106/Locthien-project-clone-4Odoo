@@ -3012,10 +3012,22 @@ async function viewOrderDetail(orderId, options = {}) {
                     <label>Tài xế:</label>
                     <span>${combinedDrivers || order.driver_name || order.taiXe || order.driver || order.driverName || 'Chưa phân công'}</span>
                 </div>
+                ${order.assistant_name || order.phuXe ? `
+                <div class="detail-row">
+                    <label>Phụ xe:</label>
+                    <span>${order.assistant_name || order.phuXe}</span>
+                </div>
+                ` : ''}
                 <div class="detail-row">
                     <label>Biển số xe:</label>
                     <span>${combinedPlates || order.plate || order.bienSo || order.vehicle_plate || 'Chưa có'}</span>
                 </div>
+                ${order.delivery_time || order.deliveryTime ? `
+                <div class="detail-row">
+                    <label>TG giao hàng:</label>
+                    <span>${order.delivery_time || order.deliveryTime}</span>
+                </div>
+                ` : ''}
                 ${!hidePrice ? `
                 <div class="detail-row money-info">
                     <label>Tổng tiền:</label>
