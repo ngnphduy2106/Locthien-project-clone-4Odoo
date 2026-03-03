@@ -53,6 +53,10 @@ router.get('/', async (req, res) => {
             .filter(u => u.status === 'ACTIVE' && u.role === CONFIG.ROLES.DRIVER)
             .map(u => ({ name: u.fullName, plate: u.plate }));
 
+        const assistants = users
+            .filter(u => u.status === 'ACTIVE' && String(u.role).toUpperCase() === 'ASSISTANT')
+            .map(u => ({ name: u.fullName }));
+
         console.log('DEBUG: Sending response. Pending:', pending.length, 'Assigned:', assigned.length, 'Completed:', completed.length, 'Cancelled:', cancelled.length);
 
         res.json({
@@ -62,7 +66,8 @@ router.get('/', async (req, res) => {
             completed,
             cancelled,
             cancelledCount: cancelled.length,
-            drivers
+            drivers,
+            assistants
         });
 
     } catch (e) {
@@ -246,7 +251,7 @@ router.get('/my/:driverName', async (req, res) => {
                 const { data: myAssignments } = await supabase
                     .from('order_driver_assignments')
                     .select('*')
-                    .ilike('driver_name', `%${driverName}%`);
+                    .or(`driver_name.ilike.%${driverName}%,assistant_name.ilike.%${driverName}%`);
 
                 // Merge and dedupe
                 const allIds = new Set();
@@ -259,11 +264,11 @@ router.get('/my/:driverName', async (req, res) => {
                 }
                 console.log(`📋 Admin sees ${assignments.length} total assignments (external + personal)`);
             } else {
-                // Regular driver - only see their own assignments
+                // Regular driver or assistant - see their own assignments
                 const { data: driverAssignments, error: assignErr } = await supabase
                     .from('order_driver_assignments')
                     .select('*')
-                    .ilike('driver_name', `%${driverName}%`);
+                    .or(`driver_name.ilike.%${driverName}%,assistant_name.ilike.%${driverName}%`);
 
                 if (assignErr) console.error('Assignment query error:', assignErr.message);
                 assignments = driverAssignments || [];
@@ -705,11 +710,13 @@ router.put('/:id', async (req, res) => {
 router.put('/:id/assign', async (req, res) => {
     try {
         const { id } = req.params;
-        const { driverName, plate, note } = req.body;
+        const { driverName, plate, note, assistantName, deliveryTime } = req.body;
 
         const order = await db.updateOrder(id, {
             taiXe: driverName,
             bienSo: plate,
+            assistant_name: assistantName,
+            delivery_time: deliveryTime,
             status: CONFIG.STATUS.DELIVERING,
             delivery_status: 'Đang giao hàng',
             note: note || '' // Save internal note
@@ -768,7 +775,9 @@ router.put('/:id/assign', async (req, res) => {
             msg += `📍 ${orderInfo?.diaChi || orderInfo?.shipping_address || ''}\n`;
             msg += `──────────────\n`;
             msg += `🚗 Tài xế: <b>${driverName}</b>\n`;
+            if (assistantName) msg += `🧑‍🔧 Phụ xe: ${assistantName}\n`;
             msg += `🔢 Biển số: ${plate || 'Chưa có'}\n`;
+            if (deliveryTime) msg += `⏰ Tgian giao: ${deliveryTime}\n`;
             if (note) msg += `📝 Ghi chú: ${note}\n`;
 
             console.log(`📨 [TELEGRAM DEBUG] Calling sendTelegramMessage to DRIVER group...`);
@@ -1054,46 +1063,15 @@ router.post('/:id/complete', async (req, res) => {
                 firstDriverPlate = allPlates || patchedAssignments[0]?.plate;
                 console.log(`🔍 MISA Multi-driver: taiXe="${firstDriverName}", bienSo="${firstDriverPlate}"`);
 
-                // Check if ALL drivers completed (using patched data)
-                allDriversCompleted = patchedAssignments.every(a => a.status === 'completed');
+                // MODIFIED: If any driver (or assistant) completes their assignment, mark the entire order as completed
+                allDriversCompleted = patchedAssignments.some(a => a.status === 'completed');
                 totalActualQty = patchedAssignments.reduce((sum, a) => sum + Number(a.actual_qty || 0), 0);
 
                 const completedCount = patchedAssignments.filter(a => a.status === 'completed').length;
                 console.log(`📊 Multi-driver status: ${completedCount}/${patchedAssignments.length} completed, Total: ${totalActualQty}kg`);
 
-                if (!allDriversCompleted) {
-                    // Partial completion - return early, don't sync MISA yet
-                    // Use actualOrderId for updateOrder to handle ID format differences
-                    try {
-                        await db.updateOrder(actualOrderId, {
-                            delivery_status: `${completedCount}/${patchedAssignments.length} hoàn thành`,
-                            partial_completion: true
-                        });
-                    } catch (orderUpdateErr) {
-                        // Fallback to URL param id if actualOrderId doesn't work
-                        console.log(`⚠️ updateOrder with actualOrderId failed, trying URL param id`);
-                        await db.updateOrder(id, {
-                            delivery_status: `${completedCount}/${patchedAssignments.length} hoàn thành`,
-                            partial_completion: true
-                        });
-                    }
-
-                    return res.json(createResponse(false,
-                        `Bạn đã hoàn thành phần của mình! (${completedCount}/${patchedAssignments.length} tài xế)`,
-                        {
-                            partial: true,
-                            progress: `${completedCount}/${patchedAssignments.length}`,
-                            yourQty: myActualQty,
-                            // Debug info
-                            _debug: {
-                                actualOrderId,
-                                paramId: id,
-                                assignmentId: assignment_id,
-                                assignmentStatuses: patchedAssignments.map(a => ({ id: a.id, status: a.status, driver: a.driver_name }))
-                            }
-                        }
-                    ));
-                }
+                // We skip the early return for partial completion here to allow the order to fully close on the first completion.
+                // It treats the entire order as delivered.
 
                 // All completed - will proceed to sync MISA with combined data
                 console.log(`🎉 All drivers completed! Syncing to MISA with ${totalActualQty}kg`);
@@ -1487,6 +1465,8 @@ router.post('/:id/assign-multi', async (req, res) => {
             driver_name: a.driver_name,
             driver_type: a.type || 'internal',
             plate: a.plate || '',
+            assistant_name: a.assistant_name || null,
+            delivery_time: a.delivery_time || null,
             assigned_qty: Number(a.qty) || 0,
             assigned_products: a.products || null, // NEW: custom products per driver
             status: 'pending',
@@ -1511,7 +1491,9 @@ router.post('/:id/assign-multi', async (req, res) => {
             status: CONFIG.STATUS.ASSIGNED,
             taiXe: mainDriver.driver_name,
             bienSo: mainDriver.plate || '',
-            note: assignments.length > 1 ? `Chia ${assignments.length} tài xế` : (mainDriver.note || '')
+            note: assignments.length > 1 ? `Chia ${assignments.length} tài xế` : (mainDriver.note || ''),
+            phuXe: mainDriver.assistant_name || null,
+            thoiGianGiao: mainDriver.delivery_time || null
         });
 
         // Send Telegram notification

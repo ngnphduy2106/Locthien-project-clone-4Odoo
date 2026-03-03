@@ -215,7 +215,7 @@ router.post('/', async (req, res) => {
 router.put('/:id/assign', async (req, res) => {
     try {
         const { id } = req.params;
-        const { driver_name, plate } = req.body;
+        const { driver_name, plate, assistant_name, delivery_time } = req.body;
 
         const supabase = getSupabase();
 
@@ -225,6 +225,8 @@ router.put('/:id/assign', async (req, res) => {
                 status: 'assigned',
                 driver_name,
                 plate,
+                assistant_name,
+                delivery_time,
                 assigned_at: new Date().toISOString()
             })
             .eq('id', id)
@@ -241,9 +243,28 @@ router.put('/:id/assign', async (req, res) => {
             .update({
                 status: 'Đang thực hiện',
                 custom_field13: driver_name,
-                custom_field14: plate
+                custom_field14: plate,
+                assistant_name: assistant_name || null,
+                delivery_time: delivery_time || null
             })
             .in('sale_order_no', data.source_order_nos || []);
+
+        // Send Telegram notification
+        try {
+            const { sendTelegramMessage } = await import('../services/telegram.js');
+            let msg = `🚛 <b>PHÂN CÔNG XE - ĐƠN GHÉP</b>\n`;
+            msg += `#${data.merged_no || id}\n`;
+            msg += `📦 Điểm giao: ${data.total_stops} điểm\n`;
+            msg += `──────────────\n`;
+            msg += `🚗 Tài xế: <b>${driver_name}</b>\n`;
+            if (assistant_name) msg += `🧑‍🔧 Phụ xe: ${assistant_name}\n`;
+            msg += `🔢 Biển số: ${plate || 'Chưa có'}\n`;
+            if (delivery_time) msg += `⏰ Tgian giao: ${delivery_time}\n`;
+
+            await sendTelegramMessage(msg, 'DRIVER');
+        } catch (tgErr) {
+            console.error('Telegram Error in merged order assign:', tgErr.message);
+        }
 
         res.json({
             error: false,

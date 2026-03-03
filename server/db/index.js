@@ -301,9 +301,11 @@ export const db = {
                     ? JSON.stringify(order.sale_order_product_mappings || order.cart)
                     : null,
                 list_product: order.list_product || null,
-                // Custom Fields (Driver/Plate)
+                // Custom Fields (Driver/Plate/Assistant)
                 custom_field13: order.custom_field13 || order.driver || order.taiXe || null,
                 custom_field14: order.custom_field14 || order.plate || order.bienSo || null,
+                assistant_name: order.assistant_name || order.phuXe || null,
+                delivery_time: order.delivery_time || order.thoiGianGiao || null,
                 // Organization
                 organization_unit_name: order.organization_unit_name || null,
                 owner_name: order.owner_name || null,
@@ -347,6 +349,12 @@ export const db = {
             if (data.plate !== undefined) safeData.custom_field14 = data.plate;
             if (data.custom_field13 !== undefined) safeData.custom_field13 = data.custom_field13;
             if (data.custom_field14 !== undefined) safeData.custom_field14 = data.custom_field14;
+
+            // Assistant / Delivery Time
+            if (data.phuXe !== undefined) safeData.assistant_name = data.phuXe;
+            if (data.assistant_name !== undefined) safeData.assistant_name = data.assistant_name;
+            if (data.thoiGianGiao !== undefined) safeData.delivery_time = data.thoiGianGiao;
+            if (data.delivery_time !== undefined) safeData.delivery_time = data.delivery_time;
 
             // Other fields
             if (data.phone !== undefined) safeData.phone = data.phone;

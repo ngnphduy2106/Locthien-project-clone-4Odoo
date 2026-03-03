@@ -10,6 +10,7 @@ let state = {
     imports: { pending: [], assigned: [], completed: [] },
     myOrders: [],  // Driver's orders for My Orders section
     drivers: [],
+    assistants: [],
     currentSection: 'dashboard',
     currentDispatchTab: 'pending',
     currentOrderType: 'export',
@@ -575,7 +576,7 @@ function applyRoleBasedUI(role) {
     const normalizedRole = (role || '').toLowerCase();
     const isAdmin = normalizedRole === 'admin' || normalizedRole === 'tester' || normalizedRole === 'dispatcher';  // DISPATCHER = ADMIN privileges
     const isDispatcher = normalizedRole === 'dispatcher';  // DISPATCHER can't see money
-    const isDriver = normalizedRole === 'driver' || normalizedRole === 'assistant';  // ASSISTANT = DRIVER privileges
+    const isDriver = normalizedRole === 'driver' || normalizedRole === 'assistant' || normalizedRole === 'phụ xe';  // ASSISTANT = DRIVER privileges
     const isAccountant = normalizedRole === 'accountant' || normalizedRole === 'kế toán' || normalizedRole === 'ke toan' || normalizedRole === 'ketoan';
 
     console.log('🔐 Applying role-based UI:', { role, normalizedRole, isAdmin, isDispatcher, isDriver, isAccountant });
@@ -713,7 +714,16 @@ async function loadDrivers() {
                 name: e.fullName || e.hoTen || e.name,
                 plate: e.bienSo || e.plate || ''
             }));
-            console.log('📋 Loaded drivers:', state.drivers);
+
+            // Filter assistants
+            state.assistants = res.data.filter(e => {
+                const role = (e.role || e.chucVu || '').toLowerCase();
+                return role.includes('phụ xe') || role.includes('phu xe') || role.includes('trợ lý') || role.includes('assistant');
+            }).map(e => ({
+                name: e.fullName || e.hoTen || e.name
+            }));
+
+            console.log('📋 Loaded drivers:', state.drivers, 'assistants:', state.assistants);
         }
     } catch (e) {
         console.error('Failed to load drivers:', e);
@@ -1105,6 +1115,7 @@ async function loadOrders() {
         state.orders.assigned = res.assigned || [];
         state.orders.completed = res.completed || [];
         state.drivers = res.drivers || [];
+        state.assistants = res.assistants || [];
 
         // Load unread counts for badges
         await loadUnreadCounts();
@@ -3469,6 +3480,20 @@ function assignDriver(orderId) {
                         </div>
                     </div>
                     
+                    <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end; margin-bottom:12px;">
+                        <div style="flex:1; min-width:150px;">
+                            <label class="form-label" style="font-size:12px;">Phụ xe (Tùy chọn)</label>
+                            <select id="new-assistant-select" class="form-control">
+                                <option value="">-- Không có --</option>
+                                ${(state.assistants || []).map(a => `<option value="${a.name}">${a.name}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div style="flex:1; min-width:150px;">
+                            <label class="form-label" style="font-size:12px;">Thời gian giao</label>
+                            <input type="text" id="new-delivery-time" class="form-control" placeholder="VD: Sáng mai, 14:00...">
+                        </div>
+                    </div>
+                    
                     <!-- Product Selection for this driver -->
                     <div style="margin-bottom:12px;">
                         <label class="form-label" style="font-size:12px; color:var(--primary);">📦 Chọn sản phẩm & số lượng cho tài xế này:</label>
@@ -3600,11 +3625,16 @@ function addDriverAssignmentRow() {
         return;
     }
 
+    const assistantName = window.$('#new-assistant-select')?.value || null;
+    const deliveryTime = window.$('#new-delivery-time')?.value?.trim() || null;
+
     // Add to list with products
     const isExternal = select?.value === '__EXTERNAL__';
     state.driverAssignments.push({
         driver_name: driverName,
         plate: plate,
+        assistant_name: assistantName,
+        delivery_time: deliveryTime,
         qty: totalQty,
         products: assignedProducts, // NEW: custom products for this driver
         type: isExternal ? 'external' : 'internal',
@@ -3615,6 +3645,8 @@ function addDriverAssignmentRow() {
     select.value = '';
     if (externalName) externalName.value = '';
     if (externalPlate) externalPlate.value = '';
+    if (window.$('#new-assistant-select')) window.$('#new-assistant-select').value = '';
+    if (window.$('#new-delivery-time')) window.$('#new-delivery-time').value = '';
     window.$('#external-driver-fields')?.classList.add('hidden');
 
     // Update remaining quantities display
@@ -3687,7 +3719,7 @@ function renderDriverAssignmentsList() {
                 <div style="flex:1;">
                     <strong>${a.driver_name}</strong>
                     ${a.is_external ? '<span style="font-size:11px; background:var(--warning); color:#000; padding:2px 6px; border-radius:4px; margin-left:6px;">Tài xế ngoài</span>' : ''}
-                    <br><small style="color:var(--text-muted);">🚗 ${a.plate || 'Chưa có biển số'}</small>
+                    <br><small style="color:var(--text-muted);">🚗 ${a.plate || 'Chưa có'}${a.assistant_name ? ` • 🧑‍🔧 ${a.assistant_name}` : ''}${a.delivery_time ? ` • ⏰ ${a.delivery_time}` : ''}</small>
                 </div>
                 <div style="font-weight:600; color:var(--primary);">${formatNumber(a.qty)} kg</div>
                 <button onclick="removeDriverAssignmentRow(${idx})" style="background:var(--danger); color:white; border:none; border-radius:4px; width:28px; height:28px; cursor:pointer;">

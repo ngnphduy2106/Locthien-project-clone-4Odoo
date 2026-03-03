@@ -102,11 +102,11 @@ const api = {
         return res.json();
     },
 
-    assignOrder: async (id, driverName, plate, note) => {
+    assignOrder: async (id, driverName, plate, note, assistantName = null, deliveryTime = null) => {
         const res = await fetch(`${API_BASE}/orders/${id}/assign`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ driverName, plate, note })
+            body: JSON.stringify({ driverName, plate, note, assistantName, deliveryTime })
         });
         return res.json();
     },

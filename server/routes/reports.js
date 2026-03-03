@@ -178,7 +178,8 @@ router.get('/order-history', async (req, res) => {
             const driverLower = driverFilter.toLowerCase();
             historyOrders = historyOrders.filter(o => {
                 const orderDriver = String(o.taiXe || o.driver || '').toLowerCase();
-                return orderDriver.includes(driverLower);
+                const orderAssistant = String(o.phuXe || o.assistant_name || '').toLowerCase();
+                return orderDriver.includes(driverLower) || orderAssistant.includes(driverLower);
             });
             console.log(`📋 Filtered order history for driver "${driverFilter}": ${historyOrders.length} orders`);
         }
@@ -214,7 +215,8 @@ router.get('/order-history', async (req, res) => {
                 const driverLower = driverFilter.toLowerCase();
                 filteredImports = completedImports.filter(t => {
                     const importDriver = String(t.assigned_driver || t.driver_name || '').toLowerCase();
-                    return importDriver.includes(driverLower);
+                    const importAssistant = String(t.assistant_name || t.phuXe || '').toLowerCase();
+                    return importDriver.includes(driverLower) || importAssistant.includes(driverLower);
                 });
             }
 

@@ -454,6 +454,19 @@ const DispatchModule = {
                         </div>
 
                         <div style="margin-bottom: 16px;">
+                            <label style="display: block; margin-bottom: 8px; font-weight: 600;">Phụ xe (Tùy chọn)</label>
+                            <input type="text" id="assistant-name" class="form-control" placeholder="Nhập tên phụ xe" list="assistant-list">
+                            <datalist id="assistant-list">
+                                ${this.employees.map(e => `<option value="${e.name || e.full_name}">`).join('')}
+                            </datalist>
+                        </div>
+
+                        <div style="margin-bottom: 16px;">
+                            <label style="display: block; margin-bottom: 8px; font-weight: 600;">Thời gian giao</label>
+                            <input type="text" id="delivery-time" class="form-control" placeholder="VD: Chiều nay, 14:00...">
+                        </div>
+
+                        <div style="margin-bottom: 16px;">
                             <label style="display: block; margin-bottom: 8px; font-weight: 600;">Biển số xe *</label>
                             <input type="text" id="vehicle-plate" class="form-control" placeholder="VD: 51A-12345">
                         </div>
@@ -488,6 +501,8 @@ const DispatchModule = {
         const driverName = document.getElementById('driver-name').value.trim();
         const vehiclePlate = document.getElementById('vehicle-plate').value.trim();
         const note = document.getElementById('assign-note').value.trim();
+        const assistantName = document.getElementById('assistant-name').value.trim();
+        const deliveryTime = document.getElementById('delivery-time').value.trim();
 
         if (!driverName) {
             alert('Vui lòng nhập tên tài xế!');
@@ -501,7 +516,7 @@ const DispatchModule = {
 
         try {
             if (window.api) {
-                const data = await window.api.assignOrder(orderId, driverName, vehiclePlate, note);
+                const data = await window.api.assignOrder(orderId, driverName, vehiclePlate, note, assistantName, deliveryTime);
 
                 if (data.error) {
                     alert('Lỗi: ' + data.msg);
@@ -683,6 +698,18 @@ const DispatchModule = {
                                     <span style="color: #64748b;">Xe:</span>
                                     <strong>${order.vehicle_plate || order.plate || '---'}</strong>
                                 </div>
+                                ${(order.phuXe || order.assistant_name) ? `
+                                <div class="info-row">
+                                    <span style="color: #64748b;">Phụ xe:</span>
+                                    <strong>${order.phuXe || order.assistant_name}</strong>
+                                </div>
+                                ` : ''}
+                                ${(order.thoiGianGiao || order.delivery_time) ? `
+                                <div class="info-row">
+                                    <span style="color: #64748b;">Thời gian:</span>
+                                    <strong>${order.thoiGianGiao || order.delivery_time}</strong>
+                                </div>
+                                ` : ''}
                                 ${order.delivery_note ? `
                                 <div class="info-row" style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #f1f5f9; flex-direction: column; gap: 4px;">
                                     <span style="color: #64748b;"><i class="bi bi-pencil-square"></i> Ghi chú giao hàng:</span>
@@ -706,6 +733,8 @@ const DispatchModule = {
                                             <div style="font-weight: 600; margin-bottom: 4px;">${order.driver_name || order.driver}</div>
                                             <div style="font-size: 13px; color: #64748b;">
                                                 <i class="bi bi-truck"></i> ${order.vehicle_plate || order.plate || 'N/A'}
+                                                ${(order.phuXe || order.assistant_name) ? ` • <i class="bi bi-person-badge"></i> ${order.phuXe || order.assistant_name}` : ''}
+                                                ${(order.thoiGianGiao || order.delivery_time) ? ` • <i class="bi bi-clock"></i> ${order.thoiGianGiao || order.delivery_time}` : ''}
                                             </div>
                                         </div>
                                         <div style="display: flex; gap: 8px;">
