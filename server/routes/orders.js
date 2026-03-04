@@ -1552,13 +1552,16 @@ router.post('/:id/assign-multi', async (req, res) => {
                 if (a.assistant_name) {
                     const assistantObj = users.find(u => u.fullName === a.assistant_name || u.username === a.assistant_name);
                     if (assistantObj && assistantObj.telegramUsername) {
-                        assistantTag = ` - PX: ${a.assistant_name} (@${assistantObj.telegramUsername.replace('@', '')})`;
+                        assistantTag = `\n    🧑‍🔧 PX: ${a.assistant_name} (@${assistantObj.telegramUsername.replace('@', '')})`;
                     } else {
-                        assistantTag = ` - PX: ${a.assistant_name}`;
+                        assistantTag = `\n    🧑‍🔧 PX: ${a.assistant_name}`;
                     }
                 }
 
-                msg += `${i + 1}. ${a.driver_name}${driverTag} ${typeLabel} - ${a.qty}kg${assistantTag}\n`;
+                msg += `${i + 1}. <b>${a.driver_name}</b>${driverTag} ${typeLabel} - ${a.qty}kg${assistantTag}\n`;
+                if (a.plate) msg += `    🔢 Xe: ${a.plate}\n`;
+                if (a.delivery_time) msg += `    ⏰ Giao: ${a.delivery_time}\n`;
+                if (a.note) msg += `    📝 Ghi chú: ${a.note}\n`;
             });
 
             msg += `\n🔔 @sales`;
