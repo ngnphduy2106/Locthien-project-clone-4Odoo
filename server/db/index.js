@@ -93,7 +93,20 @@ export const db = {
         const id = sanitizeId(user.id || ('USER' + Date.now()));
         const newUser = { ...user, id, createdAt: new Date().toISOString() };
         if (useSupabase) {
-            const { data, error } = await supabase.from('users').insert(newUser).select().single();
+            // Map JS camelCase to Supabase lowercase
+            const dbInsert = {
+                id: newUser.id,
+                username: newUser.username,
+                password: newUser.password,
+                fullname: newUser.fullName || newUser.fullname,
+                role: newUser.role,
+                plate: newUser.plate,
+                status: newUser.status,
+                phone: newUser.phone,
+                basesalary: newUser.baseSalary || 0,
+                createdat: newUser.createdAt
+            };
+            const { data, error } = await supabase.from('users').insert(dbInsert).select().single();
             if (error) console.error('Supabase addUser error:', error);
             return data || newUser;
         }
@@ -109,7 +122,22 @@ export const db = {
         const { useSupabase, useFirebase } = getMode();
         const safeId = sanitizeId(id);
         if (useSupabase) {
-            const { data: updated, error } = await supabase.from('users').update(data).eq('id', safeId).select().single();
+            // Map JS camelCase to Supabase lowercase for updates
+            const dbUpdate = { ...data };
+            if (dbUpdate.fullName !== undefined) {
+                dbUpdate.fullname = dbUpdate.fullName;
+                delete dbUpdate.fullName;
+            }
+            if (dbUpdate.baseSalary !== undefined) {
+                dbUpdate.basesalary = dbUpdate.baseSalary;
+                delete dbUpdate.baseSalary;
+            }
+            if (dbUpdate.createdAt !== undefined) {
+                dbUpdate.createdat = dbUpdate.createdAt;
+                delete dbUpdate.createdAt;
+            }
+            const { data: updated, error } = await supabase.from('users').update(dbUpdate).eq('id', safeId).select().single();
+            if (error) console.error('Supabase updateUser error:', error);
             return updated;
         }
         if (useFirebase) {
