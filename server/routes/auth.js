@@ -87,7 +87,7 @@ router.post('/login', async (req, res) => {
 // POST /api/auth/register
 router.post('/register', async (req, res) => {
     try {
-        const { fullname, username, password, role, plate } = req.body;
+        const { fullname, username, password, role, plate, telegramUsername } = req.body;
 
         if (!fullname || !username) {
             return res.json(createResponse(true, 'Vui lòng nhập đủ thông tin!'));
@@ -112,7 +112,8 @@ router.post('/register', async (req, res) => {
             fullName: fullname,
             role: role || CONFIG.ROLES.DRIVER,
             plate: plate ? plate.toUpperCase() : '',
-            status: 'ACTIVE'
+            status: 'ACTIVE',
+            telegramUsername: telegramUsername || ''
         });
 
         res.json(createResponse(false, 'Đã tạo tài khoản thành công!', { id: newUser.id }));
@@ -139,7 +140,8 @@ router.get('/users', async (req, res) => {
             role: u.role,
             plate: u.plate || '',
             status: u.status || 'ACTIVE',
-            createdAt: u.createdAt || u.created_at
+            createdAt: u.createdAt || u.created_at,
+            telegramUsername: u.telegramUsername || u.telegram_username || ''
         }));
 
         res.json({ error: false, users: safeUsers });
@@ -152,7 +154,7 @@ router.get('/users', async (req, res) => {
 router.put('/users/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const { fullName, role, plate, status, password } = req.body;
+        const { fullName, role, plate, status, password, telegramUsername } = req.body;
 
         const updateData = {};
         if (fullName !== undefined) updateData.fullName = fullName;
@@ -160,6 +162,7 @@ router.put('/users/:id', async (req, res) => {
         if (plate !== undefined) updateData.plate = plate.toUpperCase();
         if (status !== undefined) updateData.status = status;
         if (password !== undefined && password.trim()) updateData.password = password;
+        if (telegramUsername !== undefined) updateData.telegramUsername = telegramUsername.trim();
 
         const updated = await db.updateUser(id, updateData);
         res.json(createResponse(false, 'Đã cập nhật tài khoản!', { user: updated }));

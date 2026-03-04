@@ -6889,6 +6889,9 @@ function renderUsersTable() {
             <td>${getRoleBadge(u.role)}</td>
             <td>${u.plate || '-'}</td>
             <td>
+                ${u.telegramUsername ? `<a href="https://t.me/${u.telegramUsername.replace('@', '')}" target="_blank" style="text-decoration:none;">@${u.telegramUsername.replace('@', '')}</a>` : '<span style="color:var(--text-muted); font-size:12px;">Chưa có</span>'}
+            </td>
+            <td>
                 <span class="badge badge-${u.status === 'ACTIVE' ? 'success' : 'secondary'}">
                     ${u.status === 'ACTIVE' ? 'Hoạt động' : 'Đã khóa'}
                 </span>
@@ -6953,12 +6956,14 @@ function showCreateUserModal() {
     const password = window.$('#new-user-password');
     const role = window.$('#new-user-role');
     const plate = window.$('#new-user-plate');
+    const telegram = window.$('#new-user-telegram');
 
     if (fullname) fullname.value = '';
     if (phone) phone.value = '';
     if (password) password.value = '';
     if (role) role.value = 'DRIVER';
     if (plate) plate.value = '';
+    if (telegram) telegram.value = '';
 
     if (modal) modal.classList.remove('hidden');
 }
@@ -6978,6 +6983,7 @@ async function submitCreateUser() {
     const password = window.$('#new-user-password')?.value?.trim();
     const role = window.$('#new-user-role')?.value;
     const plate = window.$('#new-user-plate')?.value?.trim();
+    const telegramUsername = window.$('#new-user-telegram')?.value?.trim();
 
     if (!fullname || !username) {
         alert('Vui lòng nhập họ tên và số điện thoại!');
@@ -6990,7 +6996,7 @@ async function submitCreateUser() {
         const res = await fetch('/api/auth/register', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ fullname, username, password, role, plate })
+            body: JSON.stringify({ fullname, username, password, role, plate, telegramUsername })
         });
 
         const data = await res.json();
@@ -7026,6 +7032,7 @@ async function editUser(userId) {
     const roleSelect = window.$('#edit-user-role');
     const plateInput = window.$('#edit-user-plate');
     const passwordInput = window.$('#edit-user-password');
+    const telegramInput = window.$('#edit-user-telegram');
     const avatarEl = window.$('#edit-user-avatar');
     const displayNameEl = window.$('#edit-user-display-name');
     const displayPhoneEl = window.$('#edit-user-display-phone');
@@ -7036,6 +7043,7 @@ async function editUser(userId) {
     if (roleSelect) roleSelect.value = user.role || 'DRIVER';
     if (plateInput) plateInput.value = user.plate || '';
     if (passwordInput) passwordInput.value = '';
+    if (telegramInput) telegramInput.value = user.telegramUsername ? user.telegramUsername.replace('@', '') : '';
 
     // Update display elements
     if (avatarEl) avatarEl.textContent = (user.fullName || 'U').charAt(0).toUpperCase();
@@ -7063,6 +7071,7 @@ async function submitEditUser() {
     const role = window.$('#edit-user-role')?.value;
     const plate = window.$('#edit-user-plate')?.value?.trim();
     const password = window.$('#edit-user-password')?.value?.trim();
+    const telegramUsername = window.$('#edit-user-telegram')?.value?.trim();
 
     if (!userId) {
         alert('Lỗi: Không tìm thấy ID tài khoản!');
@@ -7080,7 +7089,8 @@ async function submitEditUser() {
         const updateData = {
             fullName: fullName,
             role: role.toUpperCase(),
-            plate: plate
+            plate: plate,
+            telegramUsername: telegramUsername
         };
 
         // Only include password if provided

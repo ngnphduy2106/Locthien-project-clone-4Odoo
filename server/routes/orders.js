@@ -774,8 +774,22 @@ router.put('/:id/assign', async (req, res) => {
             msg += `👤 KH: ${orderInfo?.khach || orderInfo?.account_name || ''}\n`;
             msg += `📍 ${orderInfo?.diaChi || orderInfo?.shipping_address || ''}\n`;
             msg += `──────────────\n`;
-            msg += `🚗 Tài xế: <b>${driverName}</b>\n`;
-            if (assistantName) msg += `🧑‍🔧 Phụ xe: ${assistantName}\n`;
+
+            // Lookup telegram usernames
+            const users = await db.getUsers();
+            const driverObj = users.find(u => u.fullName === driverName || u.username === driverName);
+            const driverTag = driverObj && driverObj.telegramUsername ? ` (@${driverObj.telegramUsername.replace('@', '')})` : '';
+
+            let assistantTag = '';
+            if (assistantName) {
+                const assistantObj = users.find(u => u.fullName === assistantName || u.username === assistantName);
+                if (assistantObj && assistantObj.telegramUsername) {
+                    assistantTag = ` (@${assistantObj.telegramUsername.replace('@', '')})`;
+                }
+            }
+
+            msg += `🚗 Tài xế: <b>${driverName}</b>${driverTag}\n`;
+            if (assistantName) msg += `🧑‍🔧 Phụ xe: ${assistantName}${assistantTag}\n`;
             msg += `🔢 Biển số: ${plate || 'Chưa có'}\n`;
             if (deliveryTime) msg += `⏰ Tgian giao: ${deliveryTime}\n`;
             if (note) msg += `📝 Ghi chú: ${note}\n`;
@@ -1523,9 +1537,28 @@ router.post('/:id/assign-multi', async (req, res) => {
 
             msg += `\n<b>Danh sách tài xế${hadPreviousAssignments ? ' mới' : ''}:</b>\n`;
 
+            const users = await db.getUsers();
+
             assignments.forEach((a, i) => {
                 const typeLabel = a.type === 'external' ? '(Ngoài)' : '(NB)';
-                msg += `${i + 1}. ${a.driver_name} ${typeLabel} - ${a.qty}kg\n`;
+
+                let driverTag = '';
+                const driverObj = users.find(u => u.fullName === a.driver_name || u.username === a.driver_name);
+                if (driverObj && driverObj.telegramUsername) {
+                    driverTag = ` (@${driverObj.telegramUsername.replace('@', '')})`;
+                }
+
+                let assistantTag = '';
+                if (a.assistant_name) {
+                    const assistantObj = users.find(u => u.fullName === a.assistant_name || u.username === a.assistant_name);
+                    if (assistantObj && assistantObj.telegramUsername) {
+                        assistantTag = ` - PX: ${a.assistant_name} (@${assistantObj.telegramUsername.replace('@', '')})`;
+                    } else {
+                        assistantTag = ` - PX: ${a.assistant_name}`;
+                    }
+                }
+
+                msg += `${i + 1}. ${a.driver_name}${driverTag} ${typeLabel} - ${a.qty}kg${assistantTag}\n`;
             });
 
             msg += `\n🔔 @sales`;

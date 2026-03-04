@@ -1455,6 +1455,7 @@
                                         <th>Tài khoản</th>
                                         <th>Vai trò</th>
                                         <th>Biển số</th>
+                                        <th>Telegram</th>
                                         <th>Trạng thái</th>
                                         <th>Thao tác</th>
                                     </tr>
@@ -1607,6 +1608,13 @@
                         <input type="text" id="new-user-plate" class="form-control" placeholder="VD: 51D-123.45">
                     </div>
                 </div>
+                <div class="form-group">
+                    <label class="form-label"><i class="bi bi-telegram"></i> Telegram Username</label>
+                    <input type="text" id="new-user-telegram" class="form-control"
+                        placeholder="VD: nguyenvana123 (Không cần @)">
+                    <small style="color:var(--text-muted); font-size:12px;">Dùng để tự động tag tên khi phân công
+                        chuyến.</small>
+                </div>
                 <div style="display:flex; gap:12px; margin-top:24px;">
                     <button class="btn btn-outline" onclick="closeCreateUserModal()" style="flex:1;">
                         <i class="bi bi-x"></i> Hủy
@@ -1672,6 +1680,14 @@
                         <label class="form-label"><i class="bi bi-truck"></i> Biển số xe</label>
                         <input type="text" id="edit-user-plate" class="form-control" placeholder="VD: 51D-123.45">
                     </div>
+                </div>
+
+                <div class="form-group" style="margin-top:16px;">
+                    <label class="form-label"><i class="bi bi-telegram"></i> Telegram Username</label>
+                    <input type="text" id="edit-user-telegram" class="form-control"
+                        placeholder="VD: nguyenvana123 (Không cần @)">
+                    <small style="color:var(--text-muted); font-size:12px;">Dùng để tự động tag tên khi phân công
+                        chuyến.</small>
                 </div>
 
                 <!-- Password Change Section -->

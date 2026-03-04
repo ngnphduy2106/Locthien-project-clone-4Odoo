@@ -252,12 +252,26 @@ router.put('/:id/assign', async (req, res) => {
         // Send Telegram notification
         try {
             const { sendTelegramMessage } = await import('../services/telegram.js');
+
+            // Lookup telegram usernames
+            const users = await db.getUsers();
+            const driverObj = users.find(u => u.fullName === driver_name || u.username === driver_name);
+            const driverTag = driverObj && driverObj.telegramUsername ? ` (@${driverObj.telegramUsername.replace('@', '')})` : '';
+
+            let assistantTag = '';
+            if (assistant_name) {
+                const assistantObj = users.find(u => u.fullName === assistant_name || u.username === assistant_name);
+                if (assistantObj && assistantObj.telegramUsername) {
+                    assistantTag = ` (@${assistantObj.telegramUsername.replace('@', '')})`;
+                }
+            }
+
             let msg = `🚛 <b>PHÂN CÔNG XE - ĐƠN GHÉP</b>\n`;
             msg += `#${data.merged_no || id}\n`;
             msg += `📦 Điểm giao: ${data.total_stops} điểm\n`;
             msg += `──────────────\n`;
-            msg += `🚗 Tài xế: <b>${driver_name}</b>\n`;
-            if (assistant_name) msg += `🧑‍🔧 Phụ xe: ${assistant_name}\n`;
+            msg += `🚗 Tài xế: <b>${driver_name}</b>${driverTag}\n`;
+            if (assistant_name) msg += `🧑‍🔧 Phụ xe: ${assistant_name}${assistantTag}\n`;
             msg += `🔢 Biển số: ${plate || 'Chưa có'}\n`;
             if (delivery_time) msg += `⏰ Tgian giao: ${delivery_time}\n`;
 

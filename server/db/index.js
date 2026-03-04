@@ -65,7 +65,8 @@ export const db = {
                 ...u,
                 fullName: u.fullname || u.fullName || '',
                 baseSalary: u.basesalary || 0,
-                createdAt: u.createdat || u.createdAt
+                createdAt: u.createdat || u.createdAt,
+                telegramUsername: u.telegram_username || ''
             }));
         }
         if (useFirebase) {
@@ -104,7 +105,8 @@ export const db = {
                 status: newUser.status,
                 phone: newUser.phone,
                 basesalary: newUser.baseSalary || 0,
-                createdat: newUser.createdAt
+                createdat: newUser.createdAt,
+                telegram_username: newUser.telegramUsername || null
             };
             const { data, error } = await supabase.from('users').insert(dbInsert).select().single();
             if (error) console.error('Supabase addUser error:', error);
@@ -135,6 +137,10 @@ export const db = {
             if (dbUpdate.createdAt !== undefined) {
                 dbUpdate.createdat = dbUpdate.createdAt;
                 delete dbUpdate.createdAt;
+            }
+            if (dbUpdate.telegramUsername !== undefined) {
+                dbUpdate.telegram_username = dbUpdate.telegramUsername;
+                delete dbUpdate.telegramUsername;
             }
             const { data: updated, error } = await supabase.from('users').update(dbUpdate).eq('id', safeId).select().single();
             if (error) console.error('Supabase updateUser error:', error);
