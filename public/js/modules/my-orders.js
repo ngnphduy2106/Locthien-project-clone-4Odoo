@@ -450,6 +450,7 @@ const MyOrdersModule = {
         const userStr = localStorage.getItem('user');
         const user = userStr ? JSON.parse(userStr) : {};
         const isAdmin = (user.role || '').toLowerCase() === 'admin' || (user.role || '').toLowerCase() === 'tester';
+        const isDriver = ['driver', 'taixe', 'assistant', 'phụ xe'].includes((user.role || '').toLowerCase());
 
         // Build product list - show all products (same for everyone)
         let products = order.products || order.cart || [];

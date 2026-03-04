@@ -2928,6 +2928,7 @@ async function viewOrderDetail(orderId, options = {}) {
     const currentUser = window.state?.user || {};
     const role = String(currentUser.role || '').toLowerCase();
     const isAdmin = role === 'admin' || role === 'tester';
+    const isDriver = role === 'driver' || role === 'taixe' || role === 'assistant' || role === 'phụ xe';
     const creatorName = order.creator_name || order.creatorName || order.nhanVienTao || order.created_by || '';
     const isCreator = creatorName && currentUser.name && creatorName === currentUser.name;
     const canViewPrice = isAdmin || isCreator;
