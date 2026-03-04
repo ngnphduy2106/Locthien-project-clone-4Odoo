@@ -480,12 +480,22 @@ const performSync = async () => {
             // Send Telegram notification for new orders
             const money = (mappedOrder.sale_order_amount || 0).toLocaleString('vi-VN');
             const productsList = (mappedOrder.sale_order_product_mappings || [])
-                .map(p => `- ${p.name}: ${p.qty} ${p.unit}`)
+                .map(p => `- ${p.name}: ${Number(p.qty).toLocaleString('vi-VN')} ${p.unit}`)
                 .join('\n');
+
+            // Format date if available
+            let formattedDate = 'N/A';
+            if (item.sale_order_date) {
+                try {
+                    formattedDate = new Date(item.sale_order_date).toLocaleDateString('vi-VN');
+                } catch (e) {
+                    formattedDate = item.sale_order_date.split('T')[0]; // fallback
+                }
+            }
 
             let msg = `🆕 <b>ĐƠN HÀNG MỚI TỪ MISA</b>\n`;
             msg += `📦 Mã: <b>${saleOrderNo}</b>\n`;
-            msg += `📅 Ngày: ${item.sale_order_date || 'N/A'}\n`;
+            msg += `📅 Ngày: ${formattedDate}\n`;
             msg += `👤 Khách: ${item.account_name || 'N/A'}\n`;
             msg += `📍 Địa chỉ: ${mappedOrder.shipping_address || 'N/A'}\n`;
 

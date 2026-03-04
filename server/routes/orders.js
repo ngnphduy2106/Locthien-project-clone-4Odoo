@@ -1558,7 +1558,7 @@ router.post('/:id/assign-multi', async (req, res) => {
                     }
                 }
 
-                msg += `${i + 1}. <b>${a.driver_name}</b>${driverTag} ${typeLabel} - ${a.qty}kg${assistantTag}\n`;
+                msg += `${i + 1}. <b>${a.driver_name}</b>${driverTag} ${typeLabel} - ${Number(a.qty).toLocaleString('vi-VN')}kg${assistantTag}\n`;
                 if (a.plate) msg += `    🔢 Xe: ${a.plate}\n`;
                 if (a.delivery_time) msg += `    ⏰ Giao: ${a.delivery_time}\n`;
                 if (a.note) msg += `    📝 Ghi chú: ${a.note}\n`;
