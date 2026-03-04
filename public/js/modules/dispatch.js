@@ -241,7 +241,7 @@ const DispatchModule = {
                 status === 'Đang giao' || status === 'DELIVERING' || status === 'Đang thực hiện' ? 'var(--info)' : 'var(--warning)';
 
             return `
-                <div class="compact-order-row" onclick="DispatchModule.viewOrderDetail('${orderId}')" style="
+                <div class="compact-order-row" onclick="viewOrderDetail('${orderId}')" style="
                     display: flex;
                     flex-direction: column;
                     gap: 2px;
@@ -263,7 +263,7 @@ const DispatchModule = {
                             <button class="btn ${order.is_pinned ? 'btn-warning' : 'btn-outline'} btn-sm" onclick="event.stopPropagation(); DispatchModule.togglePin('${orderId}', ${!order.is_pinned})" style="padding:2px; font-size:9px; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center;" title="${order.is_pinned ? 'Bỏ ghim' : 'Ghim đơn'}">
                                 <i class="bi bi-pin${order.is_pinned ? '-fill' : ''}"></i>
                             </button>
-                            <button class="btn btn-outline btn-sm" onclick="DispatchModule.viewOrderDetail('${orderId}')" style="padding:2px; font-size:9px; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center;">
+                            <button class="btn btn-outline btn-sm" onclick="viewOrderDetail('${orderId}')" style="padding:2px; font-size:9px; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center;">
                                 <i class="bi bi-eye"></i>
                             </button>
                             ${this.getActionButton(order)}
@@ -297,7 +297,7 @@ const DispatchModule = {
             `;
         } else if (status === 'Đang giao' || status === 'DELIVERING' || status === 'IN_PROGRESS' || status === 'Đang thực hiện') {
             return `
-                <button class="btn btn-success btn-sm" onclick="event.stopPropagation(); DispatchModule.viewOrderDetail('${orderId}')" style="padding:3px 6px; font-size:9px; border-radius:50%; width:24px; height:24px;">
+                <button class="btn btn-success btn-sm" onclick="event.stopPropagation(); viewOrderDetail('${orderId}')" style="padding:3px 6px; font-size:9px; border-radius:50%; width:24px; height:24px;">
                     <i class="bi bi-check"></i>
                 </button>
             `;
