@@ -591,6 +591,12 @@ function applyRoleBasedUI(role) {
         el.style.display = isDispatcher ? 'none' : '';
     });
 
+    // Hide create order/export for DISPATCHER
+    const navCreateOrder = window.$('#nav-create-order');
+    const navCreateExport = window.$('#nav-create-export');
+    if (navCreateOrder) navCreateOrder.style.display = isDispatcher ? 'none' : 'block';
+    if (navCreateExport) navCreateExport.style.display = isDispatcher ? 'none' : 'block';
+
     // Hide Dashboard for DRIVERS
     const navDashboard = window.$('#nav-dashboard');
     if (navDashboard) navDashboard.style.display = isDriver ? 'none' : 'block';
@@ -7159,7 +7165,8 @@ async function updateUserStatus(userId, status) {
 // Show admin menu on login
 function showAdminMenuIfNeeded() {
     const navUsers = window.$('#nav-users');
-    if (navUsers && isAdminRole()) {
+    const isDispatcher = state.user?.role?.toLowerCase() === 'dispatcher';
+    if (navUsers && isAdminRole() && !isDispatcher) {
         navUsers.style.display = 'block';
     }
 }
