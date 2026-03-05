@@ -591,6 +591,10 @@ function applyRoleBasedUI(role) {
         el.style.display = isDispatcher ? 'none' : '';
     });
 
+    // Hide Dashboard for DRIVERS
+    const navDashboard = window.$('#nav-dashboard');
+    if (navDashboard) navDashboard.style.display = isDriver ? 'none' : 'block';
+
     // Show nav-users for admin
     const navUsers = window.$('#nav-users');
     if (navUsers) navUsers.style.display = isAdmin ? 'block' : 'none';
