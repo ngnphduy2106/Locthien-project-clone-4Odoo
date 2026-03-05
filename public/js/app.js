@@ -595,15 +595,15 @@ function applyRoleBasedUI(role) {
     const navDashboard = window.$('#nav-dashboard');
     if (navDashboard) navDashboard.style.display = isDriver ? 'none' : 'block';
 
-    // Show nav-users for admin
+    // Show nav-users for admin (but NOT dispatcher)
     const navUsers = window.$('#nav-users');
-    if (navUsers) navUsers.style.display = isAdmin ? 'block' : 'none';
+    if (navUsers) navUsers.style.display = (isAdmin && !isDispatcher) ? 'block' : 'none';
 
-    // Show nav-suppliers for admin
+    // Show nav-suppliers for admin/dispatcher
     const navSuppliers = window.$('#nav-suppliers');
     if (navSuppliers) navSuppliers.style.display = isAdmin ? 'block' : 'none';
 
-    // Show nav-customers for admin
+    // Show nav-customers for admin/dispatcher
     const navCustomers = window.$('#nav-customers');
     if (navCustomers) navCustomers.style.display = isAdmin ? 'block' : 'none';
 
