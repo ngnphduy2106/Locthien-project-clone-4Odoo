@@ -511,13 +511,14 @@ function initApp() {
 
     // Show appropriate section based on role
     const normalizedRole = (state.user?.role || '').toLowerCase();
-    if (normalizedRole === 'driver') {
+    const isDriverRole = normalizedRole === 'driver' || normalizedRole === 'assistant' || normalizedRole === 'phụ xe';
+
+    if (isDriverRole) {
         showSection('my-orders');
     } else {
         showSection('dashboard');
     }
 }
-
 // Initialize all date pickers with Vietnamese format
 function initDatePickers() {
     const flatpickrConfig = {
