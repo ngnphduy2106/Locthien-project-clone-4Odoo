@@ -6049,6 +6049,22 @@ async function viewImportDetail(importId) {
     // Use soDon (from myOrders) or ticket_no (from imports state) or id as fallback
     const displayTicketNo = imp.soDon || imp.ticket_no || imp.id;
 
+    // Fetch merged order info if this import is part of a merge
+    let impMergedSisterOrders = [];
+    if (imp.merged_order_no) {
+        try {
+            const mergeResp = await fetch(`/api/merged-orders/${imp.merged_order_no}`);
+            const mergeData = await mergeResp.json();
+            if (!mergeData.error && mergeData.data) {
+                const sourceNos = mergeData.data.source_order_nos || [];
+                impMergedSisterOrders = sourceNos.filter(no => String(no) !== String(displayTicketNo));
+                console.log(`🔗 Import merged sisters:`, impMergedSisterOrders);
+            }
+        } catch (e) {
+            console.log('No merged order data for import:', e.message);
+        }
+    }
+
     if (modalTitle) modalTitle.textContent = `Chi tiết phiếu nhập #${displayTicketNo}`;
 
     if (modalBody) {
@@ -6056,7 +6072,10 @@ async function viewImportDetail(importId) {
             <div class="order-detail-grid">
                 <div class="detail-row">
                     <label>Mã phiếu:</label>
-                    <span><strong>#${displayTicketNo}</strong></span>
+                    <span>
+                        <strong>#${displayTicketNo}</strong>
+                        ${imp.merged_order_no ? `<div style="display:inline-block; margin-left:8px; background:linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color:white; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:600;"><i class="bi bi-link-45deg"></i> Chuyến ghép: ${imp.merged_order_no}</div>` : ''}
+                    </span>
                 </div>
                 <div class="detail-row">
                     <label>Nhà cung cấp:</label>
@@ -6092,6 +6111,24 @@ async function viewImportDetail(importId) {
                 </div>` : ''}
             </div>
             
+            ${imp.merged_order_no && impMergedSisterOrders.length > 0 ? `
+            <div style="margin:16px 0; padding:12px 16px; background:linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%); border-radius:12px; border-left:4px solid #4f46e5;">
+                <div style="font-size:12px; color:#3730a3; font-weight:600; margin-bottom:8px;">
+                    <i class="bi bi-link-45deg"></i> ĐƠN GHÉP - Chuyến ${imp.merged_order_no}
+                </div>
+                <div style="font-size:13px; color:#4338ca;">
+                    Phiếu nhập này được ghép cùng chuyến với:
+                </div>
+                <div style="margin-top:8px; display:flex; flex-wrap:wrap; gap:6px;">
+                    ${impMergedSisterOrders.map(no => `
+                        <span style="background:#4f46e5; color:white; padding:4px 10px; border-radius:8px; font-size:12px; font-weight:600;">
+                            <i class="bi bi-box-arrow-up-right" style="font-size:10px;"></i> #${no}
+                        </span>
+                    `).join('')}
+                </div>
+            </div>
+            ` : ''}
+
             ${(() => {
                 // Multi-driver assignment section for imports
                 const allAssignments = imp.all_assignments || [];
