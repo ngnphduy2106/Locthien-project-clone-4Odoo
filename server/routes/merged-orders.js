@@ -75,13 +75,26 @@ router.get('/:id', async (req, res) => {
         const { id } = req.params;
         const supabase = getSupabase();
 
-        const { data: merged, error } = await supabase
+        // Try by merged_no first (e.g. M2603001), then fallback to UUID id
+        let merged = null;
+        const { data: byNo } = await supabase
             .from('merged_orders')
             .select('*')
-            .eq('id', id)
+            .eq('merged_no', id)
             .single();
 
-        if (error || !merged) {
+        if (byNo) {
+            merged = byNo;
+        } else {
+            const { data: byId } = await supabase
+                .from('merged_orders')
+                .select('*')
+                .eq('id', id)
+                .single();
+            merged = byId;
+        }
+
+        if (!merged) {
             return res.json(createResponse(true, 'Không tìm thấy đơn ghép'));
         }
 

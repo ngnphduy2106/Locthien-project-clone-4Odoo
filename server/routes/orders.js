@@ -1666,14 +1666,32 @@ router.post('/:id/assign-multi', async (req, res) => {
         let finalMergedOrderNo = null;
         if (req.body.mergeWithOrderNo) {
             console.log(`🔗 Processing merge request with order: ${req.body.mergeWithOrderNo}`);
-            const targetOrder = await db.getOrder(req.body.mergeWithOrderNo);
+            const mergePartnerNo = req.body.mergeWithOrderNo;
+            const targetOrder = await db.getOrder(mergePartnerNo);
             const currentOrder = await db.getOrder(id);
 
-            if (targetOrder && currentOrder) {
-                const targetSaleOrderNo = targetOrder.sale_order_no || targetOrder.id;
-                const currentSaleOrderNo = currentOrder.sale_order_no || id;
+            // Check if partner is an import ticket (N prefix)
+            let isImportPartner = false;
+            let importPartner = null;
+            if (!targetOrder && mergePartnerNo.startsWith('N')) {
+                const { data: impTicket } = await supabase
+                    .from('import_tickets')
+                    .select('*')
+                    .eq('ticket_no', mergePartnerNo)
+                    .single();
+                if (impTicket) {
+                    isImportPartner = true;
+                    importPartner = impTicket;
+                }
+            }
 
-                if (targetOrder.merged_order_no) {
+            if ((targetOrder || isImportPartner) && currentOrder) {
+                const targetSaleOrderNo = isImportPartner ? importPartner.ticket_no : (targetOrder.sale_order_no || targetOrder.id);
+                const currentSaleOrderNo = currentOrder.sale_order_no || id;
+                const mainDriverName = assignments[0]?.driver_name || '';
+                const mainPlate = assignments[0]?.plate || '';
+
+                if (targetOrder?.merged_order_no) {
                     finalMergedOrderNo = targetOrder.merged_order_no;
                     // Update existing merged order
                     const { data: existingMerged } = await supabase
@@ -1705,16 +1723,33 @@ router.post('/:id/assign-multi', async (req, res) => {
                             merged_no: finalMergedOrderNo,
                             source_order_nos: [targetSaleOrderNo, currentSaleOrderNo],
                             total_stops: 2,
-                            total_amount: Number(targetOrder.sale_order_amount || 0) + Number(currentOrder.sale_order_amount || 0),
-                            status: 'assigned', // Initial state
-                            driver_name: assignments[0]?.driver_name || '',
-                            plate: assignments[0]?.plate || ''
+                            total_amount: Number((isImportPartner ? 0 : targetOrder.sale_order_amount) || 0) + Number(currentOrder.sale_order_amount || 0),
+                            status: 'assigned',
+                            driver_name: mainDriverName,
+                            plate: mainPlate
                         });
 
-                    // Update target order with this new merged_order_no
-                    await db.updateOrder(req.body.mergeWithOrderNo, {
-                        merged_order_no: finalMergedOrderNo
-                    });
+                    // Update target/partner order with merged_order_no + status + driver
+                    if (isImportPartner) {
+                        await supabase
+                            .from('import_tickets')
+                            .update({
+                                merged_order_no: finalMergedOrderNo,
+                                status: 'assigned',
+                                assigned_driver: mainDriverName,
+                                assigned_plate: mainPlate
+                            })
+                            .eq('ticket_no', mergePartnerNo);
+                        console.log(`✅ Import partner ${mergePartnerNo} updated: status=assigned, driver=${mainDriverName}`);
+                    } else {
+                        await db.updateOrder(mergePartnerNo, {
+                            merged_order_no: finalMergedOrderNo,
+                            status: CONFIG.STATUS.DELIVERING,
+                            taiXe: mainDriverName,
+                            bienSo: mainPlate
+                        });
+                        console.log(`✅ Export partner ${targetSaleOrderNo} updated: status=${CONFIG.STATUS.DELIVERING}, driver=${mainDriverName}`);
+                    }
                 }
             }
         }

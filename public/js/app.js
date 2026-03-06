@@ -3045,6 +3045,23 @@ async function viewOrderDetail(orderId, options = {}) {
         console.log('No multi-driver data:', e.message);
     }
 
+    // Fetch merged order info if this order is part of a merge
+    let mergedSisterOrders = [];
+    const currentOrderNo = order.soDon || order.sale_order_no || order.id;
+    if (order.merged_order_no) {
+        try {
+            const mergeResp = await fetch(`/api/merged-orders/${order.merged_order_no}`);
+            const mergeData = await mergeResp.json();
+            if (!mergeData.error && mergeData.data) {
+                const sourceNos = mergeData.data.source_order_nos || [];
+                mergedSisterOrders = sourceNos.filter(no => String(no) !== String(currentOrderNo));
+                console.log(`🔗 Merged sisters:`, mergedSisterOrders);
+            }
+        } catch (e) {
+            console.log('No merged order data:', e.message);
+        }
+    }
+
     if (modalTitle) modalTitle.textContent = `Chi tiết đơn hàng #${order.soDon || order.sale_order_no || order.id}`;
 
     if (modalBody) {
@@ -3105,6 +3122,24 @@ async function viewOrderDetail(orderId, options = {}) {
                 ` : ''}
             </div>
             
+            ${order.merged_order_no && mergedSisterOrders.length > 0 ? `
+            <div style="margin:16px 0; padding:12px 16px; background:linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%); border-radius:12px; border-left:4px solid #4f46e5;">
+                <div style="font-size:12px; color:#3730a3; font-weight:600; margin-bottom:8px;">
+                    <i class="bi bi-link-45deg"></i> ĐƠN GHÉP - Chuyến ${order.merged_order_no}
+                </div>
+                <div style="font-size:13px; color:#4338ca;">
+                    Đơn này được ghép cùng chuyến với:
+                </div>
+                <div style="margin-top:8px; display:flex; flex-wrap:wrap; gap:6px;">
+                    ${mergedSisterOrders.map(no => `
+                        <span style="background:#4f46e5; color:white; padding:4px 10px; border-radius:8px; font-size:12px; font-weight:600;">
+                            <i class="bi bi-box-arrow-up-right" style="font-size:10px;"></i> #${no}
+                        </span>
+                    `).join('')}
+                </div>
+            </div>
+            ` : ''}
+
             ${order.misa_note ? `
             <div style="margin:16px 0; padding:12px 16px; background:linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%); border-radius:12px; border-left:4px solid #f59e0b;">
                 <div style="font-size:12px; color:#92400e; font-weight:600; margin-bottom:6px;">
