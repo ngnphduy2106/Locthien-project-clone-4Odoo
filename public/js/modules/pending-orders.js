@@ -6,11 +6,49 @@
 const PendingOrdersModule = {
     orders: [],
     filteredOrders: [],
+    currentPage: 1,
+    itemsPerPage: 15,
+    dateRange: null,
 
     // Initialize module
     init() {
         console.log('🚚 Pending Orders Module initialized');
+        this.initDateRange();
         this.loadOrders();
+    },
+
+    initDateRange() {
+        const dateInput = document.getElementById('pending-orders-date-filter');
+        if (dateInput && typeof flatpickr !== 'undefined') {
+            flatpickr(dateInput, {
+                mode: 'range',
+                dateFormat: 'd/m/Y',
+                locale: 'vn',
+                onChange: (selectedDates) => {
+                    if (selectedDates.length === 2) {
+                        this.dateRange = {
+                            start: selectedDates[0],
+                            end: new Date(selectedDates[1].setHours(23, 59, 59, 999))
+                        };
+                        this.handleSearch();
+                    }
+                }
+            });
+        }
+    },
+
+    clearDateFilter() {
+        const dateInput = document.getElementById('pending-orders-date-filter');
+        if (dateInput && typeof flatpickr !== 'undefined' && dateInput._flatpickr) {
+            dateInput._flatpickr.clear();
+        }
+        this.dateRange = null;
+        this.handleSearch();
+    },
+
+    handleSearch() {
+        this.currentPage = 1;
+        this.filterOrders();
     },
 
     // Load pending and assigned orders (export + import)
@@ -153,13 +191,51 @@ const PendingOrdersModule = {
             }).join('');
         };
 
-        const exportOrders = this.filteredOrders.filter(o => o._type === 'export');
-        const importOrders = this.filteredOrders.filter(o => o._type === 'import');
+        const totalItems = this.filteredOrders.length;
+        const totalPages = Math.ceil(totalItems / this.itemsPerPage) || 1;
+        if (this.currentPage > totalPages) this.currentPage = totalPages;
+
+        const startIdx = (this.currentPage - 1) * this.itemsPerPage;
+        const endIdx = startIdx + this.itemsPerPage;
+        const paginatedOrders = this.filteredOrders.slice(startIdx, endIdx);
+
+        const exportOrders = paginatedOrders.filter(o => o._type === 'export');
+        const importOrders = paginatedOrders.filter(o => o._type === 'import');
 
         containerExport.innerHTML = renderTable(exportOrders, false);
         containerImport.innerHTML = renderTable(importOrders, true);
 
-        console.log('✅ Rendered pending orders split by export/import');
+        this.updatePaginationInfo(totalItems, totalPages);
+        console.log('✅ Rendered pending orders split by export/import (page ' + this.currentPage + ')');
+    },
+
+    updatePaginationInfo(totalItems, totalPages) {
+        const infoSpan = document.getElementById('pending-orders-page-info');
+        if (infoSpan) {
+            infoSpan.textContent = `Trang ${this.currentPage} / ${totalPages} (${totalItems} đơn)`;
+        }
+
+        const paginationDiv = document.getElementById('pending-orders-pagination');
+        if (paginationDiv) {
+            const buttons = paginationDiv.querySelectorAll('.pagination-btn');
+            if (buttons.length >= 2) {
+                buttons[0].disabled = this.currentPage === 1;
+                buttons[1].disabled = this.currentPage === totalPages;
+            }
+        }
+    },
+
+    changePage(offset) {
+        const totalPages = Math.ceil(this.filteredOrders.length / this.itemsPerPage) || 1;
+        let newPage = this.currentPage + offset;
+
+        if (newPage < 1) newPage = 1;
+        if (newPage > totalPages) newPage = totalPages;
+
+        if (newPage !== this.currentPage) {
+            this.currentPage = newPage;
+            this.renderOrders();
+        }
     },
 
     // Filter orders based on search, status, and type
@@ -177,6 +253,14 @@ const PendingOrdersModule = {
                 if (status === 'assigned' && order._status !== 'Đang giao') return false;
                 if (status === 'import' && order._type !== 'import') return false;
                 if (status === 'export' && order._type !== 'export') return false;
+            }
+
+            // Date Range filter
+            if (this.dateRange) {
+                const orderDateObj = new Date(order.ngay || order.sale_order_date || order.created_date || 0);
+                if (orderDateObj < this.dateRange.start || orderDateObj > this.dateRange.end) {
+                    return false;
+                }
             }
 
             // Search filter

@@ -1152,11 +1152,19 @@
                         <div class="search-input" style="flex:1; min-width:200px;">
                             <i class="bi bi-search"></i>
                             <input type="text" placeholder="Tìm kiếm theo mã đơn, khách hàng, tài xế..."
-                                id="pending-orders-search" oninput="PendingOrdersModule.filterOrders()">
+                                id="pending-orders-search" oninput="PendingOrdersModule.handleSearch()">
+                        </div>
+                        <div style="display:flex; gap:8px; align-items:center;">
+                            <input type="text" id="pending-orders-date-filter" class="form-control"
+                                style="width:auto; min-width:220px;" placeholder="Từ ngày - Đến ngày" readonly>
+                            <button class="btn btn-outline btn-sm" onclick="PendingOrdersModule.clearDateFilter()"
+                                title="Xóa lọc ngày">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
                         </div>
                         <select id="pending-orders-status" class="form-select" style="width:auto; min-width:150px;"
-                            onchange="PendingOrdersModule.filterOrders()">
-                            <option value="">Tất cả</option>
+                            onchange="PendingOrdersModule.handleSearch()">
+                            <option value="">Tất cả trạng thái</option>
                             <option value="pending">Chưa giao</option>
                             <option value="assigned">Đang giao</option>
                             <option value="export">Đơn xuất</option>
@@ -1170,7 +1178,8 @@
                         <div class="card">
                             <h4
                                 style="padding:16px; margin:0; border-bottom:1px solid var(--border); background:var(--body-bg); color:var(--primary);">
-                                <i class="bi bi-box-arrow-right"></i> Đơn Xuất</h4>
+                                <i class="bi bi-box-arrow-right"></i> Đơn Xuất
+                            </h4>
                             <div class="table-responsive" style="overflow-x:auto;">
                                 <table class="data-table" style="width:100%;">
                                     <thead>
@@ -1198,7 +1207,8 @@
                         <div class="card">
                             <h4
                                 style="padding:16px; margin:0; border-bottom:1px solid var(--border); background:var(--body-bg); color:#16a34a;">
-                                <i class="bi bi-box-arrow-in-right"></i> Đơn Nhập</h4>
+                                <i class="bi bi-box-arrow-in-right"></i> Đơn Nhập
+                            </h4>
                             <div class="table-responsive" style="overflow-x:auto;">
                                 <table class="data-table" style="width:100%;">
                                     <thead>
@@ -1221,6 +1231,17 @@
                                 </table>
                             </div>
                         </div>
+                    </div>
+
+                    <!-- Pagination -->
+                    <div id="pending-orders-pagination" class="pagination" style="margin-top:20px;">
+                        <button class="pagination-btn" onclick="PendingOrdersModule.changePage(-1)">
+                            <i class="bi bi-chevron-left"></i>
+                        </button>
+                        <span class="pagination-info" id="pending-orders-page-info">Trang 1 / 1</span>
+                        <button class="pagination-btn" onclick="PendingOrdersModule.changePage(1)">
+                            <i class="bi bi-chevron-right"></i>
+                        </button>
                     </div>
                 </section>
 
