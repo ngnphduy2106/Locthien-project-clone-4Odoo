@@ -3541,9 +3541,10 @@ function assignDriver(orderId) {
             <div style="background:var(--card-bg); padding:12px; border-radius:8px; margin-bottom:16px; border:1px solid var(--border);">
                 <div style="display:flex; align-items:center; gap:8px;">
                     <input type="checkbox" id="is-merged-order" style="width:16px; height:16px;" onchange="
-                        const selectBox = document.getElementById('merge-order-select');
+                        const selectBox = document.getElementById('merge-order-input');
                         if (this.checked) {
                             selectBox.classList.remove('hidden');
+                            selectBox.focus();
                         } else {
                             selectBox.classList.add('hidden');
                             selectBox.value = '';
@@ -3551,24 +3552,24 @@ function assignDriver(orderId) {
                     ">
                     <label for="is-merged-order" style="font-weight:600; margin:0; cursor:pointer;">🔗 Ghép chung với đơn khác</label>
                 </div>
-                <select id="merge-order-select" class="form-control hidden" style="margin-top:10px;">
-                    <option value="">-- Chọn đơn để ghép cùng --</option>
+                <input type="text" id="merge-order-input" list="merge-order-datalist" class="form-control hidden" placeholder="-- Gõ để tìm mã đơn hoặc tên khách --" style="margin-top:10px;">
+                <datalist id="merge-order-datalist">
                     ${(() => {
                 const validStatuses = ['Chưa thực hiện', 'Đang thực hiện', 'pending', 'assigned', 'delivering'];
                 const eligible = Object.values(state.orders).flat().filter(o =>
                     (o.id !== orderId && o.sale_order_no !== orderId) &&
                     validStatuses.includes(o.status)
                 );
-                if (eligible.length === 0) return '<option value="" disabled>Không có đơn nào phù hợp</option>';
+                if (eligible.length === 0) return '';
                 let html = '';
                 eligible.forEach(o => {
                     const no = o.sale_order_no || o.id;
                     const cus = o.khach || o.account_name || 'Khách lẻ';
-                    html += '<option value="' + no + '">' + no + ' - ' + cus + '</option>';
+                    html += '<option value="' + no + '">' + cus + '</option>';
                 });
                 return html;
             })()}
-                </select>
+                </datalist>
             </div>
             
             <!-- Multi-Driver Assignment Section -->
@@ -3922,10 +3923,10 @@ async function submitMultiDriverAssignment() {
     }
 
     const isMerged = window.$('#is-merged-order')?.checked;
-    const mergeWithOrderNo = isMerged ? window.$('#merge-order-select')?.value : null;
+    const mergeWithOrderNo = isMerged ? window.$('#merge-order-input')?.val() : null;
 
     if (isMerged && !mergeWithOrderNo) {
-        alert('Vui lòng chọn đơn hàng để ghép cùng!');
+        alert('Vui lòng chọn hoặc nhập mã đơn hàng để ghép cùng!');
         return;
     }
 
