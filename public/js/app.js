@@ -580,7 +580,7 @@ window.initDatePickers = initDatePickers;
 // Apply role-based UI visibility
 function applyRoleBasedUI(role) {
     // Normalize role to lowercase for comparison
-    const normalizedRole = (role || '').toLowerCase();
+    const normalizedRole = (role || '').toLowerCase().trim();
     const isAdmin = normalizedRole === 'admin' || normalizedRole === 'tester' || normalizedRole === 'dispatcher' || normalizedRole === 'điều phối' || normalizedRole === 'quản lý' || normalizedRole === 'quan ly';  // DISPATCHER = ADMIN privileges
     const isDispatcher = normalizedRole === 'dispatcher' || normalizedRole === 'điều phối' || normalizedRole === 'dieu phoi';  // DISPATCHER can't see money
     const isDriver = normalizedRole === 'driver' || normalizedRole === 'assistant' || normalizedRole === 'phụ xe';  // ASSISTANT = DRIVER privileges
