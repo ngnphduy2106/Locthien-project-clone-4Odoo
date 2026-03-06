@@ -698,6 +698,35 @@ router.put('/:id', async (req, res) => {
             console.error('MISA Sync Error on Edit:', syncErr.message);
         }
 
+        // Send Telegram notification about the edit
+        try {
+            const { sendTelegramMessage } = await import('../services/telegram.js');
+            const updatedOrder = fullOrder || await db.getOrder(id);
+            const orderNo = updatedOrder?.sale_order_no || updatedOrder?.soDon || id;
+            const customerName = customer || updatedOrder?.account_name || updatedOrder?.khach || '';
+            const orderAddress = address || updatedOrder?.shipping_address || updatedOrder?.diaChi || '';
+
+            let msg = `✏️ <b>ĐƠN HÀNG ĐÃ CHỈNH SỬA</b>\n`;
+            msg += `#${orderNo}\n`;
+            msg += `👤 KH: ${customerName}\n`;
+            if (orderAddress) msg += `📍 ${orderAddress}\n`;
+
+            // Show updated products if any
+            const updatedProducts = updateData.cart || updatedOrder?.products || [];
+            if (updatedProducts.length > 0) {
+                msg += `\n📦 <b>Sản phẩm (cập nhật):</b>\n`;
+                updatedProducts.forEach(p => {
+                    const qty = Number(p.qty || p.quantity || 0);
+                    msg += `- ${p.name || p.product || p.code}: ${qty.toLocaleString('vi-VN')} ${p.unit || 'Kg'}\n`;
+                });
+            }
+
+            if (note || notes) msg += `\n📝 Ghi chú: ${note || notes}`;
+
+            await sendTelegramMessage(msg, 'NOTIFY');
+        } catch (tgErr) {
+            console.error('Telegram Edit Notification Error:', tgErr.message);
+        }
 
         res.json(createResponse(false, 'Đã cập nhật đơn hàng!'));
 

@@ -173,6 +173,34 @@ router.put('/:id', async (req, res) => {
             return res.json(createResponse(true, 'Lỗi cập nhật: ' + error.message));
         }
 
+        // Send Telegram notification about the edit
+        try {
+            const { sendTelegramMessage } = await import('../services/telegram.js');
+            const ticketNo = data?.ticket_no || id;
+            const supName = data?.supplier_name || supplier_name || '';
+            const supAddr = data?.supplier_address || supplier_address || '';
+
+            let msg = `✏️ <b>PHIẾU NHẬP ĐÃ CHỈNH SỬA</b>\n`;
+            msg += `#${ticketNo}\n`;
+            msg += `🏭 NCC: ${supName}\n`;
+            if (supAddr) msg += `📍 ${supAddr}\n`;
+
+            const updatedProducts = data?.products || products || [];
+            if (updatedProducts.length > 0) {
+                msg += `\n📦 <b>Sản phẩm (cập nhật):</b>\n`;
+                updatedProducts.forEach(p => {
+                    const qty = Number(p.qty || 0);
+                    msg += `- ${p.name || p.product || p.code}: ${qty.toLocaleString('vi-VN')} ${p.unit || 'Kg'}\n`;
+                });
+            }
+
+            if (note) msg += `\n📝 Ghi chú: ${note}`;
+
+            await sendTelegramMessage(msg, 'NOTIFY');
+        } catch (tgErr) {
+            console.error('Telegram Import Edit Notification Error:', tgErr.message);
+        }
+
         res.json({
             error: false,
             msg: 'Đã cập nhật phiếu nhập!',
