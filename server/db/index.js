@@ -235,9 +235,9 @@ export const db = {
                 error = error2;
             }
 
-            // If still not found, try sale_order_no with sanitized id (underscores)
+            // If still not found, try sale_order_no with sanitized id (exact match)
             if (!data || error) {
-                const { data: data3, error: error3 } = await supabase.from('orders').select('*').ilike('sale_order_no', `%${safeId.replace(/_/g, '%')}%`).single();
+                const { data: data3 } = await supabase.from('orders').select('*').eq('sale_order_no', safeId).single();
                 data = data3;
             }
 

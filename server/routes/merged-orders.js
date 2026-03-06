@@ -136,19 +136,36 @@ router.post('/', async (req, res) => {
 
         const supabase = getSupabase();
 
-        // Always query by sale_order_no
-        const { data: orders, error: fetchError } = await supabase
+        // Query by sale_order_no first, then also by id for locally-created orders
+        let { data: orders, error: fetchError } = await supabase
             .from('orders')
             .select('id, sale_order_no, sale_order_amount, status')
             .in('sale_order_no', order_ids);
 
+        // If not all orders found, also search by id column (local orders may use id = sale_order_no)
+        if (!orders || orders.length < order_ids.length) {
+            const foundNos = new Set((orders || []).map(o => o.sale_order_no));
+            const missingIds = order_ids.filter(id => !foundNos.has(id));
+
+            if (missingIds.length > 0) {
+                const { data: extraOrders } = await supabase
+                    .from('orders')
+                    .select('id, sale_order_no, sale_order_amount, status')
+                    .in('id', missingIds);
+
+                if (extraOrders && extraOrders.length > 0) {
+                    orders = [...(orders || []), ...extraOrders];
+                }
+            }
+        }
+
         if (fetchError || !orders || orders.length < 2) {
-            console.error('Fetch orders error:', fetchError?.message, 'Orders found:', orders?.length);
+            console.error('Fetch orders error:', fetchError?.message, 'Orders found:', orders?.length, 'Requested:', order_ids);
             return res.json(createResponse(true, 'Không tìm thấy đơn hàng hoặc đơn đã được xử lý!'));
         }
 
-        // Extract sale_order_no for storage
-        const orderNos = orders.map(o => o.sale_order_no);
+        // Extract sale_order_no for storage (use id as fallback for local orders)
+        const orderNos = orders.map(o => o.sale_order_no || o.id);
 
         // Calculate totals
         const totalAmount = orders.reduce((sum, o) => sum + Number(o.sale_order_amount || 0), 0);
@@ -160,7 +177,7 @@ router.post('/', async (req, res) => {
             .from('merged_orders')
             .insert({
                 merged_no: mergedNo,
-                source_order_nos: orderNos,  // TEXT[] instead of UUID[]
+                source_order_nos: orderNos,
                 total_amount: totalAmount,
                 total_stops: orders.length,
                 note: note || '',
@@ -174,7 +191,7 @@ router.post('/', async (req, res) => {
             return res.json(createResponse(true, 'Lỗi tạo đơn ghép: ' + createError.message));
         }
 
-        // Update source orders to "merged" status
+        // Update source orders to "merged" status (by sale_order_no)
         await supabase
             .from('orders')
             .update({
@@ -182,6 +199,16 @@ router.post('/', async (req, res) => {
                 merged_order_no: mergedNo
             })
             .in('sale_order_no', orderNos);
+
+        // Also update by id for local orders that might not match sale_order_no
+        const orderIds = orders.map(o => o.id);
+        await supabase
+            .from('orders')
+            .update({
+                status: 'Đã ghép',
+                merged_order_no: mergedNo
+            })
+            .in('id', orderIds);
 
         // Send Telegram notification
         try {

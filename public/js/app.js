@@ -8944,9 +8944,9 @@ async function loadPendingOrdersForMerge() {
             return;
         }
 
-        // Filter pending orders only (must be completely unassigned to ensure mutual exclusivity with split-orders)
+        // Filter pending orders only (unassigned, ready to merge)
         const pendingOrders = (data.pending || []).filter(o =>
-            o.status === 'Chưa thực hiện' && !o.taiXe && !o.driver && !o.custom_field13
+            (o.status === 'Chưa thực hiện' || o.status === 'Mới') && !o.taiXe && !o.driver && !o.custom_field13
         );
 
         if (pendingOrders.length === 0) {
@@ -8967,8 +8967,9 @@ async function loadPendingOrdersForMerge() {
                 <div class="order-card" style="display:flex; gap:12px; align-items:flex-start; padding:12px; border-bottom:1px solid var(--border-color);">
                     <input type="checkbox" 
                         id="merge-cb-${order.id}" 
+                        data-order-no="${order.soDon || order.sale_order_no || order.id}"
                         ${checked ? 'checked' : ''} 
-                        onchange="toggleOrderForMerge('${order.id}')"
+                        onchange="toggleOrderForMerge('${order.soDon || order.sale_order_no || order.id}')"
                         style="width:20px; height:20px; cursor:pointer; margin-top:4px;">
                     <div style="flex:1;">
                         <div style="font-weight:600; color:var(--primary);">
