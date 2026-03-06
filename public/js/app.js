@@ -3507,19 +3507,18 @@ async function assignDriver(orderId) {
     // Init driver assignments array
     state.driverAssignments = [];
 
-    // Pre-fetch imports if not loaded (for merge datalist)
-    if (!state.imports || Object.keys(state.imports).length === 0) {
-        try {
-            const impRes = await fetch('/api/imports').then(r => r.json());
-            const imports = impRes?.data || [];
-            state.imports = {
-                pending: imports.filter(i => i.status === 'pending' || i.status === 'Chưa thực hiện'),
-                assigned: imports.filter(i => i.status === 'assigned' || i.status === 'in_transit'),
-                completed: imports.filter(i => i.status === 'completed')
-            };
-        } catch (e) {
-            console.warn('Failed to pre-fetch imports for merge:', e.message);
-        }
+    // Pre-fetch imports for merge datalist (always fetch to ensure fresh data)
+    try {
+        const impRes = await fetch('/api/imports').then(r => r.json());
+        const imports = impRes?.data || [];
+        console.log(`📥 Pre-fetched ${imports.length} import tickets for merge datalist`);
+        state.imports = {
+            pending: imports.filter(i => i.status === 'pending' || i.status === 'Chưa thực hiện'),
+            assigned: imports.filter(i => i.status === 'assigned' || i.status === 'in_transit'),
+            completed: imports.filter(i => i.status === 'completed')
+        };
+    } catch (e) {
+        console.warn('Failed to pre-fetch imports for merge:', e.message);
     }
 
     // Build distinct driver & plate select options
