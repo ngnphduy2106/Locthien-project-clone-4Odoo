@@ -3560,11 +3560,13 @@ function assignDriver(orderId) {
                             validStatuses.includes(o.status)
                         );
                         if (eligible.length === 0) return '<option value="" disabled>Không có đơn nào phù hợp</option>';
-                        return eligible.map(o => {
+                        let html = '';
+                        eligible.forEach(o => {
                             const no = o.sale_order_no || o.id;
                             const cus = o.khach || o.account_name || 'Khách lẻ';
-                            return '<option value="' + no + '">' + no + ' - ' + cus + '</option>';
-                        }).join('');
+                            html += '<option value="' + no + '">' + no + ' - ' + cus + '</option>';
+                        });
+                        return html;
                     })()}
                 </select>
             </div>
