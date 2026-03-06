@@ -428,13 +428,6 @@ export const db = {
                 safeData.merged_order_no = data.merged_order_no;
             }
 
-            // CRM Sync Status
-            if (data.crm_sync_status !== undefined) safeData.crm_sync_status = data.crm_sync_status;
-            if (data.sync_error !== undefined) safeData.sync_error = data.sync_error;
-            if (data.completed_at !== undefined) safeData.completed_at = data.completed_at;
-            if (data.admin_completed !== undefined) safeData.admin_completed = data.admin_completed;
-            if (data.is_pinned !== undefined) safeData.is_pinned = data.is_pinned;
-
             console.log(`📝 Updating order ${safeId}:`, Object.keys(safeData));
             let { data: updated, error } = await supabase.from('orders').update(safeData).eq('id', safeId).select().single();
 
