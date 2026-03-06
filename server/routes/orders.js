@@ -1670,7 +1670,7 @@ router.post('/:id/assign-multi', async (req, res) => {
         // Update order with first driver info (main driver)
         const mainDriver = assignments[0];
         await db.updateOrder(id, {
-            status: CONFIG.STATUS.ASSIGNED,
+            status: CONFIG.STATUS.DELIVERING,
             taiXe: mainDriver.driver_name,
             bienSo: mainDriver.plate || '',
             note: assignments.length > 1 ? `Chia ${assignments.length} tài xế` : (mainDriver.note || ''),
