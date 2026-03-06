@@ -3666,10 +3666,10 @@ function addDriverAssignmentRow() {
     console.log(`📦 Collecting products from ${parsedProducts.length} items...`);
 
     parsedProducts.forEach((p, idx) => {
-        const checkbox = document.querySelector(`#assign - prod - ${idx} `);
-        const qtyInput = document.querySelector(`#assign - qty - ${idx} `);
+        const checkbox = document.querySelector(`#assign-prod-${idx}`);
+        const qtyInput = document.querySelector(`#assign-qty-${idx}`);
 
-        console.log(`  Product ${idx}: checkbox = ${checkbox?.checked}, qtyInput = ${qtyInput?.value} `);
+        console.log(`  Product ${idx}: checkbox = ${checkbox?.checked}, qtyInput = ${qtyInput?.value}`);
 
         if (checkbox && checkbox.checked && qtyInput) {
             const qty = parseFloat(qtyInput.value) || 0;
