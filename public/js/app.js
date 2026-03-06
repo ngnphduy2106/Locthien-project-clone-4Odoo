@@ -2975,6 +2975,7 @@ async function viewOrderDetail(orderId, options = {}) {
     // Check permission to view price
     const currentUser = window.state?.user || {};
     const role = String(currentUser.role || '').toLowerCase();
+    const isSales = role === 'sales' || role === 'nhân viên kinh doanh' || role === 'nhân viên' || role === 'kinh doanh';
     const isAdmin = role === 'admin' || role === 'tester';
     const isDriver = role === 'driver' || role === 'taixe' || role === 'assistant' || role === 'phụ xe';
     const creatorName = order.creator_name || order.creatorName || order.nhanVienTao || order.created_by || '';
@@ -3390,6 +3391,8 @@ async function viewOrderDetail(orderId, options = {}) {
                     <button class="btn btn-info" onclick="closeOrderModal(); assignDriver('${order.id}')" style="background:var(--info); color:white;">
                         <i class="bi bi-person-gear"></i> Đổi tài xế
                     </button>
+                ` : ''}
+            ${!isReadonly && (order.status === 'Đang thực hiện' || order.status === 'Chờ giao' || order.status === 'assigned') && (isAdminRole() || isSales) ? `
                     <button class="btn btn-success" onclick="showDriverCompletionModal('${order.id}')">
                         <i class="bi bi-check-circle"></i> Hoàn thành
                     </button>
@@ -3398,13 +3401,16 @@ async function viewOrderDetail(orderId, options = {}) {
                     <button class="btn btn-warning" onclick="closeOrderModal(); editOrder('${order.id}')">
                         <i class="bi bi-pencil"></i> Chỉnh sửa
                     </button>
+                    <button class="btn btn-danger" onclick="closeOrderModal(); deleteOrder('${order.id}')">
+                        <i class="bi bi-trash"></i> Xóa
+                    </button>
                 ` : ''}
-            <button class="btn btn-outline" onclick="closeOrderModal()">
-                <i class="bi bi-x-lg"></i> Đóng
-            </button>
-        </div>
+    <button class="btn btn-outline" onclick="closeOrderModal()">
+        <i class="bi bi-x-lg"></i> Đóng
+    </button>
+        </div >
 
-    `;
+        `;
 
         // Initialize chat - load immediately then start auto-refresh
         currentChatOrderId = order.soDon || order.sale_order_no || order.id;
@@ -3484,7 +3490,7 @@ function assignDriver(orderId) {
 
     // Build driver select options with plate data
     const driverOptions = (state.drivers || []).map(d =>
-        `<option value="${d.name}" data-plate="${d.plate || ''}">${d.name}${d.plate ? ' - ' + d.plate : ''}</option>`
+        `< option value = "${d.name}" data - plate="${d.plate || ''}" > ${d.name}${d.plate ? ' - ' + d.plate : ''}</option > `
     ).join('');
 
     // Show modal
@@ -3496,7 +3502,7 @@ function assignDriver(orderId) {
 
     if (modalBody) {
         modalBody.innerHTML = `
-            <div class="order-detail-grid" style="margin-bottom:16px;">
+        < div class="order-detail-grid" style = "margin-bottom:16px;" >
                 <div class="detail-row">
                     <label>Khách hàng:</label>
                     <span>${order.khach || order.account_name || 'Chưa có'}</span>
@@ -3509,9 +3515,9 @@ function assignDriver(orderId) {
                     <label>Tổng SL:</label>
                     <span style="color:var(--primary); font-weight:600;">${formatNumber(totalQty)} kg</span>
                 </div>
-            </div>
+            </div >
             
-            <!--Multi-Driver Assignment Section-->
+            < !--Multi - Driver Assignment Section-- >
             <div style="background:var(--body-bg); padding:16px; border-radius:8px; margin-bottom:16px;">
                 <h4 style="margin:0 0 12px; font-size:14px;">Phân công tài xế</h4>
                 
@@ -3661,10 +3667,10 @@ function addDriverAssignmentRow() {
     console.log(`📦 Collecting products from ${parsedProducts.length} items...`);
 
     parsedProducts.forEach((p, idx) => {
-        const checkbox = document.querySelector(`#assign-prod-${idx}`);
-        const qtyInput = document.querySelector(`#assign-qty-${idx}`);
+        const checkbox = document.querySelector(`#assign - prod - ${idx} `);
+        const qtyInput = document.querySelector(`#assign - qty - ${idx} `);
 
-        console.log(`  Product ${idx}: checkbox=${checkbox?.checked}, qtyInput=${qtyInput?.value}`);
+        console.log(`  Product ${idx}: checkbox = ${checkbox?.checked}, qtyInput = ${qtyInput?.value} `);
 
         if (checkbox && checkbox.checked && qtyInput) {
             const qty = parseFloat(qtyInput.value) || 0;
@@ -3676,7 +3682,7 @@ function addDriverAssignmentRow() {
                     unit: qtyInput.dataset.unit || p.unit || 'kg'
                 });
                 totalQty += qty;
-                console.log(`    ✅ Added: ${p.name} x ${qty}`);
+                console.log(`    ✅ Added: ${p.name} x ${qty} `);
             }
         }
     });
@@ -3741,14 +3747,14 @@ function updateRemainingQuantities() {
         const remaining = originalQty - assignedQty;
 
         // Update remaining display
-        const remainEl = document.querySelector(`#remain-prod-${idx}`);
+        const remainEl = document.querySelector(`#remain - prod - ${idx} `);
         if (remainEl) {
             remainEl.textContent = remaining.toFixed(0);
             remainEl.style.color = remaining < 0 ? 'var(--danger)' : (remaining === 0 ? 'var(--success)' : '');
         }
 
         // Update default value in input
-        const qtyInput = document.querySelector(`#assign-qty-${idx}`);
+        const qtyInput = document.querySelector(`#assign - qty - ${idx} `);
         if (qtyInput) {
             qtyInput.value = Math.max(0, remaining);
             qtyInput.dataset.max = remaining;
@@ -3775,8 +3781,8 @@ function renderDriverAssignmentsList() {
     }
 
     container.innerHTML = state.driverAssignments.map((a, idx) => `
-        <div style="background:var(--card-bg); border-radius:6px; margin-bottom:8px; border-left:3px solid ${a.is_external ? 'var(--warning)' : 'var(--primary)'}; overflow:hidden;">
-            <div style="display:flex; align-items:center; gap:12px; padding:10px;"> 
+        < div style = "background:var(--card-bg); border-radius:6px; margin-bottom:8px; border-left:3px solid ${a.is_external ? 'var(--warning)' : 'var(--primary)'}; overflow:hidden;" >
+            <div style="display:flex; align-items:center; gap:12px; padding:10px;">
                 <div style="flex:1;">
                     <strong>${a.driver_name}</strong>
                     ${a.is_external ? '<span style="font-size:11px; background:var(--warning); color:#000; padding:2px 6px; border-radius:4px; margin-left:6px;">Tài xế ngoài</span>' : ''}
@@ -3796,9 +3802,10 @@ function renderDriverAssignmentsList() {
                         </div>
                     `).join('')}
                 </div>
-            ` : ''}
-        </div>
-    `).join('');
+            ` : ''
+        }
+        </div >
+        `).join('');
 }
 
 // Update qty summary
@@ -3813,10 +3820,10 @@ function updateQtySummaryDisplay() {
     const color = remaining === 0 ? 'var(--success)' : (remaining < 0 ? 'var(--danger)' : 'var(--warning)');
 
     container.innerHTML = `
-        <div style="display:flex; justify-content:space-between;">
+        < div style = "display:flex; justify-content:space-between;" >
             <span>Tổng đơn hàng:</span>
             <strong>${formatNumber(totalOrder)} kg</strong>
-        </div>
+        </div >
         <div style="display:flex; justify-content:space-between;">
             <span>Đã phân công:</span>
             <strong>${formatNumber(totalAssigned)} kg</strong>
@@ -3848,7 +3855,7 @@ async function submitMultiDriverAssignment() {
 
     try {
         const orderId = state.currentAssignOrderId;
-        const res = await fetch(`/api/orders/${orderId}/assign-multi`, {
+        const res = await fetch(`/ api / orders / ${orderId}/assign-multi`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ assignments: state.driverAssignments })
