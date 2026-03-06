@@ -1399,29 +1399,44 @@ router.post('/:id/complete', async (req, res) => {
                             for (const sister of sisters) {
                                 console.log(`🤖 Triggering auto-completion for sister order: ${sister}`);
                                 try {
-                                    // Make internal api fetch to complete the sister
-                                    const fetch = (await import('node-fetch')).default;
-                                    const protocol = req.protocol || 'http';
-                                    const host = req.get('host') || 'localhost:3000';
-
-                                    const sisterPayload = {
-                                        ...req.body,
-                                        prevent_loop: true,
-                                        delivery_note: req.body.delivery_note ? (req.body.delivery_note + ` (Ghép chung ${currentNo})`) : `Tự động hoàn thành theo đơn ghép ${currentNo}`,
-                                        admin_completed: true // Avoid repeating driver-only logic requiring images if possible
-                                    };
-
-                                    const resFetch = await fetch(`${protocol}://${host}/api/orders/${sister}/complete`, {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify(sisterPayload)
-                                    });
-                                    const resData = await resFetch.json();
-                                    if (resData.error) {
-                                        console.error(`❌ Auto-completion failed for ${sister}:`, resData.message);
+                                    // Check if sister is an import ticket (N-prefix)
+                                    if (sister.startsWith('N')) {
+                                        const { createClient: createSC } = await import('@supabase/supabase-js');
+                                        const sbClient = createSC(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+                                        await sbClient
+                                            .from('import_tickets')
+                                            .update({
+                                                status: 'completed',
+                                                completed_at: new Date().toISOString()
+                                            })
+                                            .eq('ticket_no', sister);
+                                        mergeMsg += ` (Đã hoàn thành kèm phiếu nhập ${sister})`;
+                                        console.log(`✅ Auto-completed import sister: ${sister}`);
                                     } else {
-                                        mergeMsg += ` (Đã hoàn thành kèm mã ${sister})`;
-                                        console.log(`✅ Auto-completed sister order: ${sister}`);
+                                        // Export order - use internal API call
+                                        const fetch = (await import('node-fetch')).default;
+                                        const protocol = req.protocol || 'http';
+                                        const host = req.get('host') || 'localhost:3000';
+
+                                        const sisterPayload = {
+                                            ...req.body,
+                                            prevent_loop: true,
+                                            delivery_note: req.body.delivery_note ? (req.body.delivery_note + ` (Ghép chung ${currentNo})`) : `Tự động hoàn thành theo đơn ghép ${currentNo}`,
+                                            admin_completed: true
+                                        };
+
+                                        const resFetch = await fetch(`${protocol}://${host}/api/orders/${sister}/complete`, {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify(sisterPayload)
+                                        });
+                                        const resData = await resFetch.json();
+                                        if (resData.error) {
+                                            console.error(`❌ Auto-completion failed for ${sister}:`, resData.message);
+                                        } else {
+                                            mergeMsg += ` (Đã hoàn thành kèm mã ${sister})`;
+                                            console.log(`✅ Auto-completed sister order: ${sister}`);
+                                        }
                                     }
                                 } catch (loopErr) {
                                     console.error(`❌ Auto-complete internal fetch error for ${sister}:`, loopErr.message);
@@ -1558,29 +1573,42 @@ router.post('/:id/complete', async (req, res) => {
                     for (const sister of sisters) {
                         console.log(`🤖 Triggering auto-completion for sister order: ${sister}`);
                         try {
-                            // Forward the admin completion or driver completion internally
-                            const fetch = (await import('node-fetch')).default;
-                            const protocol = req.protocol || 'http';
-                            const host = req.get('host') || 'localhost:3000';
-
-                            const sisterPayload = {
-                                ...req.body,
-                                prevent_loop: true,
-                                delivery_note: `Tự động hoàn thành theo đơn ghép ${currentNo}`,
-                                admin_completed: true // Prevent driver logic loops requiring images
-                            };
-
-                            const resFetch = await fetch(`${protocol}://${host}/api/orders/${sister}/complete`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify(sisterPayload)
-                            });
-                            const resData = await resFetch.json();
-                            if (resData.error) {
-                                console.error(`❌ Auto-completion failed for ${sister}:`, resData.message);
+                            // Check if sister is an import ticket (N-prefix)
+                            if (sister.startsWith('N')) {
+                                await supabase
+                                    .from('import_tickets')
+                                    .update({
+                                        status: 'completed',
+                                        completed_at: new Date().toISOString()
+                                    })
+                                    .eq('ticket_no', sister);
+                                mergeMsg += ` (Đã hoàn thành kèm phiếu nhập ${sister})`;
+                                console.log(`✅ Auto-completed import sister: ${sister}`);
                             } else {
-                                mergeMsg += ` (Đã hoàn thành kèm mã ${sister})`;
-                                console.log(`✅ Auto-completed sister order: ${sister}`);
+                                // Forward the admin completion or driver completion internally
+                                const fetch = (await import('node-fetch')).default;
+                                const protocol = req.protocol || 'http';
+                                const host = req.get('host') || 'localhost:3000';
+
+                                const sisterPayload = {
+                                    ...req.body,
+                                    prevent_loop: true,
+                                    delivery_note: `Tự động hoàn thành theo đơn ghép ${currentNo}`,
+                                    admin_completed: true
+                                };
+
+                                const resFetch = await fetch(`${protocol}://${host}/api/orders/${sister}/complete`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify(sisterPayload)
+                                });
+                                const resData = await resFetch.json();
+                                if (resData.error) {
+                                    console.error(`❌ Auto-completion failed for ${sister}:`, resData.message);
+                                } else {
+                                    mergeMsg += ` (Đã hoàn thành kèm mã ${sister})`;
+                                    console.log(`✅ Auto-completed sister order: ${sister}`);
+                                }
                             }
                         } catch (loopErr) {
                             console.error(`❌ Auto-complete internal fetch error for ${sister}:`, loopErr.message);
