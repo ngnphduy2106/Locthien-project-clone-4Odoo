@@ -4490,6 +4490,7 @@ async function submitDelivery() {
         }));
 
         // STEP 1: Complete the order
+        let completeRes = {};
         if (order.merged_order_no) {
             console.log('📤 Step 1: Check-in Merged Trip Stop:', { orderNo: order.sale_order_no || order.id, tripNo: order.merged_order_no });
             const completeResRaw = await fetch(`/api/merged-orders/${order.merged_order_no}/checkin`, {
@@ -4501,10 +4502,11 @@ async function submitDelivery() {
                     driver_name: driverName,
                     plate: plate,
                     cart: cart,
+                    images: validImages, // Send images with completion
                     actual_qty: cart.length === 1 ? cart[0].weight_kg : null
                 })
             });
-            const completeRes = await completeResRaw.json();
+            completeRes = await completeResRaw.json();
             if (completeRes.error) {
                 hideLoading();
                 alert('Lỗi check-in: ' + completeRes.msg);
@@ -4520,7 +4522,8 @@ async function submitDelivery() {
                 cart: cart,
                 local_items: localItems,
                 delivery_note: note || `Hoàn thành bởi ${driverName}`,
-                sender: driverName
+                sender: driverName,
+                images: validImages // Send images with completion
             };
 
             console.log('📤 Step 1: Complete order:', {
@@ -4529,7 +4532,7 @@ async function submitDelivery() {
                 localItems: localItems.length
             });
 
-            const completeRes = await api.completeOrder(order.id, completePayload);
+            completeRes = await api.completeOrder(order.id, completePayload);
 
             if (completeRes.error) {
                 hideLoading();
@@ -4538,7 +4541,7 @@ async function submitDelivery() {
             }
         }
 
-        // STEP 2: Add proof images using separate API (like import flow)
+        // STEP 2: Add proof images using separate API (backup - also save via add-proof-images)
         if (validImages.length > 0) {
             console.log(`📸 Step 2: Adding ${validImages.length} proof images...`);
 
