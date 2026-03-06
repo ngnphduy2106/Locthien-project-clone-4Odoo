@@ -567,7 +567,7 @@ const MyOrdersModule = {
 
         // Build detail modal HTML
         const modalHtml = `
-                < div class="modal-overlay" id = "my-order-detail-modal" onclick = "if(event.target === this) this.remove()" >
+                <div class="modal-overlay" id="my-order-detail-modal" onclick="if(event.target === this) this.remove()">
                     <div class="modal-content" style="max-width: 500px; max-height: 85vh; overflow-y: auto;">
                         <div class="modal-header">
                             <h3>📦 ${typeLabel} ${order.soDon || orderId}</h3>
@@ -653,7 +653,7 @@ const MyOrdersModule = {
                             </div>
                         </div>
                     </div>
-            </div >
+            </div>
     `;
 
         // Remove existing modal if any

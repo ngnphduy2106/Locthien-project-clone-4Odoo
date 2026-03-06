@@ -3407,7 +3407,7 @@ async function viewOrderDetail(orderId, options = {}) {
     <button class="btn btn-outline" onclick="closeOrderModal()">
         <i class="bi bi-x-lg"></i> Đóng
     </button>
-        </div >
+        </div>
 
         `;
 
@@ -3489,7 +3489,7 @@ function assignDriver(orderId) {
 
     // Build driver select options with plate data
     const driverOptions = (state.drivers || []).map(d =>
-        `< option value = "${d.name}" data - plate="${d.plate || ''}" > ${d.name}${d.plate ? ' - ' + d.plate : ''}</option > `
+        `<option value="${d.name}" data-plate="${d.plate || ''}">${d.name}${d.plate ? ' - ' + d.plate : ''}</option>`
     ).join('');
 
     // Show modal
@@ -3501,7 +3501,7 @@ function assignDriver(orderId) {
 
     if (modalBody) {
         modalBody.innerHTML = `
-        < div class="order-detail-grid" style = "margin-bottom:16px;" >
+        <div class="order-detail-grid" style="margin-bottom:16px;">
                 <div class="detail-row">
                     <label>Khách hàng:</label>
                     <span>${order.khach || order.account_name || 'Chưa có'}</span>
@@ -3514,9 +3514,9 @@ function assignDriver(orderId) {
                     <label>Tổng SL:</label>
                     <span style="color:var(--primary); font-weight:600;">${formatNumber(totalQty)} kg</span>
                 </div>
-            </div >
+            </div>
             
-            < !--Multi - Driver Assignment Section-- >
+            <!-- Multi-Driver Assignment Section -->
             <div style="background:var(--body-bg); padding:16px; border-radius:8px; margin-bottom:16px;">
                 <h4 style="margin:0 0 12px; font-size:14px;">Phân công tài xế</h4>
                 
@@ -3780,7 +3780,7 @@ function renderDriverAssignmentsList() {
     }
 
     container.innerHTML = state.driverAssignments.map((a, idx) => `
-        < div style = "background:var(--card-bg); border-radius:6px; margin-bottom:8px; border-left:3px solid ${a.is_external ? 'var(--warning)' : 'var(--primary)'}; overflow:hidden;" >
+        <div style="background:var(--card-bg); border-radius:6px; margin-bottom:8px; border-left:3px solid ${a.is_external ? 'var(--warning)' : 'var(--primary)'}; overflow:hidden;">
             <div style="display:flex; align-items:center; gap:12px; padding:10px;">
                 <div style="flex:1;">
                     <strong>${a.driver_name}</strong>
@@ -3803,7 +3803,7 @@ function renderDriverAssignmentsList() {
                 </div>
             ` : ''
         }
-        </div >
+        </div>
         `).join('');
 }
 
@@ -3819,10 +3819,10 @@ function updateQtySummaryDisplay() {
     const color = remaining === 0 ? 'var(--success)' : (remaining < 0 ? 'var(--danger)' : 'var(--warning)');
 
     container.innerHTML = `
-        < div style = "display:flex; justify-content:space-between;" >
+        <div style="display:flex; justify-content:space-between;">
             <span>Tổng đơn hàng:</span>
             <strong>${formatNumber(totalOrder)} kg</strong>
-        </div >
+        </div>
         <div style="display:flex; justify-content:space-between;">
             <span>Đã phân công:</span>
             <strong>${formatNumber(totalAssigned)} kg</strong>
