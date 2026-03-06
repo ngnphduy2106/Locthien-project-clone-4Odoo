@@ -145,7 +145,7 @@ function isAdminRole() {
     const role = (state.user?.role || '').toLowerCase().trim();
     console.log('🔍 DEBUG isAdminRole - role:', role, '| user:', state.user);
     // DISPATCHER has admin privileges (but can't see money - handled separately)
-    const adminRoles = ['admin', 'tester', 'dispatcher', 'quản lý', 'manager', 'quan ly', 'administrator', 'nhanvien', 'nhân viên', 'staff'];
+    const adminRoles = ['admin', 'tester', 'dispatcher', 'quản lý', 'manager', 'quan ly', 'administrator'];
     return adminRoles.includes(role) || role.includes('admin') || role.includes('quản') || role.includes('quan') || role.includes('tester') || role.includes('dispatcher');
 }
 
@@ -512,9 +512,12 @@ function initApp() {
     // Show appropriate section based on role
     const normalizedRole = (state.user?.role || '').toLowerCase();
     const isDriverRole = normalizedRole === 'driver' || normalizedRole === 'assistant' || normalizedRole === 'phụ xe';
+    const isSalesRole = normalizedRole === 'sales' || normalizedRole === 'nhân viên kinh doanh' || normalizedRole === 'nhân viên' || normalizedRole === 'kinh doanh';
 
     if (isDriverRole) {
         showSection('my-orders');
+    } else if (isSalesRole) {
+        showSection('order-history');
     } else {
         showSection('dashboard');
     }
@@ -706,6 +709,43 @@ function applyRoleBasedUI(role) {
         setTimeout(() => {
             showSection('pending-orders');
         }, 100);
+    }
+
+    // Sales restrictions - only order management items
+    const isSales = normalizedRole === 'sales' || normalizedRole === 'nhân viên kinh doanh' || normalizedRole === 'nhân viên' || normalizedRole === 'kinh doanh';
+    if (isSales) {
+        console.log('📈 Sales mode: Showing only order management');
+
+        // Hide dashboard
+        const navDashboard = window.$('#nav-dashboard');
+        if (navDashboard) navDashboard.style.display = 'none';
+
+        // Hide unneeded order management features
+        const navDispatch = window.$('#nav-dispatch');
+        const navCreateOrder = window.$('#nav-create-order');
+        const navCreateExport = window.$('#nav-create-export');
+        const navMyOrders = window.$('#nav-my-orders');
+        const navMergeOrders = window.$('#nav-merge-orders');
+        const navSuppliers = window.$('#nav-suppliers');
+        const navCustomers = window.$('#nav-customers');
+        if (navDispatch) navDispatch.style.display = 'none';
+        if (navCreateOrder) navCreateOrder.style.display = 'none';
+        if (navCreateExport) navCreateExport.style.display = 'none';
+        if (navMyOrders) navMyOrders.style.display = 'none';
+        if (navMergeOrders) navMergeOrders.style.display = 'none';
+        if (navSuppliers) navSuppliers.style.display = 'none';
+        if (navCustomers) navCustomers.style.display = 'none';
+
+        // Hide HR, Materials, Warehouse
+        const navHr = window.$('#nav-hr');
+        const navMaterials = window.$('#nav-materials');
+        const navWarehouse = window.$('#nav-warehouse');
+        if (navHr) navHr.style.display = 'none';
+        if (navMaterials) navMaterials.style.display = 'none';
+        if (navWarehouse) navWarehouse.style.display = 'none';
+
+        // Also hide nav-users
+        if (navUsers) navUsers.style.display = 'none';
     }
 
     // Update my-orders badge for all roles
