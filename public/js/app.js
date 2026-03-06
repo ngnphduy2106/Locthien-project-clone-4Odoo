@@ -3052,7 +3052,10 @@ async function viewOrderDetail(orderId, options = {}) {
             <div class="order-detail-grid">
                 <div class="detail-row">
                     <label>Mã đơn hàng:</label>
-                    <span><strong>#${order.soDon || order.sale_order_no || order.id}</strong></span>
+                    <span>
+                        <strong>#${order.soDon || order.sale_order_no || order.id}</strong>
+                        ${order.merged_order_no ? `<div style="display:inline-block; margin-left:8px; background:linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color:white; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:600;"><i class="bi bi-link-45deg"></i> Chuyến ghép: ${order.merged_order_no}</div>` : ''}
+                    </span>
                 </div>
                 <div class="detail-row">
                     <label>Khách hàng:</label>

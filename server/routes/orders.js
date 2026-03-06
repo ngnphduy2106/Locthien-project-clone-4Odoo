@@ -1325,7 +1325,63 @@ router.post('/:id/complete', async (req, res) => {
                 } catch (tgErr) {
                     console.error('Telegram completion error:', tgErr.message);
                 }
-                return res.json(createResponse(!syncResult.success, syncResult.success ? 'Hoàn thành!' : 'Đã lưu cục bộ nhưng CRM lỗi' + syncStatusMsg, { ticketId, crmStatus: crmSyncStatus }));
+
+                // AUTO-COMPLETE SISTER ORDERS IN MERGED TRIP (DRIVER FLOW)
+                let mergeMsg = '';
+                if (orderInfo?.merged_order_no && !req.body.prevent_loop) {
+                    console.log(`🔗 Auto-completing sister orders for merged trip: ${orderInfo.merged_order_no}`);
+                    try {
+                        const { createClient } = await import('@supabase/supabase-js');
+                        const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+                        const { data: mergedLog } = await supabase
+                            .from('merged_orders')
+                            .select('source_order_nos')
+                            .eq('merged_no', orderInfo.merged_order_no)
+                            .single();
+
+                        if (mergedLog && mergedLog.source_order_nos) {
+                            const currentNo = orderInfo.soDon || orderInfo.sale_order_no || id;
+                            const sisters = mergedLog.source_order_nos.filter(no => no !== currentNo);
+
+                            for (const sister of sisters) {
+                                console.log(`🤖 Triggering auto-completion for sister order: ${sister}`);
+                                try {
+                                    // Make internal api fetch to complete the sister
+                                    const fetch = (await import('node-fetch')).default;
+                                    const protocol = req.protocol || 'http';
+                                    const host = req.get('host') || 'localhost:3000';
+
+                                    const sisterPayload = {
+                                        ...req.body,
+                                        prevent_loop: true,
+                                        delivery_note: req.body.delivery_note ? (req.body.delivery_note + ` (Ghép chung ${currentNo})`) : `Tự động hoàn thành theo đơn ghép ${currentNo}`,
+                                        admin_completed: true // Avoid repeating driver-only logic requiring images if possible
+                                    };
+
+                                    const resFetch = await fetch(`${protocol}://${host}/api/orders/${sister}/complete`, {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify(sisterPayload)
+                                    });
+                                    const resData = await resFetch.json();
+                                    if (resData.error) {
+                                        console.error(`❌ Auto-completion failed for ${sister}:`, resData.message);
+                                    } else {
+                                        mergeMsg += ` (Đã hoàn thành kèm mã ${sister})`;
+                                        console.log(`✅ Auto-completed sister order: ${sister}`);
+                                    }
+                                } catch (loopErr) {
+                                    console.error(`❌ Auto-complete internal fetch error for ${sister}:`, loopErr.message);
+                                }
+                            }
+                        }
+                    } catch (err) {
+                        console.error('Auto-complete merged orders error:', err.message);
+                    }
+                }
+
+                return res.json(createResponse(!syncResult.success, syncResult.success ? ('Hoàn thành!' + mergeMsg) : 'Đã lưu cục bộ nhưng CRM lỗi' + syncStatusMsg, { ticketId, crmStatus: crmSyncStatus }));
 
             } catch (syncErr) {
                 await db.updateOrder(id, { crm_sync_status: 'FAILED', sync_error: syncErr.message });
@@ -1429,7 +1485,62 @@ router.post('/:id/complete', async (req, res) => {
             console.error('MISA Sync Error:', syncErr.message);
         }
 
-        res.json(createResponse(false, 'Đã hoàn thành đơn hàng!'));
+        // AUTO-COMPLETE SISTER ORDERS IN MERGED TRIP
+        let mergeMsg = '';
+        if (fullOrder?.merged_order_no && !req.body.prevent_loop) {
+            console.log(`🔗 Auto-completing sister orders for merged trip: ${fullOrder.merged_order_no}`);
+            try {
+                const { createClient } = await import('@supabase/supabase-js');
+                const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+                const { data: mergedLog } = await supabase
+                    .from('merged_orders')
+                    .select('source_order_nos')
+                    .eq('merged_no', fullOrder.merged_order_no)
+                    .single();
+
+                if (mergedLog && mergedLog.source_order_nos) {
+                    const currentNo = fullOrder.soDon || fullOrder.sale_order_no || id;
+                    const sisters = mergedLog.source_order_nos.filter(no => no !== currentNo);
+
+                    for (const sister of sisters) {
+                        console.log(`🤖 Triggering auto-completion for sister order: ${sister}`);
+                        try {
+                            // Forward the admin completion or driver completion internally
+                            const fetch = (await import('node-fetch')).default;
+                            const protocol = req.protocol || 'http';
+                            const host = req.get('host') || 'localhost:3000';
+
+                            const sisterPayload = {
+                                ...req.body,
+                                prevent_loop: true,
+                                delivery_note: `Tự động hoàn thành theo đơn ghép ${currentNo}`,
+                                admin_completed: true // Prevent driver logic loops requiring images
+                            };
+
+                            const resFetch = await fetch(`${protocol}://${host}/api/orders/${sister}/complete`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(sisterPayload)
+                            });
+                            const resData = await resFetch.json();
+                            if (resData.error) {
+                                console.error(`❌ Auto-completion failed for ${sister}:`, resData.message);
+                            } else {
+                                mergeMsg += ` (Đã hoàn thành kèm mã ${sister})`;
+                                console.log(`✅ Auto-completed sister order: ${sister}`);
+                            }
+                        } catch (loopErr) {
+                            console.error(`❌ Auto-complete internal fetch error for ${sister}:`, loopErr.message);
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error('Auto-complete merged orders error:', err.message);
+            }
+        }
+
+        res.json(createResponse(false, 'Đã hoàn thành đơn hàng!' + mergeMsg));
 
     } catch (e) {
         res.json(createResponse(true, e.message));
