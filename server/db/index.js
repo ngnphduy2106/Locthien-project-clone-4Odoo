@@ -423,8 +423,29 @@ export const db = {
                 safeData.delivery_note = data.delivery_note;
             }
 
+            // Merged Order No (Ghép chuyến)
+            if (data.merged_order_no !== undefined) {
+                safeData.merged_order_no = data.merged_order_no;
+            }
+
+            // CRM Sync Status
+            if (data.crm_sync_status !== undefined) safeData.crm_sync_status = data.crm_sync_status;
+            if (data.sync_error !== undefined) safeData.sync_error = data.sync_error;
+            if (data.completed_at !== undefined) safeData.completed_at = data.completed_at;
+            if (data.admin_completed !== undefined) safeData.admin_completed = data.admin_completed;
+            if (data.is_pinned !== undefined) safeData.is_pinned = data.is_pinned;
+
             console.log(`📝 Updating order ${safeId}:`, Object.keys(safeData));
-            const { data: updated, error } = await supabase.from('orders').update(safeData).eq('id', safeId).select().single();
+            let { data: updated, error } = await supabase.from('orders').update(safeData).eq('id', safeId).select().single();
+
+            // Fallback: if no match by id (dots sanitized to underscores), try by sale_order_no
+            if (!updated || error) {
+                console.log(`⚠️ Update by id failed, trying sale_order_no: ${id}`);
+                const result = await supabase.from('orders').update(safeData).eq('sale_order_no', id).select().single();
+                updated = result.data;
+                error = result.error;
+            }
+
             if (error) console.error('Supabase updateOrder error:', error);
             return updated || { id: safeId, ...safeData };
         }
