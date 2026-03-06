@@ -1151,16 +1151,39 @@ router.post('/:id/complete', async (req, res) => {
                 console.log(`✅ Combined ${updatedProducts.length} products (from actual_products):`, updatedProducts.map(p => `${p.name}: ${p.qty}${p.unit}`));
             }
 
+            // RESOLVE REAL DRIVER: Query order_driver_assignments for dispatched driver
+            let resolvedDriverName = driver_name;
+            let resolvedPlate = plate;
+            if (!isMultiDriverOrder) {
+                try {
+                    const { data: dispatchAssigns } = await supabase
+                        .from('order_driver_assignments')
+                        .select('driver_name, plate, assistant_name')
+                        .eq('order_id', id)
+                        .order('created_at', { ascending: false })
+                        .limit(1);
+
+                    if (dispatchAssigns && dispatchAssigns.length > 0) {
+                        resolvedDriverName = dispatchAssigns[0].driver_name || driver_name;
+                        resolvedPlate = dispatchAssigns[0].plate || plate;
+                        console.log(`✅ Resolved dispatched driver: ${resolvedDriverName} (plate: ${resolvedPlate})`);
+                    } else {
+                        console.log(`⚠️ No assignments found for order ${id}, using request body driver: ${driver_name}`);
+                    }
+                } catch (assignErr) {
+                    console.warn('Assignment lookup for driver name failed:', assignErr.message);
+                }
+            }
+
             // Update order status AND products + Set initial sync status
             await db.updateOrder(id, {
                 status: CONFIG.STATUS.DELIVERED,
                 delivery_status: 'Đã giao hàng',
-                taiXe: isMultiDriverOrder ? firstDriverName : driver_name,
-                bienSo: isMultiDriverOrder && firstDriverPlate ? firstDriverPlate : plate,
+                taiXe: isMultiDriverOrder ? firstDriverName : resolvedDriverName,
+                bienSo: isMultiDriverOrder && firstDriverPlate ? firstDriverPlate : resolvedPlate,
                 cart: updatedProducts,
                 local_items: local_items || [],
-                delivery_note: note || delivery_note || '',
-                crm_sync_status: 'PUSHING'
+                delivery_note: note || delivery_note || ''
             });
 
             // Create warehouse tickets
