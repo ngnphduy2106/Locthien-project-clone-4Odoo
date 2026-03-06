@@ -612,13 +612,13 @@ function applyRoleBasedUI(role) {
     const navUsers = window.$('#nav-users');
     if (navUsers) navUsers.style.display = (isAdmin && !isDispatcher) ? 'block' : 'none';
 
-    // Show nav-suppliers for admin/dispatcher
+    // Show nav-suppliers for admin only (NOT dispatcher)
     const navSuppliers = window.$('#nav-suppliers');
-    if (navSuppliers) navSuppliers.style.display = isAdmin ? 'block' : 'none';
+    if (navSuppliers) navSuppliers.style.display = (isAdmin && !isDispatcher) ? 'block' : 'none';
 
-    // Show nav-customers for admin/dispatcher
+    // Show nav-customers for admin only (NOT dispatcher)
     const navCustomers = window.$('#nav-customers');
-    if (navCustomers) navCustomers.style.display = isAdmin ? 'block' : 'none';
+    if (navCustomers) navCustomers.style.display = (isAdmin && !isDispatcher) ? 'block' : 'none';
 
     // Driver restrictions - hide all menus except "Đơn của tôi"
     if (isDriver) {
