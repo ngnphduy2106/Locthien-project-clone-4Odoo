@@ -217,9 +217,10 @@ router.get('/my/:driverName', async (req, res) => {
         const { role } = req.query;
         const myName = String(driverName).trim().toUpperCase();
         const normalizedRole = (role || '').toUpperCase();
-        const isAdmin = normalizedRole === 'ADMIN' || normalizedRole === 'TESTER';
+        // Allow SALES to see external drivers in "My Orders" tab just like ADMIN
+        const isAdmin = ['ADMIN', 'TESTER', 'SALES'].includes(normalizedRole);
 
-        console.log(`🔍 My Orders Search: driverName="${driverName}" role="${role}"`);
+        console.log(`🔍 My Orders Search: driverName="${driverName}" role="${role}", isAdmin=${isAdmin}`);
 
         const { createClient } = await import('@supabase/supabase-js');
         const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);

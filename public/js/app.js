@@ -728,7 +728,6 @@ function applyRoleBasedUI(role) {
         const navMergeOrders = window.$('#nav-merge-orders');
         const navSuppliers = window.$('#nav-suppliers');
         const navCustomers = window.$('#nav-customers');
-        if (navMyOrders) navMyOrders.style.display = 'none';
         if (navMergeOrders) navMergeOrders.style.display = 'none';
         if (navSuppliers) navSuppliers.style.display = 'none';
         if (navCustomers) navCustomers.style.display = 'none';
