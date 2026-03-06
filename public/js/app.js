@@ -7554,8 +7554,7 @@ async function updateUserStatus(userId, status) {
 // Show admin menu on login
 function showAdminMenuIfNeeded() {
     const navUsers = window.$('#nav-users');
-    const isDispatcher = state.user?.role?.toLowerCase() === 'dispatcher';
-    if (navUsers && isAdminRole() && !isDispatcher) {
+    if (navUsers && isAdminRole() && !isDispatcherRole()) {
         navUsers.style.display = 'block';
     }
 }
