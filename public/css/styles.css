@@ -265,9 +265,10 @@ body {
 }
 
 .user-avatar {
-    width: 40px;
+    padding: 0 16px;
+    min-width: 40px;
     height: 40px;
-    border-radius: 50%;
+    border-radius: 20px;
     background: linear-gradient(135deg, var(--primary), #9c7cff);
     display: flex;
     align-items: center;
@@ -276,6 +277,7 @@ body {
     font-weight: 600;
     font-size: 14px;
     cursor: pointer;
+    white-space: nowrap;
 }
 
 /* === Page Content === */

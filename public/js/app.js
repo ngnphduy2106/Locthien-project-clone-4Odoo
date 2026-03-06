@@ -478,7 +478,7 @@ function initApp() {
         // Update avatar initial
         const avatarInitial = window.$('#user-initial');
         if (avatarInitial) {
-            avatarInitial.textContent = userName.charAt(0).toUpperCase();
+            avatarInitial.textContent = userName;
         }
 
         // Update header user display
