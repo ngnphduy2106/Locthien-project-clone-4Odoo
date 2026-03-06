@@ -12,11 +12,25 @@ const SuppliersModule = {
     },
 
     // Load suppliers from API
+    // Check if current user is admin
+    _isAdmin() {
+        const role = (window.currentUser?.role || '').toLowerCase();
+        return role === 'admin' || role === 'quản trị viên' || role === 'quản lý';
+    },
+
     async loadSuppliers() {
         try {
             const tbody = document.getElementById('suppliers-table-body');
             if (tbody) {
                 tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:40px;"><i class="bi bi-hourglass-split"></i> Đang tải...</td></tr>';
+            }
+
+            // Hide add/import buttons for non-admin
+            const addBtn = document.querySelector('[onclick*="SuppliersModule.showAddModal"]');
+            const importBtn = document.querySelector('[onclick*="SuppliersModule.importFromSheet"]');
+            if (!this._isAdmin()) {
+                if (addBtn) addBtn.style.display = 'none';
+                if (importBtn) importBtn.style.display = 'none';
             }
 
             const res = await api.getSuppliers();
@@ -54,6 +68,7 @@ const SuppliersModule = {
             return;
         }
 
+        const isAdmin = this._isAdmin();
         tbody.innerHTML = this.filteredSuppliers.map((s, i) => `
             <tr>
                 <td style="text-align:center; color:#6B7280;">${i + 1}</td>
@@ -64,14 +79,14 @@ const SuppliersModule = {
                 <td style="color:#6B7280;">${s.address || '-'}</td>
                 <td style="color:#6B7280;">${s.phone || '-'}</td>
                 <td style="color:#6B7280;">${s.email || '-'}</td>
-                <td style="text-align:center;">
+                ${isAdmin ? `<td style="text-align:center;">
                     <button class="btn-icon" onclick="SuppliersModule.showEditModal('${s.id}')" title="Sửa" style="color:#3B82F6;">
                         <i class="bi bi-pencil"></i>
                     </button>
                     <button class="btn-icon" onclick="SuppliersModule.confirmDelete('${s.id}', '${this.escapeHtml(s.name)}')" title="Xóa" style="color:#EF4444;">
                         <i class="bi bi-trash"></i>
                     </button>
-                </td>
+                </td>` : ''}
             </tr>
         `).join('');
     },
@@ -92,6 +107,7 @@ const SuppliersModule = {
 
     // Show add modal
     showAddModal() {
+        if (!this._isAdmin()) { alert('Chỉ Admin mới được thêm NCC!'); return; }
         document.getElementById('supplier-modal-title').textContent = 'Thêm Nhà cung cấp';
         document.getElementById('supplier-id').value = '';
         document.getElementById('supplier-name').value = '';
@@ -105,6 +121,7 @@ const SuppliersModule = {
 
     // Show edit modal
     showEditModal(id) {
+        if (!this._isAdmin()) { alert('Chỉ Admin mới được sửa NCC!'); return; }
         const supplier = this.suppliers.find(s => s.id === id);
         if (!supplier) {
             showToast('Không tìm thấy nhà cung cấp', 'error');
@@ -176,6 +193,7 @@ const SuppliersModule = {
 
     // Confirm delete
     confirmDelete(id, name) {
+        if (!this._isAdmin()) { alert('Chỉ Admin mới được xóa NCC!'); return; }
         if (confirm(`Bạn có chắc muốn xóa nhà cung cấp "${name}"?`)) {
             this.deleteSupplier(id);
         }

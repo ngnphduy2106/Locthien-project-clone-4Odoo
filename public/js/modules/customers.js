@@ -12,11 +12,25 @@ const CustomersModule = {
     },
 
     // Load customers from API
+    // Check if current user is admin
+    _isAdmin() {
+        const role = (window.currentUser?.role || '').toLowerCase();
+        return role === 'admin' || role === 'quản trị viên' || role === 'quản lý';
+    },
+
     async loadCustomers() {
         try {
             const tbody = document.getElementById('customers-table-body');
             if (tbody) {
                 tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:40px;"><i class="bi bi-hourglass-split"></i> Đang tải...</td></tr>';
+            }
+
+            // Hide add/import buttons for non-admin
+            const addBtn = document.querySelector('[onclick*="CustomersModule.showAddModal"]');
+            const importBtn = document.querySelector('[onclick*="CustomersModule.importFromSheet"]');
+            if (!this._isAdmin()) {
+                if (addBtn) addBtn.style.display = 'none';
+                if (importBtn) importBtn.style.display = 'none';
             }
 
             const res = await api.getCustomers();
@@ -54,6 +68,7 @@ const CustomersModule = {
             return;
         }
 
+        const isAdmin = this._isAdmin();
         tbody.innerHTML = this.filteredCustomers.map((c, i) => `
             <tr>
                 <td style="text-align:center; color:#6B7280;">${i + 1}</td>
@@ -64,14 +79,14 @@ const CustomersModule = {
                 <td style="color:#6B7280;">${c.address || '-'}</td>
                 <td style="color:#6B7280;">${c.phone || '-'}</td>
                 <td style="color:#6B7280;">${c.email || '-'}</td>
-                <td style="text-align:center;">
+                ${isAdmin ? `<td style="text-align:center;">
                     <button class="btn-icon" onclick="CustomersModule.showEditModal('${c.id}')" title="Sửa" style="color:#3B82F6;">
                         <i class="bi bi-pencil"></i>
                     </button>
                     <button class="btn-icon" onclick="CustomersModule.confirmDelete('${c.id}', '${this.escapeHtml(c.name)}')" title="Xóa" style="color:#EF4444;">
                         <i class="bi bi-trash"></i>
                     </button>
-                </td>
+                </td>` : ''}
             </tr>
         `).join('');
     },
@@ -92,6 +107,7 @@ const CustomersModule = {
 
     // Show add modal
     showAddModal() {
+        if (!this._isAdmin()) { alert('Chỉ Admin mới được thêm khách hàng!'); return; }
         document.getElementById('customer-modal-title').textContent = 'Thêm Khách hàng';
         document.getElementById('customer-id').value = '';
         document.getElementById('customer-name').value = '';
@@ -105,6 +121,7 @@ const CustomersModule = {
 
     // Show edit modal
     showEditModal(id) {
+        if (!this._isAdmin()) { alert('Chỉ Admin mới được sửa khách hàng!'); return; }
         const customer = this.customers.find(c => c.id === id);
         if (!customer) {
             showToast('Không tìm thấy khách hàng', 'error');
@@ -176,6 +193,7 @@ const CustomersModule = {
 
     // Confirm delete
     confirmDelete(id, name) {
+        if (!this._isAdmin()) { alert('Chỉ Admin mới được xóa khách hàng!'); return; }
         if (confirm(`Bạn có chắc muốn xóa khách hàng "${name}"?`)) {
             this.deleteCustomer(id);
         }
