@@ -3868,7 +3868,7 @@ async function submitMultiDriverAssignment() {
     const totalOrder = state.currentOrderTotalQty || 0;
 
     if (Math.abs(totalAssigned - totalOrder) > 0.5) {
-        if (!confirm(`Tổng số lượng phân(${formatNumber(totalAssigned)} kg) khác tổng đơn(${formatNumber(totalOrder)} kg).Tiếp tục ? `)) {
+        if (!confirm(`Tổng số lượng phân (${formatNumber(totalAssigned)} kg) khác tổng đơn (${formatNumber(totalOrder)} kg). Tiếp tục?`)) {
             return;
         }
     }
@@ -3877,7 +3877,7 @@ async function submitMultiDriverAssignment() {
 
     try {
         const orderId = state.currentAssignOrderId;
-        const res = await fetch(`/ api / orders / ${orderId}/assign-multi`, {
+        const res = await fetch(`/api/orders/${orderId}/assign-multi`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ assignments: state.driverAssignments })
