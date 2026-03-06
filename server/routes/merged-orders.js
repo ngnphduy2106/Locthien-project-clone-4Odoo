@@ -516,40 +516,53 @@ router.post('/:id/checkin', async (req, res) => {
                             checked_in_at: new Date().toISOString()
                         }, { onConflict: 'merged_order_id,order_no' });
 
-                    // 2. Update sister order status
-                    await supabase
-                        .from('orders')
-                        .update({
-                            status: 'Đã thực hiện',
-                            delivery_status: 'Đã giao hàng',
-                            custom_field13: resolvedDriverName,
-                            custom_field14: resolvedPlate
-                        })
-                        .eq('sale_order_no', sisterNo);
-
-                    // 3. Sync sister to MISA
-                    try {
-                        const sisterInfo = await db.getOrder(sisterNo);
-                        if (sisterInfo?.misa_id) {
-                            const sisterProducts = (sisterInfo.products || []).map(p => ({
-                                product_code: p.code || '',
-                                warehouse: '',
-                                unit: p.unit || 'kg',
-                                qty: Number(p.qty || 0)
-                            }));
-
-                            await updateMisaOrder(sisterNo, {
-                                misa_id: sisterInfo.misa_id,
-                                delivery_status: 'Đã giao hàng',
+                    // 2. Update sister order status (handle both export and import)
+                    if (sisterNo.startsWith('N')) {
+                        // Sister is an import ticket
+                        await supabase
+                            .from('import_tickets')
+                            .update({
+                                status: 'completed',
+                                completed_at: new Date().toISOString()
+                            })
+                            .eq('ticket_no', sisterNo);
+                        console.log(`✅ Auto-completed import sister: ${sisterNo}`);
+                    } else {
+                        // Sister is an export order
+                        await supabase
+                            .from('orders')
+                            .update({
                                 status: 'Đã thực hiện',
-                                driver: resolvedDriverName,
-                                plate: resolvedPlate,
-                                cart: sisterProducts.length > 0 ? sisterProducts : undefined
-                            });
-                            console.log(`✅ MISA synced sister: ${sisterNo}`);
+                                delivery_status: 'Đã giao hàng',
+                                custom_field13: resolvedDriverName,
+                                custom_field14: resolvedPlate
+                            })
+                            .eq('sale_order_no', sisterNo);
+
+                        // 3. Sync export sister to MISA
+                        try {
+                            const sisterInfo = await db.getOrder(sisterNo);
+                            if (sisterInfo?.misa_id) {
+                                const sisterProducts = (sisterInfo.products || []).map(p => ({
+                                    product_code: p.code || '',
+                                    warehouse: '',
+                                    unit: p.unit || 'kg',
+                                    qty: Number(p.qty || 0)
+                                }));
+
+                                await updateMisaOrder(sisterNo, {
+                                    misa_id: sisterInfo.misa_id,
+                                    delivery_status: 'Đã giao hàng',
+                                    status: 'Đã thực hiện',
+                                    driver: resolvedDriverName,
+                                    plate: resolvedPlate,
+                                    cart: sisterProducts.length > 0 ? sisterProducts : undefined
+                                });
+                                console.log(`✅ MISA synced sister: ${sisterNo}`);
+                            }
+                        } catch (misaSisterErr) {
+                            console.warn(`⚠️ MISA sync failed for sister ${sisterNo}:`, misaSisterErr.message);
                         }
-                    } catch (misaSisterErr) {
-                        console.warn(`⚠️ MISA sync failed for sister ${sisterNo}:`, misaSisterErr.message);
                     }
 
                     console.log(`✅ Auto-completed sister order: ${sisterNo}`);
