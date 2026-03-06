@@ -578,8 +578,8 @@ window.initDatePickers = initDatePickers;
 function applyRoleBasedUI(role) {
     // Normalize role to lowercase for comparison
     const normalizedRole = (role || '').toLowerCase();
-    const isAdmin = normalizedRole === 'admin' || normalizedRole === 'tester' || normalizedRole === 'dispatcher';  // DISPATCHER = ADMIN privileges
-    const isDispatcher = normalizedRole === 'dispatcher';  // DISPATCHER can't see money
+    const isAdmin = normalizedRole === 'admin' || normalizedRole === 'tester' || normalizedRole === 'dispatcher' || normalizedRole === 'điều phối' || normalizedRole === 'quản lý' || normalizedRole === 'quan ly';  // DISPATCHER = ADMIN privileges
+    const isDispatcher = normalizedRole === 'dispatcher' || normalizedRole === 'điều phối' || normalizedRole === 'dieu phoi';  // DISPATCHER can't see money
     const isDriver = normalizedRole === 'driver' || normalizedRole === 'assistant' || normalizedRole === 'phụ xe';  // ASSISTANT = DRIVER privileges
     const isAccountant = normalizedRole === 'accountant' || normalizedRole === 'kế toán' || normalizedRole === 'ke toan' || normalizedRole === 'ketoan';
 
