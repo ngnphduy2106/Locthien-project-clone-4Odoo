@@ -15,17 +15,20 @@ const PendingOrdersModule = {
 
     // Load pending and assigned orders (export + import)
     async loadOrders() {
-        const container = document.getElementById('pending-orders-table-body');
-        if (!container) return;
+        const containerExport = document.getElementById('pending-orders-export-body');
+        const containerImport = document.getElementById('pending-orders-import-body');
+        if (!containerExport || !containerImport) return;
 
-        container.innerHTML = `
+        const loadingHtml = `
             <tr>
-                <td colspan="7" style="text-align:center; padding:40px; color:#8c8c8c;">
+                <td colspan="5" style="text-align:center; padding:40px; color:#8c8c8c;">
                     <i class="bi bi-arrow-repeat spin" style="font-size:24px;"></i>
-                    <p>Đang tải...</p>
+                    <p>Đang tải dữ liệu...</p>
                 </td>
             </tr>
         `;
+        containerExport.innerHTML = loadingHtml;
+        containerImport.innerHTML = loadingHtml;
 
         try {
             // Fetch both export orders and import tickets
@@ -101,7 +104,9 @@ const PendingOrdersModule = {
 
         } catch (error) {
             console.error('Error loading pending orders:', error);
-            container.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:20px; color:var(--danger);">Lỗi tải dữ liệu</td></tr>`;
+            const errorHtml = `<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--danger);">Lỗi tải dữ liệu</td></tr>`;
+            if (containerExport) containerExport.innerHTML = errorHtml;
+            if (containerImport) containerImport.innerHTML = errorHtml;
         }
     },
 
