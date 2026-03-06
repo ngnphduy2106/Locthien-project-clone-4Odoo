@@ -3553,21 +3553,21 @@ function assignDriver(orderId) {
                 </div>
                 <select id="merge-order-select" class="form-control hidden" style="margin-top:10px;">
                     <option value="">-- Chọn đơn để ghép cùng --</option>
-                    \${(() => {
-                        const validStatuses = ['Chưa thực hiện', 'Đang thực hiện', 'pending', 'assigned', 'delivering'];
-                        const eligible = Object.values(state.orders).flat().filter(o => 
-                            (o.id !== orderId && o.sale_order_no !== orderId) && 
-                            validStatuses.includes(o.status)
-                        );
-                        if (eligible.length === 0) return '<option value="" disabled>Không có đơn nào phù hợp</option>';
-                        let html = '';
-                        eligible.forEach(o => {
-                            const no = o.sale_order_no || o.id;
-                            const cus = o.khach || o.account_name || 'Khách lẻ';
-                            html += '<option value="' + no + '">' + no + ' - ' + cus + '</option>';
-                        });
-                        return html;
-                    })()}
+                    ${(() => {
+                const validStatuses = ['Chưa thực hiện', 'Đang thực hiện', 'pending', 'assigned', 'delivering'];
+                const eligible = Object.values(state.orders).flat().filter(o =>
+                    (o.id !== orderId && o.sale_order_no !== orderId) &&
+                    validStatuses.includes(o.status)
+                );
+                if (eligible.length === 0) return '<option value="" disabled>Không có đơn nào phù hợp</option>';
+                let html = '';
+                eligible.forEach(o => {
+                    const no = o.sale_order_no || o.id;
+                    const cus = o.khach || o.account_name || 'Khách lẻ';
+                    html += '<option value="' + no + '">' + no + ' - ' + cus + '</option>';
+                });
+                return html;
+            })()}
                 </select>
             </div>
             
