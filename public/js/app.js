@@ -8936,20 +8936,41 @@ async function loadPendingOrdersForMerge() {
     `;
 
     try {
-        const res = await fetch('/api/orders');
-        const data = await res.json();
+        // Fetch both export orders and import orders
+        const [exportRes, importRes] = await Promise.all([
+            fetch('/api/orders').then(r => r.json()).catch(() => ({})),
+            fetch('/api/imports').then(r => r.json()).catch(() => ({}))
+        ]);
 
-        if (data.error) {
-            container.innerHTML = `<p style="color:var(--danger); padding:20px;">Lỗi: ${data.msg}</p>`;
-            return;
-        }
-
-        // Filter pending orders only (unassigned, ready to merge)
-        const pendingOrders = (data.pending || []).filter(o =>
+        // Filter pending export orders (unassigned)
+        const exportOrders = (exportRes.pending || []).filter(o =>
             (o.status === 'Chưa thực hiện' || o.status === 'Mới') && !o.taiXe && !o.driver && !o.custom_field13
-        );
+        ).map(o => ({
+            ...o,
+            _type: 'export',
+            _mergeId: o.soDon || o.sale_order_no || o.id,
+            _displayNo: o.soDon || o.sale_order_no || 'N/A',
+            _customer: o.khach || o.account_name || '',
+            _address: o.diaChi || o.shipping_address || '',
+            _amount: Number(o.amount || o.sale_order_amount || 0)
+        }));
 
-        if (pendingOrders.length === 0) {
+        // Filter pending import orders (unassigned)
+        const importOrders = ((importRes.data || []).filter(i =>
+            (i.status === 'pending' || i.status === 'Chưa thực hiện') && !i.driver_name
+        )).map(i => ({
+            ...i,
+            _type: 'import',
+            _mergeId: i.ticket_no || i.id,
+            _displayNo: i.ticket_no || i.id || 'N/A',
+            _customer: i.supplier_name || i.supplier || '',
+            _address: i.pickup_address || i.address || '',
+            _amount: Number(i.total_amount || 0)
+        }));
+
+        const allOrders = [...exportOrders, ...importOrders];
+
+        if (allOrders.length === 0) {
             container.innerHTML = `
                 <div style="text-align:center; padding:40px; color:var(--text-muted);">
                     <i class="bi bi-inbox" style="font-size:32px; opacity:0.5;"></i>
@@ -8959,30 +8980,31 @@ async function loadPendingOrdersForMerge() {
             return;
         }
 
-        container.innerHTML = pendingOrders.map(order => {
-            const checked = selectedOrdersForMerge.has(order.id);
-            const addr = order.diaChi || order.shipping_address || '';
-            const amount = Number(order.amount || order.sale_order_amount || 0);
+        container.innerHTML = allOrders.map(order => {
+            const checked = selectedOrdersForMerge.has(order._mergeId);
+            const typeBadge = order._type === 'import'
+                ? '<span style="background:#40c057; color:white; padding:2px 6px; border-radius:4px; font-size:11px; font-weight:600;">Nhập</span>'
+                : '<span style="background:#4dabf7; color:white; padding:2px 6px; border-radius:4px; font-size:11px; font-weight:600;">Xuất</span>';
             return `
                 <div class="order-card" style="display:flex; gap:12px; align-items:flex-start; padding:12px; border-bottom:1px solid var(--border-color);">
                     <input type="checkbox" 
-                        id="merge-cb-${order.id}" 
-                        data-order-no="${order.soDon || order.sale_order_no || order.id}"
+                        id="merge-cb-${order._mergeId}" 
+                        data-order-no="${order._mergeId}"
                         ${checked ? 'checked' : ''} 
-                        onchange="toggleOrderForMerge('${order.soDon || order.sale_order_no || order.id}')"
+                        onchange="toggleOrderForMerge('${order._mergeId}')"
                         style="width:20px; height:20px; cursor:pointer; margin-top:4px;">
                     <div style="flex:1;">
-                        <div style="font-weight:600; color:var(--primary);">
-                            ${order.soDon || order.sale_order_no || 'N/A'}
+                        <div style="font-weight:600; color:var(--primary); display:flex; gap:8px; align-items:center;">
+                            ${typeBadge} ${order._displayNo}
                         </div>
                         <div style="font-size:13px; margin-top:4px;">
-                            <strong>${order.khach || order.account_name || ''}</strong>
+                            <strong>${order._customer}</strong>
                         </div>
                         <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">
-                            <i class="bi bi-geo-alt"></i> ${addr.substring(0, 60)}${addr.length > 60 ? '...' : ''}
+                            <i class="bi bi-geo-alt"></i> ${order._address.substring(0, 60)}${order._address.length > 60 ? '...' : ''}
                         </div>
                         <div style="font-size:12px; color:var(--success); margin-top:4px;">
-                            💰 ${amount.toLocaleString('vi-VN')}đ
+                            💰 ${order._amount.toLocaleString('vi-VN')}đ
                         </div>
                     </div>
                 </div>
