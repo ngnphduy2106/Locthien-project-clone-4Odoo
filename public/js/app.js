@@ -6257,6 +6257,10 @@ async function assignImportDriver(importId) {
         `<option value="${d.name}" data-plate="${d.plate || ''}">${d.name}${d.plate ? ' - ' + d.plate : ''}</option>`
     ).join('');
 
+    // Build plate options (same as export)
+    const uniquePlates = [...new Set((state.drivers || []).filter(d => d.plate).map(d => d.plate))];
+    const plateOptions = uniquePlates.map(p => `<option value="${p}">${p}</option>`).join('');
+
     // Show modal
     const modal = window.$('#modal-order-detail');
     const modalBody = window.$('#modal-order-body');
@@ -6292,11 +6296,18 @@ async function assignImportDriver(importId) {
                 <div style="border:1px dashed var(--border); padding:12px; border-radius:8px;">
                     <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end; margin-bottom:12px;">
                         <div style="flex:1; min-width:150px;">
-                            <label class="form-label" style="font-size:12px;">Chọn tài xế</label>
+                            <label class="form-label" style="font-size:12px;">Tên tài xế</label>
                             <select id="import-new-driver-select" class="form-control" onchange="onImportDriverChange(this)">
                                 <option value="">-- Chọn tài xế --</option>
                                 ${driverOptions}
                                 <option value="__EXTERNAL__">➕ Tài xế ngoài...</option>
+                            </select>
+                        </div>
+                        <div id="import-internal-plate-container" style="flex:1; min-width:150px;">
+                            <label class="form-label" style="font-size:12px;">Biển số xe</label>
+                            <select id="import-new-driver-plate-select" class="form-control">
+                                <option value="">-- Chọn biển số --</option>
+                                ${plateOptions}
                             </select>
                         </div>
                         <div id="import-external-driver-fields" class="hidden" style="display:none; gap:8px; flex:2;">
@@ -6308,6 +6319,20 @@ async function assignImportDriver(importId) {
                                 <label class="form-label" style="font-size:12px;">Biển số xe</label>
                                 <input type="text" id="import-external-driver-plate" class="form-control" placeholder="Biển số...">
                             </div>
+                        </div>
+                    </div>
+                    
+                    <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end; margin-bottom:12px;">
+                        <div style="flex:1; min-width:150px;">
+                            <label class="form-label" style="font-size:12px;">Phụ xe (Tùy chọn)</label>
+                            <select id="import-new-assistant-select" class="form-control">
+                                <option value="">-- Không có --</option>
+                                ${(state.assistants || []).map(a => `<option value="${a.name}">${a.name}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div style="flex:1; min-width:150px;">
+                            <label class="form-label" style="font-size:12px;">Thời gian giao</label>
+                            <input type="text" id="import-new-delivery-time" class="form-control" placeholder="VD: Sáng mai, 14:00...">
                         </div>
                     </div>
                     
@@ -6362,17 +6387,28 @@ async function assignImportDriver(importId) {
 // Handle import driver select change for external driver
 function onImportDriverChange(selectEl) {
     const externalFields = window.$('#import-external-driver-fields');
+    const plateContainer = window.$('#import-internal-plate-container');
     if (selectEl.value === '__EXTERNAL__') {
         externalFields?.classList.remove('hidden');
         externalFields.style.display = 'flex';
+        if (plateContainer) plateContainer.style.display = 'none';
     } else {
         externalFields?.classList.add('hidden');
         externalFields.style.display = 'none';
-        // Auto-fill plate
+        if (plateContainer) plateContainer.style.display = 'block';
+        // Auto-fill plate from selected driver
         const selectedOption = selectEl.options[selectEl.selectedIndex];
         const plate = selectedOption?.getAttribute('data-plate') || '';
-        const externalPlate = window.$('#import-external-driver-plate');
-        if (externalPlate) externalPlate.value = plate;
+        const plateSelect = window.$('#import-new-driver-plate-select');
+        if (plateSelect && plate) {
+            // Try to select matching plate option
+            for (let i = 0; i < plateSelect.options.length; i++) {
+                if (plateSelect.options[i].value === plate) {
+                    plateSelect.selectedIndex = i;
+                    break;
+                }
+            }
+        }
     }
 }
 
@@ -6384,6 +6420,8 @@ function addImportDriverAssignmentRow() {
 
     let driverName = select?.value;
     let plate = '';
+    let assistantName = '';
+    let deliveryTime = '';
     const isExternal = driverName === '__EXTERNAL__';
 
     // Handle external driver
@@ -6399,9 +6437,18 @@ function addImportDriverAssignmentRow() {
             alert('Vui lòng chọn tài xế!');
             return;
         }
-        const selectedOption = select.options[select.selectedIndex];
-        plate = selectedOption?.getAttribute('data-plate') || '';
+        // Read plate from the plate select
+        const plateSelect = window.$('#import-new-driver-plate-select');
+        plate = plateSelect?.value || '';
+        if (!plate) {
+            const selectedOption = select.options[select.selectedIndex];
+            plate = selectedOption?.getAttribute('data-plate') || '';
+        }
     }
+
+    // Read assistant and delivery time
+    assistantName = window.$('#import-new-assistant-select')?.value || '';
+    deliveryTime = window.$('#import-new-delivery-time')?.value?.trim() || '';
 
     // Collect products from checkboxes (matching export form logic)
     const products = state.currentImportProducts || [];
@@ -6437,7 +6484,9 @@ function addImportDriverAssignmentRow() {
         plate: plate,
         qty: totalQty,
         products: selectedProducts,
-        is_external: isExternal
+        is_external: isExternal,
+        assistant_name: assistantName,
+        delivery_time: deliveryTime
     });
 
     // Update remaining quantities in form
