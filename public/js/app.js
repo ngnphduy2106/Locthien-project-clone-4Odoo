@@ -6276,6 +6276,30 @@ async function assignImportDriver(importId) {
     // Init driver assignments array for import
     state.importDriverAssignments = [];
 
+    // Pre-fetch export orders for merge datalist
+    try {
+        const ordRes = await fetch('/api/orders').then(r => r.json());
+        if (!ordRes.error) {
+            state.orders.pending = ordRes.pending || [];
+            state.orders.assigned = ordRes.assigned || [];
+            state.orders.completed = ordRes.completed || [];
+        }
+    } catch (e) {
+        console.warn('Failed to pre-fetch orders for merge:', e.message);
+    }
+    // Also refresh imports
+    try {
+        const impRes = await fetch('/api/imports').then(r => r.json());
+        const imports = impRes?.data || [];
+        state.imports = {
+            pending: imports.filter(i => i.status === 'pending' || i.status === 'Chưa thực hiện'),
+            assigned: imports.filter(i => i.status === 'assigned' || i.status === 'in_transit'),
+            completed: imports.filter(i => i.status === 'completed')
+        };
+    } catch (e) {
+        console.warn('Failed to pre-fetch imports:', e.message);
+    }
+
     // Build driver select options with plate data
     const driverOptions = (state.drivers || []).map(d =>
         `<option value="${d.name}" data-plate="${d.plate || ''}">${d.name}</option>`
@@ -6284,6 +6308,23 @@ async function assignImportDriver(importId) {
     // Build plate options (same as export)
     const uniquePlates = [...new Set((state.drivers || []).filter(d => d.plate).map(d => d.plate))];
     const plateOptions = uniquePlates.map(p => `<option value="${p}">${p}</option>`).join('');
+
+    // Build merge datalist options (export + import orders, exclude current)
+    const importTicketNo = imp.ticket_no || imp.id;
+    const mergeValidStatuses = ['Chưa thực hiện', 'Đang thực hiện', 'pending', 'assigned', 'delivering', 'Mới'];
+    let mergeDatalistHtml = '';
+    // Export orders
+    Object.values(state.orders).flat().filter(o => mergeValidStatuses.includes(o.status)).forEach(o => {
+        const no = o.sale_order_no || o.id;
+        const cus = o.khach || o.account_name || 'Khách lẻ';
+        mergeDatalistHtml += `<option value="${no}">[Xuất] ${cus}</option>`;
+    });
+    // Import orders (exclude self)
+    Object.values(state.imports || {}).flat().filter(i => mergeValidStatuses.includes(i.status) && (i.ticket_no || i.id) !== importTicketNo).forEach(i => {
+        const no = i.ticket_no || i.id;
+        const sup = i.supplier_name || i.supplier || 'Nhà cung cấp';
+        mergeDatalistHtml += `<option value="${no}">[Nhập] ${sup}</option>`;
+    });
 
     // Show modal
     const modal = window.$('#modal-order-detail');
@@ -6307,6 +6348,27 @@ async function assignImportDriver(importId) {
                     <label>Tổng SL:</label>
                     <span style="color:var(--success); font-weight:600;">${formatNumber(totalQty)} kg</span>
                 </div>
+            </div>
+            
+            <!-- Merge Order Section -->
+            <div style="background:var(--card-bg); padding:12px; border-radius:8px; margin-bottom:16px; border:1px solid var(--border);">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <input type="checkbox" id="import-is-merged-order" style="width:16px; height:16px;" onchange="
+                        const selectBox = document.getElementById('import-merge-order-input');
+                        if (this.checked) {
+                            selectBox.classList.remove('hidden');
+                            selectBox.focus();
+                        } else {
+                            selectBox.classList.add('hidden');
+                            selectBox.value = '';
+                        }
+                    ">
+                    <label for="import-is-merged-order" style="font-weight:600; margin:0; cursor:pointer;">🔗 Ghép chung với đơn khác</label>
+                </div>
+                <input type="text" id="import-merge-order-input" list="import-merge-order-datalist" class="form-control hidden" placeholder="-- Gõ để tìm mã đơn hoặc tên --" style="margin-top:10px;">
+                <datalist id="import-merge-order-datalist">
+                    ${mergeDatalistHtml}
+                </datalist>
             </div>
             
             <!--Multi-Driver Assignment Section-->
@@ -6626,6 +6688,38 @@ async function submitImportMultiDriverAssignment() {
     if (!assignments.length) {
         alert('Vui lòng thêm ít nhất một tài xế!');
         return;
+    }
+
+    // Handle merge with another order
+    const mergeCheckbox = window.$('#import-is-merged-order');
+    const mergeInput = window.$('#import-merge-order-input');
+    if (mergeCheckbox?.checked && mergeInput?.value?.trim()) {
+        const mergeWithNo = mergeInput.value.trim();
+        const currentNo = state.currentAssignImportId;
+
+        // Find current import's ticket_no
+        const allImports = [...(state.imports?.pending || []), ...(state.imports?.assigned || [])];
+        const currentImp = allImports.find(i => i.id == currentNo);
+        const currentTicketNo = currentImp?.ticket_no || currentNo;
+
+        try {
+            const mergeRes = await fetch('/api/merged-orders', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    order_ids: [currentTicketNo, mergeWithNo],
+                    created_by: window.currentUser?.fullName || 'Admin'
+                })
+            });
+            const mergeData = await mergeRes.json();
+            if (mergeData.error) {
+                console.warn('Merge creation failed:', mergeData.msg);
+            } else {
+                console.log('✅ Merged order created:', mergeData.msg);
+            }
+        } catch (mergeErr) {
+            console.warn('Merge error:', mergeErr.message);
+        }
     }
 
     // For single driver - use existing API
