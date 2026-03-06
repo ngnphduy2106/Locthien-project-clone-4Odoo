@@ -27,7 +27,7 @@ let state = {
     }
 };
 
-
+window.state = state;
 
 // === DOM HELPERS (use globals from core.js) ===
 // Note: $ and $$ are defined in core.js and exported to window
@@ -921,7 +921,7 @@ async function loadDashboard() {
         const elCompletedRate = window.$('#stat-completed-rate');
         const elUpdateTime = window.$('#dashboard-update-time');
 
-        const currentUser = window.state?.user || {};
+        const currentUser = (window.state?.user || state?.user) || {};
         const isAdmin = ['admin', 'tester'].includes(String(currentUser.role || '').toLowerCase());
 
         if (elOrderCount) elOrderCount.textContent = orderCount.toLocaleString('vi-VN');
@@ -993,7 +993,7 @@ function loadValueTimeChart(orders, period) {
     const ctx = window.$('#valueTimeChart');
     if (!ctx) return;
 
-    const currentUser = window.state?.user || {};
+    const currentUser = (window.state?.user || state?.user) || {};
     const isAdmin = ['admin', 'tester'].includes(String(currentUser.role || '').toLowerCase());
 
     if (!isAdmin) {
@@ -1099,7 +1099,7 @@ function loadTopCustomers(orders) {
         return;
     }
 
-    const currentUser = window.state?.user || {};
+    const currentUser = (window.state?.user || state?.user) || {};
     const isAdmin = ['admin', 'tester'].includes(String(currentUser.role || '').toLowerCase());
 
     container.innerHTML = sorted.map(([name, stats], i) => `
@@ -1135,7 +1135,7 @@ function loadTopDrivers(completedOrders) {
         return;
     }
 
-    const currentUser = window.state?.user || {};
+    const currentUser = (window.state?.user || state?.user) || {};
     const isAdmin = ['admin', 'tester'].includes(String(currentUser.role || '').toLowerCase());
 
     container.innerHTML = sorted.map(([name, stats], i) => `
@@ -2973,8 +2973,8 @@ async function viewOrderDetail(orderId, options = {}) {
     console.log(`📦 Order ${order.soDon || order.id} has ${products.length} products:`, products);
 
     // Check permission to view price
-    const currentUser = window.state?.user || {};
-    const role = String(currentUser.role || '').toLowerCase();
+    const currentUser = (window.state?.user || state?.user) || {};
+    const role = String(currentUser.role || '').toLowerCase().trim();
     const isSales = role === 'sales' || role === 'nhân viên kinh doanh' || role === 'nhân viên' || role === 'kinh doanh';
     const isAdmin = role === 'admin' || role === 'tester';
     const isDriver = role === 'driver' || role === 'taixe' || role === 'assistant' || role === 'phụ xe';
@@ -5836,7 +5836,7 @@ async function viewImportDetail(importId) {
     console.log(`📦 Import ${imp.ticket_no || imp.id} has ${products.length} products:`, products);
 
     // Check permission to view price
-    const currentUser = window.state?.user || {};
+    const currentUser = (window.state?.user || state?.user) || {};
     const role = String(currentUser.role || '').toLowerCase();
     const isAdmin = role === 'admin' || role === 'tester';
     const creatorName = imp.creator_name || imp.creatorName || imp.nhanVienTao || imp.created_by || '';
