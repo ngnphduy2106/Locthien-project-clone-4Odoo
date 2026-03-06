@@ -459,15 +459,28 @@ const performSync = async () => {
         };
 
         if (existingIds.has(saleOrderNo)) {
-            // Preserve Local Fields (Driver, Status, Note)
+            // Preserve Local Fields (Driver, Status, Note, Merged Trip, etc.)
             const oldOrder = dbOrders.find(o => o.soDon === saleOrderNo);
             if (oldOrder) {
+                // Preserve driver/plate/assistant from local DB (MISA doesn't own these)
                 if (oldOrder.taiXe) mappedOrder.taiXe = oldOrder.taiXe;
                 if (oldOrder.bienSo) mappedOrder.bienSo = oldOrder.bienSo;
                 if (oldOrder.note) mappedOrder.note = oldOrder.note;
 
+                // Preserve assistant, delivery time, merged order, delivery note
+                if (oldOrder.assistant_name || oldOrder.phuXe) mappedOrder.assistant_name = oldOrder.assistant_name || oldOrder.phuXe;
+                if (oldOrder.delivery_time || oldOrder.thoiGianGiao) mappedOrder.delivery_time = oldOrder.delivery_time || oldOrder.thoiGianGiao;
+                if (oldOrder.merged_order_no) mappedOrder.merged_order_no = oldOrder.merged_order_no;
+                if (oldOrder.delivery_note) mappedOrder.delivery_note = oldOrder.delivery_note;
+
+                // CRITICAL: Remove raw MISA custom_field13/14 from mappedOrder 
+                // to prevent them from overriding the preserved taiXe/bienSo values.
+                // The ...item spread copies empty MISA custom fields which would
+                // win over the preserved taiXe/bienSo in updateOrder's field mapper.
+                delete mappedOrder.custom_field13;
+                delete mappedOrder.custom_field14;
+
                 // Only allow MISA to update status if local is 'Mới', otherwise keep local status
-                // (Unless we implement a specific status mapping from MISA)
                 if (oldOrder.status !== 'Mới') {
                     mappedOrder.status = oldOrder.status;
                 }
