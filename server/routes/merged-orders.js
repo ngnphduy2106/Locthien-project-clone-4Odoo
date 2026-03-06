@@ -295,7 +295,7 @@ router.put('/:id/assign', async (req, res) => {
 router.post('/:id/checkin', async (req, res) => {
     try {
         const { id } = req.params;
-        const { order_no, note, driver_name, plate, lat, lng, actual_qty, proof_image_urls, cart } = req.body;
+        const { order_no, note, driver_name, plate, lat, lng, actual_qty, proof_image_urls, cart, images } = req.body;
 
         if (!order_no) {
             return res.json(createResponse(true, 'Thiếu mã đơn hàng!'));
@@ -316,13 +316,37 @@ router.post('/:id/checkin', async (req, res) => {
             }
         }
 
+        // RESOLVE REAL DRIVER from order_driver_assignments
+        let resolvedDriverName = driver_name || '';
+        let resolvedPlate = plate || '';
+        try {
+            // First try by sanitized order ID
+            const orderInfo = await db.getOrder(order_no);
+            const orderId = orderInfo?.id || order_no;
+
+            const { data: dispatchAssigns } = await supabase
+                .from('order_driver_assignments')
+                .select('driver_name, plate, assistant_name')
+                .eq('order_id', orderId)
+                .order('created_at', { ascending: false })
+                .limit(1);
+
+            if (dispatchAssigns && dispatchAssigns.length > 0) {
+                resolvedDriverName = dispatchAssigns[0].driver_name || resolvedDriverName;
+                resolvedPlate = dispatchAssigns[0].plate || resolvedPlate;
+                console.log(`✅ Merged checkin: Resolved driver = ${resolvedDriverName} (plate: ${resolvedPlate})`);
+            }
+        } catch (assignErr) {
+            console.warn('Assignment lookup for merged checkin failed:', assignErr.message);
+        }
+
         // Record check-in using sale_order_no
         const { error: checkInError } = await supabase
             .from('merged_order_checkins')
             .upsert({
                 merged_order_id: mergedOrderId,
                 order_no: order_no,
-                driver_name: driver_name || '',
+                driver_name: resolvedDriverName,
                 note: note || '',
                 lat: lat || null,
                 lng: lng || null,
@@ -338,14 +362,40 @@ router.post('/:id/checkin', async (req, res) => {
         // Fetch original order info for MISA sync
         const orderInfo = await db.getOrder(order_no);
 
+        // Save proof images to order_driver_assignments if provided
+        if (images && Array.isArray(images) && images.length > 0) {
+            try {
+                const orderInfoForImg = orderInfo || await db.getOrder(order_no);
+                const orderIdForImg = orderInfoForImg?.id || order_no;
+                const { data: assigns } = await supabase
+                    .from('order_driver_assignments')
+                    .select('id, proof_images')
+                    .eq('order_id', orderIdForImg)
+                    .order('created_at', { ascending: false })
+                    .limit(1);
+
+                if (assigns && assigns.length > 0) {
+                    const existing = assigns[0].proof_images || [];
+                    const updated = [...existing, ...images].slice(0, 10);
+                    await supabase
+                        .from('order_driver_assignments')
+                        .update({ proof_images: updated })
+                        .eq('id', assigns[0].id);
+                    console.log(`📸 Saved ${images.length} proof images for merged checkin`);
+                }
+            } catch (imgErr) {
+                console.warn('Proof image save error during checkin:', imgErr.message);
+            }
+        }
+
         // Update individual order status by sale_order_no
         await supabase
             .from('orders')
             .update({
                 status: 'Đã thực hiện',
                 delivery_status: 'Đã giao hàng',
-                custom_field13: driver_name || orderInfo?.custom_field13,
-                custom_field14: plate || orderInfo?.custom_field14
+                custom_field13: resolvedDriverName || orderInfo?.custom_field13,
+                custom_field14: resolvedPlate || orderInfo?.custom_field14
             })
             .eq('sale_order_no', order_no);
 
@@ -377,14 +427,14 @@ router.post('/:id/checkin', async (req, res) => {
                     misaCart[0].qty = actual_qty;
                 }
 
-                console.log(`📤 MISA Sync [Merged Trip] - Trip: ${id}, PO: ${order_no}, Driver: ${driver_name}`);
+                console.log(`📤 MISA Sync [Merged Trip] - Trip: ${id}, PO: ${order_no}, Driver: ${resolvedDriverName}`);
 
                 const syncResult = await updateMisaOrder(order_no, {
                     misa_id: orderInfo.misa_id,
                     delivery_status: 'Đã giao hàng',
                     status: 'Đã thực hiện',
-                    driver: driver_name || orderInfo.custom_field13,
-                    plate: plate || orderInfo.custom_field14,
+                    driver: resolvedDriverName || orderInfo.custom_field13,
+                    plate: resolvedPlate || orderInfo.custom_field14,
                     cart: misaCart.length > 0 ? misaCart : undefined
                 });
 
@@ -392,11 +442,7 @@ router.post('/:id/checkin', async (req, res) => {
                     syncStatusMsg = ' (Đã đồng bộ MISA)';
                 } else {
                     syncStatusMsg = ` (⚠️ Lỗi MISA: ${syncResult.message})`;
-                    // Update DB with MISA error
-                    await db.updateOrder(order_no, {
-                        crm_sync_status: 'FAILED',
-                        sync_error: syncResult.message
-                    });
+                    console.warn(`⚠️ MISA sync failed for merged checkin: ${syncResult.message}`);
                 }
             } catch (misaErr) {
                 console.error('MISA Sync Error during trip check-in:', misaErr.message);
