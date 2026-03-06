@@ -3487,9 +3487,16 @@ function assignDriver(orderId) {
     // Init driver assignments array
     state.driverAssignments = [];
 
-    // Build driver select options with plate data
-    const driverOptions = (state.drivers || []).map(d =>
-        `<option value="${d.name}" data-plate="${d.plate || ''}">${d.name}${d.plate ? ' - ' + d.plate : ''}</option>`
+    // Build distinct driver & plate select options
+    const driversList = state.drivers || [];
+    const driverNameOptions = driversList.map(d =>
+        `<option value="${d.name}" data-plate="${d.plate || ''}">${d.name}</option>`
+    ).join('');
+
+    // Extract unique plates
+    const uniquePlates = [...new Set(driversList.map(d => d.plate).filter(Boolean))];
+    const plateOptions = uniquePlates.map(p =>
+        `<option value="${p}">${p}</option>`
     ).join('');
 
     // Show modal
@@ -3527,11 +3534,18 @@ function assignDriver(orderId) {
                 <div style="border:1px dashed var(--border); padding:12px; border-radius:8px;">
                     <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end; margin-bottom:12px;">
                         <div style="flex:1; min-width:150px;">
-                            <label class="form-label" style="font-size:12px;">Chọn tài xế</label>
+                            <label class="form-label" style="font-size:12px;">Tên tài xế</label>
                             <select id="new-driver-select" class="form-control" onchange="onNewDriverChange(this)">
                                 <option value="">-- Chọn tài xế --</option>
-                                ${driverOptions}
+                                ${driverNameOptions}
                                 <option value="__EXTERNAL__">➕ Tài xế ngoài...</option>
+                            </select>
+                        </div>
+                        <div id="internal-driver-plate-container" style="flex:1; min-width:150px;">
+                            <label class="form-label" style="font-size:12px;">Biển số xe</label>
+                            <select id="new-driver-plate-select" class="form-control">
+                                <option value="">-- Chọn biển số --</option>
+                                ${plateOptions}
                             </select>
                         </div>
                         <div id="external-driver-fields" class="hidden" style="display:flex; gap:8px; flex:2;">
@@ -3611,23 +3625,32 @@ function assignDriver(orderId) {
 // Handle driver select change for external driver
 function onNewDriverChange(selectEl) {
     const externalFields = window.$('#external-driver-fields');
+    const plateSelect = window.$('#new-driver-plate-select');
+
     if (selectEl.value === '__EXTERNAL__') {
         externalFields?.classList.remove('hidden');
         externalFields.style.display = 'flex';
+        if (plateSelect) plateSelect.parentElement.style.display = 'none'; // Hide internal plate select
     } else {
         externalFields?.classList.add('hidden');
         externalFields.style.display = 'none';
+        if (plateSelect) plateSelect.parentElement.style.display = 'block'; // Show internal plate select
+
         // Auto-fill plate
         const selectedOption = selectEl.options[selectEl.selectedIndex];
         const plate = selectedOption?.getAttribute('data-plate') || '';
-        const externalPlate = window.$('#external-driver-plate');
-        if (externalPlate) externalPlate.value = plate;
+
+        // Auto-select in the new plate dropdown if exists
+        if (plateSelect && plate) {
+            plateSelect.value = plate;
+        }
     }
 }
 
 // Add driver to assignment list
 function addDriverAssignmentRow() {
     const select = window.$('#new-driver-select');
+    const plateSelect = window.$('#new-driver-plate-select');
     const externalName = window.$('#external-driver-name');
     const externalPlate = window.$('#external-driver-plate');
 
@@ -3647,8 +3670,8 @@ function addDriverAssignmentRow() {
             alert('Vui lòng chọn tài xế!');
             return;
         }
-        const selectedOption = select.options[select.selectedIndex];
-        plate = selectedOption?.getAttribute('data-plate') || '';
+        // Use the newly added Plate dropdown
+        plate = plateSelect?.value || '';
     }
 
     // Collect selected products with quantities
