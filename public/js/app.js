@@ -3926,7 +3926,7 @@ async function submitMultiDriverAssignment() {
     }
 
     const isMerged = window.$('#is-merged-order')?.checked;
-    const mergeWithOrderNo = isMerged ? window.$('#merge-order-input')?.val() : null;
+    const mergeWithOrderNo = isMerged ? window.$('#merge-order-input')?.value : null;
 
     if (isMerged && !mergeWithOrderNo) {
         alert('Vui lòng chọn hoặc nhập mã đơn hàng để ghép cùng!');
