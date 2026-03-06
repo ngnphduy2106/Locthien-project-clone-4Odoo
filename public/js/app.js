@@ -3563,7 +3563,7 @@ function assignDriver(orderId) {
                         return eligible.map(o => {
                             const no = o.sale_order_no || o.id;
                             const cus = o.khach || o.account_name || 'Khách lẻ';
-                            return \`<option value="\${no}">\${no} - \${cus}</option>\`;
+                            return '<option value="' + no + '">' + no + ' - ' + cus + '</option>';
                         }).join('');
                     })()}
                 </select>
