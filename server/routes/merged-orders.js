@@ -450,35 +450,86 @@ router.post('/:id/checkin', async (req, res) => {
             }
         }
 
-        // Check if all stops completed
+        // AUTO-COMPLETE ALL SISTER ORDERS (completing 1 = completing all in merged group)
         const { data: merged } = await supabase
             .from('merged_orders')
-            .select('source_order_nos')
-            .eq('id', id)
+            .select('source_order_nos, merged_no')
+            .eq('id', mergedOrderId)
             .single();
 
-        const { data: checkIns } = await supabase
-            .from('merged_order_checkins')
-            .select('order_no')
-            .eq('merged_order_id', id);
+        const sourceNos = merged?.source_order_nos || [];
+        const sisterNos = sourceNos.filter(no => no !== order_no);
 
-        const totalStops = (merged?.source_order_nos || []).length;
-        const completedStops = (checkIns || []).length;
+        if (sisterNos.length > 0) {
+            console.log(`🔗 Auto-completing ${sisterNos.length} sister orders: ${sisterNos.join(', ')}`);
 
-        if (completedStops >= totalStops) {
-            // All stops completed - mark merged order as completed
-            await supabase
-                .from('merged_orders')
-                .update({
-                    status: 'completed',
-                    completed_at: new Date().toISOString()
-                })
-                .eq('id', id);
+            for (const sisterNo of sisterNos) {
+                try {
+                    // 1. Create check-in record for sister
+                    await supabase
+                        .from('merged_order_checkins')
+                        .upsert({
+                            merged_order_id: mergedOrderId,
+                            order_no: sisterNo,
+                            driver_name: resolvedDriverName,
+                            note: `Tự động hoàn thành theo đơn ghép ${order_no}`,
+                            checked_in_at: new Date().toISOString()
+                        }, { onConflict: 'merged_order_id,order_no' });
 
-            return res.json(createResponse(false, `Hoàn thành tất cả ${totalStops} điểm giao!`));
+                    // 2. Update sister order status
+                    await supabase
+                        .from('orders')
+                        .update({
+                            status: 'Đã thực hiện',
+                            delivery_status: 'Đã giao hàng',
+                            custom_field13: resolvedDriverName,
+                            custom_field14: resolvedPlate
+                        })
+                        .eq('sale_order_no', sisterNo);
+
+                    // 3. Sync sister to MISA
+                    try {
+                        const sisterInfo = await db.getOrder(sisterNo);
+                        if (sisterInfo?.misa_id) {
+                            const sisterProducts = (sisterInfo.products || []).map(p => ({
+                                product_code: p.code || '',
+                                warehouse: '',
+                                unit: p.unit || 'kg',
+                                qty: Number(p.qty || 0)
+                            }));
+
+                            await updateMisaOrder(sisterNo, {
+                                misa_id: sisterInfo.misa_id,
+                                delivery_status: 'Đã giao hàng',
+                                status: 'Đã thực hiện',
+                                driver: resolvedDriverName,
+                                plate: resolvedPlate,
+                                cart: sisterProducts.length > 0 ? sisterProducts : undefined
+                            });
+                            console.log(`✅ MISA synced sister: ${sisterNo}`);
+                        }
+                    } catch (misaSisterErr) {
+                        console.warn(`⚠️ MISA sync failed for sister ${sisterNo}:`, misaSisterErr.message);
+                    }
+
+                    console.log(`✅ Auto-completed sister order: ${sisterNo}`);
+                } catch (sisterErr) {
+                    console.error(`❌ Failed to auto-complete sister ${sisterNo}:`, sisterErr.message);
+                }
+            }
         }
 
-        res.json(createResponse(false, `Check-in thành công! (${completedStops}/${totalStops} điểm)`));
+        // Mark merged order as completed (all orders done)
+        await supabase
+            .from('merged_orders')
+            .update({
+                status: 'completed',
+                completed_at: new Date().toISOString()
+            })
+            .eq('id', mergedOrderId);
+
+        const totalStops = sourceNos.length;
+        res.json(createResponse(false, `Hoàn thành tất cả ${totalStops} đơn trong chuyến ghép!${syncStatusMsg}`));
 
     } catch (e) {
         console.error('Check-in error:', e.message);
