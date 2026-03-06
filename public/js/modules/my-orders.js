@@ -356,7 +356,10 @@ const MyOrdersModule = {
                 ${this.getUnreadBadgeHtml(orderId)}
                 <div class="order-header">
                     <div>
-                        <div class="order-id">#${order.soDon || order.id || order.order_id}${typeBadge}</div>
+                        <div class="order-id" style="display:flex; align-items:center; flex-wrap:wrap; gap:4px;">
+                            #${order.soDon || order.id || order.order_id}${typeBadge}
+                            ${order.merged_order_no ? `<span style="background:#4c6ef5; color:white; font-size:10px; padding:2px 6px; border-radius:10px;"><i class="bi bi-link-45deg"></i> ${order.merged_order_no}</span>` : ''}
+                        </div>
                         <div class="order-customer">${order.customer || order.customer_name || order.khach || ''}</div>
                     </div>
                     <span class="status-badge ${isDelivering ? 'info' : 'success'}">${this.getStatusDisplay(order)}</span>

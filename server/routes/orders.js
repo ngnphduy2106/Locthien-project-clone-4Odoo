@@ -1500,6 +1500,62 @@ router.post('/:id/assign-multi', async (req, res) => {
 
         console.log(`✅ Successfully inserted ${insertedRows?.length || 'N/A'} assignments`);
 
+        let finalMergedOrderNo = null;
+        if (req.body.mergeWithOrderNo) {
+            console.log(`🔗 Processing merge request with order: ${req.body.mergeWithOrderNo}`);
+            const targetOrder = await db.getOrder(req.body.mergeWithOrderNo);
+            const currentOrder = await db.getOrder(id);
+
+            if (targetOrder && currentOrder) {
+                const targetSaleOrderNo = targetOrder.sale_order_no || targetOrder.id;
+                const currentSaleOrderNo = currentOrder.sale_order_no || id;
+
+                if (targetOrder.merged_order_no) {
+                    finalMergedOrderNo = targetOrder.merged_order_no;
+                    // Update existing merged order
+                    const { data: existingMerged } = await supabase
+                        .from('merged_orders')
+                        .select('source_order_nos, total_amount')
+                        .eq('merged_no', finalMergedOrderNo)
+                        .single();
+
+                    if (existingMerged) {
+                        const newSourceNos = [...new Set([...(existingMerged.source_order_nos || []), currentSaleOrderNo])];
+                        await supabase
+                            .from('merged_orders')
+                            .update({
+                                source_order_nos: newSourceNos,
+                                total_stops: newSourceNos.length,
+                                total_amount: Number(existingMerged.total_amount || 0) + Number(currentOrder.sale_order_amount || 0)
+                            })
+                            .eq('merged_no', finalMergedOrderNo);
+                    }
+                } else {
+                    // Create new merged order
+                    const { getTimestamp } = await import('../config.js');
+                    const ts = getTimestamp();
+                    finalMergedOrderNo = 'M' + ts.short;
+
+                    await supabase
+                        .from('merged_orders')
+                        .insert({
+                            merged_no: finalMergedOrderNo,
+                            source_order_nos: [targetSaleOrderNo, currentSaleOrderNo],
+                            total_stops: 2,
+                            total_amount: Number(targetOrder.sale_order_amount || 0) + Number(currentOrder.sale_order_amount || 0),
+                            status: 'assigned', // Initial state
+                            driver_name: assignments[0]?.driver_name || '',
+                            plate: assignments[0]?.plate || ''
+                        });
+
+                    // Update target order with this new merged_order_no
+                    await db.updateOrder(req.body.mergeWithOrderNo, {
+                        merged_order_no: finalMergedOrderNo
+                    });
+                }
+            }
+        }
+
         // Update order with first driver info (main driver)
         const mainDriver = assignments[0];
         await db.updateOrder(id, {
@@ -1508,7 +1564,8 @@ router.post('/:id/assign-multi', async (req, res) => {
             bienSo: mainDriver.plate || '',
             note: assignments.length > 1 ? `Chia ${assignments.length} tài xế` : (mainDriver.note || ''),
             phuXe: mainDriver.assistant_name || null,
-            thoiGianGiao: mainDriver.delivery_time || null
+            thoiGianGiao: mainDriver.delivery_time || null,
+            merged_order_no: finalMergedOrderNo // Bind to merge trip if applicable
         });
 
         // Send Telegram notification

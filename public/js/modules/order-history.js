@@ -253,6 +253,7 @@ const OrderHistoryModule = {
                             <div style="min-width: 140px; font-weight: 600; color: ${isImport ? '#16a34a' : 'var(--primary)'}; font-size: 13px;">
                                 ${orderId}
                                 ${isImport ? '<span style="background:#4CAF50; color:white; padding:1px 5px; border-radius:4px; font-size:9px; margin-left:4px;">Nhập</span>' : ''}
+                                ${order.merged_order_no ? `<span style="background:#4c6ef5; color:white; padding:1px 5px; border-radius:4px; font-size:9px; margin-left:4px;" title="Chuyến ghép: ${order.merged_order_no}"><i class="bi bi-link-45deg"></i></span>` : ''}
                             </div>
                             
                             <!-- Customer (flex-grow) -->
@@ -352,7 +353,10 @@ const OrderHistoryModule = {
 
             return `
             <tr onclick="OrderHistoryModule.viewDetail('${orderId}')" style="cursor:pointer;" class="history-row">
-                <td><strong>${orderId}</strong></td>
+                <td>
+                    <strong>${orderId}</strong>
+                    ${order.merged_order_no ? `<br><span style="background:#4c6ef5; color:white; padding:2px 6px; border-radius:10px; font-size:10px;"><i class="bi bi-link-45deg"></i> ${order.merged_order_no}</span>` : ''}
+                </td>
                 <td>${customer}</td>
                 <td>${date ? new Date(date).toLocaleDateString('vi-VN') : 'N/A'}</td>
                 <td>${displayAmount}</td>

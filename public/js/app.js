@@ -1117,13 +1117,26 @@ function loadTopDrivers(completedOrders) {
     const container = window.$('#top-drivers-list');
     if (!container) return;
 
-    // Count driver deliveries
+    // Count driver deliveries (grouping by merged_order_no)
     const driverStats = {};
     completedOrders.forEach(order => {
         const driver = order.taiXe || order.driver || order.custom_field13;
         if (!driver) return;
-        if (!driverStats[driver]) driverStats[driver] = { count: 0, value: 0 };
-        driverStats[driver].count++;
+
+        if (!driverStats[driver]) driverStats[driver] = { count: 0, value: 0, mergedTrips: new Set() };
+
+        // If part of a merged trip, only count the trip once per driver
+        if (order.merged_order_no) {
+            if (!driverStats[driver].mergedTrips.has(order.merged_order_no)) {
+                driverStats[driver].count++;
+                driverStats[driver].mergedTrips.add(order.merged_order_no);
+            }
+        } else {
+            // Normal single order
+            driverStats[driver].count++;
+        }
+
+        // Value is ALWAYS accumulated
         driverStats[driver].value += parseFloat(order.amount || order.sale_order_amount) || 0;
     });
 
@@ -1574,6 +1587,7 @@ function renderDispatchOrders() {
                     <!-- ROW 1: PO + Date + Status + BUTTONS -->
                     <div style="display:flex; align-items:center; gap:6px; flex-wrap:nowrap; width:100%;">
                         <span style="font-weight:600; color:var(--primary); font-size:11px; white-space:nowrap;">${orderNo}</span>
+                        ${order.merged_order_no ? `<span class="badge" style="background:#4c6ef5; color:#fff; font-size:9px; padding:2px 5px; white-space:nowrap;" title="Đơn ghép: ${order.merged_order_no}"><i class="bi bi-link-45deg"></i> ${order.merged_order_no}</span>` : ''}
                         <span style="font-size:10px; color:var(--text-secondary); white-space:nowrap;">${formatDate(date)}</span>
                         <span class="badge badge-${getStatusBadge(status)}" style="font-size:9px; padding:2px 5px; white-space:nowrap;">${getStatusText(status)}</span>
                         <div style="display:flex; gap:3px; flex-shrink:0;" onclick="event.stopPropagation()">
@@ -3523,6 +3537,38 @@ function assignDriver(orderId) {
                 </div>
             </div>
             
+            <!-- Merge Order Section -->
+            <div style="background:var(--card-bg); padding:12px; border-radius:8px; margin-bottom:16px; border:1px solid var(--border);">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <input type="checkbox" id="is-merged-order" style="width:16px; height:16px;" onchange="
+                        const selectBox = document.getElementById('merge-order-select');
+                        if (this.checked) {
+                            selectBox.classList.remove('hidden');
+                        } else {
+                            selectBox.classList.add('hidden');
+                            selectBox.value = '';
+                        }
+                    ">
+                    <label for="is-merged-order" style="font-weight:600; margin:0; cursor:pointer;">🔗 Ghép chung với đơn khác</label>
+                </div>
+                <select id="merge-order-select" class="form-control hidden" style="margin-top:10px;">
+                    <option value="">-- Chọn đơn để ghép cùng --</option>
+                    \${(() => {
+                        const validStatuses = ['Chưa thực hiện', 'Đang thực hiện', 'pending', 'assigned', 'delivering'];
+                        const eligible = Object.values(state.orders).flat().filter(o => 
+                            (o.id !== orderId && o.sale_order_no !== orderId) && 
+                            validStatuses.includes(o.status)
+                        );
+                        if (eligible.length === 0) return '<option value="" disabled>Không có đơn nào phù hợp</option>';
+                        return eligible.map(o => {
+                            const no = o.sale_order_no || o.id;
+                            const cus = o.khach || o.account_name || 'Khách lẻ';
+                            return \`<option value="\${no}">\${no} - \${cus}</option>\`;
+                        }).join('');
+                    })()}
+                </select>
+            </div>
+            
             <!-- Multi-Driver Assignment Section -->
             <div style="background:var(--body-bg); padding:16px; border-radius:8px; margin-bottom:16px;">
                 <h4 style="margin:0 0 12px; font-size:14px;">Phân công tài xế</h4>
@@ -3873,6 +3919,14 @@ async function submitMultiDriverAssignment() {
         }
     }
 
+    const isMerged = window.$('#is-merged-order')?.checked;
+    const mergeWithOrderNo = isMerged ? window.$('#merge-order-select')?.value : null;
+
+    if (isMerged && !mergeWithOrderNo) {
+        alert('Vui lòng chọn đơn hàng để ghép cùng!');
+        return;
+    }
+
     showLoading('Đang phân công tài xế...');
 
     try {
@@ -3880,7 +3934,10 @@ async function submitMultiDriverAssignment() {
         const res = await fetch(`/api/orders/${orderId}/assign-multi`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ assignments: state.driverAssignments })
+            body: JSON.stringify({
+                assignments: state.driverAssignments,
+                mergeWithOrderNo: mergeWithOrderNo
+            })
         });
 
         const data = await res.json();
