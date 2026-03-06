@@ -513,11 +513,14 @@ function initApp() {
     const normalizedRole = (state.user?.role || '').toLowerCase();
     const isDriverRole = normalizedRole === 'driver' || normalizedRole === 'assistant' || normalizedRole === 'phụ xe';
     const isSalesRole = normalizedRole === 'sales' || normalizedRole === 'nhân viên kinh doanh' || normalizedRole === 'nhân viên' || normalizedRole === 'kinh doanh';
+    const isGuardRole = normalizedRole === 'guard' || normalizedRole === 'bảo vệ' || normalizedRole === 'bao ve';
 
     if (isDriverRole) {
         showSection('my-orders');
     } else if (isSalesRole) {
         showSection('order-history');
+    } else if (isGuardRole) {
+        showSection('pending-orders');
     } else {
         showSection('dashboard');
     }

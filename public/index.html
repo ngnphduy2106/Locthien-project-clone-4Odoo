@@ -1165,28 +1165,61 @@
                     </div>
 
                     <!-- Table -->
-                    <div class="card">
-                        <div class="table-responsive" style="overflow-x:auto;">
-                            <table class="data-table" style="width:100%;">
-                                <thead>
-                                    <tr>
-                                        <th>Mã Đơn</th>
-                                        <th>Khách Hàng</th>
-                                        <th>Ngày</th>
-                                        <th>Trạng Thái</th>
-                                        <th>Tài Xế</th>
-                                        <th>Biển Số</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="pending-orders-table-body">
-                                    <tr>
-                                        <td colspan="6" style="text-align:center; padding:40px; color:#8c8c8c;">
-                                            <i class="bi bi-arrow-repeat spin" style="font-size:24px;"></i>
-                                            <p>Đang tải...</p>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
+                        <!-- Đơn Xuất -->
+                        <div class="card">
+                            <h4
+                                style="padding:16px; margin:0; border-bottom:1px solid var(--border); background:var(--body-bg); color:var(--primary);">
+                                <i class="bi bi-box-arrow-right"></i> Đơn Xuất</h4>
+                            <div class="table-responsive" style="overflow-x:auto;">
+                                <table class="data-table" style="width:100%;">
+                                    <thead>
+                                        <tr>
+                                            <th>Mã Đơn</th>
+                                            <th>Khách Hàng</th>
+                                            <th>Trạng Thái</th>
+                                            <th>Tài Xế</th>
+                                            <th>Biển Số</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="pending-orders-export-body">
+                                        <tr>
+                                            <td colspan="5" style="text-align:center; padding:40px; color:#8c8c8c;">
+                                                <i class="bi bi-arrow-repeat spin" style="font-size:24px;"></i>
+                                                <p>Đang tải...</p>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Đơn Nhập -->
+                        <div class="card">
+                            <h4
+                                style="padding:16px; margin:0; border-bottom:1px solid var(--border); background:var(--body-bg); color:#16a34a;">
+                                <i class="bi bi-box-arrow-in-right"></i> Đơn Nhập</h4>
+                            <div class="table-responsive" style="overflow-x:auto;">
+                                <table class="data-table" style="width:100%;">
+                                    <thead>
+                                        <tr>
+                                            <th>Mã Đơn</th>
+                                            <th>Nhà Cung Cấp</th>
+                                            <th>Trạng Thái</th>
+                                            <th>Tài Xế</th>
+                                            <th>Biển Số</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="pending-orders-import-body">
+                                        <tr>
+                                            <td colspan="5" style="text-align:center; padding:40px; color:#8c8c8c;">
+                                                <i class="bi bi-arrow-repeat spin" style="font-size:24px;"></i>
+                                                <p>Đang tải...</p>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </section>
