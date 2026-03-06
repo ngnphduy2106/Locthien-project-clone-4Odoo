@@ -3561,17 +3561,27 @@ function assignDriver(orderId) {
                 <input type="text" id="merge-order-input" list="merge-order-datalist" class="form-control hidden" placeholder="-- Gõ để tìm mã đơn hoặc tên khách --" style="margin-top:10px;">
                 <datalist id="merge-order-datalist">
                     ${(() => {
-                const validStatuses = ['Chưa thực hiện', 'Đang thực hiện', 'pending', 'assigned', 'delivering'];
+                const validStatuses = ['Chưa thực hiện', 'Đang thực hiện', 'pending', 'assigned', 'delivering', 'Mới'];
+                // Include export orders
                 const eligible = Object.values(state.orders).flat().filter(o =>
                     (o.id !== orderId && o.sale_order_no !== orderId) &&
                     validStatuses.includes(o.status)
                 );
-                if (eligible.length === 0) return '';
+                // Also include import orders
+                const importOrders = Object.values(state.imports || {}).flat().filter(i =>
+                    validStatuses.includes(i.status)
+                );
+                if (eligible.length === 0 && importOrders.length === 0) return '';
                 let html = '';
                 eligible.forEach(o => {
                     const no = o.sale_order_no || o.id;
                     const cus = o.khach || o.account_name || 'Khách lẻ';
                     html += '<option value="' + no + '">' + cus + '</option>';
+                });
+                importOrders.forEach(i => {
+                    const no = i.ticket_no || i.id;
+                    const sup = i.supplier_name || i.supplier || 'Nhà cung cấp';
+                    html += '<option value="' + no + '">[Nhập] ' + sup + '</option>';
                 });
                 return html;
             })()}
@@ -6254,7 +6264,7 @@ async function assignImportDriver(importId) {
 
     // Build driver select options with plate data
     const driverOptions = (state.drivers || []).map(d =>
-        `<option value="${d.name}" data-plate="${d.plate || ''}">${d.name}${d.plate ? ' - ' + d.plate : ''}</option>`
+        `<option value="${d.name}" data-plate="${d.plate || ''}">${d.name}</option>`
     ).join('');
 
     // Build plate options (same as export)
