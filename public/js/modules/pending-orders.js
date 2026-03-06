@@ -191,16 +191,20 @@ const PendingOrdersModule = {
             }).join('');
         };
 
+        const exportOrdersAll = this.filteredOrders.filter(o => o._type === 'export');
+        const importOrdersAll = this.filteredOrders.filter(o => o._type === 'import');
+
         const totalItems = this.filteredOrders.length;
-        const totalPages = Math.ceil(totalItems / this.itemsPerPage) || 1;
+        const maxItems = Math.max(exportOrdersAll.length, importOrdersAll.length);
+        const totalPages = Math.ceil(maxItems / this.itemsPerPage) || 1;
+
         if (this.currentPage > totalPages) this.currentPage = totalPages;
 
         const startIdx = (this.currentPage - 1) * this.itemsPerPage;
         const endIdx = startIdx + this.itemsPerPage;
-        const paginatedOrders = this.filteredOrders.slice(startIdx, endIdx);
 
-        const exportOrders = paginatedOrders.filter(o => o._type === 'export');
-        const importOrders = paginatedOrders.filter(o => o._type === 'import');
+        const exportOrders = exportOrdersAll.slice(startIdx, endIdx);
+        const importOrders = importOrdersAll.slice(startIdx, endIdx);
 
         containerExport.innerHTML = renderTable(exportOrders, false);
         containerImport.innerHTML = renderTable(importOrders, true);
@@ -226,7 +230,11 @@ const PendingOrdersModule = {
     },
 
     changePage(offset) {
-        const totalPages = Math.ceil(this.filteredOrders.length / this.itemsPerPage) || 1;
+        const exportOrdersAll = this.filteredOrders.filter(o => o._type === 'export');
+        const importOrdersAll = this.filteredOrders.filter(o => o._type === 'import');
+        const maxItems = Math.max(exportOrdersAll.length, importOrdersAll.length);
+        const totalPages = Math.ceil(maxItems / this.itemsPerPage) || 1;
+
         let newPage = this.currentPage + offset;
 
         if (newPage < 1) newPage = 1;
