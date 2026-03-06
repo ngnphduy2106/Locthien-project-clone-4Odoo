@@ -3746,14 +3746,14 @@ function updateRemainingQuantities() {
         const remaining = originalQty - assignedQty;
 
         // Update remaining display
-        const remainEl = document.querySelector(`#remain - prod - ${idx} `);
+        const remainEl = document.querySelector(`#remain-prod-${idx}`);
         if (remainEl) {
             remainEl.textContent = remaining.toFixed(0);
             remainEl.style.color = remaining < 0 ? 'var(--danger)' : (remaining === 0 ? 'var(--success)' : '');
         }
 
         // Update default value in input
-        const qtyInput = document.querySelector(`#assign - qty - ${idx} `);
+        const qtyInput = document.querySelector(`#assign-qty-${idx}`);
         if (qtyInput) {
             qtyInput.value = Math.max(0, remaining);
             qtyInput.dataset.max = remaining;
