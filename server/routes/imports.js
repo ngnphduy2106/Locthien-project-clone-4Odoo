@@ -354,6 +354,105 @@ router.post('/:id/assign-multi', async (req, res) => {
             console.error('Telegram notification error:', teleErr.message);
         }
 
+        // ============================================================
+        // MERGE HANDLING: Sync partner order if merged
+        // ============================================================
+        let finalMergedOrderNo = null;
+        if (req.body.mergeWithOrderNo) {
+            console.log(`🔗 [Import] Processing merge with: ${req.body.mergeWithOrderNo}`);
+            const mergePartnerNo = req.body.mergeWithOrderNo;
+            const { data: impTicket } = await supabase.from('import_tickets').select('*').eq('id', id).single();
+            const currentTicketNo = impTicket?.ticket_no || id;
+
+            // Find partner order (could be export or another import)
+            let partnerOrder = null;
+            let isExportPartner = false;
+
+            // Try export orders first
+            const { data: expOrder } = await supabase
+                .from('orders')
+                .select('*')
+                .or(`sale_order_no.eq.${mergePartnerNo},id.eq.${mergePartnerNo}`)
+                .limit(1)
+                .single();
+            if (expOrder) {
+                partnerOrder = expOrder;
+                isExportPartner = true;
+            } else {
+                // Try import tickets
+                const { data: impPartner } = await supabase
+                    .from('import_tickets')
+                    .select('*')
+                    .eq('ticket_no', mergePartnerNo)
+                    .single();
+                if (impPartner) partnerOrder = impPartner;
+            }
+
+            if (partnerOrder) {
+                const partnerNo = isExportPartner ? (partnerOrder.sale_order_no || partnerOrder.id) : partnerOrder.ticket_no;
+                const mainDriverName = assignments[0]?.driver_name || '';
+                const mainPlate = assignments[0]?.plate || '';
+
+                // Check if partner already has a merged_order_no
+                if (partnerOrder.merged_order_no) {
+                    finalMergedOrderNo = partnerOrder.merged_order_no;
+                    const { data: existingMerged } = await supabase
+                        .from('merged_orders')
+                        .select('source_order_nos, total_amount')
+                        .eq('merged_no', finalMergedOrderNo)
+                        .single();
+                    if (existingMerged) {
+                        const newSourceNos = [...new Set([...(existingMerged.source_order_nos || []), currentTicketNo])];
+                        await supabase.from('merged_orders').update({
+                            source_order_nos: newSourceNos,
+                            total_stops: newSourceNos.length
+                        }).eq('merged_no', finalMergedOrderNo);
+                    }
+                } else {
+                    // Create new merged order
+                    const { getTimestamp } = await import('../config.js');
+                    const ts = getTimestamp();
+                    finalMergedOrderNo = 'M' + ts.short;
+
+                    await supabase.from('merged_orders').insert({
+                        merged_no: finalMergedOrderNo,
+                        source_order_nos: [partnerNo, currentTicketNo],
+                        total_stops: 2,
+                        total_amount: 0,
+                        status: 'assigned',
+                        driver_name: mainDriverName,
+                        plate: mainPlate
+                    });
+
+                    // Update partner order with merged_order_no + status + driver
+                    if (isExportPartner) {
+                        await supabase.from('orders').update({
+                            merged_order_no: finalMergedOrderNo,
+                            status: 'Đang thực hiện',
+                            custom_field13: mainDriverName,
+                            custom_field14: mainPlate
+                        }).eq('id', partnerOrder.id);
+                        console.log(`✅ Export partner ${partnerNo} synced: status=Đang thực hiện, driver=${mainDriverName}`);
+                    } else {
+                        await supabase.from('import_tickets').update({
+                            merged_order_no: finalMergedOrderNo,
+                            status: 'assigned',
+                            assigned_driver: mainDriverName,
+                            assigned_plate: mainPlate
+                        }).eq('ticket_no', mergePartnerNo);
+                        console.log(`✅ Import partner ${mergePartnerNo} synced: status=assigned, driver=${mainDriverName}`);
+                    }
+                }
+
+                // Update current import with merged_order_no
+                await supabase.from('import_tickets').update({
+                    merged_order_no: finalMergedOrderNo
+                }).eq('id', id);
+
+                console.log(`🔗 Merge complete: ${currentTicketNo} + ${partnerNo} = ${finalMergedOrderNo}`);
+            }
+        }
+
         res.json(createResponse(false, `Đã phân công ${assignments.length} tài xế!`));
 
     } catch (e) {
@@ -547,9 +646,75 @@ router.put('/:id/complete', async (req, res) => {
             console.error('Telegram Error:', tgErr.message);
         }
 
+        // ============================================================
+        // AUTO-COMPLETE SISTER ORDERS IN MERGED TRIP
+        // ============================================================
+        let mergeMsg = '';
+        if (data.merged_order_no && !req.body.prevent_loop) {
+            console.log(`🔗 [Import Complete] Auto-completing sisters for merged trip: ${data.merged_order_no}`);
+            try {
+                const { data: mergedLog } = await supabase
+                    .from('merged_orders')
+                    .select('source_order_nos')
+                    .eq('merged_no', data.merged_order_no)
+                    .single();
+
+                if (mergedLog && mergedLog.source_order_nos) {
+                    const currentNo = data.ticket_no;
+                    const sisters = mergedLog.source_order_nos.filter(no => no !== currentNo);
+
+                    for (const sister of sisters) {
+                        console.log(`🤖 Triggering auto-completion for sister: ${sister}`);
+                        try {
+                            if (sister.startsWith('N')) {
+                                // Sister is another import
+                                await supabase.from('import_tickets').update({
+                                    status: 'completed',
+                                    completed_at: new Date().toISOString()
+                                }).eq('ticket_no', sister);
+                                mergeMsg += ` (Đã hoàn thành kèm phiếu nhập ${sister})`;
+                                console.log(`✅ Auto-completed import sister: ${sister}`);
+                            } else {
+                                // Sister is an export order - call internal API
+                                const fetch = (await import('node-fetch')).default;
+                                const protocol = req.protocol || 'http';
+                                const host = req.get('host') || 'localhost:3000';
+                                const resFetch = await fetch(`${protocol}://${host}/api/orders/${sister}/complete`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        prevent_loop: true,
+                                        delivery_note: `Tự động hoàn thành theo phiếu nhập ghép ${currentNo}`,
+                                        admin_completed: true
+                                    })
+                                });
+                                const resData = await resFetch.json();
+                                if (!resData.error) {
+                                    mergeMsg += ` (Đã hoàn thành kèm đơn xuất ${sister})`;
+                                    console.log(`✅ Auto-completed export sister: ${sister}`);
+                                } else {
+                                    console.error(`❌ Auto-complete failed for ${sister}:`, resData.message);
+                                }
+                            }
+                        } catch (loopErr) {
+                            console.error(`❌ Auto-complete error for ${sister}:`, loopErr.message);
+                        }
+                    }
+
+                    // Mark merged order as completed
+                    await supabase.from('merged_orders').update({
+                        status: 'completed',
+                        completed_at: new Date().toISOString()
+                    }).eq('merged_no', data.merged_order_no);
+                }
+            } catch (err) {
+                console.error('Auto-complete merged orders error:', err.message);
+            }
+        }
+
         res.json({
             error: false,
-            msg: 'Hoàn thành phiếu nhập!',
+            msg: 'Hoàn thành phiếu nhập!' + mergeMsg,
             data
         });
 

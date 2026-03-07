@@ -3999,7 +3999,11 @@ async function submitMultiDriverAssignment() {
 
     try {
         const orderId = state.currentAssignOrderId;
-        const res = await fetch(`/api/orders/${orderId}/assign-multi`, {
+        const isImport = state.currentOrderType === 'import';
+        const apiUrl = isImport
+            ? `/api/imports/${orderId}/assign-multi`
+            : `/api/orders/${orderId}/assign-multi`;
+        const res = await fetch(apiUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
