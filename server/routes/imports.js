@@ -362,25 +362,31 @@ router.post('/:id/assign-multi', async (req, res) => {
             // Lookup users for Telegram tags
             const { data: users } = await supabase.from('users').select('fullname, username, telegram_username, telegram_user_id');
             const userList = (users || []).map(u => ({ fullName: u.fullname, username: u.username, telegramUsername: u.telegram_username, telegramUserId: u.telegram_user_id }));
+            const mentionTags = [];
 
             assignments.forEach((a, i) => {
                 const typeLabel = a.type === 'external' ? '(Ngoài)' : '(NB)';
                 const driverObj = userList.find(u => u.fullName === a.driver_name || u.username === a.driver_name);
-                const driverTag = getTelegramTag(driverObj?.telegramUsername, driverObj?.telegramUserId, a.driver_name);
+                const driverMention = getTelegramTag(driverObj?.telegramUsername, driverObj?.telegramUserId, a.driver_name);
+                if (driverMention) mentionTags.push(driverMention.trim());
 
-                let assistantTag = '';
+                let assistantLine = '';
                 if (a.assistant_name) {
                     const assistantObj = userList.find(u => u.fullName === a.assistant_name || u.username === a.assistant_name);
-                    const aTag = getTelegramTag(assistantObj?.telegramUsername, assistantObj?.telegramUserId, a.assistant_name);
-                    assistantTag = `\n    🧑‍🔧 PX: ${a.assistant_name}${aTag}`;
+                    const assistantMention = getTelegramTag(assistantObj?.telegramUsername, assistantObj?.telegramUserId, a.assistant_name);
+                    if (assistantMention) mentionTags.push(assistantMention.trim());
+                    assistantLine = `\n    🧑‍🔧 PX: ${a.assistant_name}`;
                 }
 
-                msg += `${i + 1}. <b>${a.driver_name}</b>${driverTag} ${typeLabel} - ${Number(a.qty).toLocaleString('vi-VN')}kg${assistantTag}\n`;
+                msg += `${i + 1}. <b>${a.driver_name}</b> ${typeLabel} - ${Number(a.qty).toLocaleString('vi-VN')}kg${assistantLine}\n`;
                 if (a.plate) msg += `    🔢 Xe: ${a.plate}\n`;
                 if (a.delivery_time) msg += `    ⏰ Giao: ${a.delivery_time}\n`;
             });
 
-            msg += `\n🔔 @sales`;
+            // Add mention tags at the bottom
+            if (mentionTags.length > 0) {
+                msg += `\n${mentionTags.join(' ')}`;
+            }
 
             await sendTelegramMessage(msg, 'DRIVER');
         } catch (teleErr) {

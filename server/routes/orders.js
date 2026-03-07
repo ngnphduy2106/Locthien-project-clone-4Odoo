@@ -823,22 +823,29 @@ router.put('/:id/assign', async (req, res) => {
             msg += `📍 ${orderInfo?.diaChi || orderInfo?.shipping_address || ''}\n`;
             msg += `──────────────\n`;
 
-            // Lookup telegram usernames
+            // Lookup telegram user IDs for bottom mentions
             const users = await db.getUsers();
             const driverObj = users.find(u => u.fullName === driverName || u.username === driverName);
-            const driverTag = getTelegramTag(driverObj?.telegramUsername, driverObj?.telegramUserId, driverName);
 
-            let assistantTag = '';
+            const mentionTags = [];
+            const driverMention = getTelegramTag(driverObj?.telegramUsername, driverObj?.telegramUserId, driverName);
+            if (driverMention) mentionTags.push(driverMention.trim());
+
+            msg += `🚗 Tài xế: <b>${driverName}</b>\n`;
             if (assistantName) {
                 const assistantObj = users.find(u => u.fullName === assistantName || u.username === assistantName);
-                assistantTag = getTelegramTag(assistantObj?.telegramUsername, assistantObj?.telegramUserId, assistantName);
+                const assistantMention = getTelegramTag(assistantObj?.telegramUsername, assistantObj?.telegramUserId, assistantName);
+                if (assistantMention) mentionTags.push(assistantMention.trim());
+                msg += `🧑‍🔧 Phụ xe: ${assistantName}\n`;
             }
-
-            msg += `🚗 Tài xế: <b>${driverName}</b>${driverTag}\n`;
-            if (assistantName) msg += `🧑‍🔧 Phụ xe: ${assistantName}${assistantTag}\n`;
             msg += `🔢 Biển số: ${plate || 'Chưa có'}\n`;
             if (deliveryTime) msg += `⏰ Tgian giao: ${deliveryTime}\n`;
             if (note) msg += `📝 Ghi chú: ${note}\n`;
+
+            // Add mention tags at the bottom
+            if (mentionTags.length > 0) {
+                msg += `\n${mentionTags.join(' ')}`;
+            }
 
             console.log(`📨 [TELEGRAM DEBUG] Calling sendTelegramMessage to DRIVER group...`);
             await sendTelegramMessage(msg, 'DRIVER');
@@ -1838,28 +1845,34 @@ router.post('/:id/assign-multi', async (req, res) => {
             msg += `\n<b>Danh sách tài xế${hadPreviousAssignments ? ' mới' : ''}:</b>\n`;
 
             const users = await db.getUsers();
+            const mentionTags = [];
 
             assignments.forEach((a, i) => {
                 const typeLabel = a.type === 'external' ? '(Ngoài)' : '(NB)';
 
-                let driverTag = '';
+                // Collect tags for bottom mention
                 const driverObj = users.find(u => u.fullName === a.driver_name || u.username === a.driver_name);
-                driverTag = getTelegramTag(driverObj?.telegramUsername, driverObj?.telegramUserId, a.driver_name);
+                const driverMention = getTelegramTag(driverObj?.telegramUsername, driverObj?.telegramUserId, a.driver_name);
+                if (driverMention) mentionTags.push(driverMention.trim());
 
-                let assistantTag = '';
+                let assistantLine = '';
                 if (a.assistant_name) {
                     const assistantObj = users.find(u => u.fullName === a.assistant_name || u.username === a.assistant_name);
-                    const aTag = getTelegramTag(assistantObj?.telegramUsername, assistantObj?.telegramUserId, a.assistant_name);
-                    assistantTag = `\n    🧑‍🔧 PX: ${a.assistant_name}${aTag}`;
+                    const assistantMention = getTelegramTag(assistantObj?.telegramUsername, assistantObj?.telegramUserId, a.assistant_name);
+                    if (assistantMention) mentionTags.push(assistantMention.trim());
+                    assistantLine = `\n    🧑‍🔧 PX: ${a.assistant_name}`;
                 }
 
-                msg += `${i + 1}. <b>${a.driver_name}</b>${driverTag} ${typeLabel} - ${Number(a.qty).toLocaleString('vi-VN')}kg${assistantTag}\n`;
+                msg += `${i + 1}. <b>${a.driver_name}</b> ${typeLabel} - ${Number(a.qty).toLocaleString('vi-VN')}kg${assistantLine}\n`;
                 if (a.plate) msg += `    🔢 Xe: ${a.plate}\n`;
                 if (a.delivery_time) msg += `    ⏰ Giao: ${a.delivery_time}\n`;
                 if (a.note) msg += `    📝 Ghi chú: ${a.note}\n`;
             });
 
-            msg += `\n🔔 @sales`;
+            // Add mention tags at the bottom instead of @sales
+            if (mentionTags.length > 0) {
+                msg += `\n${mentionTags.join(' ')}`;
+            }
 
             console.log(`📤 Telegram message to DRIVER group:\n${msg}`);
             await sendTelegramMessage(msg, 'DRIVER');
