@@ -58,4 +58,59 @@ router.post('/amis-order', verifyApiKey, async (req, res) => {
     }
 });
 
+// ===============================================
+// TELEGRAM WEBHOOK - Auto-capture user IDs
+// When users send messages in group, bot captures their Telegram user ID
+// and auto-maps to our DB users by matching display name
+// ===============================================
+router.post('/telegram', async (req, res) => {
+    try {
+        const update = req.body;
+        const from = update?.message?.from || update?.edited_message?.from;
+
+        if (!from || from.is_bot) {
+            return res.json({ ok: true });
+        }
+
+        const tgUserId = from.id;
+        const tgFirstName = from.first_name || '';
+        const tgLastName = from.last_name || '';
+        const tgUsername = from.username || '';
+        const tgFullName = `${tgFirstName} ${tgLastName}`.trim();
+
+        console.log(`📡 [TG Webhook] Message from: ${tgFullName} (ID: ${tgUserId}, @${tgUsername || 'N/A'})`);
+
+        // Try to match with a user in our DB
+        const users = await db.getUsers();
+        const matchedUser = users.find(u => {
+            if (!u.fullName) return false;
+            const dbName = u.fullName.toLowerCase().trim();
+            const tgName = tgFullName.toLowerCase().trim();
+            // Match by exact name, first name, or Telegram username
+            return dbName === tgName
+                || dbName.includes(tgFirstName.toLowerCase())
+                || tgName.includes(dbName)
+                || (tgUsername && u.username === tgUsername);
+        });
+
+        if (matchedUser && !matchedUser.telegramUserId) {
+            // Auto-save Telegram user ID
+            await db.updateUser(matchedUser.id, {
+                telegramUserId: tgUserId,
+                telegramUsername: tgUsername || matchedUser.telegramUsername
+            });
+            console.log(`✅ [TG Webhook] Auto-captured: ${matchedUser.fullName} → TG ID ${tgUserId}`);
+        } else if (matchedUser && matchedUser.telegramUserId) {
+            // Already captured — skip silently
+        } else {
+            console.log(`⚠️ [TG Webhook] No DB match for: ${tgFullName} (ID: ${tgUserId})`);
+        }
+
+        res.json({ ok: true });
+    } catch (e) {
+        console.error('❌ [TG Webhook] Error:', e.message);
+        res.json({ ok: true }); // Always return 200 to Telegram
+    }
+});
+
 export default router;

@@ -8,16 +8,22 @@ import db from '../db/index.js';
 import { updateMisaOrder } from '../services/misa.js';
 import { createNotification } from './notifications.js';
 
-// Helper: Create Telegram @mention tag if username is valid
-// Valid Telegram usernames: 5-32 chars, only [a-zA-Z0-9_], no spaces or special chars
-function getTelegramTag(telegramUsername) {
-    if (!telegramUsername) return '';
-    const cleaned = telegramUsername.trim().replace(/^@/, '');
-    // Valid Telegram username: only ASCII letters, digits, underscores, 5+ chars, no spaces
-    if (/^[a-zA-Z0-9_]{5,32}$/.test(cleaned)) {
-        return ` (@${cleaned})`;
+// Helper: Create Telegram mention tag
+// Priority: 1) tg://user?id= (works without username), 2) @username, 3) skip
+function getTelegramTag(telegramUsername, telegramUserId, displayName) {
+    // Method 1: Use Telegram User ID for text mention (works even without username)
+    if (telegramUserId) {
+        const name = displayName || 'user';
+        return ` (<a href="tg://user?id=${telegramUserId}">${name}</a>)`;
     }
-    return ''; // Invalid username (display name, Vietnamese chars, spaces, etc.)
+    // Method 2: Use @username if valid (5-32 chars, ASCII alphanumeric + underscore)
+    if (telegramUsername) {
+        const cleaned = telegramUsername.trim().replace(/^@/, '');
+        if (/^[a-zA-Z0-9_]{5,32}$/.test(cleaned)) {
+            return ` (@${cleaned})`;
+        }
+    }
+    return ''; // No valid mention method available
 }
 
 const router = Router();
@@ -820,12 +826,12 @@ router.put('/:id/assign', async (req, res) => {
             // Lookup telegram usernames
             const users = await db.getUsers();
             const driverObj = users.find(u => u.fullName === driverName || u.username === driverName);
-            const driverTag = getTelegramTag(driverObj?.telegramUsername);
+            const driverTag = getTelegramTag(driverObj?.telegramUsername, driverObj?.telegramUserId, driverName);
 
             let assistantTag = '';
             if (assistantName) {
                 const assistantObj = users.find(u => u.fullName === assistantName || u.username === assistantName);
-                assistantTag = getTelegramTag(assistantObj?.telegramUsername);
+                assistantTag = getTelegramTag(assistantObj?.telegramUsername, assistantObj?.telegramUserId, assistantName);
             }
 
             msg += `🚗 Tài xế: <b>${driverName}</b>${driverTag}\n`;
@@ -1838,12 +1844,12 @@ router.post('/:id/assign-multi', async (req, res) => {
 
                 let driverTag = '';
                 const driverObj = users.find(u => u.fullName === a.driver_name || u.username === a.driver_name);
-                driverTag = getTelegramTag(driverObj?.telegramUsername);
+                driverTag = getTelegramTag(driverObj?.telegramUsername, driverObj?.telegramUserId, a.driver_name);
 
                 let assistantTag = '';
                 if (a.assistant_name) {
                     const assistantObj = users.find(u => u.fullName === a.assistant_name || u.username === a.assistant_name);
-                    const aTag = getTelegramTag(assistantObj?.telegramUsername);
+                    const aTag = getTelegramTag(assistantObj?.telegramUsername, assistantObj?.telegramUserId, a.assistant_name);
                     assistantTag = `\n    🧑‍🔧 PX: ${a.assistant_name}${aTag}`;
                 }
 
