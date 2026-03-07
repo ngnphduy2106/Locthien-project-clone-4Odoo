@@ -8,6 +8,21 @@ import { createClient } from '@supabase/supabase-js';
 
 const router = Router();
 
+// Helper: Create Telegram mention tag (same as orders.js)
+function getTelegramTag(telegramUsername, telegramUserId, displayName) {
+    if (telegramUserId) {
+        const name = displayName || 'user';
+        return ` (<a href="tg://user?id=${telegramUserId}">${name}</a>)`;
+    }
+    if (telegramUsername) {
+        const cleaned = telegramUsername.trim().replace(/^@/, '');
+        if (/^[a-zA-Z0-9_]{5,32}$/.test(cleaned)) {
+            return ` (@${cleaned})`;
+        }
+    }
+    return '';
+}
+
 // Lazy Supabase client initialization (env vars may not exist at import time)
 let _supabase = null;
 function getSupabase() {
@@ -344,10 +359,28 @@ router.post('/:id/assign-multi', async (req, res) => {
             msg += `📦 NCC: ${impData?.supplier_name || ''}\n\n`;
             msg += `<b>Danh sách tài xế:</b>\n`;
 
+            // Lookup users for Telegram tags
+            const { data: users } = await supabase.from('users').select('fullname, username, telegram_username, telegram_user_id');
+            const userList = (users || []).map(u => ({ fullName: u.fullname, username: u.username, telegramUsername: u.telegram_username, telegramUserId: u.telegram_user_id }));
+
             assignments.forEach((a, i) => {
                 const typeLabel = a.type === 'external' ? '(Ngoài)' : '(NB)';
-                msg += `${i + 1}. ${a.driver_name} ${typeLabel} - ${a.qty}kg\n`;
+                const driverObj = userList.find(u => u.fullName === a.driver_name || u.username === a.driver_name);
+                const driverTag = getTelegramTag(driverObj?.telegramUsername, driverObj?.telegramUserId, a.driver_name);
+
+                let assistantTag = '';
+                if (a.assistant_name) {
+                    const assistantObj = userList.find(u => u.fullName === a.assistant_name || u.username === a.assistant_name);
+                    const aTag = getTelegramTag(assistantObj?.telegramUsername, assistantObj?.telegramUserId, a.assistant_name);
+                    assistantTag = `\n    🧑‍🔧 PX: ${a.assistant_name}${aTag}`;
+                }
+
+                msg += `${i + 1}. <b>${a.driver_name}</b>${driverTag} ${typeLabel} - ${Number(a.qty).toLocaleString('vi-VN')}kg${assistantTag}\n`;
+                if (a.plate) msg += `    🔢 Xe: ${a.plate}\n`;
+                if (a.delivery_time) msg += `    ⏰ Giao: ${a.delivery_time}\n`;
             });
+
+            msg += `\n🔔 @sales`;
 
             await sendTelegramMessage(msg, 'DRIVER');
         } catch (teleErr) {
