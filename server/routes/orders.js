@@ -1377,7 +1377,7 @@ router.post('/:id/complete', async (req, res) => {
                         'ADMIN',
                         'order_completed',
                         '✅ Đơn hoàn thành',
-                        `Đơn #${orderNo} đã được giao bởi ${driver_name}`,
+                        `Đơn #${orderNo} đã được giao bởi ${firstDriverName || orderInfo?.taiXe || driver_name}`,
                         id,
                         orderNo
                     );
@@ -1394,7 +1394,7 @@ router.post('/:id/complete', async (req, res) => {
                     let msg = `✅ <b>ĐƠN ĐÃ HOÀN THÀNH</b>\n`;
                     msg += `📦 Mã: <b>#${orderNo}</b>\n`;
                     msg += `👤 Khách: ${orderInfo?.khach || 'N/A'}\n`;
-                    msg += `🚛 Tài xế: ${driver_name}`;
+                    msg += `🚛 Tài xế: ${firstDriverName || orderInfo?.taiXe || driver_name}`;
 
                     await sendTelegramMessage(msg, 'XUAT');
                 } catch (tgErr) {

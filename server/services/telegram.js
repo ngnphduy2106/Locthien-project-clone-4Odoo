@@ -25,6 +25,7 @@ export const sendTelegramMessage = async (text, type = 'NOTIFY') => {
     if (type === 'NHAP') chatId = process.env.TELEGRAM_CHAT_NHAP;
     if (type === 'XUAT') chatId = process.env.TELEGRAM_CHAT_XUAT;
     if (type === 'DRIVER') chatId = process.env.TELEGRAM_CHAT_DRIVER;
+    if (type === 'SALES') chatId = process.env.TELEGRAM_CHAT_SALES;
 
     if (!token || !chatId || token.includes('YOUR_')) {
         console.warn(`⚠️ Telegram not configured for ${type}. Skipping notification.`);
