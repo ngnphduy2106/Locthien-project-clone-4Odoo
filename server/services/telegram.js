@@ -4,6 +4,19 @@
 
 import fetch from 'node-fetch';
 
+// Dispatchers to tag in NOTIFY group for new orders
+// Uses tg://user?id= format (works without public username)
+const NOTIFY_DISPATCHERS = [
+    { name: 'Lê Kim Chức', telegramUserId: '8537304516' },
+    { name: 'Huỳnh Hương', telegramUserId: '8763113077' },
+];
+
+export function getNotifyGroupMentions() {
+    return NOTIFY_DISPATCHERS
+        .map(d => `<a href="tg://user?id=${d.telegramUserId}">${d.name}</a>`)
+        .join(' ');
+}
+
 export const sendTelegramMessage = async (text, type = 'NOTIFY') => {
     const token = process.env.TELEGRAM_TOKEN;
 

@@ -225,12 +225,13 @@ router.post('/', async (req, res) => {
 
         // Send Telegram notification
         try {
-            const { sendTelegramMessage } = await import('../services/telegram.js');
+            const { sendTelegramMessage, getNotifyGroupMentions } = await import('../services/telegram.js');
             let msg = `🔗 <b>ĐƠN GHÉP MỚI</b>\n`;
             msg += `#${mergedNo}\n`;
             msg += `📦 Số đơn: ${orders.length}\n`;
             msg += `💰 Tổng: ${totalAmount.toLocaleString('vi-VN')}đ\n`;
-            msg += `📍 Điểm giao: ${orders.length} địa chỉ`;
+            msg += `📍 Điểm giao: ${orders.length} địa chỉ\n`;
+            msg += `\n🔔 ${getNotifyGroupMentions()}`;
 
             await sendTelegramMessage(msg, 'NOTIFY');
         } catch (tgErr) {
