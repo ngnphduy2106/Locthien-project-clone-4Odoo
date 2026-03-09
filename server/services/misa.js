@@ -496,11 +496,11 @@ const performSync = async () => {
                 .map(p => `- ${p.name}: ${Number(p.qty).toLocaleString('vi-VN')} ${p.unit}`)
                 .join('\n');
 
-            // Format date if available
+            // Format date if available (force Vietnam timezone to prevent UTC offset issues)
             let formattedDate = 'N/A';
             if (item.sale_order_date) {
                 try {
-                    formattedDate = new Date(item.sale_order_date).toLocaleDateString('vi-VN');
+                    formattedDate = new Date(item.sale_order_date).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
                 } catch (e) {
                     formattedDate = item.sale_order_date.split('T')[0]; // fallback
                 }
