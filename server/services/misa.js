@@ -371,14 +371,30 @@ const performSync = async () => {
                 const localDate = (existingOrder.ngay || existingOrder.sale_order_date || '').split('T')[0];
                 const dateChanged = misaDate && localDate && misaDate !== localDate;
 
-                // 7. Check if products are missing spec (description/quy cách)
+                // 7. Check if products spec/note changed on MISA (not just missing)
+                let specNoteChanged = false;
+                const misaProducts = item.sale_order_product_mappings || [];
+                if (hasProducts && misaProducts.length > 0) {
+                    for (const localP of existingOrder.products) {
+                        const misaP = misaProducts.find(mp => mp.product_code === localP.code);
+                        if (misaP) {
+                            const misaSpec = misaP.custom_field7 || '';
+                            const misaNote = misaP.description_product || '';
+                            if ((localP.spec || '') !== misaSpec || (localP.note || '') !== misaNote) {
+                                specNoteChanged = true;
+                                break;
+                            }
+                        }
+                    }
+                }
                 const hasMissingSpec = hasProducts && existingOrder.products.some(p => !p.spec);
 
-                if (!hasProducts || hasZeroQty || statusChanged || !hasMisaId || hasMissingPrice || (!hasOwnerName && misaHasOwnerName) || (!hasDescription && misaHasDescription) || dateChanged || hasMissingSpec) {
+                if (!hasProducts || hasZeroQty || statusChanged || !hasMisaId || hasMissingPrice || (!hasOwnerName && misaHasOwnerName) || (!hasDescription && misaHasDescription) || dateChanged || hasMissingSpec || specNoteChanged) {
                     if (hasMissingPrice) console.log(`💰 Updating ${saleOrderNo} (Missing price data)...`);
                     if (!hasOwnerName && misaHasOwnerName) console.log(`👤 Updating ${saleOrderNo} (Missing owner_name)...`);
                     if (!hasDescription && misaHasDescription) console.log(`📝 Updating ${saleOrderNo} (Missing description/misa_note)...`);
                     if (dateChanged) console.log(`📅 Updating ${saleOrderNo} (Date changed: ${localDate} → ${misaDate})`);
+                    if (specNoteChanged) console.log(`📋 Updating ${saleOrderNo} (Product spec/note changed on MISA)`);
                     shouldFetchDetail = true;
                 }
             }
