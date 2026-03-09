@@ -3007,7 +3007,7 @@ async function viewOrderDetail(orderId, options = {}) {
             const spec = p.spec || '';
             let extraHtml = '';
             if (note) extraHtml += `<div style="font-size:11px; color:var(--text-muted); margin-top:2px;">📝 ${note}</div>`;
-            if (spec) extraHtml += `<div style="font-size:11px; color:#8b5cf6; margin-top:2px;">📋 QC: ${spec}</div>`;
+            if (spec && spec !== '0' && spec !== 0) extraHtml += `<div style="font-size:11px; color:#8b5cf6; margin-top:2px;">📋 QC: ${spec}</div>`;
             return `
             <tr>
                 <td>${name}${extraHtml}</td>
