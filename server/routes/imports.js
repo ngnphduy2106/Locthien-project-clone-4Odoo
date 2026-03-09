@@ -150,8 +150,6 @@ router.post('/', async (req, res) => {
                 msg += `\n📋 <b>Sản phẩm:</b>\n${productsList}\n`;
             }
 
-            if (description) msg += `\n📝 Mô tả: ${description}`;
-            if (note) msg += `\n📝 Ghi chú: ${note}`;
             msg += `\n\n🔔 ${getNotifyGroupMentions()} - Vui lòng điều phối`;
 
             await sendTelegramMessage(msg, 'NOTIFY');
