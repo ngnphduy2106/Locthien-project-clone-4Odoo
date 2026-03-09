@@ -366,10 +366,16 @@ const performSync = async () => {
                 const hasDescription = !!existingOrder.misa_note || !!existingOrder.description;
                 const misaHasDescription = !!(item.description || item.Description);
 
-                if (!hasProducts || hasZeroQty || statusChanged || !hasMisaId || hasMissingPrice || (!hasOwnerName && misaHasOwnerName) || (!hasDescription && misaHasDescription)) {
+                // 6. Check if date has changed on MISA (e.g. delivery date correction)
+                const misaDate = (item.sale_order_date || '').split('T')[0];
+                const localDate = (existingOrder.ngay || existingOrder.sale_order_date || '').split('T')[0];
+                const dateChanged = misaDate && localDate && misaDate !== localDate;
+
+                if (!hasProducts || hasZeroQty || statusChanged || !hasMisaId || hasMissingPrice || (!hasOwnerName && misaHasOwnerName) || (!hasDescription && misaHasDescription) || dateChanged) {
                     if (hasMissingPrice) console.log(`💰 Updating ${saleOrderNo} (Missing price data)...`);
                     if (!hasOwnerName && misaHasOwnerName) console.log(`👤 Updating ${saleOrderNo} (Missing owner_name)...`);
                     if (!hasDescription && misaHasDescription) console.log(`📝 Updating ${saleOrderNo} (Missing description/misa_note)...`);
+                    if (dateChanged) console.log(`📅 Updating ${saleOrderNo} (Date changed: ${localDate} → ${misaDate})`);
                     shouldFetchDetail = true;
                 }
             }

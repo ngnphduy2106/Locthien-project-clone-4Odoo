@@ -505,7 +505,7 @@ const OrderHistoryModule = {
             // Fallback: simple alert
             let details = `Chi tiết đơn hàng ${order.soDon || orderId} \n\n`;
             details += `Khách hàng: ${order.khach || order.account_name || order.customer || 'N/A'} \n`;
-            details += `Ngày đặt: ${order.ngay || order.sale_order_date || order.date || 'N/A'} \n`;
+            details += `Ngày giao hàng: ${order.ngay || order.sale_order_date || order.date || 'N/A'} \n`;
             details += `Địa chỉ: ${order.diaChi || order.shipping_address || 'N/A'} \n`;
             details += `Tài xế: ${order.taiXe || order.driver || 'N/A'} \n`;
             details += `Trạng thái: ${order.status} \n`;

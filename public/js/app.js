@@ -3079,7 +3079,7 @@ async function viewOrderDetail(orderId, options = {}) {
                     <span>${order.khach || order.account_name || 'Chưa có'}</span>
                 </div>
                 <div class="detail-row">
-                    <label>Ngày đặt:</label>
+                    <label>Ngày giao hàng:</label>
                     <span>${formatDate(order.ngay || order.sale_order_date)}</span>
                 </div>
                 <div class="detail-row">

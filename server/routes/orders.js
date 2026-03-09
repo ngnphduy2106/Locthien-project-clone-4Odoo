@@ -2318,7 +2318,7 @@ router.post('/local', async (req, res) => {
         try {
             const { sendTelegramMessage, getNotifyGroupMentions } = await import('../services/telegram.js');
             const productsList = (products || [])
-                .map(p => `- ${p.name}: ${p.qty} ${p.unit || 'Kg'}`)
+                .map(p => `- ${p.name}: ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'Kg'}`)
                 .join('\n');
 
             let msg = `📤 <b>ĐƠN XUẤT MỚI (NỘI BỘ)</b>\n`;
@@ -2328,7 +2328,9 @@ router.post('/local', async (req, res) => {
             if (productsList) {
                 msg += `\n📋 <b>Sản phẩm:</b>\n${productsList}\n`;
             }
-            msg += `\n🔔 ${getNotifyGroupMentions()} (Vào Điều Phối gán tài xế)`;
+            if (description) msg += `\n📝 Mô tả: ${description}`;
+            if (note) msg += `\n📝 Ghi chú: ${note}`;
+            msg += `\n\n🔔 ${getNotifyGroupMentions()} (Vào Điều Phối gán tài xế)`;
 
             await sendTelegramMessage(msg, 'NOTIFY');
         } catch (tgErr) {
