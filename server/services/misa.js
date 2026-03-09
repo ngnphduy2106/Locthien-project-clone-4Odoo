@@ -371,7 +371,10 @@ const performSync = async () => {
                 const localDate = (existingOrder.ngay || existingOrder.sale_order_date || '').split('T')[0];
                 const dateChanged = misaDate && localDate && misaDate !== localDate;
 
-                if (!hasProducts || hasZeroQty || statusChanged || !hasMisaId || hasMissingPrice || (!hasOwnerName && misaHasOwnerName) || (!hasDescription && misaHasDescription) || dateChanged) {
+                // 7. Check if products are missing spec (description/quy cách)
+                const hasMissingSpec = hasProducts && existingOrder.products.some(p => !p.spec);
+
+                if (!hasProducts || hasZeroQty || statusChanged || !hasMisaId || hasMissingPrice || (!hasOwnerName && misaHasOwnerName) || (!hasDescription && misaHasDescription) || dateChanged || hasMissingSpec) {
                     if (hasMissingPrice) console.log(`💰 Updating ${saleOrderNo} (Missing price data)...`);
                     if (!hasOwnerName && misaHasOwnerName) console.log(`👤 Updating ${saleOrderNo} (Missing owner_name)...`);
                     if (!hasDescription && misaHasDescription) console.log(`📝 Updating ${saleOrderNo} (Missing description/misa_note)...`);
@@ -393,12 +396,11 @@ const performSync = async () => {
             // console.log(`⚡ Using List Data for ${saleOrderNo}`); // Debug
             products = item.sale_order_product_mappings.map(p => ({
                 code: p.product_code,
-                // User Request: Name from Description if Product Name missing
                 name: p.product_name || p.description || p.product_code,
-                // User Request: Correct Quantity (usage_unit_amount is Physical Qty)
+                note: p.description_product || '',  // Mô tả từ MISA
+                spec: p.custom_field7 || '',  // Quy cách từ MISA
                 qty: Number(p.usage_unit_amount || p.amount || 0),
                 unit: p.unit || '',
-                // Price data for display
                 price: Number(p.price || 0),
                 total: Number(p.total || p.to_currency || 0)
             }));
@@ -421,9 +423,10 @@ const performSync = async () => {
                 products = (detail.sale_order_product_mappings || []).map(p => ({
                     code: p.product_code,
                     name: p.product_name || p.description || p.product_code,
+                    note: p.description_product || '',  // Mô tả từ MISA
+                    spec: p.custom_field7 || '',  // Quy cách từ MISA
                     qty: Number(p.amount || 0),
                     unit: p.unit || '',
-                    // Price data for display
                     price: Number(p.price || 0),
                     total: Number(p.total || p.to_currency || 0)
                 }));

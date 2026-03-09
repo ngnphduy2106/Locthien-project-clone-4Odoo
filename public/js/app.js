@@ -3001,14 +3001,22 @@ async function viewOrderDetail(orderId, options = {}) {
 
     // Products HTML - only include price column if not dispatcher
     const productsHtml = products.length > 0
-        ? products.map(p => `
+        ? products.map(p => {
+            const name = p.name || p.productName || p.product_name || '-';
+            const note = p.note || '';
+            const spec = p.spec || '';
+            let extraHtml = '';
+            if (note) extraHtml += `<div style="font-size:11px; color:var(--text-muted); margin-top:2px;">📝 ${note}</div>`;
+            if (spec) extraHtml += `<div style="font-size:11px; color:#8b5cf6; margin-top:2px;">📋 QC: ${spec}</div>`;
+            return `
             <tr>
-                <td>${p.name || p.productName || p.product_name || '-'}</td>
+                <td>${name}${extraHtml}</td>
                 <td>${p.qty || p.quantity || p.amount || 0}</td>
                 <td>${p.unit || 'kg'}</td>
                 ${!hidePrice ? `<td>${formatCurrency(p.total || p.to_currency || p.price || 0)}</td>` : ''}
             </tr>
-        `).join('')
+        `;
+        }).join('')
         : `<tr><td colspan="${hidePrice ? 3 : 4}" style="text-align:center; color:var(--text-muted);">Không có sản phẩm</td></tr>`;
 
     // Show modal - use correct IDs matching index.html

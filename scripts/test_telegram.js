@@ -1,55 +1,35 @@
-// Test: Lấy đơn PO4100137022.25 từ MISA CRM rồi gửi Telegram
+// Inspect order 43.25 for Ghi Chú field
 import dotenv from 'dotenv';
 dotenv.config();
-
 import { getMisaOrders } from '../server/services/misa.js';
-import { sendTelegramMessage, getNotifyGroupMentions } from '../server/services/telegram.js';
 
-console.log('📡 Đang lấy đơn từ MISA CRM...');
-const misaOrders = await getMisaOrders(0, false);
+const orders = await getMisaOrders(0, false);
+const order = orders.find(o => (o.sale_order_no || '').includes('37043'));
 
-const TARGET = 'PO4100137022.25';
-const item = misaOrders.find(o => (o.sale_order_no || '').includes('37022'));
-
-if (!item) {
-    console.log(`❌ Không tìm thấy đơn ${TARGET}`);
-    console.log('Các đơn có:', misaOrders.slice(0, 10).map(o => o.sale_order_no).join(', '));
-    process.exit(1);
+if (order) {
+    console.log(`\n📦 Order: ${order.sale_order_no}`);
+    const products = order.sale_order_product_mappings || [];
+    products.forEach((p, i) => {
+        console.log(`\n--- Product ${i + 1}: ${p.product_code} ---`);
+        // Show only potentially relevant fields
+        const keys = ['description', 'description_product', 'sale_order_product',
+            'custom_field1', 'custom_field2', 'custom_field3', 'custom_field4',
+            'custom_field5', 'custom_field6', 'custom_field7', 'batch_number',
+            'serial_number', 'promotion', 'product_name'];
+        keys.forEach(k => {
+            if (p[k] !== null && p[k] !== undefined && p[k] !== 0 && p[k] !== '0' && p[k] !== '') {
+                console.log(`  ✅ ${k}: ${JSON.stringify(p[k])}`);
+            }
+        });
+        // Also show ALL non-empty string/non-zero fields we haven't seen
+        Object.entries(p).forEach(([k, v]) => {
+            if (!keys.includes(k) && v !== null && v !== undefined && v !== 0 && v !== '' && v !== '0' && v !== false) {
+                console.log(`     ${k}: ${JSON.stringify(v)}`);
+            }
+        });
+    });
+} else {
+    console.log('❌ Order 43.25 not found');
 }
 
-const saleOrderNo = item.sale_order_no;
-console.log(`\n📦 Đơn: ${saleOrderNo}`);
-console.log(`   Khách: ${item.account_name}`);
-console.log(`   Địa chỉ: ${item.shipping_address || 'N/A'}`);
-
-const productsList = (item.sale_order_product_mappings || [])
-    .map(p => `- ${p.product_name || p.description || p.product_code}: ${Number(p.usage_unit_amount || p.amount || 0).toLocaleString('vi-VN')} ${p.unit || 'kg'}`)
-    .join('\n');
-
-let formattedDate = 'N/A';
-if (item.sale_order_date) {
-    try {
-        formattedDate = new Date(item.sale_order_date).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
-    } catch (e) {
-        formattedDate = item.sale_order_date.split('T')[0];
-    }
-}
-
-let msg = `🆕 <b>ĐƠN HÀNG MỚI TỪ MISA</b>\n`;
-msg += `📦 Mã: <b>${saleOrderNo}</b>\n`;
-msg += `📅 Ngày: ${formattedDate}\n`;
-msg += `👤 Khách: ${item.account_name || 'N/A'}\n`;
-msg += `📍 Địa chỉ: ${item.shipping_address || 'N/A'}\n`;
-
-if (productsList) {
-    msg += `\n📋 <b>Sản phẩm:</b>\n${productsList}\n`;
-}
-
-msg += `\n🔔 ${getNotifyGroupMentions()} (Vào Điều Phối gán tài xế)`;
-
-console.log('\n--- Telegram Message ---');
-console.log(msg);
-console.log('------------------------');
-
-await sendTelegramMessage(msg, 'SALES');
 setTimeout(() => process.exit(0), 2000);
