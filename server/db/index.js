@@ -434,6 +434,11 @@ export const db = {
                 safeData.merged_order_no = data.merged_order_no;
             }
 
+            // Telegram message ID (for reply-to-original on edits)
+            if (data.telegram_message_id !== undefined) {
+                safeData.telegram_message_id = data.telegram_message_id;
+            }
+
             console.log(`📝 Updating order ${safeId}:`, Object.keys(safeData));
             let { data: updated, error } = await supabase.from('orders').update(safeData).eq('id', safeId).select().single();
 

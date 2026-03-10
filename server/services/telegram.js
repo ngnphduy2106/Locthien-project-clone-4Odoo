@@ -17,7 +17,7 @@ export function getNotifyGroupMentions() {
         .join(' ');
 }
 
-export const sendTelegramMessage = async (text, type = 'NOTIFY') => {
+export const sendTelegramMessage = async (text, type = 'NOTIFY', replyToMessageId = null) => {
     const token = process.env.TELEGRAM_TOKEN;
 
     // Select chat ID based on type
@@ -29,7 +29,7 @@ export const sendTelegramMessage = async (text, type = 'NOTIFY') => {
 
     if (!token || !chatId || token.includes('YOUR_')) {
         console.warn(`⚠️ Telegram not configured for ${type}. Skipping notification.`);
-        return;
+        return null;
     }
 
     try {
@@ -40,19 +40,28 @@ export const sendTelegramMessage = async (text, type = 'NOTIFY') => {
             parse_mode: 'HTML'
         };
 
-        // Fire and forget - don't block the caller
-        fetch(url, {
+        // Support reply to a specific message
+        if (replyToMessageId) {
+            body.reply_to_message_id = replyToMessageId;
+        }
+
+        const response = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body)
-        }).then(response => response.json())
-            .then(json => {
-                if (!json.ok) console.error(`❌ Telegram Error (${type}):`, json.description);
-                else console.log(`✅ Telegram Sent (${type}).`);
-            })
-            .catch(err => console.error(`❌ Telegram Fetch Error (${type}):`, err.message));
+        });
+        const json = await response.json();
+
+        if (!json.ok) {
+            console.error(`❌ Telegram Error (${type}):`, json.description);
+            return null;
+        }
+
+        console.log(`✅ Telegram Sent (${type}).`);
+        return json.result?.message_id || null;
 
     } catch (e) {
         console.error(`❌ Telegram Exception (${type}):`, e.message);
+        return null;
     }
 };

@@ -142,7 +142,7 @@ router.post('/', async (req, res) => {
 
             let msg = `📥 <b>PHIẾU NHẬP MỚI</b>\n`;
             msg += `#${ticketNo}\n`;
-            msg += `🏭 NCC: ${supplier_name}\n`;
+            msg += `🏭 NCC: <b>${supplier_name}</b>\n`;
             if (supplier_address) msg += `📍 Địa chỉ: ${supplier_address}\n`;
             if (expected_date) {
                 const fmtDate = new Date(expected_date).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
@@ -368,8 +368,12 @@ router.post('/:id/assign-multi', async (req, res) => {
 
             let msg = `🚛 <b>PHÂN CÔNG NHẬP HÀNG</b>\n`;
             msg += `#${impData?.ticket_no || id}\n`;
-            msg += `📦 NCC: ${impData?.supplier_name || ''}\n\n`;
-            msg += `<b>Danh sách tài xế:</b>\n`;
+            msg += `📦 NCC: <b>${impData?.supplier_name || ''}</b>\n`;
+            if (impData?.expected_date) {
+                const fmtDate = new Date(impData.expected_date).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+                msg += `📅 Ngày: ${fmtDate}\n`;
+            }
+            msg += `\n<b>Danh sách tài xế:</b>\n`;
 
             // Lookup users for Telegram tags
             const { data: users } = await supabase.from('users').select('fullname, username, telegram_username, telegram_user_id');

@@ -724,24 +724,54 @@ router.put('/:id', async (req, res) => {
             const customerName = customer || updatedOrder?.account_name || updatedOrder?.khach || '';
             const orderAddress = address || updatedOrder?.shipping_address || updatedOrder?.diaChi || '';
 
-            let msg = `✏️ <b>ĐƠN HÀNG ĐÃ CHỈNH SỬA</b>\n`;
+            let msg = `🔴 <b>‼️ ĐƠN HÀNG ĐÃ CHỈNH SỬA ‼️</b>\n`;
             msg += `#${orderNo}\n`;
-            msg += `👤 KH: ${customerName}\n`;
+            msg += `👤 KH: <b>${customerName}</b>\n`;
             if (orderAddress) msg += `📍 ${orderAddress}\n`;
 
-            // Show updated products if any
-            const updatedProducts = updateData.cart || updatedOrder?.products || [];
-            if (updatedProducts.length > 0) {
-                msg += `\n📦 <b>Sản phẩm (cập nhật):</b>\n`;
-                updatedProducts.forEach(p => {
-                    const qty = Number(p.qty || p.quantity || 0);
-                    msg += `- ${p.name || p.product || p.code}: ${qty.toLocaleString('vi-VN')} ${p.unit || 'Kg'}\n`;
+            // Compare old vs new products and show changes in blockquote
+            const oldProducts = existingOrder?.products || existingOrder?.cart || [];
+            const newProducts = updateData.cart || updatedOrder?.products || [];
+
+            if (newProducts.length > 0) {
+                // Check if anything changed
+                const changes = [];
+                const unchanged = [];
+
+                newProducts.forEach((p, i) => {
+                    const newName = p.name || p.product || p.code || '';
+                    const newQty = Number(p.qty || p.quantity || 0);
+                    const newUnit = p.unit || 'Kg';
+                    const oldP = oldProducts[i];
+                    const oldName = oldP ? (oldP.name || oldP.product || oldP.code || '') : '';
+                    const oldQty = oldP ? Number(oldP.qty || oldP.quantity || 0) : 0;
+
+                    if (oldP && (oldName !== newName || oldQty !== newQty)) {
+                        changes.push({ oldName, oldQty, newName, newQty, newUnit, oldUnit: oldP.unit || 'Kg' });
+                    } else {
+                        unchanged.push({ name: newName, qty: newQty, unit: newUnit });
+                    }
                 });
+
+                if (changes.length > 0) {
+                    msg += `\n📦 <b>Thay đổi sản phẩm:</b>\n`;
+                    changes.forEach(c => {
+                        msg += `<blockquote>❌ ${c.oldName}: ${c.oldQty.toLocaleString('vi-VN')} ${c.oldUnit}\n✅ ${c.newName}: ${c.newQty.toLocaleString('vi-VN')} ${c.newUnit}</blockquote>`;
+                    });
+                }
+
+                if (unchanged.length > 0) {
+                    unchanged.forEach(p => {
+                        msg += `- ${p.name}: ${p.qty.toLocaleString('vi-VN')} ${p.unit}\n`;
+                    });
+                }
             }
 
             if (note || notes) msg += `\n📝 Ghi chú: ${note || notes}`;
 
-            await sendTelegramMessage(msg, 'NOTIFY');
+            // Reply to original order message if available
+            const replyId = updatedOrder?.telegram_message_id || null;
+            await sendTelegramMessage(msg, 'NOTIFY', replyId);
         } catch (tgErr) {
             console.error('Telegram Edit Notification Error:', tgErr.message);
         }
@@ -819,7 +849,11 @@ router.put('/:id/assign', async (req, res) => {
 
             let msg = `🚛 <b>PHÂN CÔNG TÀI XẾ</b>\n`;
             msg += `#${orderInfo?.soDon || orderInfo?.sale_order_no || id}\n`;
-            msg += `👤 KH: ${orderInfo?.khach || orderInfo?.account_name || ''}\n`;
+            msg += `👤 KH: <b>${orderInfo?.khach || orderInfo?.account_name || ''}</b>\n`;
+            if (orderInfo?.sale_order_date) {
+                const fmtDate = new Date(orderInfo.sale_order_date).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+                msg += `📅 Ngày: ${fmtDate}\n`;
+            }
             msg += `📍 ${orderInfo?.diaChi || orderInfo?.shipping_address || ''}\n`;
             msg += `──────────────\n`;
 
@@ -1835,7 +1869,11 @@ router.post('/:id/assign-multi', async (req, res) => {
 
             let msg = `🚛 <b>${notificationType}</b>\n`;
             msg += `#${orderInfo?.soDon || id}\n`;
-            msg += `👤 KH: ${orderInfo?.khach || ''}\n`;
+            msg += `👤 KH: <b>${orderInfo?.khach || ''}</b>\n`;
+            if (orderInfo?.sale_order_date) {
+                const fmtDate = new Date(orderInfo.sale_order_date).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+                msg += `📅 Ngày: ${fmtDate}\n`;
+            }
 
             // Show previous drivers if this is a change
             if (hadPreviousAssignments && previousDrivers.length > 0) {
@@ -2323,7 +2361,7 @@ router.post('/local', async (req, res) => {
 
             let msg = `📤 <b>ĐƠN XUẤT MỚI (NỘI BỘ)</b>\n`;
             msg += `📦 Mã: <b>${orderNo}</b>\n`;
-            msg += `👤 Khách: ${customer_name}\n`;
+            msg += `👤 Khách: <b>${customer_name}</b>\n`;
             msg += `📍 Địa chỉ: ${customer_address || 'N/A'}\n`;
             if (productsList) {
                 msg += `\n📋 <b>Sản phẩm:</b>\n${productsList}\n`;

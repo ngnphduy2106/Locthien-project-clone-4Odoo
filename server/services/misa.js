@@ -534,7 +534,7 @@ const performSync = async () => {
             let msg = `🆕 <b>ĐƠN HÀNG MỚI TỪ MISA</b>\n`;
             msg += `📦 Mã: <b>${saleOrderNo}</b>\n`;
             msg += `📅 Ngày: ${formattedDate}\n`;
-            msg += `👤 Khách: ${item.account_name || 'N/A'}\n`;
+            msg += `👤 Khách: <b>${item.account_name || 'N/A'}</b>\n`;
             msg += `📍 Địa chỉ: ${mappedOrder.shipping_address || 'N/A'}\n`;
 
             if (productsList) {
@@ -543,7 +543,14 @@ const performSync = async () => {
 
             msg += `\n🔔 ${getNotifyGroupMentions()} (Vào Điều Phối gán tài xế)`;
 
-            await sendTelegramMessage(msg, 'NOTIFY');
+            const tgMsgId = await sendTelegramMessage(msg, 'NOTIFY');
+
+            // Store telegram message_id for reply-to-original on edits
+            if (tgMsgId) {
+                try {
+                    await db.updateOrder(saleOrderNo, { telegram_message_id: tgMsgId });
+                } catch (e) { /* ignore */ }
+            }
 
             // Create in-app notification for ADMIN
             try {
