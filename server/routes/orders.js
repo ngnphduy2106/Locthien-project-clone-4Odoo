@@ -1421,16 +1421,21 @@ router.post('/:id/complete', async (req, res) => {
 
                 // Send Telegram notification for order completion
                 try {
-                    const { sendTelegramMessage } = await import('../services/telegram.js');
+                    const { sendTelegramMessage, sendTelegramPhotos } = await import('../services/telegram.js');
                     const orderNo = orderInfo?.soDon || orderInfo?.sale_order_no || id;
-                    const money = (orderInfo?.sale_order_amount || 0).toLocaleString('vi-VN');
 
                     let msg = `✅ <b>ĐƠN ĐÃ HOÀN THÀNH</b>\n`;
                     msg += `📦 Mã: <b>#${orderNo}</b>\n`;
                     msg += `👤 Khách: ${orderInfo?.khach || 'N/A'}\n`;
                     msg += `🚛 Tài xế: ${firstDriverName || resolvedDriverName || orderInfo?.taiXe || driver_name}`;
 
-                    await sendTelegramMessage(msg, 'XUAT');
+                    const proofImages = images || [];
+                    if (proofImages.length > 0) {
+                        // Send photos with completion info as caption (inline)
+                        await sendTelegramPhotos(proofImages, msg, 'XUAT');
+                    } else {
+                        await sendTelegramMessage(msg, 'XUAT');
+                    }
                 } catch (tgErr) {
                     console.error('Telegram completion error:', tgErr.message);
                 }
