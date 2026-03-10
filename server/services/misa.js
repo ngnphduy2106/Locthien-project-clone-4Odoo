@@ -509,6 +509,21 @@ const performSync = async () => {
                 if (oldOrder.status !== 'Mới') {
                     mappedOrder.status = oldOrder.status;
                 }
+
+                // Detect date change from MISA → send Telegram notification
+                const oldDate = oldOrder.ngay || oldOrder.sale_order_date;
+                const newDate = item.sale_order_date;
+                if (oldDate && newDate && oldDate.split('T')[0] !== newDate.split('T')[0]) {
+                    const fmtOld = new Date(oldDate).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+                    const fmtNew = new Date(newDate).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+                    console.log(`📅 Date changed for ${saleOrderNo}: ${fmtOld} → ${fmtNew}`);
+
+                    let dateMsg = `📅 <b>THAY ĐỔI NGÀY GIAO HÀNG</b>\n`;
+                    dateMsg += `📦 Mã: <b>#${saleOrderNo}</b>\n`;
+                    dateMsg += `👤 KH: <b>${item.account_name || oldOrder.khach || 'N/A'}</b>\n`;
+                    dateMsg += `<blockquote>❌ Cũ: ${fmtOld}\n✅ Mới: ${fmtNew}</blockquote>`;
+                    sendTelegramMessage(dateMsg, 'NOTIFY').catch(() => { });
+                }
             }
             await db.updateOrder(saleOrderNo, mappedOrder);
         } else {

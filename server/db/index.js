@@ -403,6 +403,15 @@ export const db = {
             if (data.delivery_status !== undefined) safeData.delivery_status = data.delivery_status;
             if (data.owner_name !== undefined) safeData.owner_name = data.owner_name;
 
+            // Core MISA fields (must sync from CRM → DB)
+            if (data.sale_order_date !== undefined) safeData.sale_order_date = data.sale_order_date;
+            if (data.account_name !== undefined) safeData.account_name = data.account_name;
+            if (data.sale_order_no !== undefined) safeData.sale_order_no = data.sale_order_no;
+            if (data.contact_name !== undefined) safeData.contact_name = data.contact_name;
+            if (data.billing_address !== undefined) safeData.billing_address = data.billing_address;
+            if (data.sale_order_name !== undefined) safeData.sale_order_name = data.sale_order_name;
+            if (data.modified_date !== undefined) safeData.modified_date = data.modified_date;
+
             // Address
             if (data.diaChi !== undefined) safeData.shipping_address = data.diaChi;
             if (data.shipping_address !== undefined) safeData.shipping_address = data.shipping_address;
