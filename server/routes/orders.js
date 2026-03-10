@@ -1475,12 +1475,36 @@ router.post('/:id/complete', async (req, res) => {
                                         const protocol = req.protocol || 'http';
                                         const host = req.get('host') || 'localhost:3000';
 
+                                        // Fetch sister order's OWN products from DB
+                                        // Do NOT copy current order's cart to sister!
+                                        const sisterOrder = await db.getOrder(sister);
+                                        const sisterProducts = sisterOrder?.products || sisterOrder?.cart || [];
+                                        const sisterCart = sisterProducts.map(p => ({
+                                            product: { code: p.code || '', name: p.name || '' },
+                                            weight_kg: Number(p.qty || 0),
+                                            qty: Number(p.qty || 0),
+                                            unit: p.unit || 'Kg'
+                                        }));
+
+                                        // Use the resolved driver (from assignments), NOT admin name
+                                        const assignedDriver = firstDriverName || resolvedDriverName || orderInfo?.taiXe || driver_name;
+                                        const assignedPlate = firstDriverPlate || resolvedPlate || plate || '';
+
                                         const sisterPayload = {
-                                            ...req.body,
-                                            prevent_loop: true,
+                                            type: req.body.type || 'XUAT',
+                                            warehouse: req.body.warehouse || sisterOrder?.warehouse || '',
+                                            partner: sisterOrder?.khach || sisterOrder?.account_name || req.body.partner || '',
+                                            driver_name: assignedDriver,
+                                            plate: assignedPlate,
+                                            cart: sisterCart,
+                                            note: req.body.delivery_note ? (req.body.delivery_note + ` (Ghép chung ${currentNo})`) : `Tự động hoàn thành theo đơn ghép ${currentNo}`,
                                             delivery_note: req.body.delivery_note ? (req.body.delivery_note + ` (Ghép chung ${currentNo})`) : `Tự động hoàn thành theo đơn ghép ${currentNo}`,
+                                            sender: req.body.sender || assignedDriver,
+                                            prevent_loop: true,
                                             admin_completed: true
                                         };
+
+                                        console.log(`📦 Sister ${sister} own products: ${sisterCart.length} items, driver: ${assignedDriver}`);
 
                                         const resFetch = await fetch(`${protocol}://${host}/api/orders/${sister}/complete`, {
                                             method: 'POST',
@@ -1589,6 +1613,34 @@ router.post('/:id/complete', async (req, res) => {
             // Don't fail the completion - just log the error
         }
 
+        // Resolve driver from order_driver_assignments for MISA sync
+        let adminResolvedDriver = '';
+        let adminResolvedPlate = '';
+        try {
+            const { createClient: createSC } = await import('@supabase/supabase-js');
+            const sbLookup = createSC(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+            const { data: assigns } = await sbLookup
+                .from('order_driver_assignments')
+                .select('driver_name, plate')
+                .eq('order_id', id)
+                .order('created_at', { ascending: false })
+                .limit(1);
+
+            if (assigns && assigns.length > 0) {
+                adminResolvedDriver = assigns[0].driver_name || '';
+                adminResolvedPlate = assigns[0].plate || '';
+                console.log(`✅ Admin Complete: Resolved driver from assignments: ${adminResolvedDriver} (${adminResolvedPlate})`);
+
+                // Update order DB with resolved driver
+                await db.updateOrder(id, {
+                    taiXe: adminResolvedDriver,
+                    bienSo: adminResolvedPlate
+                });
+            }
+        } catch (e) {
+            console.warn('Admin driver resolution error:', e.message);
+        }
+
         // Sync to MISA
         const fullOrder = await db.getOrder(id);
         console.log(`📤 Complete Order Sync - Order: ${fullOrder?.sale_order_no}, Cart items: ${(products || fullOrder?.cart || []).length}`);
@@ -1597,8 +1649,8 @@ router.post('/:id/complete', async (req, res) => {
                 misa_id: fullOrder?.misa_id,
                 delivery_status: 'Đã giao hàng',
                 status: 'Đã thực hiện',
-                driver: fullOrder?.custom_field13 || fullOrder?.taiXe || fullOrder?.driver || '',
-                plate: fullOrder?.custom_field14 || fullOrder?.bienSo || fullOrder?.plate || '',
+                driver: adminResolvedDriver || fullOrder?.custom_field13 || fullOrder?.taiXe || '',
+                plate: adminResolvedPlate || fullOrder?.custom_field14 || fullOrder?.bienSo || '',
                 cart: products || fullOrder?.cart || fullOrder?.products || []
             });
 
@@ -1642,17 +1694,40 @@ router.post('/:id/complete', async (req, res) => {
                                 mergeMsg += ` (Đã hoàn thành kèm phiếu nhập ${sister})`;
                                 console.log(`✅ Auto-completed import sister: ${sister}`);
                             } else {
-                                // Forward the admin completion or driver completion internally
+                                // Forward the admin completion internally
                                 const fetch = (await import('node-fetch')).default;
                                 const protocol = req.protocol || 'http';
                                 const host = req.get('host') || 'localhost:3000';
 
+                                // Fetch sister order's OWN products from DB
+                                const sisterOrder = await db.getOrder(sister);
+                                const sisterProducts = sisterOrder?.products || sisterOrder?.cart || [];
+                                const sisterCart = sisterProducts.map(p => ({
+                                    product: { code: p.code || '', name: p.name || '' },
+                                    weight_kg: Number(p.qty || 0),
+                                    qty: Number(p.qty || 0),
+                                    unit: p.unit || 'Kg'
+                                }));
+
+                                // Resolve driver from current order's assignments
+                                const assignedDriver = fullOrder?.taiXe || fullOrder?.custom_field13 || driver_name;
+                                const assignedPlate = fullOrder?.bienSo || fullOrder?.custom_field14 || plate || '';
+
                                 const sisterPayload = {
-                                    ...req.body,
-                                    prevent_loop: true,
+                                    type: 'XUAT',
+                                    warehouse: sisterOrder?.warehouse || 'LT1',
+                                    partner: sisterOrder?.khach || sisterOrder?.account_name || '',
+                                    driver_name: assignedDriver,
+                                    plate: assignedPlate,
+                                    cart: sisterCart,
+                                    note: `Tự động hoàn thành theo đơn ghép ${currentNo}`,
                                     delivery_note: `Tự động hoàn thành theo đơn ghép ${currentNo}`,
+                                    sender: assignedDriver,
+                                    prevent_loop: true,
                                     admin_completed: true
                                 };
+
+                                console.log(`📦 Sister ${sister} own products: ${sisterCart.length} items, driver: ${assignedDriver}`);
 
                                 const resFetch = await fetch(`${protocol}://${host}/api/orders/${sister}/complete`, {
                                     method: 'POST',
