@@ -144,7 +144,10 @@ router.post('/', async (req, res) => {
             msg += `#${ticketNo}\n`;
             msg += `🏭 NCC: ${supplier_name}\n`;
             if (supplier_address) msg += `📍 Địa chỉ: ${supplier_address}\n`;
-            if (expected_date) msg += `📅 Ngày dự kiến: ${expected_date}\n`;
+            if (expected_date) {
+                const fmtDate = new Date(expected_date).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+                msg += `📅 Ngày dự kiến: ${fmtDate}\n`;
+            }
 
             if (productsList) {
                 msg += `\n📋 <b>Sản phẩm:</b>\n${productsList}\n`;
