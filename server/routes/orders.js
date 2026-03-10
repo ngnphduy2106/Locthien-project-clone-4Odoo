@@ -1247,8 +1247,8 @@ router.post('/:id/complete', async (req, res) => {
                     date: ts.date,
                     warehouse,
                     partner,
-                    driver: driver_name,
-                    plate,
+                    driver: isMultiDriverOrder ? firstDriverName : (resolvedDriverName || driver_name),
+                    plate: isMultiDriverOrder && firstDriverPlate ? firstDriverPlate : (resolvedPlate || plate),
                     product: standardizeData(item.product, 'PRODUCT'),
                     density: item.density,
                     qty: Number(item.weight_kg),
@@ -1280,8 +1280,8 @@ router.post('/:id/complete', async (req, res) => {
                     order_no: orderInfo?.soDon || id,
                     customer_name: partner,
                     customer_address: orderInfo?.diaChi || '',
-                    driver_name: driver_name,
-                    plate: plate,
+                    driver_name: isMultiDriverOrder ? firstDriverName : (resolvedDriverName || driver_name),
+                    plate: isMultiDriverOrder && firstDriverPlate ? firstDriverPlate : (resolvedPlate || plate),
                     warehouse: warehouse,
                     products: cart.map(c => ({
                         code: c.product?.code || c.code || '',
@@ -1343,8 +1343,8 @@ router.post('/:id/complete', async (req, res) => {
                 }
 
                 // For multi-driver: use first COMPLETED driver's name and plate (from DB) for MISA
-                const misaDriverName = isMultiDriverOrder ? firstDriverName : driver_name;
-                const misaPlate = isMultiDriverOrder && firstDriverPlate ? firstDriverPlate : plate;
+                const misaDriverName = isMultiDriverOrder ? firstDriverName : (resolvedDriverName || driver_name);
+                const misaPlate = isMultiDriverOrder && firstDriverPlate ? firstDriverPlate : (resolvedPlate || plate);
                 console.log(`📤 MISA Sync - Driver: ${misaDriverName}, Plate: ${misaPlate}, isMultiDriver: ${isMultiDriverOrder}, TotalQty: ${isMultiDriverOrder ? totalActualQty : 'N/A'}`);
 
                 const syncResult = await updateMisaOrder(orderInfo.sale_order_no || id, {
