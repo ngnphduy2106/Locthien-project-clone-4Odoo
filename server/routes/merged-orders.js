@@ -440,35 +440,24 @@ router.post('/:id/checkin', async (req, res) => {
             })
             .eq('sale_order_no', order_no);
 
-        // SYNC TO MISA (If applicable)
+        // SYNC TO MISA — Always use DB products (NOT req.body cart) to prevent cross-contamination
         let syncStatusMsg = '';
         if (orderInfo && orderInfo.misa_id) {
             try {
-                let misaCart = [];
-                if (cart && Array.isArray(cart)) {
-                    // Filter out shells and map quantities
-                    misaCart = cart.filter(item => !item.isShell).map(item => ({
-                        product_code: item.product?.code || item.product?.id || item.code || item.product || '',
-                        warehouse: item.warehouse || '',  // May be empty string if not provided
-                        unit: item.unit || 'kg',
-                        qty: Number(item.weight_kg || item.qty || 0)
-                    }));
-                } else if (orderInfo.products && Array.isArray(orderInfo.products)) {
-                    // Fallback to original order products if cart isn't sent
-                    misaCart = orderInfo.products.map(item => ({
-                        product_code: item.code || '',
-                        warehouse: '',
-                        unit: item.unit || 'kg',
-                        qty: Number(item.qty || 0)
-                    }));
-                }
+                // ALWAYS use products from DB for this specific order
+                let misaCart = (orderInfo.products || []).map(item => ({
+                    product_code: item.code || '',
+                    warehouse: '',
+                    unit: item.unit || 'kg',
+                    qty: Number(item.qty || 0)
+                }));
 
-                // If no actual_qty in cart, use overall actual_qty if provided
+                // Override qty if driver sent actual_qty for single-product orders
                 if (misaCart.length === 1 && actual_qty) {
                     misaCart[0].qty = actual_qty;
                 }
 
-                console.log(`📤 MISA Sync [Merged Trip] - Trip: ${id}, PO: ${order_no}, Driver: ${resolvedDriverName}`);
+                console.log(`📤 MISA Sync [Merged Trip] - Trip: ${id}, PO: ${order_no}, Driver: ${resolvedDriverName}, Products: ${misaCart.map(p => p.product_code + ':' + p.qty).join(', ')}`);
 
                 const syncResult = await updateMisaOrder(order_no, {
                     misa_id: orderInfo.misa_id,
@@ -489,6 +478,32 @@ router.post('/:id/checkin', async (req, res) => {
                 console.error('MISA Sync Error during trip check-in:', misaErr.message);
                 syncStatusMsg = ' (Lỗi kết nối MISA)';
             }
+        }
+
+        // Send Telegram notification for completed order in merged trip
+        try {
+            const { sendTelegramMessage } = await import('../services/telegram.js');
+            const customerName = orderInfo?.account_name || orderInfo?.khach || '';
+            const productsList = (orderInfo?.products || [])
+                .map(p => `- ${p.name || p.code}: ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'kg'}`)
+                .join('\n');
+
+            let tgMsg = `✅ <b>ĐƠN ĐÃ HOÀN THÀNH</b>\n`;
+            tgMsg += `📦 Mã: <b>${order_no}</b>\n`;
+            tgMsg += `<blockquote>👤 KH: <b>${customerName}</b></blockquote>`;
+            tgMsg += `🚗 TX: <b>${resolvedDriverName}</b> (${resolvedPlate})\n`;
+            if (productsList) tgMsg += `\n📋 Sản phẩm:\n${productsList}\n`;
+            tgMsg += `\n🔗 Chuyến ghép${syncStatusMsg}`;
+
+            // Send proof images if available
+            if (images && images.length > 0) {
+                const { sendTelegramPhotos } = await import('../services/telegram.js');
+                await sendTelegramPhotos(images, tgMsg, 'XUAT');
+            } else {
+                await sendTelegramMessage(tgMsg, 'XUAT');
+            }
+        } catch (tgErr) {
+            console.error('Telegram Error in merged checkin:', tgErr.message);
         }
 
         // Mark merged order as completed immediately (each order completes independently)
