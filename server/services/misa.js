@@ -449,9 +449,6 @@ const performSync = async () => {
 
             if (detail && detail.sale_order_no === saleOrderNo) {
                 // Success: Map from Detail
-                (detail.sale_order_product_mappings || []).forEach(p => {
-                    console.log(`🔍 MISA Product Raw: code=${p.product_code}, quantity=${p.quantity}, usage_unit_amount=${p.usage_unit_amount}, amount=${p.amount}, price=${p.price}, total=${p.total}`);
-                });
                 products = (detail.sale_order_product_mappings || []).map(p => ({
                     code: p.product_code,
                     name: p.product_name || p.description || p.product_code,
