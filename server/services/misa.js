@@ -501,8 +501,9 @@ const performSync = async () => {
             const oldOrder = dbOrders.find(o => o.soDon === saleOrderNo);
             if (oldOrder) {
                 // Only preserve driver/dispatch fields for orders already dispatched
-                // Orders still 'Mới' should allow fresh driver assignment by dispatchers
-                if (oldOrder.status !== 'Mới') {
+                // AND where MISA hasn't reset the order back to 'Mới' (cancelled & recreated)
+                const isDispatched = oldOrder.status !== 'Mới' && newStatus !== 'Mới';
+                if (isDispatched) {
                     // Preserve driver/plate/assistant from local DB (MISA doesn't own these)
                     if (oldOrder.taiXe) mappedOrder.taiXe = oldOrder.taiXe;
                     if (oldOrder.bienSo) mappedOrder.bienSo = oldOrder.bienSo;
