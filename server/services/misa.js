@@ -500,14 +500,20 @@ const performSync = async () => {
             // Preserve Local Fields (Driver, Status, Note, Merged Trip, etc.)
             const oldOrder = dbOrders.find(o => o.soDon === saleOrderNo);
             if (oldOrder) {
-                // Preserve driver/plate/assistant from local DB (MISA doesn't own these)
-                if (oldOrder.taiXe) mappedOrder.taiXe = oldOrder.taiXe;
-                if (oldOrder.bienSo) mappedOrder.bienSo = oldOrder.bienSo;
-                if (oldOrder.note) mappedOrder.note = oldOrder.note;
+                // Only preserve driver/dispatch fields for orders already dispatched
+                // Orders still 'Mới' should allow fresh driver assignment by dispatchers
+                if (oldOrder.status !== 'Mới') {
+                    // Preserve driver/plate/assistant from local DB (MISA doesn't own these)
+                    if (oldOrder.taiXe) mappedOrder.taiXe = oldOrder.taiXe;
+                    if (oldOrder.bienSo) mappedOrder.bienSo = oldOrder.bienSo;
 
-                // Preserve assistant, delivery time, merged order, delivery note
-                if (oldOrder.assistant_name || oldOrder.phuXe) mappedOrder.assistant_name = oldOrder.assistant_name || oldOrder.phuXe;
-                if (oldOrder.delivery_time || oldOrder.thoiGianGiao) mappedOrder.delivery_time = oldOrder.delivery_time || oldOrder.thoiGianGiao;
+                    // Preserve assistant, delivery time
+                    if (oldOrder.assistant_name || oldOrder.phuXe) mappedOrder.assistant_name = oldOrder.assistant_name || oldOrder.phuXe;
+                    if (oldOrder.delivery_time || oldOrder.thoiGianGiao) mappedOrder.delivery_time = oldOrder.delivery_time || oldOrder.thoiGianGiao;
+                }
+
+                // Always preserve notes & merged order (regardless of status)
+                if (oldOrder.note) mappedOrder.note = oldOrder.note;
                 if (oldOrder.merged_order_no) mappedOrder.merged_order_no = oldOrder.merged_order_no;
                 if (oldOrder.delivery_note) mappedOrder.delivery_note = oldOrder.delivery_note;
 
