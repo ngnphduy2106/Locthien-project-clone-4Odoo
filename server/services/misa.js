@@ -549,8 +549,7 @@ const performSync = async () => {
             let msg = `🆕 <b>ĐƠN HÀNG MỚI TỪ MISA</b>\n`;
             msg += `📦 Mã: <b>${saleOrderNo}</b>\n`;
             msg += `📅 Ngày: ${formattedDate}\n`;
-            msg += `👤 Khách: <b>${item.account_name || 'N/A'}</b>\n`;
-            msg += `📍 Địa chỉ: ${mappedOrder.shipping_address || 'N/A'}\n`;
+            msg += `<blockquote>👤 KH: <b>${item.account_name || 'N/A'}</b>\n📍 ${mappedOrder.shipping_address || 'N/A'}</blockquote>`;
 
             if (productsList) {
                 msg += `\n📋 <b>Sản phẩm:</b>\n${productsList}\n`;
