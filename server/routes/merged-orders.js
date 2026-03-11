@@ -204,11 +204,10 @@ router.post('/', async (req, res) => {
             return res.json(createResponse(true, 'Lỗi tạo đơn ghép: ' + createError.message));
         }
 
-        // Update source orders to "merged" status (by sale_order_no)
+        // Tag source orders with merged_order_no (keep their current status)
         await supabase
             .from('orders')
             .update({
-                status: 'Đã ghép',
                 merged_order_no: mergedNo
             })
             .in('sale_order_no', orderNos);
@@ -218,7 +217,6 @@ router.post('/', async (req, res) => {
         await supabase
             .from('orders')
             .update({
-                status: 'Đã ghép',
                 merged_order_no: mergedNo
             })
             .in('id', orderIds);

@@ -9196,9 +9196,10 @@ async function loadPendingOrdersForMerge() {
             fetch('/api/imports').then(r => r.json()).catch(() => ({}))
         ]);
 
-        // Filter pending export orders (unassigned)
-        const exportOrders = (exportRes.pending || []).filter(o =>
-            (o.status === 'Chưa thực hiện' || o.status === 'Mới') && !o.taiXe && !o.driver && !o.custom_field13
+        // Filter export orders available for merging (pending + assigned, exclude completed/merged)
+        const allExportOrders = [...(exportRes.pending || []), ...(exportRes.assigned || [])];
+        const exportOrders = allExportOrders.filter(o =>
+            (o.status === 'Chưa thực hiện' || o.status === 'Mới' || o.status === 'Đang thực hiện') && !o.merged_order_no
         ).map(o => ({
             ...o,
             _type: 'export',
@@ -9206,12 +9207,14 @@ async function loadPendingOrdersForMerge() {
             _displayNo: o.soDon || o.sale_order_no || 'N/A',
             _customer: o.khach || o.account_name || '',
             _address: o.diaChi || o.shipping_address || '',
-            _amount: Number(o.amount || o.sale_order_amount || 0)
+            _amount: Number(o.amount || o.sale_order_amount || 0),
+            _driver: o.taiXe || o.driver || o.custom_field13 || '',
+            _status: o.status
         }));
 
-        // Filter pending import orders (unassigned)
+        // Filter import orders available for merging (pending + assigned)
         const importOrders = ((importRes.data || []).filter(i =>
-            (i.status === 'pending' || i.status === 'Chưa thực hiện') && !i.driver_name
+            (i.status === 'pending' || i.status === 'assigned' || i.status === 'Chưa thực hiện') && !i.merged_order_no
         )).map(i => ({
             ...i,
             _type: 'import',
@@ -9219,7 +9222,9 @@ async function loadPendingOrdersForMerge() {
             _displayNo: i.ticket_no || i.id || 'N/A',
             _customer: i.supplier_name || i.supplier || '',
             _address: i.pickup_address || i.address || '',
-            _amount: Number(i.total_amount || 0)
+            _amount: Number(i.total_amount || 0),
+            _driver: i.driver_name || '',
+            _status: i.status
         }));
 
         const allOrders = [...exportOrders, ...importOrders];
@@ -9260,6 +9265,7 @@ async function loadPendingOrdersForMerge() {
                         <div style="font-size:12px; color:var(--success); margin-top:4px;">
                             💰 ${order._amount.toLocaleString('vi-VN')}đ
                         </div>
+                        ${order._driver ? `<div style="font-size:11px; color:var(--primary); margin-top:2px;"><i class="bi bi-truck"></i> TX: ${order._driver}</div>` : ''}
                     </div>
                 </div>
             `;
