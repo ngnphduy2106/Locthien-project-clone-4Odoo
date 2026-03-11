@@ -1682,6 +1682,45 @@ router.post('/:id/complete', async (req, res) => {
             console.error('MISA Sync Error:', syncErr.message);
         }
 
+        // Send Telegram notification for admin complete
+        try {
+            const { sendTelegramMessage, sendTelegramPhotos } = await import('../services/telegram.js');
+            const orderNo = fullOrder?.soDon || fullOrder?.sale_order_no || id;
+            const driverDisplay = adminResolvedDriver || fullOrder?.custom_field13 || fullOrder?.taiXe || '';
+
+            let msg = `✅ <b>ĐƠN ĐÃ HOÀN THÀNH</b>\n`;
+            msg += `📦 Mã: <b>#${orderNo}</b>\n`;
+            msg += `👤 Khách: ${fullOrder?.khach || fullOrder?.account_name || 'N/A'}\n`;
+            if (driverDisplay) msg += `🚛 Tài xế: ${driverDisplay}\n`;
+            if (adminResolvedPlate) msg += `🔢 Biển số: ${adminResolvedPlate}\n`;
+
+            // Try to get proof images from export ticket
+            let proofImages = images || [];
+            if (proofImages.length === 0) {
+                try {
+                    const { createClient: sc } = await import('@supabase/supabase-js');
+                    const sbImg = sc(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+                    const { data: ticket } = await sbImg
+                        .from('export_tickets')
+                        .select('images')
+                        .eq('order_id', id)
+                        .order('created_at', { ascending: false })
+                        .limit(1)
+                        .single();
+                    if (ticket?.images) proofImages = ticket.images;
+                } catch (e) { /* no images */ }
+            }
+
+            if (proofImages.length > 0) {
+                await sendTelegramPhotos(proofImages, msg, 'XUAT');
+            } else {
+                await sendTelegramMessage(msg, 'XUAT');
+            }
+            console.log(`📨 Telegram completion sent to XUAT for ${orderNo}`);
+        } catch (tgErr) {
+            console.error('Telegram admin completion error:', tgErr.message);
+        }
+
         // AUTO-COMPLETE SISTER ORDERS IN MERGED TRIP
         let mergeMsg = '';
         if (fullOrder?.merged_order_no && !req.body.prevent_loop) {
