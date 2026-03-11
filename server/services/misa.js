@@ -385,7 +385,7 @@ const performSync = async () => {
                                 specNoteChanged = true;
                             }
                             // Detect qty change from MISA (e.g. Sales corrected quantity)
-                            const misaQty = Number(misaP.quantity || misaP.usage_unit_amount || misaP.amount || 0);
+                            const misaQty = Number(misaP.amount || 0);
                             const localQty = Number(localP.qty || 0);
                             if (misaQty > 0 && localQty > 0 && Math.abs(misaQty - localQty) > 0.01) {
                                 qtyChanged = true;
@@ -457,7 +457,7 @@ const performSync = async () => {
                     name: p.product_name || p.description || p.product_code,
                     note: p.description_product || '',  // Mô tả từ MISA
                     spec: p.custom_field7 || '',  // Quy cách từ MISA
-                    qty: Number(p.quantity || p.usage_unit_amount || p.amount || 0),
+                    qty: Number(p.amount || 0),
                     unit: p.unit || '',
                     price: Number(p.price || 0),
                     total: Number(p.total || p.to_currency || 0)
@@ -537,7 +537,7 @@ const performSync = async () => {
                         for (const localP of oldOrder.products) {
                             const misaP = misaProds.find(mp => mp.product_code === localP.code);
                             if (misaP) {
-                                const misaQty = Number(misaP.quantity || misaP.usage_unit_amount || misaP.amount || 0);
+                                const misaQty = Number(misaP.amount || 0);
                                 const localQty = Number(localP.qty || 0);
                                 if (misaQty > 0 && Math.abs(misaQty - localQty) > 0.01) {
                                     misaProductsChanged = true;
