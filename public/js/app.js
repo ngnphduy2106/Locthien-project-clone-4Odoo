@@ -3605,31 +3605,31 @@ async function assignDriver(orderId) {
             <div style="background:var(--card-bg); padding:12px; border-radius:8px; margin-bottom:16px; border:1px solid var(--border);">
                 <div style="display:flex; align-items:center; gap:8px;">
                     <input type="checkbox" id="is-merged-order" style="width:16px; height:16px;" onchange="
-                        const selectBox = document.getElementById('merge-order-input');
+                        const mergeBox = document.getElementById('merge-orders-add-section');
                         if (this.checked) {
-                            selectBox.classList.remove('hidden');
-                            selectBox.focus();
+                            mergeBox.classList.remove('hidden');
                         } else {
-                            selectBox.classList.add('hidden');
-                            selectBox.value = '';
+                            mergeBox.classList.add('hidden');
+                            document.getElementById('merge-order-tags').innerHTML = '';
                         }
                     ">
                     <label for="is-merged-order" style="font-weight:600; margin:0; cursor:pointer;">🔗 Ghép chung với đơn khác</label>
                 </div>
-                <input type="text" id="merge-order-input" list="merge-order-datalist" class="form-control hidden" placeholder="-- Gõ để tìm mã đơn hoặc tên khách --" style="margin-top:10px;">
-                <datalist id="merge-order-datalist">
+                <div id="merge-orders-add-section" class="hidden" style="margin-top:10px;">
+                    <div style="display:flex; gap:6px; align-items:center;">
+                        <input type="text" id="merge-order-input" list="merge-order-datalist" class="form-control" placeholder="Gõ mã đơn hoặc tên khách..." style="flex:1;" onkeydown="if(event.key==='Enter'){event.preventDefault();addMergeOrderTag()}">
+                        <button type="button" class="btn btn-info btn-sm" onclick="addMergeOrderTag()" style="white-space:nowrap; padding:6px 12px;">+ Thêm</button>
+                    </div>
+                    <datalist id="merge-order-datalist">
                     ${(() => {
                 const validStatuses = ['Chưa thực hiện', 'Đang thực hiện', 'pending', 'assigned', 'delivering', 'Mới'];
-                // Include export orders
                 const eligible = Object.values(state.orders).flat().filter(o =>
                     (o.id !== orderId && o.sale_order_no !== orderId) &&
                     validStatuses.includes(o.status)
                 );
-                // Also include import orders
                 const importOrders = Object.values(state.imports || {}).flat().filter(i =>
                     validStatuses.includes(i.status)
                 );
-                if (eligible.length === 0 && importOrders.length === 0) return '';
                 let html = '';
                 eligible.forEach(o => {
                     const no = o.sale_order_no || o.id;
@@ -3643,7 +3643,9 @@ async function assignDriver(orderId) {
                 });
                 return html;
             })()}
-                </datalist>
+                    </datalist>
+                    <div id="merge-order-tags" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;"></div>
+                </div>
             </div>
             
             <!-- Multi-Driver Assignment Section -->
@@ -3997,10 +3999,13 @@ async function submitMultiDriverAssignment() {
     }
 
     const isMerged = window.$('#is-merged-order')?.checked;
-    const mergeWithOrderNo = isMerged ? window.$('#merge-order-input')?.value : null;
+    // Collect all merge order tags
+    const mergeTagEls = document.querySelectorAll('#merge-order-tags .merge-tag');
+    const mergeOrderNos = Array.from(mergeTagEls).map(el => el.getAttribute('data-order-no')).filter(Boolean);
+    const mergeWithOrderNo = mergeOrderNos.length > 0 ? mergeOrderNos[0] : null;
 
-    if (isMerged && !mergeWithOrderNo) {
-        alert('Vui lòng chọn hoặc nhập mã đơn hàng để ghép cùng!');
+    if (isMerged && mergeOrderNos.length === 0) {
+        alert('Vui lòng thêm ít nhất 1 đơn hàng để ghép cùng!');
         return;
     }
 
@@ -4017,7 +4022,8 @@ async function submitMultiDriverAssignment() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 assignments: state.driverAssignments,
-                mergeWithOrderNo: mergeWithOrderNo
+                mergeWithOrderNo: mergeWithOrderNo,
+                mergeWithOrderNos: mergeOrderNos
             })
         });
 
@@ -7210,6 +7216,42 @@ window.loadImportTickets = loadImportTickets;
 window.renderImportList = renderImportList;
 window.viewImportDetail = viewImportDetail;
 window.assignImportDriver = assignImportDriver;
+
+// Merge order tag helpers
+function addMergeOrderTag() {
+    const input = document.getElementById('merge-order-input');
+    if (!input) return;
+    const val = input.value.trim();
+    if (!val) return;
+
+    // Check if already added
+    const existing = document.querySelectorAll('#merge-order-tags .merge-tag');
+    for (const el of existing) {
+        if (el.getAttribute('data-order-no') === val) {
+            input.value = '';
+            return;
+        }
+    }
+
+    const container = document.getElementById('merge-order-tags');
+    if (!container) return;
+
+    const tag = document.createElement('span');
+    tag.className = 'merge-tag';
+    tag.setAttribute('data-order-no', val);
+    tag.style.cssText = 'display:inline-flex; align-items:center; gap:4px; background:linear-gradient(135deg, #3b82f6, #2563eb); color:white; padding:4px 10px; border-radius:16px; font-size:12px; font-weight:600;';
+    tag.innerHTML = `🔗 ${val} <span onclick="removeMergeOrderTag(this)" style="cursor:pointer; margin-left:4px; opacity:0.8;">✕</span>`;
+    container.appendChild(tag);
+    input.value = '';
+    input.focus();
+}
+
+function removeMergeOrderTag(closeBtn) {
+    closeBtn.parentElement.remove();
+}
+
+window.addMergeOrderTag = addMergeOrderTag;
+window.removeMergeOrderTag = removeMergeOrderTag;
 window.confirmAssignImportDriver = confirmAssignImportDriver;
 window.adminCompleteImport = adminCompleteImport;
 window.startImportOrder = startImportOrder;
