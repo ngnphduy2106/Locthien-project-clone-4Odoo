@@ -5668,18 +5668,18 @@ function editOrder(orderId) {
     const modalBody = window.$('#modal-order-body');
     const modalTitle = window.$('#modal-order-title');
 
-    if (modalTitle) modalTitle.textContent = `Chỉnh sửa đơn #${order.soDon || order.sale_order_no || order.id}`;
+    if (modalTitle) modalTitle.textContent = `Chỉnh sửa đơn #${order.soDon || order.sale_order_no || order.orderCode || order.id}`;
 
     if (modalBody) {
         modalBody.innerHTML = `
             <div class="order-detail-grid" style="margin-bottom:24px;">
                 <div class="detail-row">
                     <label>Khách hàng:</label>
-                    <input type="text" id="edit-customer" class="form-control" value="${order.khach || order.account_name || ''}">
+                    <input type="text" id="edit-customer" class="form-control" value="${order.khach || order.account_name || order.customerName || order.accountName || ''}">
                 </div>
                 <div class="detail-row">
                     <label>Địa chỉ:</label>
-                    <input type="text" id="edit-address" class="form-control" value="${order.diaChi || order.shipping_address || ''}">
+                    <input type="text" id="edit-address" class="form-control" value="${order.diaChi || order.shipping_address || order.shippingAddress || order.address || ''}">
                 </div>
                 <div class="detail-row">
                     <label>Ghi chú:</label>
