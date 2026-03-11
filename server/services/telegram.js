@@ -84,29 +84,79 @@ export const sendTelegramPhotos = async (photoUrls, caption = '', type = 'XUAT',
 
     if (!token || !chatId || !photoUrls?.length) return null;
 
-    try {
-        if (photoUrls.length === 1) {
-            // Single photo: use sendPhoto
-            const url = `https://api.telegram.org/bot${token}/sendPhoto`;
+    // Helper: check if string is a base64 data URL
+    const isBase64 = (str) => typeof str === 'string' && str.startsWith('data:');
+
+    // Helper: send single photo (supports both URL and base64)
+    const sendSinglePhoto = async (photoData, captionText, isFirst = true) => {
+        const url = `https://api.telegram.org/bot${token}/sendPhoto`;
+
+        if (isBase64(photoData)) {
+            // Base64 → multipart form-data upload
+            const matches = photoData.match(/^data:image\/(\w+);base64,(.+)$/);
+            if (!matches) {
+                console.error('❌ Invalid base64 image format');
+                return null;
+            }
+            const ext = matches[1];
+            const buffer = Buffer.from(matches[2], 'base64');
+            const boundary = '----TelegramBoundary' + Date.now();
+
+            let body = '';
+            body += `--${boundary}\r\nContent-Disposition: form-data; name="chat_id"\r\n\r\n${chatId}\r\n`;
+            if (captionText) body += `--${boundary}\r\nContent-Disposition: form-data; name="caption"\r\n\r\n${captionText}\r\n`;
+            if (captionText) body += `--${boundary}\r\nContent-Disposition: form-data; name="parse_mode"\r\n\r\nHTML\r\n`;
+            if (replyToMessageId && isFirst) body += `--${boundary}\r\nContent-Disposition: form-data; name="reply_to_message_id"\r\n\r\n${replyToMessageId}\r\n`;
+            body += `--${boundary}\r\nContent-Disposition: form-data; name="photo"; filename="proof.${ext}"\r\nContent-Type: image/${ext}\r\n\r\n`;
+
+            const prefix = Buffer.from(body, 'utf-8');
+            const suffix = Buffer.from(`\r\n--${boundary}--\r\n`, 'utf-8');
+            const fullBody = Buffer.concat([prefix, buffer, suffix]);
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': `multipart/form-data; boundary=${boundary}` },
+                body: fullBody
+            });
+            return response.json();
+        } else {
+            // HTTP URL → JSON body
             const body = {
                 chat_id: chatId,
-                photo: photoUrls[0],
-                caption: caption || undefined,
+                photo: photoData,
+                caption: captionText || undefined,
                 parse_mode: 'HTML'
             };
-            if (replyToMessageId) body.reply_to_message_id = replyToMessageId;
+            if (replyToMessageId && isFirst) body.reply_to_message_id = replyToMessageId;
 
             const response = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body)
             });
-            const json = await response.json();
-            if (!json.ok) console.error(`❌ Telegram Photo Error (${type}):`, json.description);
-            else console.log(`📸 Telegram Photo Sent (${type}).`);
-            return json.result?.message_id || null;
+            return response.json();
+        }
+    };
+
+    try {
+        const hasBase64 = photoUrls.some(isBase64);
+
+        if (photoUrls.length === 1 || hasBase64) {
+            // Send photos one by one (required for base64 uploads)
+            let firstMsgId = null;
+            for (let i = 0; i < Math.min(photoUrls.length, 5); i++) {
+                const cap = i === 0 ? caption : '';
+                const json = await sendSinglePhoto(photoUrls[i], cap, i === 0);
+                if (json?.ok) {
+                    if (i === 0) firstMsgId = json.result?.message_id;
+                    console.log(`📸 Telegram Photo ${i + 1}/${photoUrls.length} Sent (${type}).`);
+                } else {
+                    console.error(`❌ Telegram Photo ${i + 1} Error (${type}):`, json?.description);
+                }
+            }
+            return firstMsgId;
         } else {
-            // Multiple photos: use sendMediaGroup (album)
+            // Multiple HTTP URL photos: use sendMediaGroup (album)
             const url = `https://api.telegram.org/bot${token}/sendMediaGroup`;
             const media = photoUrls.slice(0, 10).map((photoUrl, i) => ({
                 type: 'photo',
