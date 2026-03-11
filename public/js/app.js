@@ -5803,6 +5803,10 @@ let editLocalItems = [];
 
 function renderLocalItemsTableEdit(localItems, orderId) {
     editLocalItems = localItems || [];
+    if (typeof editLocalItems === 'string') {
+        try { editLocalItems = JSON.parse(editLocalItems); } catch (e) { editLocalItems = []; }
+    }
+    if (!Array.isArray(editLocalItems)) editLocalItems = [];
 
     if (!editLocalItems || editLocalItems.length === 0) {
         return `<div style="text-align:center; color:var(--text-muted); padding:16px; background:var(--body-bg); border-radius:8px;">
