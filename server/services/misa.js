@@ -428,7 +428,7 @@ const performSync = async () => {
                 name: p.product_name || p.description || p.product_code,
                 note: p.description_product || '',  // Mô tả từ MISA
                 spec: p.custom_field7 || '',  // Quy cách từ MISA
-                qty: Number(p.usage_unit_amount || p.amount || 0),
+                qty: Number(p.amount || 0),
                 unit: p.unit || '',
                 price: Number(p.price || 0),
                 total: Number(p.total || p.to_currency || 0)
