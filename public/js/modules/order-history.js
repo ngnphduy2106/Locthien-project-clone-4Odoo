@@ -500,7 +500,7 @@ const OrderHistoryModule = {
                 window.state.orders.completed.push(order);
             }
 
-            viewOrderDetail(order.id, { readonly: true });
+            viewOrderDetail(order.id, {});
         } else {
             // Fallback: simple alert
             let details = `Chi tiết đơn hàng ${order.soDon || orderId} \n\n`;
