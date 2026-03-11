@@ -491,42 +491,16 @@ router.post('/:id/checkin', async (req, res) => {
             }
         }
 
-        // CHECK IF ALL ORDERS IN MERGED GROUP HAVE BEEN INDIVIDUALLY COMPLETED
-        const { data: merged } = await supabase
+        // Mark merged order as completed immediately (each order completes independently)
+        await supabase
             .from('merged_orders')
-            .select('source_order_nos, merged_no')
-            .eq('id', mergedOrderId)
-            .single();
+            .update({
+                status: 'completed',
+                completed_at: new Date().toISOString()
+            })
+            .eq('id', mergedOrderId);
 
-        const sourceNos = merged?.source_order_nos || [];
-
-        // Count how many orders have been checked in
-        const { data: allCheckins } = await supabase
-            .from('merged_order_checkins')
-            .select('order_no')
-            .eq('merged_order_id', mergedOrderId);
-
-        const checkedInNos = new Set((allCheckins || []).map(c => c.order_no));
-        const allCompleted = sourceNos.every(no => checkedInNos.has(no));
-
-        if (allCompleted) {
-            // All orders in the merged trip have been individually completed
-            await supabase
-                .from('merged_orders')
-                .update({
-                    status: 'completed',
-                    completed_at: new Date().toISOString()
-                })
-                .eq('id', mergedOrderId);
-            console.log(`✅ All ${sourceNos.length} orders completed — merged trip ${merged?.merged_no} marked as done`);
-        }
-
-        const remaining = sourceNos.filter(no => !checkedInNos.has(no));
-        const statusMsg = allCompleted
-            ? `Hoàn thành đơn ${order_no} — Chuyến ghép đã hoàn tất!${syncStatusMsg}`
-            : `Hoàn thành đơn ${order_no} — Còn ${remaining.length} đơn chưa hoàn thành trong chuyến ghép${syncStatusMsg}`;
-
-        res.json(createResponse(false, statusMsg));
+        res.json(createResponse(false, `Hoàn thành đơn ${order_no}!${syncStatusMsg}`));
 
     } catch (e) {
         console.error('Check-in error:', e.message);
