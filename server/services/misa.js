@@ -522,7 +522,7 @@ const performSync = async () => {
                     dateMsg += `📦 Mã: <b>#${saleOrderNo}</b>\n`;
                     dateMsg += `👤 KH: <b>${item.account_name || oldOrder.khach || 'N/A'}</b>\n`;
                     dateMsg += `<blockquote>❌ Cũ: ${fmtOld}\n✅ Mới: ${fmtNew}</blockquote>`;
-                    sendTelegramMessage(dateMsg, 'NOTIFY').catch(() => { });
+                    sendTelegramMessage(dateMsg, 'NOTIFY', oldOrder.telegram_message_id || null).catch(() => { });
                 }
             }
             await db.updateOrder(saleOrderNo, mappedOrder);
@@ -625,7 +625,7 @@ const performSync = async () => {
                         delMsg += `📦 Mã: <b>#${orderNo}</b>\n`;
                         delMsg += `👤 KH: ${customerName}\n`;
                         delMsg += `⚠️ Đơn đã bị xóa khỏi CRM và database`;
-                        await sendTelegramMessage(delMsg, 'NOTIFY');
+                        await sendTelegramMessage(delMsg, 'NOTIFY', candidate.telegram_message_id || null);
                     } else {
                         console.log(`✅ Order ${orderNo} still exists in MISA (not in sync page)`);
                     }
