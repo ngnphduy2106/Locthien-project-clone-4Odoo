@@ -524,21 +524,34 @@ const performSync = async () => {
                 }
 
                 // PRESERVE local product edits for completed/dispatched orders
-                // Only allow MISA to overwrite products if MISA's sale_order_amount changed
-                // (indicating Sales actually edited on MISA CRM, not just a local edit)
+                // Compare individual product quantities: if MISA products differ, use MISA
                 if (oldOrder.status !== 'Mới' && oldOrder.products && oldOrder.products.length > 0) {
-                    const localAmount = Number(oldOrder.amount || oldOrder.sale_order_amount || 0);
-                    const misaAmount = Number(item.sale_order_amount || 0);
-
-                    if (localAmount > 0 && misaAmount > 0 && Math.abs(localAmount - misaAmount) < 1) {
-                        // Amounts match → keep local products (may have been edited locally)
+                    const misaProds = item.sale_order_product_mappings || [];
+                    let misaProductsChanged = false;
+                    if (misaProds.length !== oldOrder.products.length) {
+                        misaProductsChanged = true;
+                    } else {
+                        for (const localP of oldOrder.products) {
+                            const misaP = misaProds.find(mp => mp.product_code === localP.code);
+                            if (misaP) {
+                                const misaQty = Number(misaP.usage_unit_amount || misaP.amount || 0);
+                                const localQty = Number(localP.qty || 0);
+                                if (misaQty > 0 && Math.abs(misaQty - localQty) > 0.01) {
+                                    misaProductsChanged = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    if (!misaProductsChanged) {
+                        // MISA products same as local → keep local (preserves local edits)
                         mappedOrder.sale_order_product_mappings = oldOrder.products;
-                        mappedOrder.sale_order_amount = localAmount;
-                    } else if (misaAmount > 0 && Math.abs(localAmount - misaAmount) >= 1) {
-                        // Amounts differ → MISA was updated by Sales, use MISA data
-                        console.log(`💰 MISA amount changed for ${saleOrderNo}: ${localAmount} → ${misaAmount} (using MISA products)`);
+                    } else {
+                        // MISA products changed → use MISA data
+                        console.log(`📦 MISA products changed for ${saleOrderNo} — using MISA data`);
                     }
                 }
+
 
                 // Detect date change from MISA → send Telegram notification
                 const oldDate = oldOrder.ngay || oldOrder.sale_order_date;
