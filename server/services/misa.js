@@ -577,6 +577,11 @@ const performSync = async () => {
             }
             await db.updateOrder(saleOrderNo, mappedOrder);
         } else {
+            // NEW ORDER: Clear driver/plate from MISA to prevent stale data
+            // (When sales copies an old order in MISA, custom_field13/14 carry over)
+            delete mappedOrder.custom_field13;
+            delete mappedOrder.custom_field14;
+
             mappedOrder.createdAt = new Date().toISOString();
             await db.addOrder(mappedOrder);
 
