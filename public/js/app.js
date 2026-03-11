@@ -3013,7 +3013,7 @@ async function viewOrderDetail(orderId, options = {}) {
                 <td>${name}${extraHtml}</td>
                 <td>${p.qty || p.quantity || p.amount || 0}</td>
                 <td>${p.unit || 'kg'}</td>
-                ${!hidePrice ? `<td>${formatCurrency(p.total || p.to_currency || p.price || 0)}</td>` : ''}
+                ${!hidePrice ? `<td>${formatCurrency(p.total || p.to_currency || ((Number(p.qty || p.quantity || 0)) * Number(p.price || p.saleprice || 0)) || 0)}</td>` : ''}
             </tr>
         `;
         }).join('')
@@ -3331,7 +3331,7 @@ async function viewOrderDetail(orderId, options = {}) {
                         <th>Sản phẩm</th>
                         <th>SL</th>
                         <th>Đơn vị</th>
-                        ${!hidePrice ? '<th>Giá</th>' : ''}
+                        ${!hidePrice ? '<th>Thành tiền</th>' : ''}
                     </tr>
                 </thead>
                 <tbody>
