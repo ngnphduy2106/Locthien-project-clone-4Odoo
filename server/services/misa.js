@@ -523,6 +523,23 @@ const performSync = async () => {
                     mappedOrder.status = oldOrder.status;
                 }
 
+                // PRESERVE local product edits for completed/dispatched orders
+                // Only allow MISA to overwrite products if MISA's sale_order_amount changed
+                // (indicating Sales actually edited on MISA CRM, not just a local edit)
+                if (oldOrder.status !== 'Mới' && oldOrder.products && oldOrder.products.length > 0) {
+                    const localAmount = Number(oldOrder.amount || oldOrder.sale_order_amount || 0);
+                    const misaAmount = Number(item.sale_order_amount || 0);
+
+                    if (localAmount > 0 && misaAmount > 0 && Math.abs(localAmount - misaAmount) < 1) {
+                        // Amounts match → keep local products (may have been edited locally)
+                        mappedOrder.sale_order_product_mappings = oldOrder.products;
+                        mappedOrder.sale_order_amount = localAmount;
+                    } else if (misaAmount > 0 && Math.abs(localAmount - misaAmount) >= 1) {
+                        // Amounts differ → MISA was updated by Sales, use MISA data
+                        console.log(`💰 MISA amount changed for ${saleOrderNo}: ${localAmount} → ${misaAmount} (using MISA products)`);
+                    }
+                }
+
                 // Detect date change from MISA → send Telegram notification
                 const oldDate = oldOrder.ngay || oldOrder.sale_order_date;
                 const newDate = item.sale_order_date;

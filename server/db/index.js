@@ -380,7 +380,9 @@ export const db = {
             if (data.status !== undefined) safeData.status = data.status;
             if (data.misa_id !== undefined) safeData.misa_id = data.misa_id;
             if (data.note !== undefined) safeData.description = data.note;
+            if (data.ghiChu !== undefined) safeData.description = data.ghiChu;
             if (data.description !== undefined) safeData.description = data.description;
+            if (data.khach !== undefined) safeData.account_name = data.khach;
 
             // Driver/Plate → custom_field13/14
             if (data.taiXe !== undefined) safeData.custom_field13 = data.taiXe;
