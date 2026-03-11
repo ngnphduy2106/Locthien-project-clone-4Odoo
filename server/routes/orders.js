@@ -663,24 +663,40 @@ router.put('/:id', async (req, res) => {
             const existingCart = existingOrder.cart || existingOrder.products || existingOrder.chiTiet || [];
             const updatedCart = existingCart.map((p, idx) => {
                 const update = productUpdates.find(u => u.idx === idx);
+                const unitPrice = Number(p.price || p.saleprice || p.unit_price || 0);
+                const newQty = update ? Number(update.qty) : (Number(p.qty) || Number(p.quantity) || 0);
                 return {
                     code: p.code || p.product_code || '',
                     name: p.name || p.product || '',
-                    qty: update ? Number(update.qty) : (Number(p.qty) || Number(p.quantity) || 0),
-                    unit: p.unit || 'Kg'
+                    qty: newQty,
+                    unit: p.unit || 'Kg',
+                    price: unitPrice,
+                    saleprice: unitPrice,
+                    amount: newQty * unitPrice
                 };
             });
             updateData.cart = updatedCart;
+            // Recalculate total amount from cart
+            updateData.sale_order_amount = updatedCart.reduce((sum, p) => sum + (p.amount || 0), 0);
             console.log(`📝 Updated Cart:`, JSON.stringify(updatedCart, null, 2));
+            console.log(`💰 Recalculated total: ${updateData.sale_order_amount}`);
         }
         // Handle full products array (if provided directly)
         else if (products && Array.isArray(products)) {
-            updateData.cart = products.map(p => ({
-                code: p.code || '',
-                name: p.name || p.product || '',
-                qty: Number(p.qty) || 0,
-                unit: p.unit || 'Kg'
-            }));
+            updateData.cart = products.map(p => {
+                const unitPrice = Number(p.price || p.saleprice || p.unit_price || 0);
+                const qty = Number(p.qty) || 0;
+                return {
+                    code: p.code || '',
+                    name: p.name || p.product || '',
+                    qty: qty,
+                    unit: p.unit || 'Kg',
+                    price: unitPrice,
+                    saleprice: unitPrice,
+                    amount: qty * unitPrice
+                };
+            });
+            updateData.sale_order_amount = updateData.cart.reduce((sum, p) => sum + (p.amount || 0), 0);
         }
 
         const order = await db.updateOrder(id, updateData);
