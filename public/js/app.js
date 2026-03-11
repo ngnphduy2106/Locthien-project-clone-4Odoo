@@ -1347,6 +1347,7 @@ function renderImportList() {
                         </span>
                         <span style="font-size:10px; color:var(--text-secondary); white-space:nowrap;">${formatDate(imp.expected_date || imp.created_at)}</span>
                         <span class="badge badge-${getStatusBadge(imp.status)}" style="font-size:9px; padding:2px 5px; white-space:nowrap;">${getStatusText(imp.status)}</span>
+                        ${imp.merged_order_no ? `<span style="background:linear-gradient(135deg, #3b82f6, #2563eb); color:white; padding:1px 5px; border-radius:8px; font-size:8px; font-weight:600; white-space:nowrap;"><i class="bi bi-link-45deg"></i> ${imp.merged_order_no}</span>` : ''}
                         <div style="display:flex; gap:3px; flex-shrink:0;" onclick="event.stopPropagation()">
                             <button class="btn ${imp.is_pinned ? 'btn-warning' : 'btn-outline'} btn-sm" onclick="toggleImportPin('${imp.id}', ${!imp.is_pinned})" style="padding:2px; font-size:9px; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center;" title="${imp.is_pinned ? 'Bỏ ghim' : 'Ghim đơn'}">
                                 <i class="bi bi-pin${imp.is_pinned ? '-fill' : ''}"></i>
