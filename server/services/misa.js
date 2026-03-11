@@ -371,8 +371,9 @@ const performSync = async () => {
                 const localDate = (existingOrder.ngay || existingOrder.sale_order_date || '').split('T')[0];
                 const dateChanged = misaDate && localDate && misaDate !== localDate;
 
-                // 7. Check if products spec/note changed on MISA (not just missing)
+                // 7. Check if products spec/note/qty changed on MISA
                 let specNoteChanged = false;
+                let qtyChanged = false;
                 const misaProducts = item.sale_order_product_mappings || [];
                 if (hasProducts && misaProducts.length > 0) {
                     for (const localP of existingOrder.products) {
@@ -382,19 +383,31 @@ const performSync = async () => {
                             const misaNote = misaP.description_product || '';
                             if ((localP.spec || '') !== misaSpec || (localP.note || '') !== misaNote) {
                                 specNoteChanged = true;
-                                break;
+                            }
+                            // Detect qty change from MISA (e.g. Sales corrected quantity)
+                            const misaQty = Number(misaP.usage_unit_amount || misaP.amount || 0);
+                            const localQty = Number(localP.qty || 0);
+                            if (misaQty > 0 && localQty > 0 && Math.abs(misaQty - localQty) > 0.01) {
+                                qtyChanged = true;
+                                console.log(`📦 Qty changed for ${saleOrderNo}: ${localP.code} ${localQty} → ${misaQty}`);
                             }
                         }
+                    }
+                    // Also detect if MISA has different number of products
+                    if (misaProducts.length !== existingOrder.products.length) {
+                        qtyChanged = true;
+                        console.log(`📦 Product count changed for ${saleOrderNo}: ${existingOrder.products.length} → ${misaProducts.length}`);
                     }
                 }
                 const hasMissingSpec = hasProducts && existingOrder.products.some(p => !p.spec);
 
-                if (!hasProducts || hasZeroQty || statusChanged || !hasMisaId || hasMissingPrice || (!hasOwnerName && misaHasOwnerName) || (!hasDescription && misaHasDescription) || dateChanged || hasMissingSpec || specNoteChanged) {
+                if (!hasProducts || hasZeroQty || statusChanged || !hasMisaId || hasMissingPrice || (!hasOwnerName && misaHasOwnerName) || (!hasDescription && misaHasDescription) || dateChanged || hasMissingSpec || specNoteChanged || qtyChanged) {
                     if (hasMissingPrice) console.log(`💰 Updating ${saleOrderNo} (Missing price data)...`);
                     if (!hasOwnerName && misaHasOwnerName) console.log(`👤 Updating ${saleOrderNo} (Missing owner_name)...`);
                     if (!hasDescription && misaHasDescription) console.log(`📝 Updating ${saleOrderNo} (Missing description/misa_note)...`);
                     if (dateChanged) console.log(`📅 Updating ${saleOrderNo} (Date changed: ${localDate} → ${misaDate})`);
                     if (specNoteChanged) console.log(`📋 Updating ${saleOrderNo} (Product spec/note changed on MISA)`);
+                    if (qtyChanged) console.log(`📦 Updating ${saleOrderNo} (Product qty changed on MISA)`);
                     shouldFetchDetail = true;
                 }
             }
