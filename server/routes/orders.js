@@ -1548,7 +1548,7 @@ router.post('/:id/complete', async (req, res) => {
                 }
             }
 
-            return res.json(createResponse(false, (crmSyncStatus === 'SYNCED' ? 'Hoàn thành!' : 'Hoàn thành (CRM lỗi)') + mergeMsg + syncStatusMsg, { ticketId, crmStatus: crmSyncStatus }));
+            return res.json(createResponse(false, 'Đơn của bạn đã hoàn thành!' + mergeMsg, { ticketId, crmStatus: crmSyncStatus }));
         }
 
         // ============================================================
