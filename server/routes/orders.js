@@ -1877,74 +1877,111 @@ router.post('/:id/assign-multi', async (req, res) => {
         console.log(`✅ Successfully inserted ${insertedRows?.length || 'N/A'} assignments`);
 
         let finalMergedOrderNo = null;
-        if (req.body.mergeWithOrderNo) {
-            console.log(`🔗 Processing merge request with order: ${req.body.mergeWithOrderNo}`);
-            const mergePartnerNo = req.body.mergeWithOrderNo;
-            const targetOrder = await db.getOrder(mergePartnerNo);
-            const currentOrder = await db.getOrder(id);
+        const mergeOrderNos = req.body.mergeWithOrderNos || (req.body.mergeWithOrderNo ? [req.body.mergeWithOrderNo] : []);
 
-            // Check if partner is an import ticket (N prefix)
-            let isImportPartner = false;
-            let importPartner = null;
-            if (!targetOrder && mergePartnerNo.startsWith('N')) {
-                const { data: impTicket } = await supabase
-                    .from('import_tickets')
-                    .select('*')
-                    .eq('ticket_no', mergePartnerNo)
-                    .single();
-                if (impTicket) {
-                    isImportPartner = true;
-                    importPartner = impTicket;
+        if (mergeOrderNos.length > 0) {
+            console.log(`🔗 Processing merge request with ${mergeOrderNos.length} orders: ${mergeOrderNos.join(', ')}`);
+            const currentOrder = await db.getOrder(id);
+            const mainDriverName = assignments[0]?.driver_name || '';
+            const mainPlate = assignments[0]?.plate || '';
+            const currentSaleOrderNo = currentOrder?.sale_order_no || id;
+
+            // Check if any partner already has a merged_order_no → join existing trip
+            let existingMergedNo = null;
+            for (const partnerNo of mergeOrderNos) {
+                const partner = await db.getOrder(partnerNo);
+                if (partner?.merged_order_no) {
+                    existingMergedNo = partner.merged_order_no;
+                    break;
                 }
             }
 
-            if ((targetOrder || isImportPartner) && currentOrder) {
-                const targetSaleOrderNo = isImportPartner ? importPartner.ticket_no : (targetOrder.sale_order_no || targetOrder.id);
-                const currentSaleOrderNo = currentOrder.sale_order_no || id;
-                const mainDriverName = assignments[0]?.driver_name || '';
-                const mainPlate = assignments[0]?.plate || '';
+            const { createClient } = await import('@supabase/supabase-js');
+            const supabase2 = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
-                if (targetOrder?.merged_order_no) {
-                    finalMergedOrderNo = targetOrder.merged_order_no;
-                    // Update existing merged order
-                    const { data: existingMerged } = await supabase
+            if (existingMergedNo) {
+                // Join existing merged order
+                finalMergedOrderNo = existingMergedNo;
+                const { data: existingMerged } = await supabase2
+                    .from('merged_orders')
+                    .select('source_order_nos, total_amount')
+                    .eq('merged_no', finalMergedOrderNo)
+                    .single();
+
+                if (existingMerged) {
+                    const allNos = [...new Set([...(existingMerged.source_order_nos || []), currentSaleOrderNo, ...mergeOrderNos])];
+                    let totalAmount = Number(existingMerged.total_amount || 0) + Number(currentOrder?.sale_order_amount || 0);
+
+                    await supabase2
                         .from('merged_orders')
-                        .select('source_order_nos, total_amount')
-                        .eq('merged_no', finalMergedOrderNo)
-                        .single();
+                        .update({
+                            source_order_nos: allNos,
+                            total_stops: allNos.length,
+                            total_amount: totalAmount
+                        })
+                        .eq('merged_no', finalMergedOrderNo);
+                    console.log(`✅ Added to existing merged order ${finalMergedOrderNo}, total stops: ${allNos.length}`);
+                }
+            } else {
+                // Create new merged order with ALL partners
+                const { getTimestamp } = await import('../config.js');
+                const ts = getTimestamp();
+                finalMergedOrderNo = 'M' + ts.short;
 
-                    if (existingMerged) {
-                        const newSourceNos = [...new Set([...(existingMerged.source_order_nos || []), currentSaleOrderNo])];
-                        await supabase
-                            .from('merged_orders')
-                            .update({
-                                source_order_nos: newSourceNos,
-                                total_stops: newSourceNos.length,
-                                total_amount: Number(existingMerged.total_amount || 0) + Number(currentOrder.sale_order_amount || 0)
-                            })
-                            .eq('merged_no', finalMergedOrderNo);
+                const allSourceNos = [currentSaleOrderNo, ...mergeOrderNos];
+                let totalAmount = Number(currentOrder?.sale_order_amount || 0);
+
+                // Sum amounts from all partners
+                for (const partnerNo of mergeOrderNos) {
+                    const partner = await db.getOrder(partnerNo);
+                    if (partner) {
+                        totalAmount += Number(partner.sale_order_amount || 0);
+                    } else {
+                        // Check import tickets
+                        const { data: impTicket } = await supabase2
+                            .from('import_tickets')
+                            .select('total_amount')
+                            .eq('ticket_no', partnerNo)
+                            .single();
+                        if (impTicket) totalAmount += Number(impTicket.total_amount || 0);
                     }
+                }
+
+                await supabase2
+                    .from('merged_orders')
+                    .insert({
+                        merged_no: finalMergedOrderNo,
+                        source_order_nos: allSourceNos,
+                        total_stops: allSourceNos.length,
+                        total_amount: totalAmount,
+                        status: 'assigned',
+                        driver_name: mainDriverName,
+                        plate: mainPlate
+                    });
+                console.log(`✅ Created merged order ${finalMergedOrderNo} with ${allSourceNos.length} stops`);
+            }
+
+            // Update ALL partner orders with merged_order_no + driver + status
+            for (const partnerNo of mergeOrderNos) {
+                const partner = await db.getOrder(partnerNo);
+                if (partner) {
+                    // Export order
+                    await db.updateOrder(partnerNo, {
+                        merged_order_no: finalMergedOrderNo,
+                        status: CONFIG.STATUS.DELIVERING,
+                        taiXe: mainDriverName,
+                        bienSo: mainPlate
+                    });
+                    console.log(`✅ Export partner ${partnerNo} updated: merged=${finalMergedOrderNo}`);
                 } else {
-                    // Create new merged order
-                    const { getTimestamp } = await import('../config.js');
-                    const ts = getTimestamp();
-                    finalMergedOrderNo = 'M' + ts.short;
-
-                    await supabase
-                        .from('merged_orders')
-                        .insert({
-                            merged_no: finalMergedOrderNo,
-                            source_order_nos: [targetSaleOrderNo, currentSaleOrderNo],
-                            total_stops: 2,
-                            total_amount: Number((isImportPartner ? 0 : targetOrder.sale_order_amount) || 0) + Number(currentOrder.sale_order_amount || 0),
-                            status: 'assigned',
-                            driver_name: mainDriverName,
-                            plate: mainPlate
-                        });
-
-                    // Update target/partner order with merged_order_no + status + driver
-                    if (isImportPartner) {
-                        await supabase
+                    // Try import ticket
+                    const { data: impTicket } = await supabase2
+                        .from('import_tickets')
+                        .select('id')
+                        .eq('ticket_no', partnerNo)
+                        .single();
+                    if (impTicket) {
+                        await supabase2
                             .from('import_tickets')
                             .update({
                                 merged_order_no: finalMergedOrderNo,
@@ -1952,16 +1989,8 @@ router.post('/:id/assign-multi', async (req, res) => {
                                 assigned_driver: mainDriverName,
                                 assigned_plate: mainPlate
                             })
-                            .eq('ticket_no', mergePartnerNo);
-                        console.log(`✅ Import partner ${mergePartnerNo} updated: status=assigned, driver=${mainDriverName}`);
-                    } else {
-                        await db.updateOrder(mergePartnerNo, {
-                            merged_order_no: finalMergedOrderNo,
-                            status: CONFIG.STATUS.DELIVERING,
-                            taiXe: mainDriverName,
-                            bienSo: mainPlate
-                        });
-                        console.log(`✅ Export partner ${targetSaleOrderNo} updated: status=${CONFIG.STATUS.DELIVERING}, driver=${mainDriverName}`);
+                            .eq('ticket_no', partnerNo);
+                        console.log(`✅ Import partner ${partnerNo} updated: merged=${finalMergedOrderNo}`);
                     }
                 }
             }
