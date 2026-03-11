@@ -149,50 +149,82 @@ router.post('/', async (req, res) => {
 
         const supabase = getSupabase();
 
-        // Query by sale_order_no first, then also by id for locally-created orders
-        let { data: orders, error: fetchError } = await supabase
+        // Search BOTH orders table and import_tickets table
+        let foundExportOrders = [];
+        let foundImportTickets = [];
+
+        // 1. Search export orders (by sale_order_no and id)
+        const { data: expOrders } = await supabase
             .from('orders')
             .select('id, sale_order_no, sale_order_amount, status')
             .in('sale_order_no', order_ids);
+        foundExportOrders = expOrders || [];
 
-        // If not all orders found, also search by id column (local orders may use id = sale_order_no)
-        if (!orders || orders.length < order_ids.length) {
-            const foundNos = new Set((orders || []).map(o => o.sale_order_no));
-            const missingIds = order_ids.filter(id => !foundNos.has(id));
+        // Also search by id for locally-created export orders
+        const foundExpNos = new Set(foundExportOrders.map(o => o.sale_order_no));
+        const missingFromExp = order_ids.filter(id => !foundExpNos.has(id));
+        if (missingFromExp.length > 0) {
+            const { data: extraExp } = await supabase
+                .from('orders')
+                .select('id, sale_order_no, sale_order_amount, status')
+                .in('id', missingFromExp);
+            if (extraExp) foundExportOrders = [...foundExportOrders, ...extraExp];
+        }
 
-            if (missingIds.length > 0) {
-                const { data: extraOrders } = await supabase
-                    .from('orders')
-                    .select('id, sale_order_no, sale_order_amount, status')
-                    .in('id', missingIds);
+        // 2. Search import tickets (by ticket_no and id)
+        const stillMissing = order_ids.filter(id =>
+            !foundExportOrders.some(o => o.sale_order_no === id || o.id === id)
+        );
+        if (stillMissing.length > 0) {
+            const { data: impTickets } = await supabase
+                .from('import_tickets')
+                .select('id, ticket_no, total_amount, status')
+                .or(stillMissing.map(id => `ticket_no.eq.${id}`).join(','));
+            if (impTickets) foundImportTickets = impTickets;
 
-                if (extraOrders && extraOrders.length > 0) {
-                    orders = [...(orders || []), ...extraOrders];
+            // Also search by id
+            if (foundImportTickets.length < stillMissing.length) {
+                const foundImpNos = new Set(foundImportTickets.map(i => i.ticket_no));
+                const stillMissing2 = stillMissing.filter(id => !foundImpNos.has(id));
+                if (stillMissing2.length > 0) {
+                    const { data: extraImp } = await supabase
+                        .from('import_tickets')
+                        .select('id, ticket_no, total_amount, status')
+                        .in('id', stillMissing2);
+                    if (extraImp) foundImportTickets = [...foundImportTickets, ...extraImp];
                 }
             }
         }
 
-        if (fetchError || !orders || orders.length < 2) {
-            console.error('Fetch orders error:', fetchError?.message, 'Orders found:', orders?.length, 'Requested:', order_ids);
-            return res.json(createResponse(true, 'Không tìm thấy đơn hàng hoặc đơn đã được xử lý!'));
+        const totalFound = foundExportOrders.length + foundImportTickets.length;
+        if (totalFound < 2) {
+            console.error('Fetch orders error: found only', totalFound, 'out of', order_ids.length);
+            return res.json(createResponse(true, 'Không tìm thấy đủ đơn hàng để ghép!'));
         }
 
-        // Extract sale_order_no for storage (use id as fallback for local orders)
-        const orderNos = orders.map(o => o.sale_order_no || o.id);
+        // Build order numbers list for storage
+        const orderNos = [
+            ...foundExportOrders.map(o => o.sale_order_no || o.id),
+            ...foundImportTickets.map(i => i.ticket_no || i.id)
+        ];
 
         // Calculate totals
-        const totalAmount = orders.reduce((sum, o) => sum + Number(o.sale_order_amount || 0), 0);
+        const totalAmount = [
+            ...foundExportOrders.map(o => Number(o.sale_order_amount || 0)),
+            ...foundImportTickets.map(i => Number(i.total_amount || 0))
+        ].reduce((sum, v) => sum + v, 0);
+
         const ts = getTimestamp();
         const mergedNo = 'M' + ts.short;
 
-        // Create merged order with sale_order_no list
+        // Create merged order record
         const { data: merged, error: createError } = await supabase
             .from('merged_orders')
             .insert({
                 merged_no: mergedNo,
                 source_order_nos: orderNos,
                 total_amount: totalAmount,
-                total_stops: orders.length,
+                total_stops: totalFound,
                 note: note || '',
                 status: 'pending',
                 created_by: created_by || 'Admin'
@@ -204,22 +236,23 @@ router.post('/', async (req, res) => {
             return res.json(createResponse(true, 'Lỗi tạo đơn ghép: ' + createError.message));
         }
 
-        // Tag source orders with merged_order_no (keep their current status)
-        await supabase
-            .from('orders')
-            .update({
-                merged_order_no: mergedNo
-            })
-            .in('sale_order_no', orderNos);
+        // Tag export orders with merged_order_no
+        if (foundExportOrders.length > 0) {
+            const expNos = foundExportOrders.map(o => o.sale_order_no || o.id);
+            await supabase.from('orders').update({ merged_order_no: mergedNo }).in('sale_order_no', expNos);
+            await supabase.from('orders').update({ merged_order_no: mergedNo }).in('id', foundExportOrders.map(o => o.id));
+        }
 
-        // Also update by id for local orders that might not match sale_order_no
-        const orderIds = orders.map(o => o.id);
-        await supabase
-            .from('orders')
-            .update({
-                merged_order_no: mergedNo
-            })
-            .in('id', orderIds);
+        // Tag import tickets with merged_order_no
+        if (foundImportTickets.length > 0) {
+            const impIds = foundImportTickets.map(i => i.id);
+            try {
+                await supabase.from('import_tickets').update({ merged_order_no: mergedNo }).in('id', impIds);
+                console.log(`📦 Tagged ${impIds.length} import tickets with ${mergedNo}`);
+            } catch (impErr) {
+                console.warn('⚠️ Could not tag import tickets (column may not exist):', impErr.message);
+            }
+        }
 
         // Send Telegram notification
         try {
