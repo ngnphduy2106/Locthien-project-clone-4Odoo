@@ -1206,12 +1206,26 @@ router.post('/:id/complete', async (req, res) => {
             const ticketId = prefix + ts.short;
 
             // Prepare actual delivered products for DB update
-            let updatedProducts = cart.filter(c => !c.isShell).map(item => ({
-                code: item.product?.code || item.product?.id || item.code || '',
-                name: item.product?.name || item.name || item.product || '',
-                qty: Number(item.weight_kg || item.qty || 0),
-                unit: item.unit || 'Kg'
-            }));
+            // Lookup original products to preserve price/total from MISA sync
+            const originalOrderForPrice = await db.getOrder(id);
+            const originalPriceMap = {};
+            (originalOrderForPrice?.products || []).forEach(p => {
+                originalPriceMap[p.code] = { price: Number(p.price || 0), total: Number(p.total || 0) };
+            });
+
+            let updatedProducts = cart.filter(c => !c.isShell).map(item => {
+                const code = item.product?.code || item.product?.id || item.code || '';
+                const qty = Number(item.weight_kg || item.qty || 0);
+                const origPrice = originalPriceMap[code]?.price || 0;
+                return {
+                    code,
+                    name: item.product?.name || item.name || item.product || '',
+                    qty,
+                    unit: item.unit || 'Kg',
+                    price: origPrice,
+                    total: origPrice > 0 ? qty * origPrice : (originalPriceMap[code]?.total || 0)
+                };
+            });
 
             // For multi-driver orders: combine products from ALL assignments
             if (isMultiDriverOrder && allDriversCompleted && allAssignments.length > 0) {
@@ -1237,10 +1251,13 @@ router.post('/:id/complete', async (req, res) => {
                                     code: p.code || '',
                                     name: p.name || '',
                                     qty: 0,
-                                    unit: p.unit || 'Kg'
+                                    unit: p.unit || 'Kg',
+                                    price: Number(p.price || originalPriceMap[p.code]?.price || 0),
+                                    total: 0
                                 };
                             }
                             combinedProducts[key].qty += qty;
+                            combinedProducts[key].total += Number(p.total || 0) || (qty * combinedProducts[key].price);
                         });
                     }
                 });
@@ -1248,7 +1265,8 @@ router.post('/:id/complete', async (req, res) => {
                 // Convert to array with integer quantities
                 updatedProducts = Object.values(combinedProducts).map(p => ({
                     ...p,
-                    qty: Math.round(p.qty)  // Ensure integer
+                    qty: Math.round(p.qty),  // Ensure integer
+                    total: p.price > 0 ? Math.round(p.qty) * p.price : p.total
                 }));
                 console.log(`✅ Combined ${updatedProducts.length} products (from actual_products):`, updatedProducts.map(p => `${p.name}: ${p.qty}${p.unit}`));
             }
