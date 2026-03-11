@@ -295,12 +295,16 @@ router.put('/:id/assign', async (req, res) => {
             // Lookup telegram usernames
             const users = await db.getUsers();
             const driverObj = users.find(u => u.fullName === driver_name || u.username === driver_name);
-            const driverTag = driverObj && driverObj.telegramUsername ? ` (@${driverObj.telegramUsername.replace('@', '')})` : '';
+            const driverTag = driverObj && driverObj.telegramUserId
+                ? ` (<a href="tg://user?id=${driverObj.telegramUserId}">${driver_name}</a>)`
+                : (driverObj && driverObj.telegramUsername ? ` (@${driverObj.telegramUsername.replace('@', '')})` : '');
 
             let assistantTag = '';
             if (assistant_name) {
                 const assistantObj = users.find(u => u.fullName === assistant_name || u.username === assistant_name);
-                if (assistantObj && assistantObj.telegramUsername) {
+                if (assistantObj && assistantObj.telegramUserId) {
+                    assistantTag = ` (<a href="tg://user?id=${assistantObj.telegramUserId}">${assistant_name}</a>)`;
+                } else if (assistantObj && assistantObj.telegramUsername) {
                     assistantTag = ` (@${assistantObj.telegramUsername.replace('@', '')})`;
                 }
             }
@@ -313,6 +317,25 @@ router.put('/:id/assign', async (req, res) => {
             if (assistant_name) msg += `🧑‍🔧 Phụ xe: ${assistant_name}${assistantTag}\n`;
             msg += `🔢 Biển số: ${plate || 'Chưa có'}\n`;
             if (delivery_time) msg += `⏰ Tgian giao: ${delivery_time}\n`;
+
+            // Fetch source order details for richer notification
+            const sourceNos = data.source_order_nos || [];
+            if (sourceNos.length > 0) {
+                const { data: sourceOrders } = await supabase
+                    .from('orders')
+                    .select('sale_order_no, account_name, shipping_address')
+                    .in('sale_order_no', sourceNos);
+
+                if (sourceOrders && sourceOrders.length > 0) {
+                    msg += `\n<b>Danh sách đơn:</b>\n`;
+                    sourceOrders.forEach((so, i) => {
+                        msg += `${i + 1}. <b>${so.sale_order_no}</b>\n`;
+                        msg += `    👤 ${so.account_name || 'N/A'}\n`;
+                        const addr = (so.shipping_address || '').substring(0, 50);
+                        if (addr) msg += `    📍 ${addr}${so.shipping_address?.length > 50 ? '...' : ''}\n`;
+                    });
+                }
+            }
 
             await sendTelegramMessage(msg, 'DRIVER');
         } catch (tgErr) {

@@ -306,6 +306,40 @@ router.put('/:id/assign', async (req, res) => {
             console.error('Push notification error:', notifyErr.message);
         }
 
+        // Send Telegram notification
+        try {
+            const { sendTelegramMessage } = await import('../services/telegram.js');
+            const db = await import('../db/index.js');
+            const users = await db.default.getUsers();
+            const driverObj = users.find(u => u.fullName === driver_name || u.username === driver_name);
+            const driverTag = driverObj && driverObj.telegramUserId
+                ? ` (<a href="tg://user?id=${driverObj.telegramUserId}">${driver_name}</a>)`
+                : (driverObj && driverObj.telegramUsername ? ` (@${driverObj.telegramUsername.replace('@', '')})` : '');
+
+            // Products list
+            let products = data?.products || [];
+            if (typeof products === 'string') try { products = JSON.parse(products); } catch (e) { products = []; }
+            const productsList = (products || [])
+                .map(p => `- ${p.name || p.code || 'SP'}: ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'kg'}`)
+                .join('\n');
+
+            let msg = `🚛 <b>PHÂN CÔNG NHẬP HÀNG</b>\n`;
+            msg += `#${data?.ticket_no || id}\n`;
+            msg += `📦 NCC: <b>${data?.supplier_name || ''}</b>\n`;
+            if (data?.expected_date) {
+                const fmtDate = new Date(data.expected_date).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+                msg += `📅 Ngày: ${fmtDate}\n`;
+            }
+            msg += `──────────────\n`;
+            msg += `🚗 Tài xế: <b>${driver_name}</b>${driverTag}\n`;
+            msg += `🔢 Biển số: ${plate || 'Chưa có'}\n`;
+            if (productsList) msg += `\n📋 Sản phẩm:\n${productsList}\n`;
+
+            await sendTelegramMessage(msg, 'DRIVER');
+        } catch (tgErr) {
+            console.error('Telegram Error in import assign:', tgErr.message);
+        }
+
         res.json({
             error: false,
             msg: 'Đã gán tài xế!',
