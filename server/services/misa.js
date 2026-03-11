@@ -385,7 +385,7 @@ const performSync = async () => {
                                 specNoteChanged = true;
                             }
                             // Detect qty change from MISA (e.g. Sales corrected quantity)
-                            const misaQty = Number(misaP.usage_unit_amount || misaP.amount || 0);
+                            const misaQty = Number(misaP.quantity || misaP.usage_unit_amount || misaP.amount || 0);
                             const localQty = Number(localP.qty || 0);
                             if (misaQty > 0 && localQty > 0 && Math.abs(misaQty - localQty) > 0.01) {
                                 qtyChanged = true;
@@ -449,12 +449,15 @@ const performSync = async () => {
 
             if (detail && detail.sale_order_no === saleOrderNo) {
                 // Success: Map from Detail
+                (detail.sale_order_product_mappings || []).forEach(p => {
+                    console.log(`🔍 MISA Product Raw: code=${p.product_code}, quantity=${p.quantity}, usage_unit_amount=${p.usage_unit_amount}, amount=${p.amount}, price=${p.price}, total=${p.total}`);
+                });
                 products = (detail.sale_order_product_mappings || []).map(p => ({
                     code: p.product_code,
                     name: p.product_name || p.description || p.product_code,
                     note: p.description_product || '',  // Mô tả từ MISA
                     spec: p.custom_field7 || '',  // Quy cách từ MISA
-                    qty: Number(p.amount || 0),
+                    qty: Number(p.quantity || p.usage_unit_amount || p.amount || 0),
                     unit: p.unit || '',
                     price: Number(p.price || 0),
                     total: Number(p.total || p.to_currency || 0)
@@ -534,7 +537,7 @@ const performSync = async () => {
                         for (const localP of oldOrder.products) {
                             const misaP = misaProds.find(mp => mp.product_code === localP.code);
                             if (misaP) {
-                                const misaQty = Number(misaP.usage_unit_amount || misaP.amount || 0);
+                                const misaQty = Number(misaP.quantity || misaP.usage_unit_amount || misaP.amount || 0);
                                 const localQty = Number(localP.qty || 0);
                                 if (misaQty > 0 && Math.abs(misaQty - localQty) > 0.01) {
                                     misaProductsChanged = true;
@@ -574,9 +577,9 @@ const performSync = async () => {
             await db.addOrder(mappedOrder);
 
             // Send Telegram notification for new orders
-            const money = (mappedOrder.sale_order_amount || 0).toLocaleString('vi-VN');
+            const money = (mappedOrder.sale_order_amount || 0).toLocaleString('en-US');
             const productsList = (mappedOrder.sale_order_product_mappings || [])
-                .map(p => `- ${p.name}: ${Number(p.qty).toLocaleString('vi-VN')} ${p.unit}`)
+                .map(p => `- ${p.name}: ${Number(p.qty).toLocaleString('en-US')} ${p.unit}`)
                 .join('\n');
 
             // Format date if available (force Vietnam timezone to prevent UTC offset issues)
