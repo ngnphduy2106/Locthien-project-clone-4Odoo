@@ -144,6 +144,13 @@
                                 Khách hàng
                             </button>
                         </div>
+                        <div id="nav-confirm-orders" style="display:none;">
+                            <button class="nav-link" onclick="showSection('confirm-orders')">
+                                <i class="bi bi-clipboard-check"></i>
+                                Xác nhận đơn
+                                <span id="confirm-orders-badge" class="nav-badge" style="display:none;">0</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -1346,6 +1353,90 @@
 
                     <!-- Stats -->
                     <div id="customers-stats" style="margin-top:12px; color:#6B7280; font-size:13px;"></div>
+                </section>
+
+                <!-- ==================== CONFIRM ORDERS SECTION ==================== -->
+                <section id="section-confirm-orders" class="hidden">
+                    <div
+                        style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:8px;">
+                        <h2 class="page-heading" style="margin:0;">Xác nhận đơn hàng</h2>
+                        <button class="btn btn-outline btn-sm" onclick="loadPendingConfirmOrders()">
+                            <i class="bi bi-arrow-clockwise"></i> Làm mới
+                        </button>
+                    </div>
+
+                    <!-- Export/Import Tabs -->
+                    <div style="display:flex; gap:8px; margin-bottom:16px;">
+                        <button id="confirm-tab-export" class="btn btn-primary btn-sm"
+                            onclick="switchConfirmTab('export')" style="border-radius:20px; padding:6px 16px;">
+                            <i class="bi bi-box-arrow-up"></i> Đơn xuất
+                            <span id="confirm-export-count"
+                                style="background:rgba(255,255,255,0.3); padding:1px 6px; border-radius:10px; font-size:11px; margin-left:4px;">0</span>
+                        </button>
+                        <button id="confirm-tab-import" class="btn btn-outline btn-sm"
+                            onclick="switchConfirmTab('import')" style="border-radius:20px; padding:6px 16px;">
+                            <i class="bi bi-box-arrow-in-down"></i> Đơn nhập
+                            <span id="confirm-import-count"
+                                style="background:rgba(0,0,0,0.1); padding:1px 6px; border-radius:10px; font-size:11px; margin-left:4px;">0</span>
+                        </button>
+                    </div>
+
+                    <!-- Order List -->
+                    <div id="confirm-order-list" style="display:flex; flex-direction:column; gap:8px;">
+                        <div style="text-align:center; padding:40px; color:#9CA3AF;">
+                            <i class="bi bi-clipboard-check" style="font-size:48px;"></i>
+                            <p>Đang tải...</p>
+                        </div>
+                    </div>
+
+                    <!-- Split-Screen Review Panel (hidden by default) -->
+                    <div id="confirm-review-panel"
+                        style="display:none; margin-top:20px; border:2px solid #E5E7EB; border-radius:16px; overflow:hidden; background:white;">
+                        <div
+                            style="background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); color:white; padding:12px 20px; display:flex; justify-content:space-between; align-items:center;">
+                            <span style="font-weight:600;"><i class="bi bi-search"></i> Kiểm tra đơn: <span
+                                    id="review-order-no"></span></span>
+                            <button onclick="closeReviewPanel()"
+                                style="background:rgba(255,255,255,0.2); border:none; color:white; border-radius:50%; width:30px; height:30px; cursor:pointer; font-size:16px;">✕</button>
+                        </div>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; min-height:400px;"
+                            id="review-split-container">
+                            <!-- Left: Proof Images -->
+                            <div
+                                style="border-right:1px solid #E5E7EB; padding:16px; overflow-y:auto; max-height:70vh;">
+                                <h4 style="margin:0 0 12px; font-size:14px; color:#374151;"><i class="bi bi-camera"></i>
+                                    Ảnh phiếu giao</h4>
+                                <div id="review-images" style="display:flex; flex-direction:column; gap:8px;">
+                                    <!-- Images loaded here -->
+                                </div>
+                            </div>
+                            <!-- Right: Order Details (Editable) -->
+                            <div style="padding:16px; overflow-y:auto; max-height:70vh;">
+                                <h4 style="margin:0 0 12px; font-size:14px; color:#374151;"><i
+                                        class="bi bi-pencil-square"></i> Chi tiết đơn hàng</h4>
+                                <div id="review-order-info" style="margin-bottom:16px; font-size:13px;"></div>
+
+                                <div
+                                    style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                                    <h5 style="margin:0; font-size:13px; color:#374151;">Sản phẩm:</h5>
+                                    <button class="btn btn-outline btn-sm" onclick="addReviewProduct()"
+                                        style="font-size:11px; padding:2px 8px;">
+                                        <i class="bi bi-plus"></i> Thêm SP
+                                    </button>
+                                </div>
+                                <div id="review-products" style="display:flex; flex-direction:column; gap:6px;">
+                                    <!-- Editable products -->
+                                </div>
+
+                                <div style="margin-top:20px; padding-top:16px; border-top:1px solid #E5E7EB;">
+                                    <button class="btn btn-primary" onclick="confirmReviewOrder()"
+                                        style="width:100%; padding:12px; font-size:15px; border-radius:12px; background:linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
+                                        <i class="bi bi-check"></i> XÁC NHẬN ĐƠN
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </section>
 
                 <!-- ==================== HR SECTION ==================== -->

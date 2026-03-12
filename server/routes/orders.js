@@ -2637,6 +2637,8 @@ router.put('/:id/cancel', async (req, res) => {
 // ============================================================
 
 // GET /api/orders/pending-confirm?type=export|import
+// Returns orders not yet admin_approved
+// Each order includes sale_confirmed status for UI checkmark display
 router.get('/pending-confirm', async (req, res) => {
     try {
         const { createClient } = await import('@supabase/supabase-js');
@@ -2644,7 +2646,7 @@ router.get('/pending-confirm', async (req, res) => {
         const type = req.query.type || 'export'; // export or import
 
         if (type === 'import') {
-            // Import tickets that are completed but not confirmed
+            // Import tickets that are completed but parent order not admin_approved
             const { data: tickets, error } = await supabase
                 .from('import_tickets')
                 .select('*')
@@ -2653,15 +2655,15 @@ router.get('/pending-confirm', async (req, res) => {
 
             if (error) return res.json(createResponse(true, error.message));
 
-            // Filter out confirmed ones (check parent order's sale_confirmed)
+            // Filter out admin_approved ones (check parent order)
             const result = [];
             for (const t of (tickets || [])) {
                 if (t.order_id) {
                     const { data: order } = await supabase.from('orders')
-                        .select('sale_confirmed, account_name, shipping_address, sale_order_date')
+                        .select('sale_confirmed, admin_approved, account_name, shipping_address, sale_order_date')
                         .eq('id', t.order_id).single();
-                    if (!order?.sale_confirmed) {
-                        result.push({ ...t, parent_order: order });
+                    if (!order?.admin_approved) {
+                        result.push({ ...t, parent_order: order, sale_confirmed: order?.sale_confirmed || false });
                     }
                 } else {
                     result.push(t);
@@ -2670,12 +2672,12 @@ router.get('/pending-confirm', async (req, res) => {
             return res.json(createResponse(false, 'OK', result));
         }
 
-        // Export orders: completed/delivered but not sale_confirmed
+        // Export orders: completed/delivered but not admin_approved
         const { data: orders, error } = await supabase
             .from('orders')
             .select('*')
             .in('status', ['Đã thực hiện', 'Hoàn thành'])
-            .or('sale_confirmed.is.null,sale_confirmed.eq.false')
+            .or('admin_approved.is.null,admin_approved.eq.false')
             .order('sale_order_date', { ascending: false });
 
         if (error) return res.json(createResponse(true, error.message));
@@ -2763,7 +2765,7 @@ router.get('/:id/review', async (req, res) => {
     }
 });
 
-// POST /api/orders/:id/confirm - Sale confirms order → sync to MISA
+// POST /api/orders/:id/confirm - Sales xác nhận (checkmark only, NO MISA sync)
 router.post('/:id/confirm', async (req, res) => {
     try {
         const { id } = req.params;
@@ -2772,15 +2774,61 @@ router.post('/:id/confirm', async (req, res) => {
         const order = await db.getOrder(id);
         if (!order) return res.json(createResponse(true, 'Không tìm thấy đơn hàng'));
 
-        // Update products if provided (Sale edited quantities/items)
+        // Sales confirm: only set checkmark, no MISA sync
         const updateData = {
             sale_confirmed: true,
             sale_confirmed_at: new Date().toISOString(),
-            sale_confirmed_by: confirmed_by || 'admin'
+            sale_confirmed_by: confirmed_by || 'sales'
         };
 
         if (products && Array.isArray(products)) {
             updateData.sale_order_product_mappings = products;
+        }
+
+        await db.updateOrder(id, updateData);
+
+        // Telegram: notify sales confirmed (no CRM sync)
+        try {
+            const { sendTelegramMessage } = await import('../services/telegram.js');
+            const orderNo = order.soDon || order.sale_order_no || id;
+            let msg = `☑️ <b>SALES XÁC NHẬN ĐƠN</b>\n`;
+            msg += `📦 <b>#${orderNo}</b>\n`;
+            msg += `👤 ${order.khach || order.account_name || 'N/A'}\n`;
+            msg += `👔 Bởi: ${confirmed_by || 'sales'}\n`;
+            msg += `⏳ Chờ Admin duyệt`;
+            await sendTelegramMessage(msg, 'NOTIFY');
+        } catch (tgErr) {
+            console.error('Telegram confirm error:', tgErr.message);
+        }
+
+        res.json(createResponse(false, 'Đã xác nhận! Chờ Admin duyệt.'));
+    } catch (e) {
+        console.error('confirm error:', e.message);
+        res.json(createResponse(true, e.message));
+    }
+});
+
+// POST /api/orders/:id/approve - Admin duyệt → sync to MISA CRM
+router.post('/:id/approve', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { approved_by } = req.body;
+
+        const order = await db.getOrder(id);
+        if (!order) return res.json(createResponse(true, 'Không tìm thấy đơn hàng'));
+
+        // Update admin approval fields
+        const updateData = {
+            admin_approved: true,
+            admin_approved_at: new Date().toISOString(),
+            admin_approved_by: approved_by || 'admin'
+        };
+
+        // If sales hasn't confirmed yet, auto-confirm (admin can do both)
+        if (!order.sale_confirmed) {
+            updateData.sale_confirmed = true;
+            updateData.sale_confirmed_at = new Date().toISOString();
+            updateData.sale_confirmed_by = approved_by || 'admin';
         }
 
         await db.updateOrder(id, updateData);
@@ -2795,34 +2843,34 @@ router.post('/:id/confirm', async (req, res) => {
                 status: 'Đã thực hiện',
                 driver: updatedOrder?.taiXe || updatedOrder?.custom_field13 || '',
                 plate: updatedOrder?.bienSo || updatedOrder?.custom_field14 || '',
-                cart: updatedOrder?.products || products || []
+                cart: updatedOrder?.products || []
             });
             if (!syncResult?.success) {
                 crmStatus = syncResult?.message || 'MISA sync failed';
-                console.error('MISA confirm sync failed:', crmStatus);
+                console.error('MISA approve sync failed:', crmStatus);
             }
         } catch (syncErr) {
             crmStatus = syncErr.message;
-            console.error('MISA confirm sync error:', syncErr.message);
+            console.error('MISA approve sync error:', syncErr.message);
         }
 
-        // Send Telegram notification
+        // Telegram notification
         try {
             const { sendTelegramMessage } = await import('../services/telegram.js');
             const orderNo = order.soDon || order.sale_order_no || id;
-            let msg = `✅ <b>ĐƠN ĐÃ XÁC NHẬN</b>\n`;
-            msg += `📦 Mã: <b>#${orderNo}</b>\n`;
-            msg += `👤 KH: ${order.khach || order.account_name || 'N/A'}\n`;
-            msg += `👔 Xác nhận bởi: ${confirmed_by || 'admin'}\n`;
+            let msg = `✅ <b>ADMIN DUYỆT ĐƠN</b>\n`;
+            msg += `📦 <b>#${orderNo}</b>\n`;
+            msg += `👤 ${order.khach || order.account_name || 'N/A'}\n`;
+            msg += `👔 Duyệt bởi: ${approved_by || 'admin'}\n`;
             msg += `📤 CRM: ${crmStatus === 'OK' ? '✅ Đã đồng bộ' : '⚠️ ' + crmStatus}`;
             await sendTelegramMessage(msg, 'NOTIFY');
         } catch (tgErr) {
-            console.error('Telegram confirm error:', tgErr.message);
+            console.error('Telegram approve error:', tgErr.message);
         }
 
-        res.json(createResponse(false, 'Xác nhận thành công!', { crmStatus }));
+        res.json(createResponse(false, 'Duyệt thành công!', { crmStatus }));
     } catch (e) {
-        console.error('confirm error:', e.message);
+        console.error('approve error:', e.message);
         res.json(createResponse(true, e.message));
     }
 });

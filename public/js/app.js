@@ -9675,7 +9675,7 @@ async function loadPendingConfirmOrders() {
         const json = await res.json();
 
         if (json.error) {
-            container.innerHTML = `<div style="text-align:center; padding:40px; color:#EF4444;"><i class="bi bi-exclamation-triangle" style="font-size:32px;"></i><p>${json.message}</p></div>`;
+            container.innerHTML = `<div style="text-align:center; padding:40px; color:#EF4444;"><i class="bi bi-exclamation-triangle" style="font-size:32px;"></i><p>${json.msg || json.message || 'Lỗi không xác định'}</p></div>`;
             return;
         }
 
@@ -9712,18 +9712,22 @@ async function loadPendingConfirmOrders() {
         }
 
         if (confirmCurrentTab === 'export') {
+            const isAdmin = state.user?.role === 'admin';
             container.innerHTML = orders.map(o => {
                 const orderNo = o.sale_order_no || o.id;
                 const fmtDate = o.sale_order_date ? new Date(o.sale_order_date).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : '';
                 const products = (o.products || []).map(p => `${p.name || p.code}: ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'Kg'}`).join(', ');
+                const isConfirmed = !!o.sale_confirmed;
 
                 return `
-                <div style="background:white; border:1px solid #E5E7EB; border-radius:12px; padding:12px 16px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;" id="confirm-card-${o.id}">
+                <div style="background:white; border:1px solid ${isConfirmed ? '#10b981' : '#E5E7EB'}; border-radius:12px; padding:12px 16px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; ${isConfirmed ? 'border-left:4px solid #10b981;' : ''}" id="confirm-card-${o.id}">
+                    ${isConfirmed ? '<div style="color:#10b981; font-size:20px; flex-shrink:0;" title="Sales đã xác nhận">☑️</div>' : ''}
                     <div style="flex:1; min-width:200px;">
                         <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                             <span style="font-weight:600; color:var(--primary); font-size:13px;">#${orderNo}</span>
                             <span style="font-size:11px; color:#6B7280;">${fmtDate}</span>
                             <span class="badge badge-${o.status === 'Hoàn thành' ? 'success' : 'info'}" style="font-size:10px; padding:2px 6px;">${o.status}</span>
+                            ${isConfirmed ? `<span style="font-size:10px; color:#10b981; background:#ECFDF5; padding:2px 6px; border-radius:4px;">✓ ${o.sale_confirmed_by || 'Sales'}</span>` : ''}
                         </div>
                         <div style="font-size:12px; color:#374151; margin-top:2px;">
                             <b>${o.account_name || 'N/A'}</b>
@@ -9736,9 +9740,16 @@ async function loadPendingConfirmOrders() {
                         <button class="btn btn-outline btn-sm" onclick="openReviewPanel('${o.id}')" style="font-size:12px; padding:6px 12px; border-radius:8px;">
                             <i class="bi bi-search"></i> Kiểm tra
                         </button>
-                        <button class="btn btn-primary btn-sm" onclick="quickConfirmOrder('${o.id}')" style="font-size:12px; padding:6px 12px; border-radius:8px; background:linear-gradient(135deg, #10b981, #059669);">
-                            <i class="bi bi-check-circle"></i> Xác nhận
-                        </button>
+                        ${!isConfirmed ? `
+                            <button class="btn btn-primary btn-sm" onclick="quickConfirmOrder('${o.id}')" style="font-size:12px; padding:6px 12px; border-radius:8px; background:linear-gradient(135deg, #f59e0b, #d97706);">
+                                <i class="bi bi-check"></i> Xác nhận
+                            </button>
+                        ` : ''}
+                        ${isAdmin ? `
+                            <button class="btn btn-primary btn-sm" onclick="approveOrder('${o.id}')" style="font-size:12px; padding:6px 12px; border-radius:8px; background:linear-gradient(135deg, #10b981, #059669);">
+                                <i class="bi bi-check-circle"></i> Duyệt
+                            </button>
+                        ` : ''}
                     </div>
                 </div>`;
             }).join('');
@@ -9917,10 +9928,10 @@ function getReviewProducts() {
 
 async function confirmReviewOrder() {
     if (!confirmReviewingOrderId) return;
-    if (!confirm('Xác nhận đơn này và gửi về MISA CRM?')) return;
+    if (!confirm('Xác nhận đơn này? (Chờ Admin duyệt trước khi đẩy MISA)')) return;
 
     const products = getReviewProducts();
-    const userName = state.user?.fullName || state.user?.username || 'admin';
+    const userName = state.user?.fullName || state.user?.username || 'sales';
 
     try {
         const btn = document.querySelector('#confirm-review-panel .btn-primary');
@@ -9935,23 +9946,18 @@ async function confirmReviewOrder() {
 
         if (json.error) {
             alert('Lỗi: ' + json.message);
-            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-check-circle"></i> XÁC NHẬN ĐƠN'; }
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-check"></i> XÁC NHẬN'; }
             return;
         }
 
-        // Success
-        const crmStatus = json.data?.crmStatus || 'OK';
         const card = window.$(`#confirm-card-${confirmReviewingOrderId}`);
         if (card) {
             card.style.transition = 'all 0.3s';
-            card.style.opacity = '0';
-            card.style.transform = 'translateX(100px)';
-            setTimeout(() => card.remove(), 300);
+            card.style.borderColor = '#10b981';
+            card.style.borderLeft = '4px solid #10b981';
         }
         closeReviewPanel();
-        alert(`✅ Xác nhận thành công!\nCRM: ${crmStatus === 'OK' ? 'Đã đồng bộ' : crmStatus}`);
-
-        // Refresh counts
+        alert('✅ Đã xác nhận! Chờ Admin duyệt.');
         setTimeout(() => loadPendingConfirmOrders(), 500);
     } catch (err) {
         console.error('confirmReviewOrder error:', err);
@@ -9960,9 +9966,9 @@ async function confirmReviewOrder() {
 }
 
 async function quickConfirmOrder(orderId) {
-    if (!confirm('Xác nhận đơn này mà không kiểm tra?')) return;
+    if (!confirm('Xác nhận đơn này? (Chờ Admin duyệt)')) return;
 
-    const userName = state.user?.fullName || state.user?.username || 'admin';
+    const userName = state.user?.fullName || state.user?.username || 'sales';
     try {
         const res = await fetch(`/api/orders/${orderId}/confirm`, {
             method: 'POST',
@@ -9975,14 +9981,44 @@ async function quickConfirmOrder(orderId) {
         const card = window.$(`#confirm-card-${orderId}`);
         if (card) {
             card.style.transition = 'all 0.3s';
+            card.style.borderColor = '#10b981';
+            card.style.borderLeft = '4px solid #10b981';
+        }
+        alert('✅ Đã xác nhận! Chờ Admin duyệt.');
+        setTimeout(() => loadPendingConfirmOrders(), 500);
+    } catch (err) {
+        alert('Lỗi kết nối server');
+    }
+}
+
+async function approveOrder(orderId) {
+    if (!confirm('ADMIN: Duyệt đơn này và đẩy dữ liệu vào MISA CRM?')) return;
+
+    const userName = state.user?.fullName || state.user?.username || 'admin';
+    try {
+        showLoading('Đang duyệt và đẩy MISA...');
+        const res = await fetch(`/api/orders/${orderId}/approve`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ approved_by: userName })
+        });
+        const json = await res.json();
+        hideLoading();
+
+        if (json.error) { alert('Lỗi: ' + json.message); return; }
+
+        const card = window.$(`#confirm-card-${orderId}`);
+        if (card) {
+            card.style.transition = 'all 0.3s';
             card.style.opacity = '0';
             card.style.transform = 'translateX(100px)';
             setTimeout(() => card.remove(), 300);
         }
         const crmStatus = json.data?.crmStatus || 'OK';
-        alert(`✅ Xác nhận thành công!\nCRM: ${crmStatus === 'OK' ? 'Đã đồng bộ' : crmStatus}`);
+        alert(`✅ Duyệt thành công!\nCRM: ${crmStatus === 'OK' ? 'Đã đồng bộ' : crmStatus}`);
         setTimeout(() => loadPendingConfirmOrders(), 500);
     } catch (err) {
+        hideLoading();
         alert('Lỗi kết nối server');
     }
 }
@@ -10002,3 +10038,4 @@ window.closeReviewPanel = closeReviewPanel;
 window.addReviewProduct = addReviewProduct;
 window.confirmReviewOrder = confirmReviewOrder;
 window.quickConfirmOrder = quickConfirmOrder;
+window.approveOrder = approveOrder;
