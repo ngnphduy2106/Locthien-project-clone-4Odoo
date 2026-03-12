@@ -451,11 +451,6 @@ export const db = {
                 safeData.telegram_message_id = data.telegram_message_id;
             }
 
-            // Sale Confirmation (Xác nhận đơn trước khi gửi CRM)
-            if (data.sale_confirmed !== undefined) safeData.sale_confirmed = data.sale_confirmed;
-            if (data.sale_confirmed_at !== undefined) safeData.sale_confirmed_at = data.sale_confirmed_at;
-            if (data.sale_confirmed_by !== undefined) safeData.sale_confirmed_by = data.sale_confirmed_by;
-
             console.log(`📝 Updating order ${safeId}:`, Object.keys(safeData));
             let { data: updated, error } = await supabase.from('orders').update(safeData).eq('id', safeId).select().single();
 
