@@ -366,9 +366,10 @@ const performSync = async () => {
                 const hasOwnerName = !!existingOrder.creator_name || !!existingOrder.owner_name;
                 const misaHasOwnerName = !!(item.owner_name || item.OwnerName);
 
-                // 5. Check if description (misa_note) is missing - need to populate from MISA
-                const hasDescription = !!existingOrder.misa_note || !!existingOrder.description;
-                const misaHasDescription = !!(item.description || item.Description);
+                // 5. Check if description (misa_note) has changed - continuous sync
+                const localDescription = existingOrder.misa_note || existingOrder.description || '';
+                const misaDescription = item.description || item.Description || '';
+                const descriptionChanged = misaDescription && misaDescription !== localDescription;
 
                 // 6. Check if date has changed on MISA (e.g. delivery date correction)
                 const misaDate = (item.sale_order_date || '').split('T')[0];
@@ -405,13 +406,37 @@ const performSync = async () => {
                 }
                 const hasMissingSpec = hasProducts && existingOrder.products.some(p => !p.spec);
 
-                if (!hasProducts || hasZeroQty || statusChanged || !hasMisaId || hasMissingPrice || (!hasOwnerName && misaHasOwnerName) || (!hasDescription && misaHasDescription) || dateChanged || hasMissingSpec || specNoteChanged || qtyChanged) {
+                // 8. Check if address changed on MISA (continuous sync)
+                const misaAddress = item.shipping_address || '';
+                const localAddress = existingOrder.diaChi || existingOrder.shipping_address || '';
+                const addressChanged = misaAddress && misaAddress !== localAddress;
+
+                // 9. Check if phone changed on MISA (continuous sync)
+                const misaPhone = item.mobile || item.receiver_mobile || item.contact_mobile || item.phone || '';
+                const localPhone = existingOrder.phone || existingOrder.mobile || existingOrder.receiver_mobile || '';
+                const phoneChanged = misaPhone && misaPhone !== localPhone;
+
+                // 10. Check if contact_name changed on MISA (continuous sync)
+                const misaContact = item.contact_name || item.ContactName || '';
+                const localContact = existingOrder.contact_name || '';
+                const contactChanged = misaContact && misaContact !== localContact;
+
+                // 11. Check if account_name (customer) changed
+                const misaCustomer = item.account_name || '';
+                const localCustomer = existingOrder.khach || existingOrder.account_name || '';
+                const customerChanged = misaCustomer && misaCustomer !== localCustomer;
+
+                if (!hasProducts || hasZeroQty || statusChanged || !hasMisaId || hasMissingPrice || (!hasOwnerName && misaHasOwnerName) || descriptionChanged || dateChanged || hasMissingSpec || specNoteChanged || qtyChanged || addressChanged || phoneChanged || contactChanged || customerChanged) {
                     if (hasMissingPrice) console.log(`💰 Updating ${saleOrderNo} (Missing price data)...`);
                     if (!hasOwnerName && misaHasOwnerName) console.log(`👤 Updating ${saleOrderNo} (Missing owner_name)...`);
-                    if (!hasDescription && misaHasDescription) console.log(`📝 Updating ${saleOrderNo} (Missing description/misa_note)...`);
+                    if (descriptionChanged) console.log(`📝 Updating ${saleOrderNo} (Description changed on MISA)`);
                     if (dateChanged) console.log(`📅 Updating ${saleOrderNo} (Date changed: ${localDate} → ${misaDate})`);
                     if (specNoteChanged) console.log(`📋 Updating ${saleOrderNo} (Product spec/note changed on MISA)`);
                     if (qtyChanged) console.log(`📦 Updating ${saleOrderNo} (Product qty changed on MISA)`);
+                    if (addressChanged) console.log(`📍 Updating ${saleOrderNo} (Address changed on MISA)`);
+                    if (phoneChanged) console.log(`📞 Updating ${saleOrderNo} (Phone changed on MISA)`);
+                    if (contactChanged) console.log(`👤 Updating ${saleOrderNo} (Contact changed on MISA)`);
+                    if (customerChanged) console.log(`🏢 Updating ${saleOrderNo} (Customer changed on MISA)`);
                     shouldFetchDetail = true;
                 }
             }
@@ -498,6 +523,8 @@ const performSync = async () => {
             // Explicitly map description & owner_name (MISA may return camelCase or snake_case)
             description: item.description || item.Description || '',
             owner_name: item.owner_name || item.OwnerName || item.ownerName || '',
+            // Explicitly map phone/mobile (MISA sends 'mobile', DB expects 'phone')
+            phone: item.mobile || item.receiver_mobile || item.contact_mobile || item.phone || '',
         };
 
         if (existingIds.has(saleOrderNo)) {
@@ -564,19 +591,69 @@ const performSync = async () => {
                 }
 
 
-                // Detect date change from MISA → send Telegram notification
+                // Detect ALL field changes from MISA → send consolidated Telegram notification
+                const changes = [];
                 const oldDate = oldOrder.ngay || oldOrder.sale_order_date;
                 const newDate = item.sale_order_date;
                 if (oldDate && newDate && oldDate.split('T')[0] !== newDate.split('T')[0]) {
                     const fmtOld = new Date(oldDate).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
                     const fmtNew = new Date(newDate).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
-                    console.log(`📅 Date changed for ${saleOrderNo}: ${fmtOld} → ${fmtNew}`);
+                    changes.push(`📅 Ngày giao: ${fmtOld} → ${fmtNew}`);
+                }
 
-                    let dateMsg = `📅 <b>THAY ĐỔI NGÀY GIAO HÀNG</b>\n`;
-                    dateMsg += `📦 Mã: <b>#${saleOrderNo}</b>\n`;
-                    dateMsg += `👤 KH: <b>${item.account_name || oldOrder.khach || 'N/A'}</b>\n`;
-                    dateMsg += `<blockquote>❌ Cũ: ${fmtOld}\n✅ Mới: ${fmtNew}</blockquote>`;
-                    sendTelegramMessage(dateMsg, 'NOTIFY', oldOrder.telegram_message_id || null).catch(() => { });
+                const oldAddr = oldOrder.diaChi || oldOrder.shipping_address || '';
+                const newAddr = item.shipping_address || '';
+                if (newAddr && newAddr !== oldAddr) {
+                    changes.push(`📍 Địa chỉ: ${oldAddr || '(trống)'} → ${newAddr}`);
+                }
+
+                const oldPhone = oldOrder.phone || oldOrder.mobile || '';
+                const newPhone = item.mobile || item.receiver_mobile || item.phone || '';
+                if (newPhone && newPhone !== oldPhone) {
+                    changes.push(`📞 SĐT: ${oldPhone || '(trống)'} → ${newPhone}`);
+                }
+
+                const oldContact = oldOrder.contact_name || '';
+                const newContact = item.contact_name || '';
+                if (newContact && newContact !== oldContact) {
+                    changes.push(`👤 Liên hệ: ${oldContact || '(trống)'} → ${newContact}`);
+                }
+
+                const oldCustomer = oldOrder.khach || oldOrder.account_name || '';
+                const newCustomer = item.account_name || '';
+                if (newCustomer && newCustomer !== oldCustomer) {
+                    changes.push(`🏢 KH: ${oldCustomer} → ${newCustomer}`);
+                }
+
+                const oldDesc = oldOrder.misa_note || oldOrder.description || '';
+                const newDesc = item.description || item.Description || '';
+                if (newDesc && newDesc !== oldDesc) {
+                    changes.push(`📝 Ghi chú: ${newDesc}`);
+                }
+
+                // Product changes
+                const misaProdsForCheck = item.sale_order_product_mappings || [];
+                if (misaProdsForCheck.length > 0 && oldOrder.products) {
+                    for (const mp of misaProdsForCheck) {
+                        const lp = oldOrder.products.find(p => p.code === mp.product_code);
+                        if (lp) {
+                            const mQty = Number(mp.amount || 0);
+                            const lQty = Number(lp.qty || 0);
+                            if (mQty > 0 && Math.abs(mQty - lQty) > 0.01) {
+                                changes.push(`📦 ${lp.name || lp.code}: ${lQty.toLocaleString('vi-VN')} → ${mQty.toLocaleString('vi-VN')} ${lp.unit || 'Kg'}`);
+                            }
+                        } else {
+                            changes.push(`📦 + ${mp.product_name || mp.product_code}: ${Number(mp.amount || 0).toLocaleString('vi-VN')} ${mp.unit || 'Kg'}`);
+                        }
+                    }
+                }
+
+                if (changes.length > 0) {
+                    let changeMsg = `🔄 <b>CẬP NHẬT ĐƠN HÀNG TỪ MISA</b>\n`;
+                    changeMsg += `📦 Mã: <b>#${saleOrderNo}</b>\n`;
+                    changeMsg += `👤 KH: <b>${item.account_name || oldOrder.khach || 'N/A'}</b>\n`;
+                    changeMsg += `<blockquote>${changes.join('\n')}</blockquote>`;
+                    sendTelegramMessage(changeMsg, 'NOTIFY', oldOrder.telegram_message_id || null).catch(() => { });
                 }
             }
             await db.updateOrder(saleOrderNo, mappedOrder);
