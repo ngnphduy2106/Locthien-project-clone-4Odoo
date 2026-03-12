@@ -663,17 +663,19 @@ const performSync = async () => {
             delete mappedOrder.custom_field13;
             delete mappedOrder.custom_field14;
 
-            mappedOrder.createdAt = new Date().toISOString();
-            const addResult = await db.addOrder(mappedOrder);
-
-            // DEDUP: Skip Telegram if we already notified for this order
-            // or if addOrder failed (prevents spam on silent DB errors)
+            // DEDUP: Skip if already notified in this process lifecycle
             if (notifiedNewOrders.has(saleOrderNo)) {
-                console.log(`⏭️ Skipping Telegram for ${saleOrderNo} — already notified`);
+                console.log(`⏭️ Skipping ${saleOrderNo} — already notified`);
                 newCount++;
                 continue;
             }
+
+            // Mark as notified BEFORE addOrder + Telegram to prevent any race
             notifiedNewOrders.set(saleOrderNo, Date.now());
+            existingIds.add(saleOrderNo); // prevent in-batch duplicates
+
+            mappedOrder.createdAt = new Date().toISOString();
+            const addResult = await db.addOrder(mappedOrder);
 
             // Auto-clean dedup map: remove entries older than 24 hours
             for (const [key, ts] of notifiedNewOrders) {

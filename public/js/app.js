@@ -3708,8 +3708,15 @@ async function assignDriver(orderId) {
                     
                     <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end; margin-bottom:12px;">
                         <div style="flex:1; min-width:150px;">
-                            <label class="form-label" style="font-size:12px;">Phụ xe (Tùy chọn)</label>
+                            <label class="form-label" style="font-size:12px;">Phụ xe 1 (Tùy chọn)</label>
                             <select id="new-assistant-select" class="form-control">
+                                <option value="">-- Không có --</option>
+                                ${(state.assistants || []).map(a => `<option value="${a.name}">${a.name}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div style="flex:1; min-width:150px;">
+                            <label class="form-label" style="font-size:12px;">Phụ xe 2 (Tùy chọn)</label>
+                            <select id="new-assistant-select-2" class="form-control">
                                 <option value="">-- Không có --</option>
                                 ${(state.assistants || []).map(a => `<option value="${a.name}">${a.name}</option>`).join('')}
                             </select>
@@ -3860,7 +3867,9 @@ function addDriverAssignmentRow() {
         return;
     }
 
-    const assistantName = window.$('#new-assistant-select')?.value || null;
+    const assistant1 = window.$('#new-assistant-select')?.value || '';
+    const assistant2 = window.$('#new-assistant-select-2')?.value || '';
+    const assistantName = [assistant1, assistant2].filter(Boolean).join(', ') || null;
     const deliveryTime = window.$('#new-delivery-time')?.value?.trim() || null;
 
     // Add to list with products
@@ -6541,8 +6550,15 @@ async function assignImportDriver(importId) {
                     
                     <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end; margin-bottom:12px;">
                         <div style="flex:1; min-width:150px;">
-                            <label class="form-label" style="font-size:12px;">Phụ xe (Tùy chọn)</label>
+                            <label class="form-label" style="font-size:12px;">Phụ xe 1 (Tùy chọn)</label>
                             <select id="import-new-assistant-select" class="form-control">
+                                <option value="">-- Không có --</option>
+                                ${(state.assistants || []).map(a => `<option value="${a.name}">${a.name}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div style="flex:1; min-width:150px;">
+                            <label class="form-label" style="font-size:12px;">Phụ xe 2 (Tùy chọn)</label>
+                            <select id="import-new-assistant-select-2" class="form-control">
                                 <option value="">-- Không có --</option>
                                 ${(state.assistants || []).map(a => `<option value="${a.name}">${a.name}</option>`).join('')}
                             </select>
@@ -6664,7 +6680,9 @@ function addImportDriverAssignmentRow() {
     }
 
     // Read assistant and delivery time
-    assistantName = window.$('#import-new-assistant-select')?.value || '';
+    const importAssistant1 = window.$('#import-new-assistant-select')?.value || '';
+    const importAssistant2 = window.$('#import-new-assistant-select-2')?.value || '';
+    assistantName = [importAssistant1, importAssistant2].filter(Boolean).join(', ') || '';
     deliveryTime = window.$('#import-new-delivery-time')?.value?.trim() || '';
 
     // Collect products from checkboxes (matching export form logic)
