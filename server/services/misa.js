@@ -696,14 +696,17 @@ const performSync = async () => {
                 }
             }
 
-            let msg = `🆕 <b>ĐƠN HÀNG MỚI TỪ MISA</b>\n`;
-            msg += `📦 Mã: <b>${saleOrderNo}</b>\n`;
-            msg += `📅 Ngày: ${formattedDate}\n`;
-            msg += `<blockquote>👤 KH: <b>${item.account_name || 'N/A'}</b>\n📍 ${mappedOrder.shipping_address || 'N/A'}</blockquote>`;
+            let msg = `🟩 <b>XUẤT MISA</b>\n`;
+            msg += `📦 <b>#${saleOrderNo}</b>\n`;
+            msg += `📅 ${formattedDate}\n`;
+            msg += `👤 <b>${item.account_name || 'N/A'}</b>\n`;
 
             if (productsList) {
-                msg += `\n📋 <b>Sản phẩm:</b>\n${productsList}\n`;
+                msg += `📦 ${(mappedOrder.sale_order_product_mappings || []).map(p => `${p.name} — ${Number(p.qty).toLocaleString('vi-VN')} ${p.unit}`).join(', ')}\n`;
             }
+
+            msg += `📍 ${mappedOrder.shipping_address || 'N/A'}\n`;
+            if (mappedOrder.description) msg += `📝 ${mappedOrder.description}\n`;
 
             msg += `\n🔔 ${getNotifyGroupMentions()} (Vào Điều Phối gán tài xế)`;
 

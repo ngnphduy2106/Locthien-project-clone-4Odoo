@@ -872,6 +872,12 @@ router.put('/:id/assign', async (req, res) => {
                 msg += `📅 Ngày: ${fmtDate}\n`;
             }
             msg += `📍 ${orderInfo?.diaChi || orderInfo?.shipping_address || ''}\n`;
+
+            // Merged order info
+            if (orderInfo?.merged_order_no) {
+                msg += `🔗 Ghép chuyến: ${orderInfo.merged_order_no}\n`;
+            }
+
             msg += `──────────────\n`;
 
             // Lookup telegram user IDs for bottom mentions
@@ -2058,6 +2064,15 @@ router.post('/:id/assign-multi', async (req, res) => {
                 msg += `📅 Ngày: ${fmtDate}\n`;
             }
 
+            // Merged order info
+            if (orderInfo?.merged_order_no) {
+                msg += `🔗 Ghép chuyến: ${orderInfo.merged_order_no}\n`;
+            }
+            // Split driver info
+            if (assignments.length > 1) {
+                msg += `✂️ Chia ${assignments.length} tài xế\n`;
+            }
+
             // Show previous drivers if this is a change
             if (hadPreviousAssignments && previousDrivers.length > 0) {
                 msg += `\n<b>Tài xế cũ:</b> ${previousDrivers.join(', ')}\n`;
@@ -2542,20 +2557,21 @@ router.post('/local', async (req, res) => {
                 .map(p => `- ${p.name}: ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'Kg'}`)
                 .join('\n');
 
-            let msg = `📤 <b>ĐƠN XUẤT ERP MỚI</b>\n`;
-            msg += `📦 Mã: <b>${orderNo}</b>\n`;
-            msg += `👤 Khách: <b>${customer_name}</b>\n`;
+            let msg = `🟩 <b>XUẤT ERP</b>\n`;
+            msg += `📦 <b>#${orderNo}</b>\n`;
             if (expected_date) {
                 try {
                     const fmtDate = new Date(expected_date).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
-                    msg += `📅 Ngày dự kiến: ${fmtDate}\n`;
-                } catch { msg += `📅 Ngày dự kiến: ${expected_date}\n`; }
+                    msg += `📅 ${fmtDate}\n`;
+                } catch { msg += `📅 ${expected_date}\n`; }
             }
-            msg += `📍 Địa chỉ: ${customer_address || 'N/A'}\n`;
+            msg += `👤 <b>${customer_name}</b>\n`;
             if (productsList) {
-                msg += `\n📋 <b>Sản phẩm:</b>\n${productsList}\n`;
+                msg += `📦 ${(products || []).map(p => `${p.name} — ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'Kg'}`).join(', ')}\n`;
             }
-            msg += `\n\n🔔 ${getNotifyGroupMentions()} (Vào Điều Phối gán tài xế)`;
+            msg += `📍 ${customer_address || 'N/A'}\n`;
+            if (description || note) msg += `📝 ${description || note}\n`;
+            msg += `\n🔔 ${getNotifyGroupMentions()} (Vào Điều Phối gán tài xế)`;
 
             await sendTelegramMessage(msg, 'NOTIFY');
         } catch (tgErr) {
@@ -2570,6 +2586,201 @@ router.post('/local', async (req, res) => {
 
     } catch (e) {
         console.error('❌ Create local export error:', e.message);
+        res.json(createResponse(true, e.message));
+    }
+});
+
+// ============================================================
+// ORDER CONFIRMATION (Xác nhận đơn - Sale review before CRM sync)
+// ============================================================
+
+// GET /api/orders/pending-confirm?type=export|import
+router.get('/pending-confirm', async (req, res) => {
+    try {
+        const { createClient } = await import('@supabase/supabase-js');
+        const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+        const type = req.query.type || 'export'; // export or import
+
+        if (type === 'import') {
+            // Import tickets that are completed but not confirmed
+            const { data: tickets, error } = await supabase
+                .from('import_tickets')
+                .select('*')
+                .eq('status', 'completed')
+                .order('created_at', { ascending: false });
+
+            if (error) return res.json(createResponse(true, error.message));
+
+            // Filter out confirmed ones (check parent order's sale_confirmed)
+            const result = [];
+            for (const t of (tickets || [])) {
+                if (t.order_id) {
+                    const { data: order } = await supabase.from('orders')
+                        .select('sale_confirmed, account_name, shipping_address, sale_order_date')
+                        .eq('id', t.order_id).single();
+                    if (!order?.sale_confirmed) {
+                        result.push({ ...t, parent_order: order });
+                    }
+                } else {
+                    result.push(t);
+                }
+            }
+            return res.json(createResponse(false, 'OK', result));
+        }
+
+        // Export orders: completed/delivered but not sale_confirmed
+        const { data: orders, error } = await supabase
+            .from('orders')
+            .select('*')
+            .in('status', ['Đã thực hiện', 'Hoàn thành'])
+            .or('sale_confirmed.is.null,sale_confirmed.eq.false')
+            .order('sale_order_date', { ascending: false });
+
+        if (error) return res.json(createResponse(true, error.message));
+
+        // Parse products for each order
+        const mapped = (orders || []).map(o => {
+            let products = [];
+            try {
+                if (typeof o.sale_order_product_mappings === 'string') products = JSON.parse(o.sale_order_product_mappings);
+                else if (Array.isArray(o.sale_order_product_mappings)) products = o.sale_order_product_mappings;
+            } catch (e) { }
+            return { ...o, products };
+        });
+
+        res.json(createResponse(false, 'OK', mapped));
+    } catch (e) {
+        console.error('pending-confirm error:', e.message);
+        res.json(createResponse(true, e.message));
+    }
+});
+
+// GET /api/orders/:id/review - Get order details + proof images for review
+router.get('/:id/review', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { createClient } = await import('@supabase/supabase-js');
+        const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+        // Get order
+        const order = await db.getOrder(id);
+        if (!order) return res.json(createResponse(true, 'Không tìm thấy đơn hàng'));
+
+        // Get proof images from driver assignments
+        let proofImages = [];
+        const { data: assigns } = await supabase
+            .from('order_driver_assignments')
+            .select('id, driver_name, proof_images, actual_products, completed_at, delivery_note, actual_qty')
+            .eq('order_id', id)
+            .eq('status', 'completed');
+
+        if (assigns) {
+            for (const a of assigns) {
+                if (a.proof_images?.length > 0) {
+                    proofImages.push(...a.proof_images.map(img => ({ url: img, driver: a.driver_name })));
+                }
+            }
+        }
+
+        // Also check export_tickets for images
+        const { data: tickets } = await supabase
+            .from('export_tickets')
+            .select('images, ticket_no')
+            .eq('order_id', id);
+
+        if (tickets) {
+            for (const t of tickets) {
+                if (t.images?.length > 0) {
+                    proofImages.push(...t.images.map(img => ({ url: img, ticket: t.ticket_no })));
+                }
+            }
+        }
+
+        // Also check import_tickets
+        const { data: importTickets } = await supabase
+            .from('import_tickets')
+            .select('images, ticket_no')
+            .eq('order_id', id);
+
+        if (importTickets) {
+            for (const t of importTickets) {
+                if (t.images?.length > 0) {
+                    proofImages.push(...t.images.map(img => ({ url: img, ticket: t.ticket_no })));
+                }
+            }
+        }
+
+        res.json(createResponse(false, 'OK', {
+            order,
+            proofImages,
+            driverAssignments: assigns || []
+        }));
+    } catch (e) {
+        console.error('review error:', e.message);
+        res.json(createResponse(true, e.message));
+    }
+});
+
+// POST /api/orders/:id/confirm - Sale confirms order → sync to MISA
+router.post('/:id/confirm', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { products, confirmed_by } = req.body;
+
+        const order = await db.getOrder(id);
+        if (!order) return res.json(createResponse(true, 'Không tìm thấy đơn hàng'));
+
+        // Update products if provided (Sale edited quantities/items)
+        const updateData = {
+            sale_confirmed: true,
+            sale_confirmed_at: new Date().toISOString(),
+            sale_confirmed_by: confirmed_by || 'admin'
+        };
+
+        if (products && Array.isArray(products)) {
+            updateData.sale_order_product_mappings = products;
+        }
+
+        await db.updateOrder(id, updateData);
+
+        // Sync to MISA CRM
+        let crmStatus = 'OK';
+        try {
+            const updatedOrder = await db.getOrder(id);
+            const syncResult = await updateMisaOrder(updatedOrder?.sale_order_no || id, {
+                misa_id: updatedOrder?.misa_id,
+                delivery_status: 'Đã giao hàng',
+                status: 'Đã thực hiện',
+                driver: updatedOrder?.taiXe || updatedOrder?.custom_field13 || '',
+                plate: updatedOrder?.bienSo || updatedOrder?.custom_field14 || '',
+                cart: updatedOrder?.products || products || []
+            });
+            if (!syncResult?.success) {
+                crmStatus = syncResult?.message || 'MISA sync failed';
+                console.error('MISA confirm sync failed:', crmStatus);
+            }
+        } catch (syncErr) {
+            crmStatus = syncErr.message;
+            console.error('MISA confirm sync error:', syncErr.message);
+        }
+
+        // Send Telegram notification
+        try {
+            const { sendTelegramMessage } = await import('../services/telegram.js');
+            const orderNo = order.soDon || order.sale_order_no || id;
+            let msg = `✅ <b>ĐƠN ĐÃ XÁC NHẬN</b>\n`;
+            msg += `📦 Mã: <b>#${orderNo}</b>\n`;
+            msg += `👤 KH: ${order.khach || order.account_name || 'N/A'}\n`;
+            msg += `👔 Xác nhận bởi: ${confirmed_by || 'admin'}\n`;
+            msg += `📤 CRM: ${crmStatus === 'OK' ? '✅ Đã đồng bộ' : '⚠️ ' + crmStatus}`;
+            await sendTelegramMessage(msg, 'NOTIFY');
+        } catch (tgErr) {
+            console.error('Telegram confirm error:', tgErr.message);
+        }
+
+        res.json(createResponse(false, 'Xác nhận thành công!', { crmStatus }));
+    } catch (e) {
+        console.error('confirm error:', e.message);
         res.json(createResponse(true, e.message));
     }
 });

@@ -140,20 +140,18 @@ router.post('/', async (req, res) => {
                 .map(p => `- ${p.name || p.code}: ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'Kg'}`)
                 .join('\n');
 
-            let msg = `📥 <b>PHIẾU NHẬP MỚI</b>\n`;
-            msg += `#${ticketNo}\n`;
-            msg += `🏭 NCC: <b>${supplier_name}</b>\n`;
-            if (supplier_address) msg += `📍 Địa chỉ: ${supplier_address}\n`;
+            let msg = `🟥 <b>NHẬP HÀNG</b>\n`;
+            msg += `📦 <b>#${ticketNo}</b>\n`;
             if (expected_date) {
                 const fmtDate = new Date(expected_date).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
-                msg += `📅 Ngày dự kiến: ${fmtDate}\n`;
+                msg += `📅 ${fmtDate}\n`;
             }
+            msg += `🏭 <b>${supplier_name}</b>\n`;
+            msg += `📦 ${(products || []).map(p => `${p.name || p.code} — ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'Kg'}`).join(', ')}\n`;
+            if (supplier_address) msg += `📍 ${supplier_address}\n`;
+            if (description || note) msg += `📝 ${description || note}\n`;
 
-            if (productsList) {
-                msg += `\n📋 <b>Sản phẩm:</b>\n${productsList}\n`;
-            }
-
-            msg += `\n\n🔔 ${getNotifyGroupMentions()} - Vui lòng điều phối`;
+            msg += `\n🔔 ${getNotifyGroupMentions()} - Vui lòng điều phối`;
 
             await sendTelegramMessage(msg, 'NOTIFY');
         } catch (tgErr) {
@@ -324,16 +322,18 @@ router.put('/:id/assign', async (req, res) => {
                 .join('\n');
 
             let msg = `🚛 <b>PHÂN CÔNG NHẬP HÀNG</b>\n`;
-            msg += `#${data?.ticket_no || id}\n`;
-            msg += `📦 NCC: <b>${data?.supplier_name || ''}</b>\n`;
+            msg += `📦 <b>#${data?.ticket_no || id}</b>\n`;
             if (data?.expected_date) {
                 const fmtDate = new Date(data.expected_date).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
-                msg += `📅 Ngày: ${fmtDate}\n`;
+                msg += `📅 ${fmtDate}\n`;
             }
+            msg += `🏭 <b>${data?.supplier_name || ''}</b>\n`;
+            if (productsList) msg += `📦 ${(products || []).map(p => `${p.name || p.code || 'SP'} — ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'kg'}`).join(', ')}\n`;
+            if (data?.supplier_address) msg += `📍 ${data.supplier_address}\n`;
+            if (data?.merged_order_no) msg += `🔗 Ghép chuyến: ${data.merged_order_no}\n`;
             msg += `──────────────\n`;
             msg += `🚗 Tài xế: <b>${driver_name}</b>${driverTag}\n`;
             msg += `🔢 Biển số: ${plate || 'Chưa có'}\n`;
-            if (productsList) msg += `\n📋 Sản phẩm:\n${productsList}\n`;
 
             await sendTelegramMessage(msg, 'DRIVER');
         } catch (tgErr) {
@@ -401,12 +401,14 @@ router.post('/:id/assign-multi', async (req, res) => {
             const { data: impData } = await supabase.from('import_tickets').select('*').eq('id', id).single();
 
             let msg = `🚛 <b>PHÂN CÔNG NHẬP HÀNG</b>\n`;
-            msg += `#${impData?.ticket_no || id}\n`;
-            msg += `📦 NCC: <b>${impData?.supplier_name || ''}</b>\n`;
+            msg += `📦 <b>#${impData?.ticket_no || id}</b>\n`;
             if (impData?.expected_date) {
                 const fmtDate = new Date(impData.expected_date).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
-                msg += `📅 Ngày: ${fmtDate}\n`;
+                msg += `📅 ${fmtDate}\n`;
             }
+            msg += `🏭 <b>${impData?.supplier_name || ''}</b>\n`;
+            if (impData?.merged_order_no) msg += `🔗 Ghép chuyến: ${impData.merged_order_no}\n`;
+            if (assignments.length > 1) msg += `✂️ Chia ${assignments.length} tài xế\n`;
             msg += `\n<b>Danh sách tài xế:</b>\n`;
 
             // Lookup users for Telegram tags
