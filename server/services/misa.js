@@ -13,6 +13,10 @@ const MISA_PRODUCTS_URL = 'https://crmconnect.misa.vn/api/v2/Products';
 let cachedToken = null;
 let isSyncing = false; // Prevent race conditions
 
+// Dedup: Track orders we've already sent Telegram notifications for
+// Prevents spam when addOrder fails silently and sync re-detects as 'new'
+const notifiedNewOrders = new Map(); // orderNo -> timestamp
+
 // Helper to check if syncing
 export const getSyncStatus = () => isSyncing;
 
@@ -583,7 +587,21 @@ const performSync = async () => {
             delete mappedOrder.custom_field14;
 
             mappedOrder.createdAt = new Date().toISOString();
-            await db.addOrder(mappedOrder);
+            const addResult = await db.addOrder(mappedOrder);
+
+            // DEDUP: Skip Telegram if we already notified for this order
+            // or if addOrder failed (prevents spam on silent DB errors)
+            if (notifiedNewOrders.has(saleOrderNo)) {
+                console.log(`⏭️ Skipping Telegram for ${saleOrderNo} — already notified`);
+                newCount++;
+                continue;
+            }
+            notifiedNewOrders.set(saleOrderNo, Date.now());
+
+            // Auto-clean dedup map: remove entries older than 24 hours
+            for (const [key, ts] of notifiedNewOrders) {
+                if (Date.now() - ts > 24 * 60 * 60 * 1000) notifiedNewOrders.delete(key);
+            }
 
             // Send Telegram notification for new orders
             const money = (mappedOrder.sale_order_amount || 0).toLocaleString('en-US');
