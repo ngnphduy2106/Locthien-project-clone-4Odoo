@@ -5689,6 +5689,10 @@ function editOrder(orderId) {
                     <input type="text" id="edit-address" class="form-control" value="${order.diaChi || order.shipping_address || order.shippingAddress || order.address || ''}">
                 </div>
                 <div class="detail-row">
+                    <label>Ngày đơn:</label>
+                    <input type="date" id="edit-order-date" class="form-control" value="${(order.ngay || order.sale_order_date || '').split('T')[0]}">
+                </div>
+                <div class="detail-row">
                     <label>Ghi chú:</label>
                     <textarea id="edit-note" class="form-control" rows="2">${order.note || order.description || ''}</textarea>
                 </div>
@@ -5760,6 +5764,7 @@ async function saveEditOrder() {
     const customer = window.$('#edit-customer')?.value || '';
     const address = window.$('#edit-address')?.value || '';
     const note = window.$('#edit-note')?.value || '';
+    const date = window.$('#edit-order-date')?.value || '';
 
     // Collect product quantities
     const qtyInputs = window.$$('.edit-product-qty');
@@ -5780,6 +5785,7 @@ async function saveEditOrder() {
                 customer,
                 address,
                 note,
+                date,
                 productUpdates,
                 local_items: editLocalItems  // Save local items (NOT synced to MISA)
             })

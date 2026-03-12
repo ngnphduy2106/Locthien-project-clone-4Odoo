@@ -406,6 +406,7 @@ export const db = {
             if (data.owner_name !== undefined) safeData.owner_name = data.owner_name;
 
             // Core MISA fields (must sync from CRM → DB)
+            if (data.ngay !== undefined) safeData.sale_order_date = data.ngay;
             if (data.sale_order_date !== undefined) safeData.sale_order_date = data.sale_order_date;
             if (data.account_name !== undefined) safeData.account_name = data.account_name;
             if (data.sale_order_no !== undefined) safeData.sale_order_no = data.sale_order_no;

@@ -636,7 +636,7 @@ router.put('/:id/local-items', async (req, res) => {
 router.put('/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const { customer, address, note, notes, products, productUpdates, local_items } = req.body;
+        const { customer, address, note, notes, date, products, productUpdates, local_items } = req.body;
 
         console.log(`📝 Edit Order Request for ${id}:`, JSON.stringify(req.body, null, 2));
 
@@ -651,6 +651,7 @@ router.put('/:id', async (req, res) => {
         if (customer !== undefined) updateData.khach = customer;
         if (address !== undefined) updateData.diaChi = address;
         if (note !== undefined || notes !== undefined) updateData.ghiChu = note || notes;
+        if (date) updateData.ngay = date; // Update order date
 
         // Local items (vỏ can, phuy, tank) - NOT synced to MISA
         if (local_items !== undefined && Array.isArray(local_items)) {
