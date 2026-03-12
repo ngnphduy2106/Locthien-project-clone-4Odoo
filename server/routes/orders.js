@@ -1461,19 +1461,22 @@ router.post('/:id/complete', async (req, res) => {
             try {
                 const { sendTelegramMessage, sendTelegramPhotos } = await import('../services/telegram.js');
                 const orderNo = orderInfo?.soDon || orderInfo?.sale_order_no || id;
+                const isImport = type === 'NHAP';
+                const tgGroup = isImport ? 'NHAP' : 'XUAT';
+                const label = isImport ? 'ĐƠN NHẬP HOÀN THÀNH' : 'ĐƠN ĐÃ HOÀN THÀNH';
 
-                let msg = `✅ <b>ĐƠN ĐÃ HOÀN THÀNH</b>\n`;
+                let msg = `✅ <b>${label}</b>\n`;
                 msg += `📦 Mã: <b>#${orderNo}</b>\n`;
-                msg += `👤 Khách: ${orderInfo?.khach || 'N/A'}\n`;
+                msg += `👤 ${isImport ? 'NCC' : 'Khách'}: ${orderInfo?.khach || 'N/A'}\n`;
                 msg += `🚛 Tài xế: ${firstDriverName || resolvedDriverName || orderInfo?.taiXe || driver_name}`;
 
                 const proofImages = images || [];
                 if (proofImages.length > 0) {
-                    await sendTelegramPhotos(proofImages, msg, 'XUAT');
+                    await sendTelegramPhotos(proofImages, msg, tgGroup);
                 } else {
-                    await sendTelegramMessage(msg, 'XUAT');
+                    await sendTelegramMessage(msg, tgGroup);
                 }
-                console.log(`📨 Telegram completion sent to XUAT for ${orderNo}`);
+                console.log(`📨 Telegram completion sent to ${tgGroup} for ${orderNo}`);
             } catch (tgErr) {
                 console.error('Telegram completion error:', tgErr.message);
             }
@@ -1699,10 +1702,13 @@ router.post('/:id/complete', async (req, res) => {
             const { sendTelegramMessage, sendTelegramPhotos } = await import('../services/telegram.js');
             const orderNo = fullOrder?.soDon || fullOrder?.sale_order_no || id;
             const driverDisplay = adminResolvedDriver || fullOrder?.custom_field13 || fullOrder?.taiXe || '';
+            const isImport = type === 'NHAP';
+            const tgGroup = isImport ? 'NHAP' : 'XUAT';
+            const label = isImport ? 'ĐƠN NHẬP HOÀN THÀNH' : 'ĐƠN ĐÃ HOÀN THÀNH';
 
-            let msg = `✅ <b>ĐƠN ĐÃ HOÀN THÀNH</b>\n`;
+            let msg = `✅ <b>${label}</b>\n`;
             msg += `📦 Mã: <b>#${orderNo}</b>\n`;
-            msg += `👤 Khách: ${fullOrder?.khach || fullOrder?.account_name || 'N/A'}\n`;
+            msg += `👤 ${isImport ? 'NCC' : 'Khách'}: ${fullOrder?.khach || fullOrder?.account_name || 'N/A'}\n`;
             if (driverDisplay) msg += `🚛 Tài xế: ${driverDisplay}\n`;
             if (adminResolvedPlate) msg += `🔢 Biển số: ${adminResolvedPlate}\n`;
 
@@ -1712,8 +1718,9 @@ router.post('/:id/complete', async (req, res) => {
                 try {
                     const { createClient: sc } = await import('@supabase/supabase-js');
                     const sbImg = sc(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+                    const ticketTable = isImport ? 'import_tickets' : 'export_tickets';
                     const { data: ticket } = await sbImg
-                        .from('export_tickets')
+                        .from(ticketTable)
                         .select('images')
                         .eq('order_id', id)
                         .order('created_at', { ascending: false })
@@ -1724,11 +1731,11 @@ router.post('/:id/complete', async (req, res) => {
             }
 
             if (proofImages.length > 0) {
-                await sendTelegramPhotos(proofImages, msg, 'XUAT');
+                await sendTelegramPhotos(proofImages, msg, tgGroup);
             } else {
-                await sendTelegramMessage(msg, 'XUAT');
+                await sendTelegramMessage(msg, tgGroup);
             }
-            console.log(`📨 Telegram completion sent to XUAT for ${orderNo}`);
+            console.log(`📨 Telegram completion sent to ${tgGroup} for ${orderNo}`);
         } catch (tgErr) {
             console.error('Telegram admin completion error:', tgErr.message);
         }
