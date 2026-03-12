@@ -288,6 +288,9 @@ function showSection(sectionId) {
                 PendingOrdersModule.init();
             }
             break;
+        case 'confirm-orders':
+            loadPendingConfirmOrders();
+            break;
     }
 }
 
@@ -620,6 +623,11 @@ function applyRoleBasedUI(role) {
     const navCustomers = window.$('#nav-customers');
     if (navCustomers) navCustomers.style.display = (isAdmin && !isDispatcher) ? 'block' : 'none';
 
+    // Show nav-confirm-orders for admin and sales
+    const navConfirmOrders = window.$('#nav-confirm-orders');
+    const _isSalesRole = normalizedRole === 'sales' || normalizedRole === 'nhân viên kinh doanh' || normalizedRole === 'nhân viên' || normalizedRole === 'kinh doanh';
+    if (navConfirmOrders) navConfirmOrders.style.display = (isAdmin || _isSalesRole) ? 'block' : 'none';
+
     // Driver restrictions - hide all menus except "Đơn của tôi"
     if (isDriver) {
         console.log('🚚 Driver mode: Hiding admin menus');
@@ -639,6 +647,7 @@ function applyRoleBasedUI(role) {
         if (navOrderHistory) navOrderHistory.style.display = 'none';
         if (navSuppliers) navSuppliers.style.display = 'none';
         if (navCustomers) navCustomers.style.display = 'none';
+        if (navConfirmOrders) navConfirmOrders.style.display = 'none';
 
         // Hide HR, Materials, Warehouse
         const navHr = window.$('#nav-hr');
@@ -3474,9 +3483,11 @@ async function viewOrderDetail(orderId, options = {}) {
                     <button class="btn btn-warning" onclick="closeOrderModal(); editOrder('${order.id}')">
                         <i class="bi bi-pencil"></i> Chỉnh sửa
                     </button>
-                    <button class="btn btn-danger" onclick="closeOrderModal(); deleteOrder('${order.id}')">
-                        <i class="bi bi-trash"></i> Xóa
+                    ${order.status !== 'Đã thực hiện' && order.status !== 'Đã hủy bỏ' && order.status !== 'cancelled' ? `
+                    <button class="btn btn-danger" onclick="cancelOrder('${order.id}')">
+                        <i class="bi bi-x-circle"></i> Hủy đơn
                     </button>
+                    ` : ''}
                 ` : ''}
     <button class="btn btn-outline" onclick="closeOrderModal()">
         <i class="bi bi-x-lg"></i> Đóng
@@ -6337,6 +6348,11 @@ async function viewImportDetail(importId) {
                     <button class="btn btn-warning" onclick="closeOrderModal(); editImport('${imp.id}')">
                         <i class="bi bi-pencil"></i> Chỉnh sửa
                     </button>
+                    ${imp.status !== 'completed' && imp.status !== 'cancelled' && imp.status !== 'Đã hủy bỏ' ? `
+                    <button class="btn btn-danger" onclick="cancelImportTicket('${imp.id}')">
+                        <i class="bi bi-x-circle"></i> Hủy đơn
+                    </button>
+                    ` : ''}
                 ` : ''}
                 <button class="btn btn-outline" onclick="closeOrderModal()">
                     <i class="bi bi-x-lg"></i> Đóng
@@ -7290,13 +7306,46 @@ window.renderDriverAssignmentsList = renderDriverAssignmentsList;
 window.updateQtySummaryDisplay = updateQtySummaryDisplay;
 window.submitMultiDriverAssignment = submitMultiDriverAssignment;
 
-// Delete Import Ticket
-async function deleteImportTicket(importId) {
+// Cancel Export Order
+async function cancelOrder(orderId) {
+    const reason = prompt('Lý do hủy đơn xuất:');
+    if (reason === null) return; // User pressed Cancel
+
+    try {
+        closeOrderModal();
+        showLoading('Đang hủy đơn xuất...');
+        const currentUser = (window.state?.user || {});
+        const res = await fetch(`/api/orders/${orderId}/cancel`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reason, cancelled_by: currentUser.name || 'admin' })
+        });
+        const data = await res.json();
+        hideLoading();
+
+        if (!data.error) {
+            toastSuccess('Đã hủy đơn xuất thành công!');
+            await loadOrders();
+        } else {
+            toastError('Lỗi: ' + (data.msg || 'Không thể hủy đơn'));
+        }
+    } catch (e) {
+        hideLoading();
+        console.error('Cancel order error:', e);
+        toastError('Lỗi kết nối: ' + e.message);
+    }
+}
+
+window.cancelOrder = cancelOrder;
+
+// Cancel Import Ticket
+async function cancelImportTicket(importId) {
     if (!confirm('Bạn có chắc muốn HỦY đơn nhập này?\n\nĐơn sẽ được chuyển sang trạng thái "Đã hủy".')) {
         return;
     }
 
     try {
+        closeOrderModal();
         showLoading('Đang hủy đơn nhập...');
         const res = await fetch(`/api/imports/${importId}`, {
             method: 'DELETE'
@@ -7306,19 +7355,20 @@ async function deleteImportTicket(importId) {
 
         if (!data.error) {
             toastSuccess('Đã hủy đơn nhập thành công!');
-            // Reload the import list
             await loadImportTickets();
         } else {
             toastError('Lỗi: ' + (data.msg || 'Không thể hủy đơn nhập'));
         }
     } catch (e) {
         hideLoading();
-        console.error('Delete import ticket error:', e);
+        console.error('Cancel import ticket error:', e);
         toastError('Lỗi kết nối: ' + e.message);
     }
 }
 
-window.deleteImportTicket = deleteImportTicket;
+window.cancelImportTicket = cancelImportTicket;
+// Keep old name for backward compatibility
+window.deleteImportTicket = cancelImportTicket;
 
 // ===============================================
 // USER ACCOUNT MANAGEMENT (ADMIN ONLY)
@@ -9576,3 +9626,348 @@ window.createMergedOrder = createMergedOrder;
 window.loadMergedOrdersList = loadMergedOrdersList;
 window.viewMergedOrderDetail = viewMergedOrderDetail;
 window.cancelMergedOrder = cancelMergedOrder;
+
+// ============================================================
+// ORDER CONFIRMATION MODULE (Xác nhận đơn)
+// ============================================================
+let confirmCurrentTab = 'export';
+let confirmReviewingOrderId = null;
+let confirmReviewingOrder = null;
+
+async function loadPendingConfirmOrders() {
+    const container = window.$('#confirm-order-list');
+    if (!container) return;
+    container.innerHTML = '<div style="text-align:center; padding:40px; color:#9CA3AF;"><div class="spinner"></div><p>Đang tải...</p></div>';
+
+    try {
+        const res = await fetch(`/api/orders/pending-confirm?type=${confirmCurrentTab}`);
+        const json = await res.json();
+
+        if (json.error) {
+            container.innerHTML = `<div style="text-align:center; padding:40px; color:#EF4444;"><i class="bi bi-exclamation-triangle" style="font-size:32px;"></i><p>${json.message}</p></div>`;
+            return;
+        }
+
+        const orders = json.data || [];
+
+        // Update tab counts
+        const countEl = window.$(`#confirm-${confirmCurrentTab}-count`);
+        if (countEl) countEl.textContent = orders.length;
+
+        // Also fetch the other tab count
+        try {
+            const otherTab = confirmCurrentTab === 'export' ? 'import' : 'export';
+            const otherRes = await fetch(`/api/orders/pending-confirm?type=${otherTab}`);
+            const otherJson = await otherRes.json();
+            const otherCount = window.$(`#confirm-${otherTab}-count`);
+            if (otherCount) otherCount.textContent = (otherJson.data || []).length;
+        } catch (e) { }
+
+        // Update badge
+        const badge = window.$('#confirm-orders-badge');
+        if (badge) {
+            const total = orders.length;
+            if (total > 0) {
+                badge.textContent = total;
+                badge.style.display = 'inline-block';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+
+        if (orders.length === 0) {
+            container.innerHTML = '<div style="text-align:center; padding:40px; color:#9CA3AF;"><i class="bi bi-check-circle" style="font-size:48px; color:#10b981;"></i><p>Không có đơn cần xác nhận 🎉</p></div>';
+            return;
+        }
+
+        if (confirmCurrentTab === 'export') {
+            container.innerHTML = orders.map(o => {
+                const orderNo = o.sale_order_no || o.id;
+                const fmtDate = o.sale_order_date ? new Date(o.sale_order_date).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : '';
+                const products = (o.products || []).map(p => `${p.name || p.code}: ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'Kg'}`).join(', ');
+
+                return `
+                <div style="background:white; border:1px solid #E5E7EB; border-radius:12px; padding:12px 16px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;" id="confirm-card-${o.id}">
+                    <div style="flex:1; min-width:200px;">
+                        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                            <span style="font-weight:600; color:var(--primary); font-size:13px;">#${orderNo}</span>
+                            <span style="font-size:11px; color:#6B7280;">${fmtDate}</span>
+                            <span class="badge badge-${o.status === 'Hoàn thành' ? 'success' : 'info'}" style="font-size:10px; padding:2px 6px;">${o.status}</span>
+                        </div>
+                        <div style="font-size:12px; color:#374151; margin-top:2px;">
+                            <b>${o.account_name || 'N/A'}</b>
+                            ${o.shipping_address ? ` · ${o.shipping_address.substring(0, 50)}` : ''}
+                        </div>
+                        <div style="font-size:11px; color:#6B7280; margin-top:2px;">${products || 'Không có SP'}</div>
+                        ${o.custom_field13 ? `<div style="font-size:11px; color:#6B7280;">🚛 ${o.custom_field13}</div>` : ''}
+                    </div>
+                    <div style="display:flex; gap:6px; flex-shrink:0;">
+                        <button class="btn btn-outline btn-sm" onclick="openReviewPanel('${o.id}')" style="font-size:12px; padding:6px 12px; border-radius:8px;">
+                            <i class="bi bi-search"></i> Kiểm tra
+                        </button>
+                        <button class="btn btn-primary btn-sm" onclick="quickConfirmOrder('${o.id}')" style="font-size:12px; padding:6px 12px; border-radius:8px; background:linear-gradient(135deg, #10b981, #059669);">
+                            <i class="bi bi-check-circle"></i> Xác nhận
+                        </button>
+                    </div>
+                </div>`;
+            }).join('');
+        } else {
+            // Import tab
+            container.innerHTML = orders.map(t => {
+                const products = (t.products || []).map(p => `${p.name || p.code}: ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'Kg'}`).join(', ');
+                return `
+                <div style="background:white; border:1px solid #E5E7EB; border-radius:12px; padding:12px 16px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                    <div style="flex:1; min-width:200px;">
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <span style="font-weight:600; color:#dc2626; font-size:13px;">#${t.ticket_no || t.id}</span>
+                            <span style="font-size:11px; color:#6B7280;">${t.created_at ? new Date(t.created_at).toLocaleDateString('vi-VN') : ''}</span>
+                        </div>
+                        <div style="font-size:12px; color:#374151; margin-top:2px;"><b>${t.supplier_name || t.parent_order?.account_name || 'N/A'}</b></div>
+                        <div style="font-size:11px; color:#6B7280; margin-top:2px;">${products || 'Không có SP'}</div>
+                    </div>
+                    <div style="display:flex; gap:6px; flex-shrink:0;">
+                        <button class="btn btn-outline btn-sm" onclick="openReviewPanel('${t.order_id || t.id}')" style="font-size:12px; padding:6px 12px; border-radius:8px;">
+                            <i class="bi bi-search"></i> Kiểm tra
+                        </button>
+                        <button class="btn btn-primary btn-sm" onclick="quickConfirmOrder('${t.order_id || t.id}')" style="font-size:12px; padding:6px 12px; border-radius:8px; background:linear-gradient(135deg, #10b981, #059669);">
+                            <i class="bi bi-check-circle"></i> Xác nhận
+                        </button>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+    } catch (err) {
+        console.error('loadPendingConfirmOrders error:', err);
+        container.innerHTML = '<div style="text-align:center; padding:40px; color:#EF4444;"><p>Lỗi tải dữ liệu</p></div>';
+    }
+}
+
+function switchConfirmTab(tab) {
+    confirmCurrentTab = tab;
+    // Update tab styles
+    const tabExport = window.$('#confirm-tab-export');
+    const tabImport = window.$('#confirm-tab-import');
+    if (tabExport) {
+        tabExport.className = tab === 'export' ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm';
+    }
+    if (tabImport) {
+        tabImport.className = tab === 'import' ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm';
+    }
+    closeReviewPanel();
+    loadPendingConfirmOrders();
+}
+
+async function openReviewPanel(orderId) {
+    const panel = window.$('#confirm-review-panel');
+    if (!panel) return;
+
+    confirmReviewingOrderId = orderId;
+    panel.style.display = 'block';
+    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    const imgContainer = window.$('#review-images');
+    const infoContainer = window.$('#review-order-info');
+    const productsContainer = window.$('#review-products');
+    const orderNoEl = window.$('#review-order-no');
+
+    imgContainer.innerHTML = '<div class="spinner"></div>';
+    infoContainer.innerHTML = 'Đang tải...';
+    productsContainer.innerHTML = '';
+
+    try {
+        const res = await fetch(`/api/orders/${orderId}/review`);
+        const json = await res.json();
+        if (json.error) { alert(json.message); return; }
+
+        const { order, proofImages, driverAssignments } = json.data;
+        confirmReviewingOrder = order;
+
+        if (orderNoEl) orderNoEl.textContent = `#${order.soDon || order.sale_order_no || orderId}`;
+
+        // Render images
+        if (proofImages.length > 0) {
+            imgContainer.innerHTML = proofImages.map((img, i) => `
+                <div style="position:relative;">
+                    <img src="${img.url}" style="width:100%; border-radius:8px; cursor:pointer; border:1px solid #E5E7EB;" onclick="window.open('${img.url}', '_blank')" alt="Proof ${i + 1}">
+                    <span style="position:absolute; top:4px; left:4px; background:rgba(0,0,0,0.6); color:white; padding:2px 6px; border-radius:4px; font-size:10px;">
+                        ${img.driver ? '🚛 ' + img.driver : img.ticket ? '📋 ' + img.ticket : 'Ảnh ' + (i + 1)}
+                    </span>
+                </div>
+            `).join('');
+        } else {
+            imgContainer.innerHTML = '<div style="text-align:center; padding:40px; color:#9CA3AF;"><i class="bi bi-image" style="font-size:48px;"></i><p>Không có ảnh</p></div>';
+        }
+
+        // Render order info
+        const fmtDate = order.ngay || order.sale_order_date ? new Date(order.ngay || order.sale_order_date).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : 'N/A';
+        infoContainer.innerHTML = `
+            <div style="display:grid; grid-template-columns:auto 1fr; gap:4px 12px; font-size:13px;">
+                <span style="color:#6B7280;">Khách hàng:</span><b>${order.khach || order.account_name || 'N/A'}</b>
+                <span style="color:#6B7280;">Ngày:</span><span>${fmtDate}</span>
+                <span style="color:#6B7280;">Địa chỉ:</span><span>${order.diaChi || order.shipping_address || 'N/A'}</span>
+                <span style="color:#6B7280;">Tài xế:</span><span>${order.taiXe || order.custom_field13 || 'N/A'}</span>
+                <span style="color:#6B7280;">Trạng thái:</span><span>${order.status || 'N/A'}</span>
+                ${order.delivery_note ? `<span style="color:#6B7280;">Ghi chú giao:</span><span>${order.delivery_note}</span>` : ''}
+            </div>
+            ${driverAssignments.length > 0 ? `
+                <div style="margin-top:8px; padding:8px; background:#F9FAFB; border-radius:8px; font-size:12px;">
+                    <b>Chi tiết giao hàng:</b>
+                    ${driverAssignments.map(a => `
+                        <div style="margin-top:4px;">🚛 ${a.driver_name}: ${Number(a.actual_qty || 0).toLocaleString('vi-VN')} Kg ${a.delivery_note ? '· ' + a.delivery_note : ''}</div>
+                    `).join('')}
+                </div>
+            ` : ''}
+        `;
+
+        // Render editable products
+        const products = order.products || [];
+        renderReviewProducts(products);
+    } catch (err) {
+        console.error('openReviewPanel error:', err);
+        imgContainer.innerHTML = '<div style="color:#EF4444;">Lỗi tải dữ liệu</div>';
+    }
+}
+
+function renderReviewProducts(products) {
+    const container = window.$('#review-products');
+    if (!container) return;
+
+    container.innerHTML = products.map((p, i) => `
+        <div style="display:flex; align-items:center; gap:6px; padding:8px; background:#F9FAFB; border-radius:8px;" data-idx="${i}">
+            <div style="flex:1; min-width:120px;">
+                <input type="text" value="${p.name || p.code || ''}" style="width:100%; border:1px solid #D1D5DB; border-radius:6px; padding:4px 8px; font-size:12px; background:white;" data-field="name" placeholder="Tên SP">
+                <input type="text" value="${p.code || ''}" style="width:100%; border:1px solid #D1D5DB; border-radius:6px; padding:4px 8px; font-size:11px; margin-top:2px; color:#6B7280; background:white;" data-field="code" placeholder="Mã SP">
+            </div>
+            <div style="width:80px;">
+                <input type="number" value="${p.qty || 0}" style="width:100%; border:1px solid #D1D5DB; border-radius:6px; padding:4px 8px; font-size:12px; text-align:right; background:white;" data-field="qty" placeholder="SL">
+            </div>
+            <div style="width:50px;">
+                <input type="text" value="${p.unit || 'Kg'}" style="width:100%; border:1px solid #D1D5DB; border-radius:6px; padding:4px 8px; font-size:12px; background:white;" data-field="unit" placeholder="ĐVT">
+            </div>
+            <button onclick="this.closest('[data-idx]').remove()" style="background:#FEE2E2; border:none; color:#EF4444; border-radius:50%; width:24px; height:24px; cursor:pointer; font-size:14px; flex-shrink:0;">✕</button>
+        </div>
+    `).join('');
+}
+
+function addReviewProduct() {
+    const container = window.$('#review-products');
+    if (!container) return;
+    const idx = container.children.length;
+    const div = document.createElement('div');
+    div.style.cssText = 'display:flex; align-items:center; gap:6px; padding:8px; background:#ECFDF5; border-radius:8px; border:1px dashed #10b981;';
+    div.setAttribute('data-idx', idx);
+    div.innerHTML = `
+        <div style="flex:1; min-width:120px;">
+            <input type="text" style="width:100%; border:1px solid #D1D5DB; border-radius:6px; padding:4px 8px; font-size:12px; background:white;" data-field="name" placeholder="Tên sản phẩm">
+            <input type="text" style="width:100%; border:1px solid #D1D5DB; border-radius:6px; padding:4px 8px; font-size:11px; margin-top:2px; background:white;" data-field="code" placeholder="Mã SP">
+        </div>
+        <div style="width:80px;"><input type="number" style="width:100%; border:1px solid #D1D5DB; border-radius:6px; padding:4px 8px; font-size:12px; text-align:right; background:white;" data-field="qty" placeholder="SL"></div>
+        <div style="width:50px;"><input type="text" value="Kg" style="width:100%; border:1px solid #D1D5DB; border-radius:6px; padding:4px 8px; font-size:12px; background:white;" data-field="unit"></div>
+        <button onclick="this.closest('[data-idx]').remove()" style="background:#FEE2E2; border:none; color:#EF4444; border-radius:50%; width:24px; height:24px; cursor:pointer; font-size:14px; flex-shrink:0;">✕</button>
+    `;
+    container.appendChild(div);
+}
+
+function getReviewProducts() {
+    const container = window.$('#review-products');
+    if (!container) return [];
+    const products = [];
+    container.querySelectorAll('[data-idx]').forEach(row => {
+        const name = row.querySelector('[data-field="name"]')?.value || '';
+        const code = row.querySelector('[data-field="code"]')?.value || '';
+        const qty = Number(row.querySelector('[data-field="qty"]')?.value || 0);
+        const unit = row.querySelector('[data-field="unit"]')?.value || 'Kg';
+        if (name || code) {
+            products.push({ name, code, qty, unit });
+        }
+    });
+    return products;
+}
+
+async function confirmReviewOrder() {
+    if (!confirmReviewingOrderId) return;
+    if (!confirm('Xác nhận đơn này và gửi về MISA CRM?')) return;
+
+    const products = getReviewProducts();
+    const userName = state.user?.fullName || state.user?.username || 'admin';
+
+    try {
+        const btn = document.querySelector('#confirm-review-panel .btn-primary');
+        if (btn) { btn.disabled = true; btn.innerHTML = '<div class="spinner" style="width:16px;height:16px;"></div> Đang xử lý...'; }
+
+        const res = await fetch(`/api/orders/${confirmReviewingOrderId}/confirm`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ products, confirmed_by: userName })
+        });
+        const json = await res.json();
+
+        if (json.error) {
+            alert('Lỗi: ' + json.message);
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-check-circle"></i> XÁC NHẬN ĐƠN'; }
+            return;
+        }
+
+        // Success
+        const crmStatus = json.data?.crmStatus || 'OK';
+        const card = window.$(`#confirm-card-${confirmReviewingOrderId}`);
+        if (card) {
+            card.style.transition = 'all 0.3s';
+            card.style.opacity = '0';
+            card.style.transform = 'translateX(100px)';
+            setTimeout(() => card.remove(), 300);
+        }
+        closeReviewPanel();
+        alert(`✅ Xác nhận thành công!\nCRM: ${crmStatus === 'OK' ? 'Đã đồng bộ' : crmStatus}`);
+
+        // Refresh counts
+        setTimeout(() => loadPendingConfirmOrders(), 500);
+    } catch (err) {
+        console.error('confirmReviewOrder error:', err);
+        alert('Lỗi kết nối server');
+    }
+}
+
+async function quickConfirmOrder(orderId) {
+    if (!confirm('Xác nhận đơn này mà không kiểm tra?')) return;
+
+    const userName = state.user?.fullName || state.user?.username || 'admin';
+    try {
+        const res = await fetch(`/api/orders/${orderId}/confirm`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ confirmed_by: userName })
+        });
+        const json = await res.json();
+        if (json.error) { alert('Lỗi: ' + json.message); return; }
+
+        const card = window.$(`#confirm-card-${orderId}`);
+        if (card) {
+            card.style.transition = 'all 0.3s';
+            card.style.opacity = '0';
+            card.style.transform = 'translateX(100px)';
+            setTimeout(() => card.remove(), 300);
+        }
+        const crmStatus = json.data?.crmStatus || 'OK';
+        alert(`✅ Xác nhận thành công!\nCRM: ${crmStatus === 'OK' ? 'Đã đồng bộ' : crmStatus}`);
+        setTimeout(() => loadPendingConfirmOrders(), 500);
+    } catch (err) {
+        alert('Lỗi kết nối server');
+    }
+}
+
+function closeReviewPanel() {
+    const panel = window.$('#confirm-review-panel');
+    if (panel) panel.style.display = 'none';
+    confirmReviewingOrderId = null;
+    confirmReviewingOrder = null;
+}
+
+// Export confirm functions
+window.loadPendingConfirmOrders = loadPendingConfirmOrders;
+window.switchConfirmTab = switchConfirmTab;
+window.openReviewPanel = openReviewPanel;
+window.closeReviewPanel = closeReviewPanel;
+window.addReviewProduct = addReviewProduct;
+window.confirmReviewOrder = confirmReviewOrder;
+window.quickConfirmOrder = quickConfirmOrder;

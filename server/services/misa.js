@@ -4,7 +4,7 @@
 
 import fetch from 'node-fetch';
 import db from '../db/index.js';
-import { sendTelegramMessage, getNotifyGroupMentions } from './telegram.js';
+import { sendTelegramMessage } from './telegram.js';
 
 const MISA_AUTH_URL = 'https://crmconnect.misa.vn/api/v2/Account';
 const MISA_ORDERS_URL = 'https://crmconnect.misa.vn/api/v2/SaleOrders';
@@ -707,8 +707,6 @@ const performSync = async () => {
 
             msg += `📍 ${mappedOrder.shipping_address || 'N/A'}\n`;
             if (mappedOrder.description) msg += `📝 ${mappedOrder.description}\n`;
-
-            msg += `\n🔔 ${getNotifyGroupMentions()} (Vào Điều Phối gán tài xế)`;
 
             const tgMsgId = await sendTelegramMessage(msg, 'NOTIFY');
 

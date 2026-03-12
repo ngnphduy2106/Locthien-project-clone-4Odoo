@@ -135,7 +135,7 @@ router.post('/', async (req, res) => {
 
         // Send Telegram notification
         try {
-            const { sendTelegramMessage, getNotifyGroupMentions } = await import('../services/telegram.js');
+            const { sendTelegramMessage } = await import('../services/telegram.js');
             const productsList = (products || [])
                 .map(p => `- ${p.name || p.code}: ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'Kg'}`)
                 .join('\n');
@@ -150,8 +150,6 @@ router.post('/', async (req, res) => {
             msg += `📦 ${(products || []).map(p => `${p.name || p.code} — ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'Kg'}`).join(', ')}\n`;
             if (supplier_address) msg += `📍 ${supplier_address}\n`;
             if (description || note) msg += `📝 ${description || note}\n`;
-
-            msg += `\n🔔 ${getNotifyGroupMentions()} - Vui lòng điều phối`;
 
             await sendTelegramMessage(msg, 'NOTIFY');
         } catch (tgErr) {
@@ -819,6 +817,20 @@ router.delete('/:id', async (req, res) => {
     try {
         const { id } = req.params;
 
+        // Fetch ticket info before cancelling
+        const { data: ticket } = await getSupabase()
+            .from('import_tickets')
+            .select('ticket_no, supplier_name, status')
+            .eq('id', id)
+            .single();
+
+        if (ticket) {
+            const status = String(ticket.status || '').toLowerCase();
+            if (status === 'completed' || status === 'cancelled') {
+                return res.json(createResponse(true, 'Đơn đã hoàn thành hoặc đã hủy, không thể hủy'));
+            }
+        }
+
         const { error } = await getSupabase()
             .from('import_tickets')
             .update({ status: 'cancelled' })
@@ -826,6 +838,17 @@ router.delete('/:id', async (req, res) => {
 
         if (error) {
             return res.json(createResponse(true, 'Lỗi hủy phiếu: ' + error.message));
+        }
+
+        // Send Telegram notification
+        try {
+            const { sendTelegramMessage } = await import('../services/telegram.js');
+            let msg = `❌ <b>ĐƠN NHẬP ĐÃ HỦY</b>\n`;
+            msg += `📦 <b>#${ticket?.ticket_no || id}</b>\n`;
+            msg += `🏭 ${ticket?.supplier_name || 'N/A'}`;
+            await sendTelegramMessage(msg, 'NOTIFY');
+        } catch (tgErr) {
+            console.error('Telegram cancel import error:', tgErr.message);
         }
 
         res.json({

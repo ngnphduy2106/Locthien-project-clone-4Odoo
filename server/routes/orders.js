@@ -2552,7 +2552,7 @@ router.post('/local', async (req, res) => {
 
         // Send Telegram notification
         try {
-            const { sendTelegramMessage, getNotifyGroupMentions } = await import('../services/telegram.js');
+            const { sendTelegramMessage } = await import('../services/telegram.js');
             const productsList = (products || [])
                 .map(p => `- ${p.name}: ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'Kg'}`)
                 .join('\n');
@@ -2571,7 +2571,6 @@ router.post('/local', async (req, res) => {
             }
             msg += `📍 ${customer_address || 'N/A'}\n`;
             if (description || note) msg += `📝 ${description || note}\n`;
-            msg += `\n🔔 ${getNotifyGroupMentions()} (Vào Điều Phối gán tài xế)`;
 
             await sendTelegramMessage(msg, 'NOTIFY');
         } catch (tgErr) {
@@ -2586,6 +2585,49 @@ router.post('/local', async (req, res) => {
 
     } catch (e) {
         console.error('❌ Create local export error:', e.message);
+        res.json(createResponse(true, e.message));
+    }
+});
+
+// PUT /api/orders/:id/cancel - Cancel an order (export)
+router.put('/:id/cancel', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { reason, cancelled_by } = req.body;
+
+        const order = await db.getOrder(id);
+        if (!order) {
+            return res.json(createResponse(true, 'Không tìm thấy đơn hàng'));
+        }
+
+        // Don't cancel already completed or cancelled orders
+        const status = String(order.status || '').toLowerCase();
+        if (status === 'đã thực hiện' || status === 'đã hủy bỏ' || status === 'cancelled') {
+            return res.json(createResponse(true, 'Đơn đã hoàn thành hoặc đã hủy, không thể hủy'));
+        }
+
+        await db.updateOrder(id, {
+            status: 'Đã hủy bỏ',
+            delivery_note: reason ? `[HỦY] ${reason}` : '[HỦY bởi ' + (cancelled_by || 'admin') + ']'
+        });
+
+        // Send Telegram notification
+        try {
+            const { sendTelegramMessage } = await import('../services/telegram.js');
+            const orderNo = order.soDon || order.sale_order_no || id;
+            let msg = `❌ <b>ĐƠN XUẤT ĐÃ HỦY</b>\n`;
+            msg += `📦 <b>#${orderNo}</b>\n`;
+            msg += `👤 ${order.khach || order.account_name || 'N/A'}\n`;
+            if (reason) msg += `📝 Lý do: ${reason}\n`;
+            msg += `👔 Hủy bởi: ${cancelled_by || 'admin'}`;
+            await sendTelegramMessage(msg, 'NOTIFY');
+        } catch (tgErr) {
+            console.error('Telegram cancel error:', tgErr.message);
+        }
+
+        res.json(createResponse(false, 'Đã hủy đơn hàng!'));
+    } catch (e) {
+        console.error('Cancel order error:', e.message);
         res.json(createResponse(true, e.message));
     }
 });
