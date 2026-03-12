@@ -405,9 +405,7 @@
                 <section id="section-dispatch" class="hidden">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
                         <h2 class="page-heading" style="margin-bottom:0;">Quản lý đơn hàng</h2>
-                        <button id="btn-force-sync" class="btn btn-info" onclick="forceSyncMisa()">
-                            <i class="bi bi-arrow-repeat"></i> Đồng bộ MISA
-                        </button>
+                        <!-- Sync button hidden - auto sync runs every 15s -->
                     </div>
 
                     <!-- Order Type Toggle -->
@@ -568,10 +566,7 @@
                                     <i class="bi bi-plus-circle"></i>
                                     Thêm sản phẩm mới
                                 </div>
-                                <button id="btn-sync-misa-static" class="btn btn-sm"
-                                    style="background:rgba(255,255,255,0.2); color:white; border:1px solid rgba(255,255,255,0.3);">
-                                    <i class="bi bi-arrow-repeat me-1"></i>Sync MISA
-                                </button>
+                                <!-- Sync MISA hidden for ĐPV -->
                             </div>
                             <div class="card-body">
                                 <!-- Product Code (MISA) -->
@@ -762,11 +757,7 @@
                                 <div>
                                     <i class="bi bi-plus-square"></i> Thêm sản phẩm mới
                                 </div>
-                                <button type="button" id="btn-export-sync-misa" class="btn btn-sm"
-                                    style="background:rgba(255,255,255,0.2); color:white; border:1px solid rgba(255,255,255,0.3);"
-                                    onclick="syncExportMisaProducts()">
-                                    <i class="bi bi-arrow-repeat"></i> Sync MISA
-                                </button>
+                                <!-- Sync MISA hidden for ĐPV -->
                             </div>
                             <div class="card-body">
                                 <div class="form-group">
