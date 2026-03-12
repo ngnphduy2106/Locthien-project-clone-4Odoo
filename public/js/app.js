@@ -6876,7 +6876,15 @@ async function submitImportMultiDriverAssignment() {
         const a = assignments[0];
         showLoading('Đang gán tài xế...');
         try {
-            const res = await api.assignImportDriver(importId, a.driver_name, a.plate);
+            const res = await fetch(`/api/imports/${importId}/assign`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    driver_name: a.driver_name,
+                    plate: a.plate,
+                    assistant_name: a.assistant_name || null
+                })
+            }).then(r => r.json());
             hideLoading();
 
             if (res.error) {
@@ -6902,7 +6910,8 @@ async function submitImportMultiDriverAssignment() {
                 driver_name: a.driver_name,
                 plate: a.plate || '',
                 qty: a.qty,
-                type: a.is_external ? 'external' : 'internal'
+                type: a.is_external ? 'external' : 'internal',
+                assistant_name: a.assistant_name || null
             }))
         };
 
