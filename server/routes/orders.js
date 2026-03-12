@@ -2535,9 +2535,15 @@ router.post('/local', async (req, res) => {
                 .map(p => `- ${p.name}: ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'Kg'}`)
                 .join('\n');
 
-            let msg = `📤 <b>ĐƠN XUẤT MỚI (NỘI BỘ)</b>\n`;
+            let msg = `📤 <b>ĐƠN XUẤT ERP MỚI</b>\n`;
             msg += `📦 Mã: <b>${orderNo}</b>\n`;
             msg += `👤 Khách: <b>${customer_name}</b>\n`;
+            if (expected_date) {
+                try {
+                    const fmtDate = new Date(expected_date).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+                    msg += `📅 Ngày dự kiến: ${fmtDate}\n`;
+                } catch { msg += `📅 Ngày dự kiến: ${expected_date}\n`; }
+            }
             msg += `📍 Địa chỉ: ${customer_address || 'N/A'}\n`;
             if (productsList) {
                 msg += `\n📋 <b>Sản phẩm:</b>\n${productsList}\n`;
