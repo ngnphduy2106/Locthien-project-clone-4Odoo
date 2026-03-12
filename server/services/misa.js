@@ -311,6 +311,7 @@ const performSync = async () => {
     const existingIds = new Set(dbOrders.map(o => o.soDon || o.id));
 
     let newCount = 0;
+    const newOrdersInBatch = []; // Flood guard: track new orders for summary notification
 
     // 3. Process Orders
     for (const item of misaOrders) {
@@ -682,41 +683,47 @@ const performSync = async () => {
                 if (Date.now() - ts > 24 * 60 * 60 * 1000) notifiedNewOrders.delete(key);
             }
 
-            // Send Telegram notification for new orders
-            const money = (mappedOrder.sale_order_amount || 0).toLocaleString('en-US');
-            const productsList = (mappedOrder.sale_order_product_mappings || [])
-                .map(p => `- ${p.name}: ${Number(p.qty).toLocaleString('en-US')} ${p.unit}`)
-                .join('\n');
+            // FLOOD GUARD: If too many new orders in one batch, collect for summary instead
+            const FLOOD_THRESHOLD = 5;
+            newOrdersInBatch.push({ saleOrderNo, account_name: item.account_name, shipping_address: mappedOrder.shipping_address });
 
-            // Format date if available (force Vietnam timezone to prevent UTC offset issues)
-            let formattedDate = 'N/A';
-            if (item.sale_order_date) {
-                try {
-                    formattedDate = new Date(item.sale_order_date).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
-                } catch (e) {
-                    formattedDate = item.sale_order_date.split('T')[0]; // fallback
+            if (newOrdersInBatch.length > FLOOD_THRESHOLD) {
+                // Too many new orders — skip individual notification, will send summary later
+                console.log(`⚠️ Flood guard: skipping individual notification for ${saleOrderNo} (${newOrdersInBatch.length} new orders in batch)`);
+            } else {
+                // Normal: send individual Telegram notification
+                const productsList = (mappedOrder.sale_order_product_mappings || [])
+                    .map(p => `- ${p.name}: ${Number(p.qty).toLocaleString('en-US')} ${p.unit}`)
+                    .join('\n');
+
+                let formattedDate = 'N/A';
+                if (item.sale_order_date) {
+                    try {
+                        formattedDate = new Date(item.sale_order_date).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+                    } catch (e) {
+                        formattedDate = item.sale_order_date.split('T')[0];
+                    }
                 }
-            }
 
-            let msg = `🟩 <b>XUẤT MISA</b>\n`;
-            msg += `📦 <b>#${saleOrderNo}</b>\n`;
-            msg += `📅 ${formattedDate}\n`;
-            msg += `👤 <b>${item.account_name || 'N/A'}</b>\n`;
+                let msg = `🟩 <b>XUẤT MISA</b>\n`;
+                msg += `📦 <b>#${saleOrderNo}</b>\n`;
+                msg += `📅 ${formattedDate}\n`;
+                msg += `👤 <b>${item.account_name || 'N/A'}</b>\n`;
 
-            if (productsList) {
-                msg += `📦 ${(mappedOrder.sale_order_product_mappings || []).map(p => `${p.name} — ${Number(p.qty).toLocaleString('vi-VN')} ${p.unit}`).join(', ')}\n`;
-            }
+                if (productsList) {
+                    msg += `📦 ${(mappedOrder.sale_order_product_mappings || []).map(p => `${p.name} — ${Number(p.qty).toLocaleString('vi-VN')} ${p.unit}`).join(', ')}\n`;
+                }
 
-            msg += `📍 ${mappedOrder.shipping_address || 'N/A'}\n`;
-            if (mappedOrder.description) msg += `📝 ${mappedOrder.description}\n`;
+                msg += `📍 ${mappedOrder.shipping_address || 'N/A'}\n`;
+                if (mappedOrder.description) msg += `📝 ${mappedOrder.description}\n`;
 
-            const tgMsgId = await sendTelegramMessage(msg, 'NOTIFY');
+                const tgMsgId = await sendTelegramMessage(msg, 'NOTIFY');
 
-            // Store telegram message_id for reply-to-original on edits
-            if (tgMsgId) {
-                try {
-                    await db.updateOrder(saleOrderNo, { telegram_message_id: tgMsgId });
-                } catch (e) { /* ignore */ }
+                if (tgMsgId) {
+                    try {
+                        await db.updateOrder(saleOrderNo, { telegram_message_id: tgMsgId });
+                    } catch (e) { /* ignore */ }
+                }
             }
 
             // Create in-app notification for ADMIN
@@ -791,6 +798,26 @@ const performSync = async () => {
         }
     } catch (cleanupErr) {
         console.error('⚠️ Cleanup check error:', cleanupErr.message);
+    }
+
+    // FLOOD GUARD: Send summary if too many new orders were skipped
+    if (newOrdersInBatch.length > 5) {
+        try {
+            let summaryMsg = `⚠️ <b>ĐỒNG BỘ HÀNG LOẠT MISA</b>\n`;
+            summaryMsg += `📦 ${newOrdersInBatch.length} đơn mới được đồng bộ\n`;
+            summaryMsg += `(Chỉ ${5} đơn đầu được thông báo riêng)\n\n`;
+            // List the ones that were skipped (after first 5)
+            const skipped = newOrdersInBatch.slice(5, 20); // Show max 15 skipped
+            skipped.forEach(o => {
+                summaryMsg += `• #${o.saleOrderNo} — ${o.account_name || 'N/A'}\n`;
+            });
+            if (newOrdersInBatch.length > 20) {
+                summaryMsg += `... và ${newOrdersInBatch.length - 20} đơn khác`;
+            }
+            await sendTelegramMessage(summaryMsg, 'NOTIFY');
+        } catch (e) {
+            console.error('Flood summary notification error:', e.message);
+        }
     }
 
     console.log(`✨ Sync Complete. New orders synced: ${newCount}`);
