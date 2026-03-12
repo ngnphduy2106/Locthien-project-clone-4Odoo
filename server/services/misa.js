@@ -552,14 +552,23 @@ const performSync = async () => {
 
                 // CRITICAL: Remove raw MISA custom_field13/14 from mappedOrder 
                 // to prevent them from overriding the preserved taiXe/bienSo values.
-                // The ...item spread copies empty MISA custom fields which would
-                // win over the preserved taiXe/bienSo in updateOrder's field mapper.
-                delete mappedOrder.custom_field13;
-                delete mappedOrder.custom_field14;
+                // PROTECT LOCAL DATA: Never let MISA downgrade status or overwrite local operational fields
+                const LOCAL_PROTECTED_FIELDS = ['status', 'delivery_status', 'custom_field13', 'custom_field14',
+                    'assistant_name', 'delivery_time', 'merged_order_no', 'telegram_message_id',
+                    'sale_confirmed', 'sale_confirmed_at', 'sale_confirmed_by',
+                    'admin_approved', 'admin_approved_at', 'admin_approved_by',
+                    'delivery_note', 'local_items', 'is_pinned'];
 
-                // Only allow MISA to update status if local is 'Mới', otherwise keep local status
                 if (oldOrder.status !== 'Mới') {
-                    mappedOrder.status = oldOrder.status;
+                    // Order is in-progress/completed locally — protect ALL local fields
+                    for (const field of LOCAL_PROTECTED_FIELDS) {
+                        delete mappedOrder[field];
+                    }
+                    console.log(`🛡️ Protected local fields for ${saleOrderNo} (status: ${oldOrder.status})`);
+                } else {
+                    // Order is still 'Mới' — only protect driver/plate from stale MISA data
+                    delete mappedOrder.custom_field13;
+                    delete mappedOrder.custom_field14;
                 }
 
                 // PRESERVE local product edits for completed/dispatched orders

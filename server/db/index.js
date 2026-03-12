@@ -6,38 +6,27 @@
 import { supabase, supabaseInitialized } from './supabase.js';
 import { db as firebaseDb, firebaseInitialized } from './firebase.js';
 
-// Priority: Supabase > Firebase > Mock
+// Priority: Supabase > Firebase. NO MOCK FALLBACK.
 const getMode = () => {
     const useSupabase = supabaseInitialized && supabase !== null;
     const useFirebase = !useSupabase && firebaseInitialized && firebaseDb !== null;
+    if (!useSupabase && !useFirebase) {
+        console.error('❌ CRITICAL: No database connection! Supabase and Firebase both unavailable.');
+        throw new Error('DATABASE_NOT_AVAILABLE: Supabase is required. Check SUPABASE_URL and SUPABASE_KEY in .env');
+    }
     return { useSupabase, useFirebase };
 };
 
 // Log detailed diagnostics at startup
-const { useSupabase, useFirebase } = getMode();
-console.log(`📦 DATABASE DIAGNOSTICS:`);
-console.log(`   - SUPABASE_URL: ${process.env.SUPABASE_URL ? 'PRESENT' : 'MISSING'}`);
-console.log(`   - SUPABASE_KEY: ${process.env.SUPABASE_KEY ? 'PRESENT' : 'MISSING'}`);
-console.log(`   - PREFERRED MODE: ${useSupabase ? 'Supabase' : (useFirebase ? 'Firebase RTDB' : 'Mock (In-Memory)')}`);
-
-// ===============================================
-// MOCK DATA (Fallback)
-// ===============================================
-
-let mockData = {
-    users: [
-        { id: '1', username: '0901234567', password: '234567', fullName: 'Admin Test', role: 'ADMIN', plate: '', status: 'ACTIVE', phone: '0901234567', baseSalary: 15000000 },
-        { id: '2', username: '0909876543', password: '876543', fullName: 'Tài Xế A', role: 'DRIVER', plate: '51C-12345', status: 'ACTIVE', phone: '0909876543', baseSalary: 10000000 },
-        { id: '3', username: '0905555555', password: '555555', fullName: 'Nhân Viên Kho', role: 'WAREHOUSE', plate: '', status: 'ACTIVE', phone: '0905555555', baseSalary: 8000000 }
-    ],
-    orders: [],
-    materials: [],
-    employees: [],
-    inventory: [],
-    trucks: ['51C-12345', '51C-67890'],
-    customers: ['Công ty ABC', 'Công ty XYZ'],
-    suppliers: ['NCC Hóa Chất']
-};
+try {
+    const { useSupabase, useFirebase } = getMode();
+    console.log(`📦 DATABASE MODE: ${useSupabase ? 'Supabase' : 'Firebase RTDB'}`);
+} catch (e) {
+    console.error(`📦 DATABASE DIAGNOSTICS:`);
+    console.error(`   - SUPABASE_URL: ${process.env.SUPABASE_URL ? 'PRESENT' : 'MISSING'}`);
+    console.error(`   - SUPABASE_KEY: ${process.env.SUPABASE_KEY ? 'PRESENT' : 'MISSING'}`);
+    console.error(`   ❌ ${e.message}`);
+}
 
 // ===============================================
 // HELPERS
