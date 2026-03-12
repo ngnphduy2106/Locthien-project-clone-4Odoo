@@ -724,13 +724,12 @@ router.put('/:id/complete', async (req, res) => {
         try {
             const { sendTelegramMessage } = await import('../services/telegram.js');
             let msg = `✅ <b>PHIẾU NHẬP ĐÃ HOÀN THÀNH</b>\n`;
-            msg += `#${data.ticket_no}\n`;
-            msg += `🏭 NCC: ${data.supplier_name}\n`;
-            msg += `\n📋 <b>Chi tiết:</b>\n`;
-            mergedProducts.forEach(p => {
-                msg += `- ${p.name}: ${p.qty} ${p.unit || 'Kg'}\n`;
-            });
-            if (note) msg += `\n📝 Note: ${note}`;
+            msg += `📦 <b>#${data.ticket_no}</b>\n`;
+            msg += `🏭 ${data.supplier_name}\n`;
+            if (data.assigned_driver) msg += `🚗 TX: <b>${data.assigned_driver}</b>${data.assigned_plate ? ` (${data.assigned_plate})` : ''}\n`;
+            if (data.assistant_name) msg += `🧑‍🔧 PX: ${data.assistant_name}\n`;
+            msg += `📦 ${mergedProducts.map(p => `${p.name} — ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'Kg'}`).join(', ')}\n`;
+            if (note) msg += `📝 ${note}\n`;
 
             await sendTelegramMessage(msg, 'NHAP');
         } catch (tgErr) {
