@@ -1347,7 +1347,7 @@ function renderImportList() {
                         </span>
                         <span style="font-size:10px; color:var(--text-secondary); white-space:nowrap;">${formatDate(imp.expected_date || imp.created_at)}</span>
                         <span class="badge badge-${getStatusBadge(imp.status)}" style="font-size:9px; padding:2px 5px; white-space:nowrap;">${getStatusText(imp.status)}</span>
-                        ${imp.merged_order_no ? `<span style="background:linear-gradient(135deg, #3b82f6, #2563eb); color:white; padding:1px 5px; border-radius:8px; font-size:8px; font-weight:600; white-space:nowrap;"><i class="bi bi-link-45deg"></i> ${imp.merged_order_no}</span>` : ''}
+                        ${imp.merged_order_no ? (() => { const sibs = getMergedSiblings(imp.merged_order_no, imp.id); return `<span style="background:linear-gradient(135deg, #3b82f6, #2563eb); color:white; padding:1px 5px; border-radius:8px; font-size:8px; font-weight:600; white-space:nowrap;" title="${sibs.join(', ')}"><i class="bi bi-link-45deg"></i> Ghép: ${sibs.join(', ')}</span>`; })() : ''}
                         <div style="display:flex; gap:3px; flex-shrink:0;" onclick="event.stopPropagation()">
                             <button class="btn ${imp.is_pinned ? 'btn-warning' : 'btn-outline'} btn-sm" onclick="toggleImportPin('${imp.id}', ${!imp.is_pinned})" style="padding:2px; font-size:9px; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center;" title="${imp.is_pinned ? 'Bỏ ghim' : 'Ghim đơn'}">
                                 <i class="bi bi-pin${imp.is_pinned ? '-fill' : ''}"></i>
@@ -1466,6 +1466,16 @@ function clearDateFilter() {
     if (dateInput) dateInput.value = '';
     renderDispatchOrders();
 }
+
+// Helper: get sibling order codes in a merge group
+function getMergedSiblings(mergedOrderNo, currentOrderId) {
+    if (!mergedOrderNo) return [];
+    const allOrders = [...(state.orders?.pending || []), ...(state.orders?.assigned || []), ...(state.orders?.completed || [])];
+    return allOrders
+        .filter(o => o.merged_order_no === mergedOrderNo && String(o.id) !== String(currentOrderId))
+        .map(o => o.soDon || o.sale_order_no || o.id);
+}
+window.getMergedSiblings = getMergedSiblings;
 
 function renderDispatchOrders() {
     const container = window.$('#dispatch-order-list');
@@ -1591,7 +1601,7 @@ function renderDispatchOrders() {
                     <!-- ROW 1: PO + Date + Status + BUTTONS -->
                     <div style="display:flex; align-items:center; gap:6px; flex-wrap:nowrap; width:100%;">
                         <span style="font-weight:600; color:var(--primary); font-size:11px; white-space:nowrap;">${orderNo}</span>
-                        ${order.merged_order_no ? `<span class="badge" style="background:#4c6ef5; color:#fff; font-size:9px; padding:2px 5px; white-space:nowrap;" title="Đơn ghép: ${order.merged_order_no}"><i class="bi bi-link-45deg"></i> ${order.merged_order_no}</span>` : ''}
+                        ${order.merged_order_no ? (() => { const sibs = getMergedSiblings(order.merged_order_no, orderId); return `<span class="badge" style="background:#4c6ef5; color:#fff; font-size:9px; padding:2px 5px; white-space:nowrap;" title="${sibs.join(', ')}"><i class="bi bi-link-45deg"></i> Ghép: ${sibs.join(', ')}</span>`; })() : ''}
                         <span style="font-size:10px; color:var(--text-secondary); white-space:nowrap;">${formatDate(date)}</span>
                         <span class="badge badge-${getStatusBadge(status)}" style="font-size:9px; padding:2px 5px; white-space:nowrap;">${getStatusText(status)}</span>
                         <div style="display:flex; gap:3px; flex-shrink:0;" onclick="event.stopPropagation()">
@@ -3080,7 +3090,7 @@ async function viewOrderDetail(orderId, options = {}) {
                     <label>Mã đơn hàng:</label>
                     <span>
                         <strong>#${order.soDon || order.sale_order_no || order.id}</strong>
-                        ${order.merged_order_no ? `<div style="display:inline-block; margin-left:8px; background:linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color:white; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:600;"><i class="bi bi-link-45deg"></i> Chuyến ghép: ${order.merged_order_no}</div>` : ''}
+                        ${order.merged_order_no && mergedSisterOrders.length > 0 ? `<div style="display:inline-block; margin-left:8px; background:linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color:white; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:600;"><i class="bi bi-link-45deg"></i> Ghép: ${mergedSisterOrders.join(', ')}</div>` : ''}
                     </span>
                 </div>
                 <div class="detail-row">
@@ -3134,7 +3144,7 @@ async function viewOrderDetail(orderId, options = {}) {
             ${order.merged_order_no && mergedSisterOrders.length > 0 ? `
             <div style="margin:16px 0; padding:12px 16px; background:linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%); border-radius:12px; border-left:4px solid #4f46e5;">
                 <div style="font-size:12px; color:#3730a3; font-weight:600; margin-bottom:8px;">
-                    <i class="bi bi-link-45deg"></i> ĐƠN GHÉP - Chuyến ${order.merged_order_no}
+                    <i class="bi bi-link-45deg"></i> ĐƠN GHÉP
                 </div>
                 <div style="font-size:13px; color:#4338ca;">
                     Đơn này được ghép cùng chuyến với:
