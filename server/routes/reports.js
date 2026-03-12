@@ -102,7 +102,7 @@ router.get('/dashboard', async (req, res) => {
         let completedTotal = 0;
         let cancelledTotal = 0;
 
-        const completedStatuses = ['Đã thực hiện', 'Đã hủy bỏ', 'completed', 'hoàn thành', 'đã giao hàng', 'cancelled'];
+        const completedStatuses = ['đã thực hiện', 'đã hủy bỏ', 'completed', 'hoàn thành', 'đã giao hàng', 'cancelled'];
 
         let totalOrders = orders.length;
 
