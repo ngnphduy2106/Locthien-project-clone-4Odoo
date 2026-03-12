@@ -119,6 +119,75 @@ async function retryFailedSyncs() {
 app.use('/api', apiRouter);
 app.use('/', apiRouter);
 
+// One-time: Sync driver data from MISA CRM back into DB
+app.get('/api/admin/sync-drivers', async (req, res) => {
+    try {
+        const fetchImport = (await import('node-fetch')).default;
+
+        // Login to MISA
+        const authRes = await fetchImport('https://crmconnect.misa.vn/api/v2/Account', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                client_id: process.env.MISA_CLIENT_ID,
+                client_secret: process.env.MISA_CLIENT_SECRET
+            })
+        });
+        const authJson = await authRes.json();
+        const token = authJson.Data || authJson.data;
+        if (!token) return res.json({ error: true, msg: 'MISA login failed' });
+
+        // Fetch all orders from MISA (multiple pages)
+        let allOrders = [];
+        let page = 0;
+        let hasMore = true;
+        while (hasMore) {
+            const orderRes = await fetchImport(`https://crmconnect.misa.vn/api/v2/SaleOrders?pageSize=100&page=${page}`, {
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', 'Clientid': process.env.MISA_CLIENT_ID }
+            });
+            const orderJson = await orderRes.json();
+            const data = orderJson.data || [];
+            allOrders = allOrders.concat(data);
+            hasMore = data.length === 100;
+            page++;
+        }
+
+        // Update DB: only orders missing driver data
+        let updated = 0, skipped = 0;
+        const { createClient } = await import('@supabase/supabase-js');
+        const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+        for (const item of allOrders) {
+            const orderNo = item.sale_order_no;
+            const driver = item.custom_field13 || '';
+            const plate = item.custom_field14 || '';
+            if (!orderNo || (!driver && !plate)) { skipped++; continue; }
+
+            const { data: existing } = await supabase.from('orders')
+                .select('id, custom_field13, custom_field14')
+                .eq('sale_order_no', orderNo).single();
+
+            if (!existing || (existing.custom_field13 && existing.custom_field13.trim())) {
+                skipped++;
+                continue;
+            }
+
+            const updateData = {};
+            if (driver) updateData.custom_field13 = driver;
+            if (plate) updateData.custom_field14 = plate;
+
+            await supabase.from('orders').update(updateData).eq('id', existing.id);
+            console.log(`✅ Synced driver: ${orderNo} → ${driver} / ${plate}`);
+            updated++;
+        }
+
+        res.json({ error: false, msg: `Synced ${updated} orders, skipped ${skipped}`, updated, skipped, totalMisa: allOrders.length });
+    } catch (e) {
+        console.error('sync-drivers error:', e);
+        res.json({ error: true, msg: e.message });
+    }
+});
+
 // Health check
 app.get('/api/health', (req, res) => {
     res.json({
