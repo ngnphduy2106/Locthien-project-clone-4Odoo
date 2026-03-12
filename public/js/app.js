@@ -6155,6 +6155,10 @@ async function viewImportDetail(importId) {
                     <label>Biển số xe:</label>
                     <span>${imp.assigned_plate || imp.plate || imp.bienSo || 'Chưa có'}</span>
                 </div>
+                ${(imp.assistant_name || imp.phuXe) ? `<div class="detail-row">
+                    <label>Phụ xe:</label>
+                    <span>${imp.assistant_name || imp.phuXe}</span>
+                </div>` : ''}
                 ${!hidePrice ? `<div class="detail-row">
                     <label>Tổng tiền:</label>
                     <span style="color:var(--success); font-weight:700; font-size:18px;">${formatCurrency(displayTotal)}</span>

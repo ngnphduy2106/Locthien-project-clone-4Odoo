@@ -261,14 +261,15 @@ router.put('/:id/pin', async (req, res) => {
 router.put('/:id/assign', async (req, res) => {
     try {
         const { id } = req.params;
-        const { driver_name, plate } = req.body;
+        const { driver_name, plate, assistant_name } = req.body;
 
         const { data, error } = await getSupabase()
             .from('import_tickets')
             .update({
                 status: 'assigned',
                 assigned_driver: driver_name,
-                assigned_plate: plate
+                assigned_plate: plate,
+                assistant_name: assistant_name || null
             })
             .eq('id', id)
             .select()
@@ -331,6 +332,7 @@ router.put('/:id/assign', async (req, res) => {
             if (data?.merged_order_no) msg += `🔗 Ghép chuyến: ${data.merged_order_no}\n`;
             msg += `──────────────\n`;
             msg += `🚗 Tài xế: <b>${driver_name}</b>${driverTag}\n`;
+            if (assistant_name) msg += `🧑‍🔧 Phụ xe: ${assistant_name}\n`;
             msg += `🔢 Biển số: ${plate || 'Chưa có'}\n`;
 
             await sendTelegramMessage(msg, 'DRIVER');
