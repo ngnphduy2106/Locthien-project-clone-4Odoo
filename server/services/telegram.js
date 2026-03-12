@@ -140,25 +140,71 @@ export const sendTelegramPhotos = async (photoUrls, caption = '', type = 'XUAT',
 
     try {
         const hasBase64 = photoUrls.some(isBase64);
+        const photos = photoUrls.slice(0, 5); // Max 5 photos
 
-        if (photoUrls.length === 1 || hasBase64) {
-            // Send photos one by one (required for base64 uploads)
-            let firstMsgId = null;
-            for (let i = 0; i < Math.min(photoUrls.length, 5); i++) {
-                const cap = i === 0 ? caption : '';
-                const json = await sendSinglePhoto(photoUrls[i], cap, i === 0);
-                if (json?.ok) {
-                    if (i === 0) firstMsgId = json.result?.message_id;
-                    console.log(`📸 Telegram Photo ${i + 1}/${photoUrls.length} Sent (${type}).`);
-                } else {
-                    console.error(`❌ Telegram Photo ${i + 1} Error (${type}):`, json?.description);
+        if (photos.length === 1) {
+            // Single photo: sendPhoto with caption
+            const json = await sendSinglePhoto(photos[0], caption, true);
+            if (json?.ok) {
+                console.log(`📸 Telegram Photo Sent (${type}).`);
+                return json.result?.message_id || null;
+            } else {
+                console.error(`❌ Telegram Photo Error (${type}):`, json?.description);
+                return null;
+            }
+        } else if (hasBase64) {
+            // Multiple base64 photos: sendMediaGroup with multipart file attachments
+            const url = `https://api.telegram.org/bot${token}/sendMediaGroup`;
+            const boundary = '----TgAlbum' + Date.now();
+            const buffers = [];
+
+            // Build media JSON array referencing attached files
+            const media = photos.map((photo, i) => ({
+                type: 'photo',
+                media: isBase64(photo) ? `attach://photo_${i}` : photo,
+                ...(i === 0 && caption ? { caption, parse_mode: 'HTML' } : {})
+            }));
+
+            // Add chat_id field
+            buffers.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="chat_id"\r\n\r\n${chatId}\r\n`));
+
+            // Add media JSON field
+            buffers.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="media"\r\n\r\n${JSON.stringify(media)}\r\n`));
+
+            if (replyToMessageId) {
+                buffers.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="reply_to_message_id"\r\n\r\n${replyToMessageId}\r\n`));
+            }
+
+            // Add each base64 photo as file attachment
+            for (let i = 0; i < photos.length; i++) {
+                if (isBase64(photos[i])) {
+                    const matches = photos[i].match(/^data:image\/(\w+);base64,(.+)$/);
+                    if (!matches) continue;
+                    const ext = matches[1];
+                    const imgBuffer = Buffer.from(matches[2], 'base64');
+                    buffers.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="photo_${i}"; filename="proof_${i}.${ext}"\r\nContent-Type: image/${ext}\r\n\r\n`));
+                    buffers.push(imgBuffer);
+                    buffers.push(Buffer.from('\r\n'));
                 }
             }
-            return firstMsgId;
+
+            // Close boundary
+            buffers.push(Buffer.from(`--${boundary}--\r\n`));
+            const fullBody = Buffer.concat(buffers);
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': `multipart/form-data; boundary=${boundary}` },
+                body: fullBody
+            });
+            const json = await response.json();
+            if (!json.ok) console.error(`❌ Telegram MediaGroup Error (${type}):`, json.description);
+            else console.log(`📸 Telegram ${photos.length} Photos Album Sent (${type}).`);
+            return json.result?.[0]?.message_id || null;
         } else {
-            // Multiple HTTP URL photos: use sendMediaGroup (album)
+            // Multiple HTTP URL photos: sendMediaGroup with JSON
             const url = `https://api.telegram.org/bot${token}/sendMediaGroup`;
-            const media = photoUrls.slice(0, 10).map((photoUrl, i) => ({
+            const media = photos.map((photoUrl, i) => ({
                 type: 'photo',
                 media: photoUrl,
                 ...(i === 0 && caption ? { caption, parse_mode: 'HTML' } : {})
@@ -173,7 +219,7 @@ export const sendTelegramPhotos = async (photoUrls, caption = '', type = 'XUAT',
             });
             const json = await response.json();
             if (!json.ok) console.error(`❌ Telegram MediaGroup Error (${type}):`, json.description);
-            else console.log(`📸 Telegram ${photoUrls.length} Photos Sent (${type}).`);
+            else console.log(`📸 Telegram ${photos.length} Photos Sent (${type}).`);
             return json.result?.[0]?.message_id || null;
         }
     } catch (e) {
