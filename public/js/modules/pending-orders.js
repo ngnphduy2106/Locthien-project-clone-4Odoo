@@ -193,14 +193,15 @@ const PendingOrdersModule = {
                         </tr>
                     `;
                 } else {
-                    // Export: Mã đơn | Khách hàng | Trạng thái | Tài Xế | Biển Số
-                    const status = order._status || 'N/A';
-                    const statusClass = status === 'Đang giao' ? 'warning' : 'secondary';
+                    // Export: Mã đơn | Khách hàng | Sản phẩm | Tài Xế | Biển Số
+                    const productList = (order.products || []).map(p =>
+                        `${p.name || p.code || 'SP'}: ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'Kg'}`
+                    ).join(', ');
                     return `
                         <tr onclick="${clickHandler}" style="cursor:pointer;" class="history-row">
                             <td><strong style="color:var(--primary);">${orderId}</strong></td>
                             <td>${customer}</td>
-                            <td><span class="badge badge-${statusClass}">${status}</span></td>
+                            <td style="font-size:12px; max-width:250px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${productList || '—'}</td>
                             <td>${driver !== '-' ? `<span style="color:var(--info);">${driver}</span>` : '<span style="opacity:0.5;">—</span>'}</td>
                             <td>${plate !== '-' ? `<span style="font-family:monospace; font-weight:600;">${plate}</span>` : '<span style="opacity:0.5;">—</span>'}</td>
                         </tr>
