@@ -9713,7 +9713,8 @@ async function loadPendingConfirmOrders() {
 
         if (confirmCurrentTab === 'export') {
             const isAdmin = state.user?.role?.toLowerCase() === 'admin';
-            const isSales = ['staff', 'admin', 'dispatcher'].includes(state.user?.role?.toLowerCase());
+            const isSales = ['sales', 'staff', 'admin', 'dispatcher'].includes(state.user?.role?.toLowerCase());
+            const canApprove = isSales; // Sales + Admin + Dispatcher can approve & push MISA
             container.innerHTML = orders.map(o => {
                 const orderNo = o.sale_order_no || o.id;
                 const fmtDate = o.sale_order_date ? new Date(o.sale_order_date).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : '';
@@ -9743,18 +9744,8 @@ async function loadPendingConfirmOrders() {
                             <button class="btn btn-outline btn-sm" onclick="openReviewPanel('${o.id}')" style="font-size:12px; padding:6px 14px; border-radius:8px; width:100%;">
                                 <i class="bi bi-eye"></i> Kiểm tra
                             </button>
-                            ${!isConfirmed && isSales ? `
-                                <button class="btn btn-sm" onclick="quickConfirmOrder('${o.id}')" style="font-size:12px; padding:6px 14px; border-radius:8px; width:100%; background:transparent; border:2px solid #f59e0b; color:#d97706; font-weight:600;">
-                                    <i class="bi bi-check-lg"></i> Sales Xác nhận
-                                </button>
-                            ` : ''}
-                            ${isAdmin && isConfirmed ? `
+                            ${canApprove ? `
                                 <button class="btn btn-sm" onclick="approveOrder('${o.id}')" style="font-size:12px; padding:6px 14px; border-radius:8px; width:100%; background:linear-gradient(135deg, #10b981, #059669); color:white; border:none; font-weight:600; box-shadow:0 2px 4px rgba(16,185,129,0.3);">
-                                    <i class="bi bi-cloud-upload"></i> Duyệt & MISA
-                                </button>
-                            ` : ''}
-                            ${isAdmin && !isConfirmed ? `
-                                <button class="btn btn-sm" onclick="approveOrder('${o.id}')" style="font-size:12px; padding:6px 14px; border-radius:8px; width:100%; background:#e5e7eb; color:#6b7280; border:none; font-weight:500;" title="Sales chưa xác nhận">
                                     <i class="bi bi-cloud-upload"></i> Duyệt & MISA
                                 </button>
                             ` : ''}
@@ -9879,13 +9870,13 @@ async function openReviewPanel(orderId) {
         // Update confirm button based on role
         const confirmBtn = panel.querySelector('#review-confirm-btn');
         if (confirmBtn) {
-            const isAdmin = state.user?.role?.toLowerCase() === 'admin';
-            if (isAdmin) {
+            const canApprove = ['admin', 'sales', 'staff', 'dispatcher'].includes(state.user?.role?.toLowerCase());
+            if (canApprove) {
                 confirmBtn.innerHTML = '<i class="bi bi-cloud-upload"></i> DUYỆT & ĐẨY MISA';
                 confirmBtn.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
-                confirmBtn.onclick = () => approveOrder(orderId).then(() => closeReviewPanel());
+                confirmBtn.onclick = () => approveOrder(orderId);
             } else {
-                confirmBtn.innerHTML = '<i class="bi bi-check-lg"></i> SALES XÁC NHẬN';
+                confirmBtn.innerHTML = '<i class="bi bi-check-lg"></i> XÁC NHẬN';
                 confirmBtn.style.background = 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)';
                 confirmBtn.onclick = () => confirmReviewOrder();
             }
