@@ -2786,16 +2786,20 @@ router.post('/:id/approve', async (req, res) => {
             console.error('MISA approve sync error:', syncErr.message);
         }
 
-        // Telegram notification
+        // Telegram notification → SALES group
         try {
             const { sendTelegramMessage } = await import('../services/telegram.js');
             const orderNo = order.soDon || order.sale_order_no || id;
-            let msg = `✅ <b>ADMIN DUYỆT ĐƠN</b>\n`;
+            const products = (order.products || []).map(p => `  • ${p.name || p.code}: ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'Kg'}`).join('\n');
+            let msg = `✅ <b>DUYỆT ĐƠN & ĐẨY MISA</b>\n`;
             msg += `📦 <b>#${orderNo}</b>\n`;
             msg += `👤 ${order.khach || order.account_name || 'N/A'}\n`;
+            msg += `📍 ${order.diaChi || order.shipping_address || ''}\n`;
+            msg += `🚛 ${order.taiXe || order.custom_field13 || 'N/A'}\n`;
+            if (products) msg += `📋 Sản phẩm:\n${products}\n`;
             msg += `👔 Duyệt bởi: ${approved_by || 'admin'}\n`;
             msg += `📤 CRM: ${crmStatus === 'OK' ? '✅ Đã đồng bộ' : '⚠️ ' + crmStatus}`;
-            await sendTelegramMessage(msg, 'NOTIFY');
+            await sendTelegramMessage(msg, 'SALES');
         } catch (tgErr) {
             console.error('Telegram approve error:', tgErr.message);
         }
