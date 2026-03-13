@@ -1,4 +1,4 @@
-// ===============================================
+﻿// ===============================================
 // DATABASE ABSTRACTION LAYER
 // Supports: Supabase (Primary), Firebase RTDB, Mock
 // ===============================================
@@ -11,7 +11,7 @@ const getMode = () => {
     const useSupabase = supabaseInitialized && supabase !== null;
     const useFirebase = !useSupabase && firebaseInitialized && firebaseDb !== null;
     if (!useSupabase && !useFirebase) {
-        console.error('❌ CRITICAL: No database connection! Supabase and Firebase both unavailable.');
+        console.error('âŒ CRITICAL: No database connection! Supabase and Firebase both unavailable.');
         throw new Error('DATABASE_NOT_AVAILABLE: Supabase is required. Check SUPABASE_URL and SUPABASE_KEY in .env');
     }
     return { useSupabase, useFirebase };
@@ -20,12 +20,12 @@ const getMode = () => {
 // Log detailed diagnostics at startup
 try {
     const { useSupabase, useFirebase } = getMode();
-    console.log(`📦 DATABASE MODE: ${useSupabase ? 'Supabase' : 'Firebase RTDB'}`);
+    console.log(`ðŸ“¦ DATABASE MODE: ${useSupabase ? 'Supabase' : 'Firebase RTDB'}`);
 } catch (e) {
-    console.error(`📦 DATABASE DIAGNOSTICS:`);
+    console.error(`ðŸ“¦ DATABASE DIAGNOSTICS:`);
     console.error(`   - SUPABASE_URL: ${process.env.SUPABASE_URL ? 'PRESENT' : 'MISSING'}`);
     console.error(`   - SUPABASE_KEY: ${process.env.SUPABASE_KEY ? 'PRESENT' : 'MISSING'}`);
-    console.error(`   ❌ ${e.message}`);
+    console.error(`   âŒ ${e.message}`);
 }
 
 // ===============================================
@@ -63,7 +63,7 @@ export const db = {
             const snapshot = await firebaseDb.ref('users').once('value');
             return snapshot.val() ? Object.values(snapshot.val()) : [];
         }
-        return mockData.users;
+        return [];
     },
 
     getUserById: async (id) => {
@@ -76,7 +76,7 @@ export const db = {
             const snapshot = await firebaseDb.ref(`users/${sanitizeId(id)}`).once('value');
             return snapshot.val();
         }
-        return mockData.users.find(u => u.id === id);
+        return null;
     },
 
     addUser: async (user) => {
@@ -106,7 +106,7 @@ export const db = {
         if (useFirebase) {
             await firebaseDb.ref(`users/${id}`).set(newUser);
         } else {
-            mockData.users.push(newUser);
+            // mock removed
         }
         return newUser;
     },
@@ -145,10 +145,10 @@ export const db = {
             await firebaseDb.ref(`users/${safeId}`).update(data);
             return { id: safeId, ...data };
         }
-        const index = mockData.users.findIndex(u => u.id === id);
+        return null; // mock removed
         if (index > -1) {
-            mockData.users[index] = { ...mockData.users[index], ...data };
-            return mockData.users[index];
+
+
         }
         return null;
     },
@@ -165,7 +165,7 @@ export const db = {
 
             // Filter out cancelled orders by default (soft-deleted from MISA)
             if (!includeDeleted) {
-                query = query.neq('status', 'Đã hủy bỏ');
+                query = query.neq('status', 'ÄÃ£ há»§y bá»');
             }
 
             const { data, error } = await query;
@@ -198,8 +198,8 @@ export const db = {
                     driver: o.custom_field13 || '',
                     plate: o.custom_field14 || '',
                     // MISA Description & Creator (for driver view)
-                    misa_note: o.description || '', // Ghi chú từ MISA CRM
-                    creator_name: o.owner_name || '', // Người tạo đơn (để tài xế liên lạc)
+                    misa_note: o.description || '', // Ghi chÃº tá»« MISA CRM
+                    creator_name: o.owner_name || '', // NgÆ°á»i táº¡o Ä‘Æ¡n (Ä‘á»ƒ tÃ i xáº¿ liÃªn láº¡c)
                     // Products
                     products: products,
                     cart: products,
@@ -213,7 +213,7 @@ export const db = {
             const data = snapshot.val();
             return data ? Object.values(data) : [];
         }
-        return mockData.orders;
+        return [];
     },
 
     getOrder: async (id) => {
@@ -247,7 +247,7 @@ export const db = {
                     }
                 } catch (e) { }
 
-                // Parse local_items from JSONB (vỏ can, phuy, tank - NOT synced to MISA)
+                // Parse local_items from JSONB (vá» can, phuy, tank - NOT synced to MISA)
                 let localItems = [];
                 try {
                     if (typeof data.local_items === 'string') {
@@ -272,8 +272,8 @@ export const db = {
                 data.driver_name = data.custom_field13 || '';
                 data.plate = data.custom_field14 || '';
                 // MISA Description & Creator (for driver view)
-                data.misa_note = data.description || ''; // Ghi chú từ MISA CRM
-                data.creator_name = data.owner_name || ''; // Người tạo đơn (để tài xế liên lạc)
+                data.misa_note = data.description || ''; // Ghi chÃº tá»« MISA CRM
+                data.creator_name = data.owner_name || ''; // NgÆ°á»i táº¡o Ä‘Æ¡n (Ä‘á»ƒ tÃ i xáº¿ liÃªn láº¡c)
             }
 
 
@@ -283,7 +283,7 @@ export const db = {
             const snapshot = await firebaseDb.ref(`orders/${sanitizeId(id)}`).once('value');
             return snapshot.val();
         }
-        return mockData.orders.find(o => o.id === id);
+        return null;
     },
 
 
@@ -309,7 +309,7 @@ export const db = {
                 contact_name: order.contact_name || null,
                 phone: order.phone || null,
                 // Status
-                status: order.status || 'Mới',
+                status: order.status || 'Má»›i',
                 delivery_status: order.delivery_status || null,
                 pay_status: order.pay_status || null,
                 revenue_status: order.revenue_status || null,
@@ -354,7 +354,7 @@ export const db = {
             await firebaseDb.ref(`orders/${id}`).set(safeOrder);
             return safeOrder;
         }
-        mockData.orders.push(order);
+        // mock removed
         return order;
     },
 
@@ -365,7 +365,7 @@ export const db = {
             // Map incoming data to Supabase column names
             const safeData = {};
 
-            // Direct mappings (camelCase/Vietnamese → Supabase columns)
+            // Direct mappings (camelCase/Vietnamese â†’ Supabase columns)
             if (data.status !== undefined) safeData.status = data.status;
             if (data.misa_id !== undefined) safeData.misa_id = data.misa_id;
             if (data.note !== undefined) safeData.description = data.note;
@@ -373,7 +373,7 @@ export const db = {
             if (data.description !== undefined) safeData.description = data.description;
             if (data.khach !== undefined) safeData.account_name = data.khach;
 
-            // Driver/Plate → custom_field13/14
+            // Driver/Plate â†’ custom_field13/14
             if (data.taiXe !== undefined) safeData.custom_field13 = data.taiXe;
             if (data.bienSo !== undefined) safeData.custom_field14 = data.bienSo;
             if (data.driver !== undefined) safeData.custom_field13 = data.driver;
@@ -394,7 +394,7 @@ export const db = {
             if (data.delivery_status !== undefined) safeData.delivery_status = data.delivery_status;
             if (data.owner_name !== undefined) safeData.owner_name = data.owner_name;
 
-            // Core MISA fields (must sync from CRM → DB)
+            // Core MISA fields (must sync from CRM â†’ DB)
             if (data.ngay !== undefined) safeData.sale_order_date = data.ngay;
             if (data.sale_order_date !== undefined) safeData.sale_order_date = data.sale_order_date;
             if (data.account_name !== undefined) safeData.account_name = data.account_name;
@@ -418,7 +418,7 @@ export const db = {
                     : JSON.stringify(data.sale_order_product_mappings);
             }
 
-            // Local Items (NOT synced to MISA - vỏ can, phuy, tank, etc.)
+            // Local Items (NOT synced to MISA - vá» can, phuy, tank, etc.)
             if (data.local_items !== undefined) {
                 safeData.local_items = typeof data.local_items === 'string'
                     ? data.local_items
@@ -430,7 +430,7 @@ export const db = {
                 safeData.delivery_note = data.delivery_note;
             }
 
-            // Merged Order No (Ghép chuyến)
+            // Merged Order No (GhÃ©p chuyáº¿n)
             if (data.merged_order_no !== undefined) {
                 safeData.merged_order_no = data.merged_order_no;
             }
@@ -440,22 +440,22 @@ export const db = {
                 safeData.telegram_message_id = data.telegram_message_id;
             }
 
-            // Sale Confirmation (Xác nhận đơn trước khi gửi CRM)
+            // Sale Confirmation (XÃ¡c nháº­n Ä‘Æ¡n trÆ°á»›c khi gá»­i CRM)
             if (data.sale_confirmed !== undefined) safeData.sale_confirmed = data.sale_confirmed;
             if (data.sale_confirmed_at !== undefined) safeData.sale_confirmed_at = data.sale_confirmed_at;
             if (data.sale_confirmed_by !== undefined) safeData.sale_confirmed_by = data.sale_confirmed_by;
 
-            // Admin Approval (Admin duyệt → đẩy MISA)
+            // Admin Approval (Admin duyá»‡t â†’ Ä‘áº©y MISA)
             if (data.admin_approved !== undefined) safeData.admin_approved = data.admin_approved;
             if (data.admin_approved_at !== undefined) safeData.admin_approved_at = data.admin_approved_at;
             if (data.admin_approved_by !== undefined) safeData.admin_approved_by = data.admin_approved_by;
 
-            console.log(`📝 Updating order ${safeId}:`, Object.keys(safeData));
+            console.log(`ðŸ“ Updating order ${safeId}:`, Object.keys(safeData));
             let { data: updated, error } = await supabase.from('orders').update(safeData).eq('id', safeId).select().single();
 
             // Fallback: if no match by id (dots sanitized to underscores), try by sale_order_no
             if (!updated || error) {
-                console.log(`⚠️ Update by id failed, trying sale_order_no: ${id}`);
+                console.log(`âš ï¸ Update by id failed, trying sale_order_no: ${id}`);
                 const result = await supabase.from('orders').update(safeData).eq('sale_order_no', id).select().single();
                 updated = result.data;
                 error = result.error;
@@ -467,11 +467,6 @@ export const db = {
         if (useFirebase) {
             await firebaseDb.ref(`orders/${safeId}`).update(data);
             return { id: safeId, ...data };
-        }
-        const index = mockData.orders.findIndex(o => o.id === id);
-        if (index !== -1) {
-            mockData.orders[index] = { ...mockData.orders[index], ...data };
-            return mockData.orders[index];
         }
         return null;
     },
@@ -487,7 +482,7 @@ export const db = {
             await firebaseDb.ref('orders').remove();
             return;
         }
-        mockData.orders = [];
+        // mock removed
     },
 
     deleteOrder: async (id) => {
@@ -510,11 +505,6 @@ export const db = {
             await firebaseDb.ref(`orders/${safeId}`).remove();
             return true;
         }
-        const index = mockData.orders.findIndex(o => o.id === id);
-        if (index !== -1) {
-            mockData.orders.splice(index, 1);
-            return true;
-        }
         return false;
     },
 
@@ -530,7 +520,7 @@ export const db = {
             const snapshot = await firebaseDb.ref('materials').once('value');
             return snapshot.val() ? Object.values(snapshot.val()) : [];
         }
-        return mockData.materials;
+        return [];
     },
 
     addMaterial: async (material) => {
@@ -538,7 +528,7 @@ export const db = {
 
         // Debug: Log which mode is being used
         if (!useSupabase && !useFirebase) {
-            console.warn('⚠️ addMaterial: Neither Supabase nor Firebase enabled, using mock data');
+            console.warn('âš ï¸ addMaterial: Neither Supabase nor Firebase enabled, using mock data');
         }
 
         if (useSupabase) {
@@ -548,8 +538,8 @@ export const db = {
             const { data, error } = await supabase.from('materials').upsert(safeMaterial, { onConflict: 'id' }).select().single();
 
             if (error) {
-                console.error('❌ Supabase addMaterial error:', error.message, error.details, error.hint);
-                console.error('❌ Failed material data:', JSON.stringify(safeMaterial).substring(0, 200));
+                console.error('âŒ Supabase addMaterial error:', error.message, error.details, error.hint);
+                console.error('âŒ Failed material data:', JSON.stringify(safeMaterial).substring(0, 200));
                 return null; // Return null on error
             }
 
@@ -561,7 +551,7 @@ export const db = {
             await firebaseDb.ref(`materials/${id}`).set(safeMaterial);
             return safeMaterial;
         }
-        mockData.materials.push(material);
+        // mock removed
         return material;
     },
 
@@ -589,7 +579,7 @@ export const db = {
             const snapshot = await firebaseDb.ref('employees').once('value');
             return snapshot.val() ? Object.values(snapshot.val()) : [];
         }
-        return mockData.employees;
+        return [];
     },
 
     addEmployee: async (employee) => {
@@ -603,7 +593,7 @@ export const db = {
         if (useFirebase) {
             await firebaseDb.ref(`employees/${id}`).set(newEmployee);
         } else {
-            mockData.employees.push(newEmployee);
+            // mock removed
         }
         return newEmployee;
     },
@@ -633,7 +623,7 @@ export const db = {
             const snapshot = await firebaseDb.ref('inventory').once('value');
             return snapshot.val() ? Object.values(snapshot.val()) : [];
         }
-        return mockData.inventory;
+        return [];
     },
 
     updateInventory: async () => { return true; },
@@ -641,10 +631,10 @@ export const db = {
     addDataXuat: async (d) => { return d; },
 
     // === MASTER DATA ===
-    getTrucks: async () => { return mockData.trucks; },
-    getCustomers: async () => { return mockData.customers; },
+    getTrucks: async () => { return []; },
+    getCustomers: async () => { return []; },
 
-    // === SUPPLIERS (Nhà cung cấp) ===
+    // === SUPPLIERS (NhÃ  cung cáº¥p) ===
     getSuppliers: async () => {
         const { useSupabase, useFirebase } = getMode();
         if (useSupabase) {
@@ -662,7 +652,7 @@ export const db = {
             const snapshot = await firebaseDb.ref('suppliers').once('value');
             return snapshot.val() ? Object.values(snapshot.val()) : [];
         }
-        return mockData.suppliers;
+        return [];
     },
 
     addSupplier: async (supplier) => {
@@ -687,7 +677,7 @@ export const db = {
             await firebaseDb.ref(`suppliers/${safeId}`).set(safeSupplier);
             return safeSupplier;
         }
-        mockData.suppliers.push(safeSupplier);
+        // mock removed
         return safeSupplier;
     },
 
@@ -737,7 +727,7 @@ export const db = {
         return false;
     },
 
-    // === CUSTOMERS (Khách hàng) ===
+    // === CUSTOMERS (KhÃ¡ch hÃ ng) ===
     getCustomers: async () => {
         const { useSupabase, useFirebase } = getMode();
         if (useSupabase) {
@@ -755,7 +745,7 @@ export const db = {
             const snapshot = await firebaseDb.ref('customers').once('value');
             return snapshot.val() ? Object.values(snapshot.val()) : [];
         }
-        return mockData.customers || [];
+        return [];
     },
 
     addCustomer: async (customer) => {
@@ -780,8 +770,8 @@ export const db = {
             await firebaseDb.ref(`customers/${safeId}`).set(safeCustomer);
             return safeCustomer;
         }
-        mockData.customers = mockData.customers || [];
-        mockData.customers.push(safeCustomer);
+        // mock removed
+        // mock removed
         return safeCustomer;
     },
 
