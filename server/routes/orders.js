@@ -1374,73 +1374,20 @@ router.post('/:id/complete', async (req, res) => {
                 console.error('Supabase Export Ticket Error:', err.message);
             }
 
-            // 2. Sync to MISA CRM
+            // MISA sync is now handled via 2-step confirmation (Sales confirm → Admin approve)
+            // Mark order as pending approval instead of direct MISA sync
             let orderInfo;
             try {
                 orderInfo = await db.getOrder(id);
-
-                // For multi-driver: combine actual_qty from all assignments
-                let misaCart;
-                if (isMultiDriverOrder && allAssignments && allAssignments.length > 0) {
-                    const originalProducts = orderInfo?.products || orderInfo?.cart || [];
-                    console.log(`📦 Multi-driver sync: Using combined qty ${totalActualQty}kg from ${allAssignments.length} drivers`);
-
-                    if (cart.length === 1 || originalProducts.length === 1) {
-                        misaCart = [{
-                            product_code: updatedProducts[0]?.code || cart[0]?.product?.code || cart[0]?.code || originalProducts[0]?.code || '',
-                            warehouse,
-                            unit: updatedProducts[0]?.unit || cart[0]?.unit || 'kg',
-                            qty: Math.round(updatedProducts[0]?.qty || totalActualQty)
-                        }];
-                    } else {
-                        console.log(`📦 Multi-driver MISA sync: Using combined products:`, updatedProducts);
-                        misaCart = updatedProducts.map(item => ({
-                            product_code: item.code || '',
-                            warehouse,
-                            unit: item.unit || 'kg',
-                            qty: Math.round(item.qty || 0)
-                        }));
-                    }
-                } else {
-                    misaCart = cart.filter(item => !item.isShell).map(item => ({
-                        product_code: item.product?.code || item.product?.id || item.code || item.product || '',
-                        warehouse,
-                        unit: item.unit || 'kg',
-                        qty: Number(item.weight_kg || item.qty || 0)
-                    }));
-                }
-
-                const misaDriverName = isMultiDriverOrder ? firstDriverName : (resolvedDriverName || driver_name);
-                const misaPlate = isMultiDriverOrder && firstDriverPlate ? firstDriverPlate : (resolvedPlate || plate);
-                console.log(`📤 MISA Sync - Driver: ${misaDriverName}, Plate: ${misaPlate}, isMultiDriver: ${isMultiDriverOrder}, TotalQty: ${isMultiDriverOrder ? totalActualQty : 'N/A'}`);
-
-                const syncResult = await updateMisaOrder(orderInfo.sale_order_no || id, {
-                    misa_id: orderInfo.misa_id,
-                    delivery_status: 'Đã giao hàng',
-                    status: 'Đã thực hiện',
-                    driver: misaDriverName,
-                    plate: misaPlate,
-                    cart: misaCart
-                });
-
-                if (syncResult.success) {
-                    crmSyncStatus = 'SYNCED';
-                } else {
-                    crmSyncStatus = 'FAILED';
-                    syncStatusMsg = ` (⚠️ CRM Lỗi: ${syncResult.message})`;
-                }
-
                 await db.updateOrder(id, {
-                    crm_sync_status: crmSyncStatus,
-                    sync_error: syncResult.success ? null : syncResult.message
+                    crm_sync_status: 'PENDING_APPROVAL',
+                    sync_error: null
                 });
-
+                crmSyncStatus = 'PENDING_APPROVAL';
+                console.log(`⏳ Order ${id} marked PENDING_APPROVAL (MISA sync deferred to Admin approve)`);
             } catch (syncErr) {
-                crmSyncStatus = 'FAILED';
-                syncStatusMsg = ` (⚠️ CRM Exception: ${syncErr.message})`;
-                await db.updateOrder(id, { crm_sync_status: 'FAILED', sync_error: syncErr.message });
-                console.error('MISA Sync Error:', syncErr.message);
-                // DO NOT return here - continue to send notifications!
+                crmSyncStatus = 'PENDING_APPROVAL';
+                console.error('Error marking pending approval:', syncErr.message);
             }
 
             // Reload order info if not loaded yet (e.g. MISA sync failed on getOrder)
@@ -1683,25 +1630,9 @@ router.post('/:id/complete', async (req, res) => {
             console.warn('Admin driver resolution error:', e.message);
         }
 
-        // Sync to MISA
-        const fullOrder = await db.getOrder(id);
-        console.log(`📤 Complete Order Sync - Order: ${fullOrder?.sale_order_no}, Cart items: ${(products || fullOrder?.cart || []).length}`);
-        try {
-            const syncResult = await updateMisaOrder(fullOrder?.sale_order_no || id, {
-                misa_id: fullOrder?.misa_id,
-                delivery_status: 'Đã giao hàng',
-                status: 'Đã thực hiện',
-                driver: adminResolvedDriver || fullOrder?.custom_field13 || fullOrder?.taiXe || '',
-                plate: adminResolvedPlate || fullOrder?.custom_field14 || fullOrder?.bienSo || '',
-                cart: products || fullOrder?.cart || fullOrder?.products || []
-            });
-
-            if (!syncResult.success) {
-                console.error('MISA Sync Failed during Complete:', syncResult.message);
-            }
-        } catch (syncErr) {
-            console.error('MISA Sync Error:', syncErr.message);
-        }
+        // MISA sync is now handled via 2-step confirmation (Sales confirm → Admin approve)
+        // Mark order as pending approval instead of direct MISA sync
+        console.log(`⏳ Admin Complete: Order ${id} marked PENDING_APPROVAL (MISA sync deferred to Admin approve)`);
 
         // Send Telegram notification for admin complete
         try {
