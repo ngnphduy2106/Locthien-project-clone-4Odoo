@@ -307,7 +307,22 @@ const performSync = async () => {
 
     // 2. Get Existing Orders from DB to check for duplicates
     // Include deleted orders so we can compare against MISA for sync
-    const dbOrders = await db.getOrders(true); // true = includeDeleted
+    let dbOrders = [];
+    try {
+        dbOrders = await db.getOrders(true); // true = includeDeleted
+    } catch (dbErr) {
+        console.error('❌ CRITICAL: Cannot fetch DB orders for sync:', dbErr.message);
+        console.error('🚫 ABORTING SYNC to prevent data corruption');
+        return;
+    }
+
+    // SAFEGUARD: If DB returns 0 orders but MISA has many, something is wrong
+    // Skip sync to prevent treating all existing orders as "new"
+    if (dbOrders.length === 0 && misaOrders.length > 5) {
+        console.error(`🚫 SAFEGUARD: DB returned 0 orders but MISA has ${misaOrders.length}. Skipping sync to prevent data corruption.`);
+        return;
+    }
+
     const existingIds = new Set(dbOrders.map(o => o.soDon || o.id));
 
     let newCount = 0;
