@@ -9804,8 +9804,21 @@ async function openReviewPanel(orderId) {
     if (!panel) return;
 
     confirmReviewingOrderId = orderId;
+
+    // Move panel to <body> to avoid parent container constraints
+    if (!panel._originalParent) {
+        panel._originalParent = panel.parentElement;
+    }
+    document.body.appendChild(panel);
     panel.style.display = 'block';
-    // Close on backdrop click (the scrollable wrapper is the 3rd child)
+
+    // Make grid responsive
+    const splitContainer = window.$('#review-split-container');
+    if (splitContainer) {
+        splitContainer.style.gridTemplateColumns = window.innerWidth < 768 ? '1fr' : '1fr 1fr';
+    }
+
+    // Close on backdrop click (the scrollable wrapper is the 2nd child)
     const wrapper = panel.children[1]; // scrollable wrapper div
     if (wrapper) wrapper.onclick = (e) => { if (e.target === wrapper) closeReviewPanel(); };
 
@@ -10166,7 +10179,13 @@ async function approveOrder(orderId) {
 
 function closeReviewPanel() {
     const panel = window.$('#confirm-review-panel');
-    if (panel) panel.style.display = 'none';
+    if (panel) {
+        panel.style.display = 'none';
+        // Move panel back to original parent
+        if (panel._originalParent && panel.parentElement === document.body) {
+            panel._originalParent.appendChild(panel);
+        }
+    }
     confirmReviewingOrderId = null;
     confirmReviewingOrder = null;
 }
