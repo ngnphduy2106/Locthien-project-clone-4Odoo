@@ -663,7 +663,10 @@ const performSync = async () => {
                     changeMsg += `📦 Mã: <b>#${saleOrderNo}</b>\n`;
                     changeMsg += `👤 KH: <b>${item.account_name || oldOrder.khach || 'N/A'}</b>\n`;
                     changeMsg += `<blockquote>${changes.join('\n')}</blockquote>`;
-                    sendTelegramMessage(changeMsg, 'NOTIFY', oldOrder.telegram_message_id || null).catch(() => { });
+                    console.log(`📢 Sending change notification for ${saleOrderNo}: ${changes.length} changes`);
+                    sendTelegramMessage(changeMsg, 'NOTIFY', oldOrder.telegram_message_id || null)
+                        .then(() => console.log(`✅ Change notification sent for ${saleOrderNo}`))
+                        .catch(err => console.error(`❌ Change notification FAILED for ${saleOrderNo}:`, err.message));
                 }
             }
             await db.updateOrder(saleOrderNo, mappedOrder);
