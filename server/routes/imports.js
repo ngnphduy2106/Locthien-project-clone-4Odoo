@@ -1066,13 +1066,12 @@ router.post('/:id/admin-confirm', async (req, res) => {
             ticketId = byNo.id;
         }
 
-        // Update: mark as admin_approved
+        // Update: mark as confirmed (use status field since admin_approved column doesn't exist)
         const { data, error } = await supabase
             .from('import_tickets')
             .update({
-                admin_approved: true,
-                admin_approved_at: new Date().toISOString(),
-                admin_approved_by: confirmed_by || 'Admin'
+                status: 'confirmed',
+                note: `Xác nhận bởi ${confirmed_by || 'Admin'} lúc ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}`
             })
             .eq('id', ticketId)
             .select()

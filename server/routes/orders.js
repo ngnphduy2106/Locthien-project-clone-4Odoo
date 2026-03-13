@@ -575,6 +575,7 @@ router.get('/pending-confirm', async (req, res) => {
         const type = req.query.type || 'export';
 
         if (type === 'import') {
+            // Only show completed (not yet confirmed) imports
             const { data: tickets, error } = await supabase
                 .from('import_tickets')
                 .select('*')
@@ -583,23 +584,7 @@ router.get('/pending-confirm', async (req, res) => {
 
             if (error) return res.json(createResponse(true, error.message));
 
-            const result = [];
-            for (const t of (tickets || [])) {
-                // Skip already admin-confirmed imports
-                if (t.admin_approved) continue;
-
-                if (t.order_id) {
-                    const { data: order } = await supabase.from('orders')
-                        .select('sale_confirmed, admin_approved, account_name, shipping_address, sale_order_date')
-                        .eq('id', t.order_id).single();
-                    if (!order?.admin_approved) {
-                        result.push({ ...t, parent_order: order, sale_confirmed: order?.sale_confirmed || false });
-                    }
-                } else {
-                    result.push(t);
-                }
-            }
-            return res.json(createResponse(false, 'OK', result));
+            return res.json(createResponse(false, 'OK', tickets || []));
         }
 
         // Export orders: MISA orders completed but not yet admin_approved

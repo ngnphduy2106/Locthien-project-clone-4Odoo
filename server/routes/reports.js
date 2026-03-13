@@ -167,7 +167,7 @@ router.get('/order-history', async (req, res) => {
         const orders = await db.getOrders();
 
         // Filter completed/cancelled orders
-        const historyStatuses = ['Đã thực hiện', 'Đã hủy bỏ', 'completed', 'Hoàn thành', 'Đã giao hàng', 'cancelled'];
+        const historyStatuses = ['Đã thực hiện', 'Đã hủy bỏ', 'completed', 'confirmed', 'Hoàn thành', 'Đã giao hàng', 'cancelled'];
         let historyOrders = orders.filter(o => {
             const s = String(o.status || '').trim().toLowerCase();
             return historyStatuses.some(hs => hs.toLowerCase() === s);
