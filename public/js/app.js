@@ -9713,43 +9713,52 @@ async function loadPendingConfirmOrders() {
 
         if (confirmCurrentTab === 'export') {
             const isAdmin = state.user?.role === 'admin';
+            const isSales = ['staff', 'admin', 'dispatcher'].includes(state.user?.role);
             container.innerHTML = orders.map(o => {
                 const orderNo = o.sale_order_no || o.id;
                 const fmtDate = o.sale_order_date ? new Date(o.sale_order_date).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : '';
                 const products = (o.products || []).map(p => `${p.name || p.code}: ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'Kg'}`).join(', ');
                 const isConfirmed = !!o.sale_confirmed;
+                const driver = o.custom_field13 || o.taiXe || '';
 
                 return `
-                <div style="background:white; border:1px solid ${isConfirmed ? '#10b981' : '#E5E7EB'}; border-radius:12px; padding:12px 16px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; ${isConfirmed ? 'border-left:4px solid #10b981;' : ''}" id="confirm-card-${o.id}">
-                    ${isConfirmed ? '<div style="color:#10b981; font-size:20px; flex-shrink:0;" title="Sales đã xác nhận">☑️</div>' : ''}
-                    <div style="flex:1; min-width:200px;">
-                        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                            <span style="font-weight:600; color:var(--primary); font-size:13px;">#${orderNo}</span>
-                            <span style="font-size:11px; color:#6B7280;">${fmtDate}</span>
-                            <span class="badge badge-${o.status === 'Hoàn thành' ? 'success' : 'info'}" style="font-size:10px; padding:2px 6px;">${o.status}</span>
-                            ${isConfirmed ? `<span style="font-size:10px; color:#10b981; background:#ECFDF5; padding:2px 6px; border-radius:4px;">✓ ${o.sale_confirmed_by || 'Sales'}</span>` : ''}
+                <div style="background:white; border:1px solid ${isConfirmed ? '#10b981' : '#E5E7EB'}; border-radius:12px; padding:16px; ${isConfirmed ? 'border-left:4px solid #10b981;' : ''}" id="confirm-card-${o.id}">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap;">
+                        <div style="flex:1; min-width:250px;">
+                            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:6px;">
+                                ${isConfirmed ? '<span style="color:#10b981; font-size:18px;" title="Sales đã xác nhận">☑️</span>' : '<span style="color:#d1d5db; font-size:18px;">☐</span>'}
+                                <span style="font-weight:700; color:var(--primary); font-size:14px;">#${orderNo}</span>
+                                <span style="font-size:11px; color:#6B7280; background:#F3F4F6; padding:2px 8px; border-radius:4px;">${fmtDate}</span>
+                                <span style="font-size:10px; color:white; background:${o.status === 'Hoàn thành' ? '#10b981' : '#6366f1'}; padding:2px 8px; border-radius:10px;">${o.status}</span>
+                                ${isConfirmed ? '<span style="font-size:10px; color:#10b981; background:#ECFDF5; padding:2px 8px; border-radius:10px;">✓ ' + (o.sale_confirmed_by || 'Sales') + '</span>' : ''}
+                            </div>
+                            <div style="font-size:13px; color:#1f2937; font-weight:600; margin-bottom:4px;">
+                                ${o.account_name || 'N/A'}
+                            </div>
+                            ${o.shipping_address ? '<div style="font-size:11px; color:#6B7280; margin-bottom:4px;">📍 ' + o.shipping_address.substring(0, 80) + '</div>' : ''}
+                            <div style="font-size:11px; color:#4B5563;">📦 ${products || 'Không có SP'}</div>
+                            ${driver ? '<div style="font-size:11px; color:#6B7280; margin-top:2px;">🚛 ' + driver + '</div>' : ''}
                         </div>
-                        <div style="font-size:12px; color:#374151; margin-top:2px;">
-                            <b>${o.account_name || 'N/A'}</b>
-                            ${o.shipping_address ? ` · ${o.shipping_address.substring(0, 50)}` : ''}
+                        <div style="display:flex; flex-direction:column; gap:6px; flex-shrink:0; min-width:120px;">
+                            <button class="btn btn-outline btn-sm" onclick="openReviewPanel('${o.id}')" style="font-size:12px; padding:6px 14px; border-radius:8px; width:100%;">
+                                <i class="bi bi-eye"></i> Kiểm tra
+                            </button>
+                            ${!isConfirmed && isSales ? `
+                                <button class="btn btn-sm" onclick="quickConfirmOrder('${o.id}')" style="font-size:12px; padding:6px 14px; border-radius:8px; width:100%; background:transparent; border:2px solid #f59e0b; color:#d97706; font-weight:600;">
+                                    <i class="bi bi-check-lg"></i> Sales Xác nhận
+                                </button>
+                            ` : ''}
+                            ${isAdmin && isConfirmed ? `
+                                <button class="btn btn-sm" onclick="approveOrder('${o.id}')" style="font-size:12px; padding:6px 14px; border-radius:8px; width:100%; background:linear-gradient(135deg, #10b981, #059669); color:white; border:none; font-weight:600; box-shadow:0 2px 4px rgba(16,185,129,0.3);">
+                                    <i class="bi bi-cloud-upload"></i> Duyệt & MISA
+                                </button>
+                            ` : ''}
+                            ${isAdmin && !isConfirmed ? `
+                                <button class="btn btn-sm" onclick="approveOrder('${o.id}')" style="font-size:12px; padding:6px 14px; border-radius:8px; width:100%; background:#e5e7eb; color:#6b7280; border:none; font-weight:500;" title="Sales chưa xác nhận">
+                                    <i class="bi bi-cloud-upload"></i> Duyệt & MISA
+                                </button>
+                            ` : ''}
                         </div>
-                        <div style="font-size:11px; color:#6B7280; margin-top:2px;">${products || 'Không có SP'}</div>
-                        ${o.custom_field13 ? `<div style="font-size:11px; color:#6B7280;">🚛 ${o.custom_field13}</div>` : ''}
-                    </div>
-                    <div style="display:flex; gap:6px; flex-shrink:0;">
-                        <button class="btn btn-outline btn-sm" onclick="openReviewPanel('${o.id}')" style="font-size:12px; padding:6px 12px; border-radius:8px;">
-                            <i class="bi bi-search"></i> Kiểm tra
-                        </button>
-                        ${!isConfirmed ? `
-                            <button class="btn btn-primary btn-sm" onclick="quickConfirmOrder('${o.id}')" style="font-size:12px; padding:6px 12px; border-radius:8px; background:linear-gradient(135deg, #f59e0b, #d97706);">
-                                <i class="bi bi-check"></i> Xác nhận
-                            </button>
-                        ` : ''}
-                        ${isAdmin ? `
-                            <button class="btn btn-primary btn-sm" onclick="approveOrder('${o.id}')" style="font-size:12px; padding:6px 12px; border-radius:8px; background:linear-gradient(135deg, #10b981, #059669);">
-                                <i class="bi bi-check-circle"></i> Duyệt
-                            </button>
-                        ` : ''}
                     </div>
                 </div>`;
             }).join('');
@@ -9805,6 +9814,8 @@ async function openReviewPanel(orderId) {
 
     confirmReviewingOrderId = orderId;
     panel.style.display = 'flex';
+    // Close on backdrop click
+    panel.onclick = (e) => { if (e.target === panel) closeReviewPanel(); };
 
     const imgContainer = window.$('#review-images');
     const infoContainer = window.$('#review-order-info');
@@ -9863,6 +9874,21 @@ async function openReviewPanel(orderId) {
         // Render editable products
         const products = order.products || [];
         renderReviewProducts(products);
+
+        // Update confirm button based on role
+        const confirmBtn = panel.querySelector('#review-confirm-btn');
+        if (confirmBtn) {
+            const isAdmin = state.user?.role === 'admin';
+            if (isAdmin) {
+                confirmBtn.innerHTML = '<i class="bi bi-cloud-upload"></i> DUYỆT & ĐẨY MISA';
+                confirmBtn.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+                confirmBtn.onclick = () => approveOrder(orderId).then(() => closeReviewPanel());
+            } else {
+                confirmBtn.innerHTML = '<i class="bi bi-check-lg"></i> SALES XÁC NHẬN';
+                confirmBtn.style.background = 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)';
+                confirmBtn.onclick = () => confirmReviewOrder();
+            }
+        }
     } catch (err) {
         console.error('openReviewPanel error:', err);
         imgContainer.innerHTML = '<div style="color:#EF4444;">Lỗi tải dữ liệu</div>';
