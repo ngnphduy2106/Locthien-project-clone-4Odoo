@@ -303,74 +303,142 @@ const OrderHistoryModule = {
         console.log('✅ Rendered', orders.length, 'compact rows');
     },
 
-    // OLD: Render as table
+    // Render as split table (Export + Import side by side)
     renderTable(data) {
         const orders = data || this.history;
-        const container = document.getElementById('history-table-body');
         const cardsContainer = document.getElementById('history-cards-container');
         const tableContainer = document.getElementById('history-table-container');
 
-        if (!container) {
+        if (!tableContainer) {
             console.error('❌ Table container not found!');
             return;
         }
 
         if (cardsContainer) cardsContainer.classList.add('hidden');
-        if (tableContainer) tableContainer.classList.remove('hidden');
+        tableContainer.classList.remove('hidden');
 
-        // Always show the Total Amount column header
-        const thTotalAmount = document.getElementById('th-total-amount');
-        if (thTotalAmount) thTotalAmount.style.display = '';
+        // Split orders by type
+        const exportOrders = orders.filter(o => (o.orderType || 'export') === 'export');
+        const importOrders = orders.filter(o => o.orderType === 'import');
 
-        if (orders.length === 0) {
-            container.innerHTML = `
-                <tr>
-                    <td colspan="7" style="text-align: center; padding: 40px; color: #8c8c8c;">
-                        <i class="bi bi-inbox" style="font-size: 48px; display: block; margin-bottom: 12px;"></i>
-                        Không tìm thấy đơn hàng
-                    </td>
-                </tr>
-            `;
-            return;
-        }
+        // Permission check helper
+        const currentUser = window.state?.user || {};
+        const role = String(currentUser.role || '').toLowerCase();
+        const isAdmin = role === 'admin' || role === 'tester';
 
-        container.innerHTML = orders.map(order => {
+        const canViewPrice = (order) => {
+            const isCreator = order.creatorName && currentUser.name && order.creatorName === currentUser.name;
+            return isAdmin || isCreator;
+        };
+
+        // Products formatter
+        const formatProducts = (products) => {
+            if (!products || !Array.isArray(products) || products.length === 0) return '—';
+            return products.map(p => {
+                const name = p.name || p.code || p.product || 'SP';
+                const qty = Number(p.qty || p.quantity || 0).toLocaleString('vi-VN');
+                const unit = p.unit || 'Kg';
+                return `${name}: ${qty} ${unit}`;
+            }).join('<br>');
+        };
+
+        // Render export row
+        const renderExportRow = (order) => {
             const orderId = order.orderCode || order.id || 'N/A';
             const customer = order.customerName || order.accountName || 'N/A';
-            const date = order.orderDate || order.order_date || order.createdAt;
-            const amount = order.totalAmount || order.total_amount || 0;
-            const status = order.status || 'N/A';
-            const driver = order.driverName || order.driver_name || '-';
+            const driver = order.driverName || order.driver_name || '—';
+            const assistant = order.assistantName || '—';
             const completedDate = order.completedAt || order.completed_at;
-
-            // Permission check
-            const currentUser = window.state?.user || {};
-            const role = String(currentUser.role || '').toLowerCase();
-            const isAdmin = role === 'admin' || role === 'tester';
-            const isCreator = order.creatorName && currentUser.name && order.creatorName === currentUser.name;
-            const canViewPrice = isAdmin || isCreator;
-            const displayAmount = canViewPrice ? `${amount.toLocaleString('vi-VN')} VNĐ` : '***';
+            const products = formatProducts(order.products);
 
             return `
             <tr onclick="OrderHistoryModule.viewDetail('${orderId}')" style="cursor:pointer;" class="history-row">
-                <td>
-                    <strong>${orderId}</strong>
-                    ${order.merged_order_no ? `<br><span style="background:#4c6ef5; color:white; padding:2px 6px; border-radius:10px; font-size:10px;"><i class="bi bi-link-45deg"></i> ${order.merged_order_no}</span>` : ''}
-                </td>
+                <td><strong>${orderId}</strong></td>
                 <td>${customer}</td>
-                <td>${date ? new Date(date).toLocaleDateString('vi-VN') : 'N/A'}</td>
-                <td>${displayAmount}</td>
-                <td>
-                    <span class="status-badge ${this.getStatusClass(status)}">
-                        ${this.getStatusText(status)}
-                    </span>
-                </td>
+                <td style="font-size:11px; line-height:1.4;">${products}</td>
                 <td>${driver}</td>
-                <td>${completedDate ? new Date(completedDate).toLocaleString('vi-VN') : '-'}</td>
+                <td>${assistant}</td>
+                <td style="font-size:11px;">${completedDate ? new Date(completedDate).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'}</td>
             </tr>`;
-        }).join('');
+        };
 
-        console.log('✅ Rendered', orders.length, 'table rows');
+        // Render import row
+        const renderImportRow = (order) => {
+            const orderId = order.orderCode || order.id || 'N/A';
+            const supplier = order.customerName || 'N/A';
+            const driver = order.driverName || '—';
+            const assistant = order.assistantName || '—';
+            const completedDate = order.completedAt || order.completed_at;
+            const products = formatProducts(order.products);
+
+            return `
+            <tr onclick="OrderHistoryModule.viewDetail('${orderId}')" style="cursor:pointer;" class="history-row">
+                <td><strong style="color:#16a34a;">${orderId}</strong></td>
+                <td>${supplier}</td>
+                <td style="font-size:11px; line-height:1.4;">${products}</td>
+                <td>${driver}</td>
+                <td>${assistant}</td>
+                <td style="font-size:11px;">${completedDate ? new Date(completedDate).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'}</td>
+            </tr>`;
+        };
+
+        const emptyRow = (cols, text) => `<tr><td colspan="${cols}" style="text-align:center; padding:30px; color:#9CA3AF;"><i class="bi bi-inbox" style="font-size:32px; display:block; margin-bottom:8px;"></i>${text}</td></tr>`;
+
+        tableContainer.innerHTML = `
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+                <!-- Export Table -->
+                <div>
+                    <h4 style="margin:0 0 8px; font-size:14px; color:var(--primary); display:flex; align-items:center; gap:6px;">
+                        <i class="bi bi-box-arrow-up-right"></i> Đơn Xuất
+                        <span style="background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-size:11px;">${exportOrders.length}</span>
+                    </h4>
+                    <div style="overflow-x:auto; border:1px solid #E5E7EB; border-radius:8px;">
+                        <table class="data-table" style="width:100%; font-size:12px;">
+                            <thead>
+                                <tr>
+                                    <th>Mã Đơn</th>
+                                    <th>Khách Hàng</th>
+                                    <th>Sản Phẩm</th>
+                                    <th>Tài Xế</th>
+                                    <th>Phụ Xe</th>
+                                    <th>Hoàn Thành</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${exportOrders.length > 0 ? exportOrders.map(renderExportRow).join('') : emptyRow(6, 'Không có đơn xuất')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Import Table -->
+                <div>
+                    <h4 style="margin:0 0 8px; font-size:14px; color:#16a34a; display:flex; align-items:center; gap:6px;">
+                        <i class="bi bi-box-arrow-in-down-left"></i> Đơn Nhập
+                        <span style="background:#16a34a; color:white; padding:2px 8px; border-radius:10px; font-size:11px;">${importOrders.length}</span>
+                    </h4>
+                    <div style="overflow-x:auto; border:1px solid #E5E7EB; border-radius:8px;">
+                        <table class="data-table" style="width:100%; font-size:12px;">
+                            <thead>
+                                <tr>
+                                    <th>Mã Đơn</th>
+                                    <th>Nhà Cung Cấp</th>
+                                    <th>Sản Phẩm</th>
+                                    <th>Tài Xế</th>
+                                    <th>Phụ Xe</th>
+                                    <th>Hoàn Thành</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${importOrders.length > 0 ? importOrders.map(renderImportRow).join('') : emptyRow(6, 'Không có đơn nhập')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        console.log('✅ Rendered split tables:', exportOrders.length, 'export +', importOrders.length, 'import');
     },
 
     // Toggle between card/table views
