@@ -986,5 +986,134 @@ router.delete('/:id/proof-images/:imageIndex', async (req, res) => {
         res.json(createResponse(true, 'Lỗi: ' + e.message));
     }
 });
+// ===============================================
+// REVIEW & ADMIN CONFIRM FOR IMPORT TICKETS
+// ===============================================
+
+// GET /api/imports/:id/review - Get import ticket data for review panel
+router.get('/:id/review', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const supabase = getSupabase();
+
+        // Try by ticket_no first, then by id
+        let ticket = null;
+        const { data: byNo } = await supabase
+            .from('import_tickets')
+            .select('*')
+            .eq('ticket_no', id)
+            .single();
+
+        if (byNo) {
+            ticket = byNo;
+        } else {
+            const { data: byId } = await supabase
+                .from('import_tickets')
+                .select('*')
+                .eq('id', id)
+                .single();
+            ticket = byId;
+        }
+
+        if (!ticket) {
+            return res.json(createResponse(true, 'Không tìm thấy phiếu nhập'));
+        }
+
+        // Get proof images from ticket itself
+        const proofImages = ticket.images || [];
+
+        res.json({
+            error: false,
+            data: {
+                id: ticket.id,
+                orderNo: ticket.ticket_no,
+                orderType: 'import',
+                customerName: ticket.supplier_name,
+                address: ticket.supplier_address || '',
+                orderDate: ticket.expected_date || ticket.created_at,
+                status: ticket.status,
+                driverName: ticket.assigned_driver || '',
+                plate: ticket.assigned_plate || '',
+                products: ticket.products || [],
+                note: ticket.note || '',
+                images: proofImages,
+                admin_approved: ticket.admin_approved || false
+            }
+        });
+
+    } catch (e) {
+        console.error('Import review error:', e.message);
+        res.json(createResponse(true, 'Lỗi: ' + e.message));
+    }
+});
+
+// POST /api/imports/:id/admin-confirm - Admin confirms import ticket (no MISA)
+router.post('/:id/admin-confirm', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { confirmed_by } = req.body;
+        const supabase = getSupabase();
+
+        // Find ticket by ticket_no or id
+        let ticketId = id;
+        const { data: byNo } = await supabase
+            .from('import_tickets')
+            .select('id, ticket_no, supplier_name, products, assigned_driver, status')
+            .eq('ticket_no', id)
+            .single();
+
+        if (byNo) {
+            ticketId = byNo.id;
+        }
+
+        // Update: mark as admin_approved
+        const { data, error } = await supabase
+            .from('import_tickets')
+            .update({
+                admin_approved: true,
+                admin_approved_at: new Date().toISOString(),
+                admin_approved_by: confirmed_by || 'Admin'
+            })
+            .eq('id', ticketId)
+            .select()
+            .single();
+
+        if (error) {
+            return res.json(createResponse(true, 'Lỗi xác nhận: ' + error.message));
+        }
+
+        console.log(`✅ Import ${data.ticket_no} admin-confirmed by ${confirmed_by}`);
+
+        // Send Telegram notification
+        try {
+            const { sendTelegramMessage } = await import('../services/telegram.js');
+            const products = data.products || [];
+            const productList = products.map(p =>
+                `- ${p.name || p.code}: ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'Kg'}`
+            ).join('\n');
+
+            let msg = `✅ <b>ĐƠN NHẬP ĐÃ XÁC NHẬN</b>\n`;
+            msg += `📦 <b>#${data.ticket_no}</b>\n`;
+            msg += `🏭 ${data.supplier_name || 'N/A'}\n`;
+            if (data.assigned_driver) msg += `🚗 TX: ${data.assigned_driver}\n`;
+            if (productList) msg += `\n${productList}\n`;
+            msg += `\n👤 Xác nhận bởi: ${confirmed_by || 'Admin'}`;
+
+            await sendTelegramMessage(msg, 'SALES');
+        } catch (tgErr) {
+            console.error('Telegram import confirm error:', tgErr.message);
+        }
+
+        res.json({
+            error: false,
+            msg: `Đã xác nhận phiếu nhập #${data.ticket_no}!`,
+            data
+        });
+
+    } catch (e) {
+        console.error('Admin confirm import error:', e.message);
+        res.json(createResponse(true, 'Lỗi: ' + e.message));
+    }
+});
 
 export default router;

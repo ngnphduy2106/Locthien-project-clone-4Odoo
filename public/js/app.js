@@ -9768,10 +9768,10 @@ async function loadPendingConfirmOrders() {
                         <div style="font-size:11px; color:#6B7280; margin-top:2px;">${products || 'Không có SP'}</div>
                     </div>
                     <div style="display:flex; gap:6px; flex-shrink:0;">
-                        <button class="btn btn-outline btn-sm" onclick="openReviewPanel('${t.order_id || t.id}')" style="font-size:12px; padding:6px 12px; border-radius:8px;">
+                        <button class="btn btn-outline btn-sm" onclick="openReviewPanel('${t.ticket_no || t.id}', true)" style="font-size:12px; padding:6px 12px; border-radius:8px;">
                             <i class="bi bi-search"></i> Kiểm tra
                         </button>
-                        <button class="btn btn-primary btn-sm" onclick="quickConfirmOrder('${t.order_id || t.id}')" style="font-size:12px; padding:6px 12px; border-radius:8px; background:linear-gradient(135deg, #10b981, #059669);">
+                        <button class="btn btn-primary btn-sm" onclick="confirmImportOrder('${t.ticket_no || t.id}')" style="font-size:12px; padding:6px 12px; border-radius:8px; background:linear-gradient(135deg, #10b981, #059669);">
                             <i class="bi bi-check-circle"></i> Xác nhận
                         </button>
                     </div>
@@ -9799,7 +9799,7 @@ function switchConfirmTab(tab) {
     loadPendingConfirmOrders();
 }
 
-async function openReviewPanel(orderId) {
+async function openReviewPanel(orderId, isImport = false) {
     const panel = window.$('#confirm-review-panel');
     if (!panel) return;
 
@@ -9832,66 +9832,116 @@ async function openReviewPanel(orderId) {
     productsContainer.innerHTML = '';
 
     try {
-        const res = await fetch(`/api/orders/${orderId}/review`);
+        // Use different API endpoint for import vs export
+        const apiUrl = isImport ? `/api/imports/${orderId}/review` : `/api/orders/${orderId}/review`;
+        const res = await fetch(apiUrl);
         const json = await res.json();
         if (json.error) { alert(json.message); return; }
 
-        const { order, proofImages, driverAssignments } = json.data;
-        confirmReviewingOrder = order;
+        if (isImport) {
+            // === IMPORT order review ===
+            const data = json.data;
+            confirmReviewingOrder = data;
 
-        if (orderNoEl) orderNoEl.textContent = `#${order.soDon || order.sale_order_no || orderId}`;
+            if (orderNoEl) orderNoEl.textContent = `#${data.orderNo || orderId}`;
 
-        // Render images
-        if (proofImages.length > 0) {
-            imgContainer.innerHTML = proofImages.map((img, i) => `
-                <div style="position:relative;">
-                    <img src="${img.url}" style="width:100%; border-radius:8px; cursor:zoom-in; border:1px solid #E5E7EB;" onclick="showImageLightbox(this.src)" alt="Proof ${i + 1}">
-                    <span style="position:absolute; top:4px; left:4px; background:rgba(0,0,0,0.6); color:white; padding:2px 6px; border-radius:4px; font-size:10px;">
-                        ${img.driver ? '🚛 ' + img.driver : img.ticket ? '📋 ' + img.ticket : 'Ảnh ' + (i + 1)}
-                    </span>
-                </div>
-            `).join('');
-        } else {
-            imgContainer.innerHTML = '<div style="text-align:center; padding:40px; color:#9CA3AF;"><i class="bi bi-image" style="font-size:48px;"></i><p>Không có ảnh</p></div>';
-        }
-
-        // Render order info
-        const fmtDate = order.ngay || order.sale_order_date ? new Date(order.ngay || order.sale_order_date).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : 'N/A';
-        infoContainer.innerHTML = `
-            <div style="display:grid; grid-template-columns:auto 1fr; gap:4px 12px; font-size:13px;">
-                <span style="color:#6B7280;">Khách hàng:</span><b>${order.khach || order.account_name || 'N/A'}</b>
-                <span style="color:#6B7280;">Ngày:</span><span>${fmtDate}</span>
-                <span style="color:#6B7280;">Địa chỉ:</span><span>${order.diaChi || order.shipping_address || 'N/A'}</span>
-                <span style="color:#6B7280;">Tài xế:</span><span>${order.taiXe || order.custom_field13 || 'N/A'}</span>
-                <span style="color:#6B7280;">Trạng thái:</span><span>${order.status || 'N/A'}</span>
-                ${order.delivery_note ? `<span style="color:#6B7280;">Ghi chú giao:</span><span>${order.delivery_note}</span>` : ''}
-            </div>
-            ${driverAssignments.length > 0 ? `
-                <div style="margin-top:8px; padding:8px; background:#F9FAFB; border-radius:8px; font-size:12px;">
-                    <b>Chi tiết giao hàng:</b>
-                    ${driverAssignments.map(a => `
-                        <div style="margin-top:4px;">🚛 ${a.driver_name}: ${Number(a.actual_qty || 0).toLocaleString('vi-VN')} Kg ${a.delivery_note ? '· ' + a.delivery_note : ''}</div>
-                    `).join('')}
-                </div>
-            ` : ''}
-        `;
-
-        // Render editable products
-        const products = order.products || [];
-        renderReviewProducts(products);
-
-        // Update confirm button based on role
-        const confirmBtn = panel.querySelector('#review-confirm-btn');
-        if (confirmBtn) {
-            const canApprove = ['admin', 'sales', 'staff', 'dispatcher'].includes(state.user?.role?.toLowerCase());
-            if (canApprove) {
-                confirmBtn.innerHTML = '<i class="bi bi-cloud-upload"></i> DUYỆT & ĐẨY MISA';
-                confirmBtn.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
-                confirmBtn.onclick = () => approveOrder(orderId);
+            // Render images
+            const images = data.images || [];
+            if (images.length > 0) {
+                imgContainer.innerHTML = images.map((img, i) => `
+                    <div style="position:relative;">
+                        <img src="${img}" style="width:100%; border-radius:8px; cursor:zoom-in; border:1px solid #E5E7EB;" onclick="showImageLightbox(this.src)" alt="Proof ${i + 1}">
+                        <span style="position:absolute; top:4px; left:4px; background:rgba(0,0,0,0.6); color:white; padding:2px 6px; border-radius:4px; font-size:10px;">📷 Ảnh ${i + 1}</span>
+                    </div>
+                `).join('');
             } else {
-                confirmBtn.innerHTML = '<i class="bi bi-check-lg"></i> XÁC NHẬN';
-                confirmBtn.style.background = 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)';
-                confirmBtn.onclick = () => confirmReviewOrder();
+                imgContainer.innerHTML = '<div style="text-align:center; padding:40px; color:#9CA3AF;"><i class="bi bi-image" style="font-size:48px;"></i><p>Không có ảnh</p></div>';
+            }
+
+            // Render order info
+            const fmtDate = data.orderDate ? new Date(data.orderDate).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : 'N/A';
+            infoContainer.innerHTML = `
+                <div style="display:grid; grid-template-columns:auto 1fr; gap:4px 12px; font-size:13px;">
+                    <span style="color:#6B7280;">Nhà cung cấp:</span><b>${data.customerName || 'N/A'}</b>
+                    <span style="color:#6B7280;">Ngày:</span><span>${fmtDate}</span>
+                    <span style="color:#6B7280;">Địa chỉ:</span><span>${data.address || 'N/A'}</span>
+                    <span style="color:#6B7280;">Tài xế:</span><span>${data.driverName || 'N/A'}</span>
+                    <span style="color:#6B7280;">Biển số:</span><span>${data.plate || 'N/A'}</span>
+                    <span style="color:#6B7280;">Trạng thái:</span><span>${data.status || 'N/A'}</span>
+                    ${data.note ? `<span style="color:#6B7280;">Ghi chú:</span><span>${data.note}</span>` : ''}
+                </div>
+            `;
+
+            // Render products (read-only for import)
+            const products = data.products || [];
+            renderReviewProducts(products);
+
+            // Update confirm button for import (no MISA)
+            const confirmBtn = panel.querySelector('#review-confirm-btn');
+            if (confirmBtn) {
+                confirmBtn.innerHTML = '<i class="bi bi-check-circle"></i> XÁC NHẬN ĐƠN NHẬP';
+                confirmBtn.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+                confirmBtn.onclick = () => confirmImportOrder(orderId);
+            }
+        } else {
+            // === EXPORT order review (existing logic) ===
+            const { order, proofImages, driverAssignments } = json.data;
+            confirmReviewingOrder = order;
+
+            if (orderNoEl) orderNoEl.textContent = `#${order.soDon || order.sale_order_no || orderId}`;
+
+            // Render images
+            if (proofImages.length > 0) {
+                imgContainer.innerHTML = proofImages.map((img, i) => `
+                    <div style="position:relative;">
+                        <img src="${img.url}" style="width:100%; border-radius:8px; cursor:zoom-in; border:1px solid #E5E7EB;" onclick="showImageLightbox(this.src)" alt="Proof ${i + 1}">
+                        <span style="position:absolute; top:4px; left:4px; background:rgba(0,0,0,0.6); color:white; padding:2px 6px; border-radius:4px; font-size:10px;">
+                            ${img.driver ? '🚛 ' + img.driver : img.ticket ? '📋 ' + img.ticket : 'Ảnh ' + (i + 1)}
+                        </span>
+                    </div>
+                `).join('');
+            } else {
+                imgContainer.innerHTML = '<div style="text-align:center; padding:40px; color:#9CA3AF;"><i class="bi bi-image" style="font-size:48px;"></i><p>Không có ảnh</p></div>';
+            }
+
+            // Render order info
+            const fmtDate = order.ngay || order.sale_order_date ? new Date(order.ngay || order.sale_order_date).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : 'N/A';
+            infoContainer.innerHTML = `
+                <div style="display:grid; grid-template-columns:auto 1fr; gap:4px 12px; font-size:13px;">
+                    <span style="color:#6B7280;">Khách hàng:</span><b>${order.khach || order.account_name || 'N/A'}</b>
+                    <span style="color:#6B7280;">Ngày:</span><span>${fmtDate}</span>
+                    <span style="color:#6B7280;">Địa chỉ:</span><span>${order.diaChi || order.shipping_address || 'N/A'}</span>
+                    <span style="color:#6B7280;">Tài xế:</span><span>${order.taiXe || order.custom_field13 || 'N/A'}</span>
+                    <span style="color:#6B7280;">Trạng thái:</span><span>${order.status || 'N/A'}</span>
+                    ${order.delivery_note ? `<span style="color:#6B7280;">Ghi chú giao:</span><span>${order.delivery_note}</span>` : ''}
+                </div>
+                ${driverAssignments.length > 0 ? `
+                    <div style="margin-top:8px; padding:8px; background:#F9FAFB; border-radius:8px; font-size:12px;">
+                        <b>Chi tiết giao hàng:</b>
+                        ${driverAssignments.map(a => `
+                            <div style="margin-top:4px;">🚛 ${a.driver_name}: ${Number(a.actual_qty || 0).toLocaleString('vi-VN')} Kg ${a.delivery_note ? '· ' + a.delivery_note : ''}</div>
+                        `).join('')}
+                    </div>
+                ` : ''}
+            `;
+
+            // Render editable products
+            const products = order.products || [];
+            renderReviewProducts(products);
+
+            // Update confirm button based on role
+            const confirmBtn = panel.querySelector('#review-confirm-btn');
+            if (confirmBtn) {
+                const canApprove = ['admin', 'sales', 'staff', 'dispatcher'].includes(state.user?.role?.toLowerCase());
+                if (canApprove) {
+                    confirmBtn.innerHTML = '<i class="bi bi-cloud-upload"></i> DUYỆT & ĐẨY MISA';
+                    confirmBtn.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+                    confirmBtn.onclick = () => approveOrder(orderId);
+                } else {
+                    confirmBtn.innerHTML = '<i class="bi bi-check-lg"></i> XÁC NHẬN';
+                    confirmBtn.style.background = 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)';
+                    confirmBtn.onclick = () => confirmReviewOrder();
+                }
             }
         }
     } catch (err) {
@@ -10190,6 +10240,36 @@ function closeReviewPanel() {
     confirmReviewingOrder = null;
 }
 
+// Confirm import order (no MISA sync, just mark confirmed)
+async function confirmImportOrder(ticketNo) {
+    if (!confirm(`Xác nhận đơn nhập #${ticketNo}?`)) return;
+
+    const userName = state.user?.fullName || state.user?.username || 'admin';
+    try {
+        showLoading && showLoading('Đang xác nhận...');
+        const res = await fetch(`/api/imports/${ticketNo}/admin-confirm`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ confirmed_by: userName })
+        });
+        const json = await res.json();
+        hideLoading && hideLoading();
+
+        if (json.error) {
+            alert('Lỗi: ' + json.message);
+            return;
+        }
+
+        alert(json.msg || 'Đã xác nhận!');
+        closeReviewPanel();
+        loadPendingConfirmOrders();
+    } catch (err) {
+        hideLoading && hideLoading();
+        console.error('confirmImportOrder error:', err);
+        alert('Lỗi: ' + err.message);
+    }
+}
+
 // Export confirm functions
 window.loadPendingConfirmOrders = loadPendingConfirmOrders;
 window.switchConfirmTab = switchConfirmTab;
@@ -10197,7 +10277,7 @@ window.openReviewPanel = openReviewPanel;
 window.closeReviewPanel = closeReviewPanel;
 window.addReviewProduct = addReviewProduct;
 window.confirmReviewOrder = confirmReviewOrder;
-window.quickConfirmOrder = quickConfirmOrder;
+window.confirmImportOrder = confirmImportOrder;
 window.approveOrder = approveOrder;
 
 // Lightbox for proof images
