@@ -1389,233 +1389,237 @@
                         </div>
                     </div>
 
-                    <!-- Split-Screen Review Panel (hidden by default) -->
+                    <!-- Review Panel (Fixed Overlay Modal) -->
                     <div id="confirm-review-panel"
-                        style="display:none; margin-top:20px; border:2px solid #E5E7EB; border-radius:16px; overflow:hidden; background:white;">
+                        style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center; padding:20px;">
                         <div
-                            style="background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); color:white; padding:12px 20px; display:flex; justify-content:space-between; align-items:center;">
-                            <span style="font-weight:600;"><i class="bi bi-search"></i> Kiểm tra đơn: <span
-                                    id="review-order-no"></span></span>
-                            <button onclick="closeReviewPanel()"
-                                style="background:rgba(255,255,255,0.2); border:none; color:white; border-radius:50%; width:30px; height:30px; cursor:pointer; font-size:16px;">✕</button>
-                        </div>
-                        <div style="display:grid; grid-template-columns:1fr 1fr; min-height:400px;"
-                            id="review-split-container">
-                            <!-- Left: Proof Images -->
+                            style="background:white; border-radius:16px; overflow:hidden; width:100%; max-width:1100px; max-height:90vh; display:flex; flex-direction:column; box-shadow:0 25px 50px rgba(0,0,0,0.25);">
                             <div
-                                style="border-right:1px solid #E5E7EB; padding:16px; overflow-y:auto; max-height:70vh;">
-                                <h4 style="margin:0 0 12px; font-size:14px; color:#374151;"><i class="bi bi-camera"></i>
-                                    Ảnh phiếu giao</h4>
-                                <div id="review-images" style="display:flex; flex-direction:column; gap:8px;">
-                                    <!-- Images loaded here -->
-                                </div>
+                                style="background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); color:white; padding:12px 20px; display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
+                                <span style="font-weight:600;"><i class="bi bi-search"></i> Kiểm tra đơn: <span
+                                        id="review-order-no"></span></span>
+                                <button onclick="closeReviewPanel()"
+                                    style="background:rgba(255,255,255,0.2); border:none; color:white; border-radius:50%; width:30px; height:30px; cursor:pointer; font-size:16px;">✕</button>
                             </div>
-                            <!-- Right: Order Details (Editable) -->
-                            <div style="padding:16px; overflow-y:auto; max-height:70vh;">
-                                <h4 style="margin:0 0 12px; font-size:14px; color:#374151;"><i
-                                        class="bi bi-pencil-square"></i> Chi tiết đơn hàng</h4>
-                                <div id="review-order-info" style="margin-bottom:16px; font-size:13px;"></div>
-
+                            <div style="display:grid; grid-template-columns:1fr 1fr; min-height:400px; overflow-y:auto; flex:1;"
+                                id="review-split-container">
+                                <!-- Left: Proof Images -->
                                 <div
-                                    style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                                    <h5 style="margin:0; font-size:13px; color:#374151;">Sản phẩm:</h5>
-                                    <button class="btn btn-outline btn-sm" onclick="addReviewProduct()"
-                                        style="font-size:11px; padding:2px 8px;">
-                                        <i class="bi bi-plus"></i> Thêm SP
-                                    </button>
+                                    style="border-right:1px solid #E5E7EB; padding:16px; overflow-y:auto; max-height:70vh;">
+                                    <h4 style="margin:0 0 12px; font-size:14px; color:#374151;"><i
+                                            class="bi bi-camera"></i>
+                                        Ảnh phiếu giao</h4>
+                                    <div id="review-images" style="display:flex; flex-direction:column; gap:8px;">
+                                        <!-- Images loaded here -->
+                                    </div>
                                 </div>
-                                <div id="review-products" style="display:flex; flex-direction:column; gap:6px;">
-                                    <!-- Editable products -->
-                                </div>
+                                <!-- Right: Order Details (Editable) -->
+                                <div style="padding:16px; overflow-y:auto; max-height:70vh;">
+                                    <h4 style="margin:0 0 12px; font-size:14px; color:#374151;"><i
+                                            class="bi bi-pencil-square"></i> Chi tiết đơn hàng</h4>
+                                    <div id="review-order-info" style="margin-bottom:16px; font-size:13px;"></div>
 
-                                <div style="margin-top:20px; padding-top:16px; border-top:1px solid #E5E7EB;">
-                                    <button class="btn btn-primary" onclick="confirmReviewOrder()"
-                                        style="width:100%; padding:12px; font-size:15px; border-radius:12px; background:linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
-                                        <i class="bi bi-check"></i> XÁC NHẬN ĐƠN
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </section>
+                                    <div
+                                        style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                                        <h5 style="margin:0; font-size:13px; color:#374151;">Sản phẩm:</h5>
+                                        <button class="btn btn-outline btn-sm" onclick="addReviewProduct()"
+                                            style="font-size:11px; padding:2px 8px;">
+                                            <i class="bi bi-plus"></i> Thêm SP
+                                        </button>
+                                    </div>
+                                    <div id="review-products" style="display:flex; flex-direction:column; gap:6px;">
+                                        <!-- Editable products -->
+                                    </div>
 
-                <!-- ==================== HR SECTION ==================== -->
-                <section id="section-hr" class="hidden">
-                    <h2 class="page-heading">Quản lý Nhân sự</h2>
-                    <div id="hr-content">
-                        <!-- Content will be rendered by module -->
-                    </div>
-                </section>
-
-                <!-- ==================== MATERIALS SECTION ==================== -->
-                <section id="section-materials" class="hidden">
-                    <h2 class="page-heading">Quản lý Vật tư</h2>
-                    <div id="materials-content">
-                        <!-- Content will be rendered by module -->
-                    </div>
-                </section>
-
-                <!-- ==================== WAREHOUSE SECTION ==================== -->
-                <section id="section-warehouse" class="hidden">
-                    <div
-                        style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
-                        <h2 class="page-heading" style="margin-bottom:0;">Quản lý Kho hàng</h2>
-                        <div style="display:flex; gap:8px; align-items:center;">
-                            <select id="warehouse-select" class="form-select" style="width:auto;"
-                                onchange="loadWarehouse()">
-                                <option value="LT1">Kho Lộc Thiên 1</option>
-                                <option value="LT2">Kho Lộc Thiên 2</option>
-                            </select>
-                            <button class="btn btn-outline" onclick="loadWarehouse()" title="Làm mới">
-                                <i class="bi bi-arrow-clockwise"></i>
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Warehouse Stats Cards -->
-                    <div class="stat-cards" style="grid-template-columns: repeat(4, 1fr); margin-bottom:24px;">
-                        <div class="stat-card" style="background: linear-gradient(135deg, #4dabf7, #339af0);">
-                            <div class="stat-card-content">
-                                <div class="stat-card-label" style="color:#fff; opacity:0.9;">Tổng sản phẩm</div>
-                                <div class="stat-card-value" id="stat-total-products"
-                                    style="color:#fff; font-size:2rem;">0</div>
-                            </div>
-                        </div>
-                        <div class="stat-card" style="background: linear-gradient(135deg, #51cf66, #40c057);">
-                            <div class="stat-card-content">
-                                <div class="stat-card-label" style="color:#fff; opacity:0.9;">Còn hàng</div>
-                                <div class="stat-card-value" id="stat-in-stock" style="color:#fff; font-size:2rem;">0
-                                </div>
-                            </div>
-                        </div>
-                        <div class="stat-card" style="background: linear-gradient(135deg, #ffa94d, #fd7e14);">
-                            <div class="stat-card-content">
-                                <div class="stat-card-label" style="color:#fff; opacity:0.9;">Sắp hết</div>
-                                <div class="stat-card-value" id="stat-low-stock" style="color:#fff; font-size:2rem;">0
-                                </div>
-                            </div>
-                        </div>
-                        <div class="stat-card" style="background: linear-gradient(135deg, #ff6b6b, #fa5252);">
-                            <div class="stat-card-content">
-                                <div class="stat-card-label" style="color:#fff; opacity:0.9;">Hết hàng</div>
-                                <div class="stat-card-value" id="stat-out-stock" style="color:#fff; font-size:2rem;">0
+                                    <div style="margin-top:20px; padding-top:16px; border-top:1px solid #E5E7EB;">
+                                        <button class="btn btn-primary" onclick="confirmReviewOrder()"
+                                            style="width:100%; padding:12px; font-size:15px; border-radius:12px; background:linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
+                                            <i class="bi bi-check"></i> XÁC NHẬN ĐƠN
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
+            </div>
+            </section>
 
-                    <!-- Search -->
-                    <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:16px;">
-                        <div class="search-input" style="flex:1; min-width:200px;">
-                            <i class="bi bi-search"></i>
-                            <input type="text" placeholder="Tìm kiếm sản phẩm..." id="warehouse-search-input"
-                                oninput="filterWarehouseProducts(this.value)">
-                        </div>
-                        <select id="warehouse-status-filter" class="form-select" style="width:auto;"
-                            onchange="filterWarehouseProducts()">
-                            <option value="">Tất cả trạng thái</option>
-                            <option value="OK">Còn hàng</option>
-                            <option value="LOW">Sắp hết</option>
-                            <option value="OUT_OF_STOCK">Hết hàng</option>
+            <!-- ==================== HR SECTION ==================== -->
+            <section id="section-hr" class="hidden">
+                <h2 class="page-heading">Quản lý Nhân sự</h2>
+                <div id="hr-content">
+                    <!-- Content will be rendered by module -->
+                </div>
+            </section>
+
+            <!-- ==================== MATERIALS SECTION ==================== -->
+            <section id="section-materials" class="hidden">
+                <h2 class="page-heading">Quản lý Vật tư</h2>
+                <div id="materials-content">
+                    <!-- Content will be rendered by module -->
+                </div>
+            </section>
+
+            <!-- ==================== WAREHOUSE SECTION ==================== -->
+            <section id="section-warehouse" class="hidden">
+                <div
+                    style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
+                    <h2 class="page-heading" style="margin-bottom:0;">Quản lý Kho hàng</h2>
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <select id="warehouse-select" class="form-select" style="width:auto;"
+                            onchange="loadWarehouse()">
+                            <option value="LT1">Kho Lộc Thiên 1</option>
+                            <option value="LT2">Kho Lộc Thiên 2</option>
                         </select>
-                    </div>
-
-                    <!-- Inventory Table -->
-                    <div class="card">
-                        <div class="card-body" style="padding: 0; overflow-x: auto;">
-                            <table class="data-table" id="warehouse-table">
-                                <thead>
-                                    <tr>
-                                        <th>#</th>
-                                        <th>Tên sản phẩm</th>
-                                        <th style="text-align:right;">Số lượng</th>
-                                        <th>Đơn vị</th>
-                                        <th>Trạng thái</th>
-                                        <th>Thao tác</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="warehouse-table-body">
-                                    <tr>
-                                        <td colspan="6"
-                                            style="text-align:center; padding:40px; color:var(--text-muted);">
-                                            <i class="bi bi-box-seam"
-                                                style="font-size:48px; display:block; margin-bottom:12px;"></i>
-                                            Đang tải dữ liệu kho...
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- ==================== USERS MANAGEMENT SECTION (ADMIN ONLY) ==================== -->
-                <section id="section-users" class="hidden">
-                    <div
-                        style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
-                        <h2 class="page-heading" style="margin-bottom:0;">Quản lý Tài khoản</h2>
-                        <button class="btn btn-primary" onclick="showCreateUserModal()">
-                            <i class="bi bi-person-plus"></i> Tạo tài khoản
+                        <button class="btn btn-outline" onclick="loadWarehouse()" title="Làm mới">
+                            <i class="bi bi-arrow-clockwise"></i>
                         </button>
                     </div>
+                </div>
 
-                    <!-- User Stats Cards - Responsive 2x2 on mobile -->
-                    <div class="stat-cards user-stat-cards" style="margin-bottom:24px;">
-                        <div class="stat-card" style="background: linear-gradient(135deg, #667eea, #764ba2);">
-                            <div class="stat-card-content">
-                                <div class="stat-card-label" style="color:#fff; opacity:0.9;">Tổng tài khoản</div>
-                                <div class="stat-card-value" id="stat-total-users" style="color:#fff; font-size:2rem;">0
-                                </div>
-                            </div>
-                        </div>
-                        <div class="stat-card" style="background: linear-gradient(135deg, #51cf66, #40c057);">
-                            <div class="stat-card-content">
-                                <div class="stat-card-label" style="color:#fff; opacity:0.9;">Đang hoạt động</div>
-                                <div class="stat-card-value" id="stat-active-users" style="color:#fff; font-size:2rem;">
-                                    0</div>
-                            </div>
-                        </div>
-                        <div class="stat-card" style="background: linear-gradient(135deg, #ffa94d, #fd7e14);">
-                            <div class="stat-card-content">
-                                <div class="stat-card-label" style="color:#fff; opacity:0.9;">Tài xế</div>
-                                <div class="stat-card-value" id="stat-driver-users" style="color:#fff; font-size:2rem;">
-                                    0</div>
-                            </div>
-                        </div>
-                        <div class="stat-card" style="background: linear-gradient(135deg, #845ef7, #7950f2);">
-                            <div class="stat-card-content">
-                                <div class="stat-card-label" style="color:#fff; opacity:0.9;">Admin</div>
-                                <div class="stat-card-value" id="stat-admin-users" style="color:#fff; font-size:2rem;">0
-                                </div>
+                <!-- Warehouse Stats Cards -->
+                <div class="stat-cards" style="grid-template-columns: repeat(4, 1fr); margin-bottom:24px;">
+                    <div class="stat-card" style="background: linear-gradient(135deg, #4dabf7, #339af0);">
+                        <div class="stat-card-content">
+                            <div class="stat-card-label" style="color:#fff; opacity:0.9;">Tổng sản phẩm</div>
+                            <div class="stat-card-value" id="stat-total-products" style="color:#fff; font-size:2rem;">0
                             </div>
                         </div>
                     </div>
-
-                    <!-- Users Table with mobile scroll -->
-                    <div class="card">
-                        <div class="card-body" style="padding: 0; overflow-x: auto;">
-                            <table class="data-table" style="min-width:600px;">
-                                <thead>
-                                    <tr>
-                                        <th>Họ tên</th>
-                                        <th>Tài khoản</th>
-                                        <th>Vai trò</th>
-                                        <th>Biển số</th>
-                                        <th>Telegram</th>
-                                        <th>Trạng thái</th>
-                                        <th>Thao tác</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="users-table-body">
-                                    <!-- Rows will be rendered here -->
-                                </tbody>
-                            </table>
+                    <div class="stat-card" style="background: linear-gradient(135deg, #51cf66, #40c057);">
+                        <div class="stat-card-content">
+                            <div class="stat-card-label" style="color:#fff; opacity:0.9;">Còn hàng</div>
+                            <div class="stat-card-value" id="stat-in-stock" style="color:#fff; font-size:2rem;">0
+                            </div>
                         </div>
                     </div>
-                </section>
+                    <div class="stat-card" style="background: linear-gradient(135deg, #ffa94d, #fd7e14);">
+                        <div class="stat-card-content">
+                            <div class="stat-card-label" style="color:#fff; opacity:0.9;">Sắp hết</div>
+                            <div class="stat-card-value" id="stat-low-stock" style="color:#fff; font-size:2rem;">0
+                            </div>
+                        </div>
+                    </div>
+                    <div class="stat-card" style="background: linear-gradient(135deg, #ff6b6b, #fa5252);">
+                        <div class="stat-card-content">
+                            <div class="stat-card-label" style="color:#fff; opacity:0.9;">Hết hàng</div>
+                            <div class="stat-card-value" id="stat-out-stock" style="color:#fff; font-size:2rem;">0
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-            </div>
-        </main>
+                <!-- Search -->
+                <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:16px;">
+                    <div class="search-input" style="flex:1; min-width:200px;">
+                        <i class="bi bi-search"></i>
+                        <input type="text" placeholder="Tìm kiếm sản phẩm..." id="warehouse-search-input"
+                            oninput="filterWarehouseProducts(this.value)">
+                    </div>
+                    <select id="warehouse-status-filter" class="form-select" style="width:auto;"
+                        onchange="filterWarehouseProducts()">
+                        <option value="">Tất cả trạng thái</option>
+                        <option value="OK">Còn hàng</option>
+                        <option value="LOW">Sắp hết</option>
+                        <option value="OUT_OF_STOCK">Hết hàng</option>
+                    </select>
+                </div>
+
+                <!-- Inventory Table -->
+                <div class="card">
+                    <div class="card-body" style="padding: 0; overflow-x: auto;">
+                        <table class="data-table" id="warehouse-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Tên sản phẩm</th>
+                                    <th style="text-align:right;">Số lượng</th>
+                                    <th>Đơn vị</th>
+                                    <th>Trạng thái</th>
+                                    <th>Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody id="warehouse-table-body">
+                                <tr>
+                                    <td colspan="6" style="text-align:center; padding:40px; color:var(--text-muted);">
+                                        <i class="bi bi-box-seam"
+                                            style="font-size:48px; display:block; margin-bottom:12px;"></i>
+                                        Đang tải dữ liệu kho...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==================== USERS MANAGEMENT SECTION (ADMIN ONLY) ==================== -->
+            <section id="section-users" class="hidden">
+                <div
+                    style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
+                    <h2 class="page-heading" style="margin-bottom:0;">Quản lý Tài khoản</h2>
+                    <button class="btn btn-primary" onclick="showCreateUserModal()">
+                        <i class="bi bi-person-plus"></i> Tạo tài khoản
+                    </button>
+                </div>
+
+                <!-- User Stats Cards - Responsive 2x2 on mobile -->
+                <div class="stat-cards user-stat-cards" style="margin-bottom:24px;">
+                    <div class="stat-card" style="background: linear-gradient(135deg, #667eea, #764ba2);">
+                        <div class="stat-card-content">
+                            <div class="stat-card-label" style="color:#fff; opacity:0.9;">Tổng tài khoản</div>
+                            <div class="stat-card-value" id="stat-total-users" style="color:#fff; font-size:2rem;">0
+                            </div>
+                        </div>
+                    </div>
+                    <div class="stat-card" style="background: linear-gradient(135deg, #51cf66, #40c057);">
+                        <div class="stat-card-content">
+                            <div class="stat-card-label" style="color:#fff; opacity:0.9;">Đang hoạt động</div>
+                            <div class="stat-card-value" id="stat-active-users" style="color:#fff; font-size:2rem;">
+                                0</div>
+                        </div>
+                    </div>
+                    <div class="stat-card" style="background: linear-gradient(135deg, #ffa94d, #fd7e14);">
+                        <div class="stat-card-content">
+                            <div class="stat-card-label" style="color:#fff; opacity:0.9;">Tài xế</div>
+                            <div class="stat-card-value" id="stat-driver-users" style="color:#fff; font-size:2rem;">
+                                0</div>
+                        </div>
+                    </div>
+                    <div class="stat-card" style="background: linear-gradient(135deg, #845ef7, #7950f2);">
+                        <div class="stat-card-content">
+                            <div class="stat-card-label" style="color:#fff; opacity:0.9;">Admin</div>
+                            <div class="stat-card-value" id="stat-admin-users" style="color:#fff; font-size:2rem;">0
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Users Table with mobile scroll -->
+                <div class="card">
+                    <div class="card-body" style="padding: 0; overflow-x: auto;">
+                        <table class="data-table" style="min-width:600px;">
+                            <thead>
+                                <tr>
+                                    <th>Họ tên</th>
+                                    <th>Tài khoản</th>
+                                    <th>Vai trò</th>
+                                    <th>Biển số</th>
+                                    <th>Telegram</th>
+                                    <th>Trạng thái</th>
+                                    <th>Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody id="users-table-body">
+                                <!-- Rows will be rendered here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+    </div>
+    </main>
     </div>
 
     <!-- ==================== MODALS ==================== -->

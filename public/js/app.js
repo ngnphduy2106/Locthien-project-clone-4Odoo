@@ -9804,8 +9804,7 @@ async function openReviewPanel(orderId) {
     if (!panel) return;
 
     confirmReviewingOrderId = orderId;
-    panel.style.display = 'block';
-    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    panel.style.display = 'flex';
 
     const imgContainer = window.$('#review-images');
     const infoContainer = window.$('#review-order-info');
