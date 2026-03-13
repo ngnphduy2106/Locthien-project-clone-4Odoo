@@ -9892,18 +9892,18 @@ function renderReviewProducts(products) {
     if (!container) return;
 
     container.innerHTML = products.map((p, i) => `
-        <div style="display:flex; align-items:center; gap:6px; padding:8px; background:#F9FAFB; border-radius:8px;" data-idx="${i}">
-            <div style="flex:1; min-width:120px;">
-                <input type="text" value="${p.name || p.code || ''}" style="width:100%; border:1px solid #D1D5DB; border-radius:6px; padding:4px 8px; font-size:12px; background:white;" data-field="name" placeholder="Tên SP">
-                <input type="text" value="${p.code || ''}" style="width:100%; border:1px solid #D1D5DB; border-radius:6px; padding:4px 8px; font-size:11px; margin-top:2px; color:#6B7280; background:white;" data-field="code" placeholder="Mã SP">
+        <div style="display:flex; align-items:center; gap:8px; padding:10px; background:#F9FAFB; border-radius:8px;" data-idx="${i}">
+            <div style="flex:1; min-width:150px;">
+                <input type="text" value="${p.name || p.code || ''}" style="width:100%; border:1px solid #D1D5DB; border-radius:6px; padding:6px 10px; font-size:13px; background:white;" data-field="name" placeholder="Tên SP">
+                <input type="text" value="${p.code || ''}" style="width:100%; border:1px solid #D1D5DB; border-radius:6px; padding:4px 10px; font-size:11px; margin-top:3px; color:#6B7280; background:white;" data-field="code" placeholder="Mã SP">
             </div>
-            <div style="width:80px;">
-                <input type="number" value="${p.qty || 0}" style="width:100%; border:1px solid #D1D5DB; border-radius:6px; padding:4px 8px; font-size:12px; text-align:right; background:white;" data-field="qty" placeholder="SL">
+            <div style="width:100px;">
+                <input type="text" value="${Number(p.qty || 0).toLocaleString('vi-VN')}" style="width:100%; border:1px solid #D1D5DB; border-radius:6px; padding:6px 10px; font-size:13px; text-align:right; background:white; font-weight:600;" data-field="qty" placeholder="SL">
             </div>
             <div style="width:50px;">
-                <input type="text" value="${p.unit || 'Kg'}" style="width:100%; border:1px solid #D1D5DB; border-radius:6px; padding:4px 8px; font-size:12px; background:white;" data-field="unit" placeholder="ĐVT">
+                <input type="text" value="${p.unit || 'kg'}" style="width:100%; border:1px solid #D1D5DB; border-radius:6px; padding:6px 10px; font-size:13px; background:white;" data-field="unit" placeholder="ĐVT">
             </div>
-            <button onclick="this.closest('[data-idx]').remove()" style="background:#FEE2E2; border:none; color:#EF4444; border-radius:50%; width:24px; height:24px; cursor:pointer; font-size:14px; flex-shrink:0;">✕</button>
+            <button onclick="this.closest('[data-idx]').remove()" style="background:#FEE2E2; border:none; color:#EF4444; border-radius:50%; width:28px; height:28px; cursor:pointer; font-size:14px; flex-shrink:0;">✕</button>
         </div>
     `).join('');
 }
@@ -9934,7 +9934,7 @@ function getReviewProducts() {
     container.querySelectorAll('[data-idx]').forEach(row => {
         const name = row.querySelector('[data-field="name"]')?.value || '';
         const code = row.querySelector('[data-field="code"]')?.value || '';
-        const qty = Number(row.querySelector('[data-field="qty"]')?.value || 0);
+        const qty = Number(String(row.querySelector('[data-field="qty"]')?.value || '0').replace(/\./g, '').replace(',', '.')) || 0;
         const unit = row.querySelector('[data-field="unit"]')?.value || 'Kg';
         if (name || code) {
             products.push({ name, code, qty, unit });
