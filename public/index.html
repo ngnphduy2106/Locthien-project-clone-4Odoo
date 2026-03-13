@@ -1395,17 +1395,18 @@
                         <div
                             style="background:white; border-radius:16px; overflow:hidden; width:100%; max-width:1100px; max-height:90vh; display:flex; flex-direction:column; box-shadow:0 25px 50px rgba(0,0,0,0.25);">
                             <div
-                                style="background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); color:white; padding:12px 20px; display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
+                                style="background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); color:white; padding:12px 20px; display:flex; justify-content:space-between; align-items:center; flex-shrink:0; position:sticky; top:0; z-index:10;">
                                 <span style="font-weight:600;"><i class="bi bi-search"></i> Kiểm tra đơn: <span
                                         id="review-order-no"></span></span>
                                 <button onclick="closeReviewPanel()"
-                                    style="background:rgba(255,255,255,0.2); border:none; color:white; border-radius:50%; width:30px; height:30px; cursor:pointer; font-size:16px;">✕</button>
+                                    style="background:rgba(255,255,255,0.2); border:none; color:white; border-radius:50%; width:36px; height:36px; cursor:pointer; font-size:18px; font-weight:bold; transition:background 0.2s;"
+                                    onmouseover="this.style.background='rgba(255,255,255,0.4)'"
+                                    onmouseout="this.style.background='rgba(255,255,255,0.2)'">✕</button>
                             </div>
-                            <div style="display:grid; grid-template-columns:1fr 1fr; min-height:400px; overflow-y:auto; flex:1;"
+                            <div style="display:grid; grid-template-columns:1fr 1fr; flex:1; overflow:hidden;"
                                 id="review-split-container">
                                 <!-- Left: Proof Images -->
-                                <div
-                                    style="border-right:1px solid #E5E7EB; padding:16px; overflow-y:auto; max-height:70vh;">
+                                <div style="border-right:1px solid #E5E7EB; padding:16px; overflow-y:auto;">
                                     <h4 style="margin:0 0 12px; font-size:14px; color:#374151;"><i
                                             class="bi bi-camera"></i>
                                         Ảnh phiếu giao</h4>
@@ -1414,7 +1415,7 @@
                                     </div>
                                 </div>
                                 <!-- Right: Order Details (Editable) -->
-                                <div style="padding:16px; overflow-y:auto; max-height:70vh;">
+                                <div style="padding:16px; overflow-y:auto;">
                                     <h4 style="margin:0 0 12px; font-size:14px; color:#374151;"><i
                                             class="bi bi-pencil-square"></i> Chi tiết đơn hàng</h4>
                                     <div id="review-order-info" style="margin-bottom:16px; font-size:13px;"></div>
