@@ -599,12 +599,14 @@ router.get('/pending-confirm', async (req, res) => {
             return res.json(createResponse(false, 'OK', result));
         }
 
-        // Export orders: only those pending approval (from new 2-step flow)
+        // Export orders: only MISA orders pending approval (local orders don't need MISA sync)
         const { data: orders, error } = await supabase
             .from('orders')
+            .select('*')
             .eq('crm_sync_status', 'PENDING_APPROVAL')
             .or('admin_approved.is.null,admin_approved.eq.false')
-            .select('*')
+            .not('sale_order_no', 'is', null)
+            .neq('sale_order_no', '')
             .order('sale_order_date', { ascending: false });
 
         if (error) return res.json(createResponse(true, error.message));
