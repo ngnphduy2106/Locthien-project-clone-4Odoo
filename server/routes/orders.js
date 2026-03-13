@@ -794,7 +794,25 @@ router.put('/:id', async (req, res) => {
             let msg = `🔴 <b>‼️ ĐƠN HÀNG ĐÃ CHỈNH SỬA ‼️</b>\n`;
             msg += `#${orderNo}\n`;
             msg += `👤 KH: <b>${customerName}</b>\n`;
-            if (orderAddress) msg += `📍 ${orderAddress}\n`;
+
+            // Detect and highlight address change
+            const oldAddress = existingOrder?.diaChi || existingOrder?.shipping_address || '';
+            const newAddress = address || updatedOrder?.shipping_address || updatedOrder?.diaChi || '';
+            if (address !== undefined && oldAddress && newAddress && oldAddress !== newAddress) {
+                msg += `\n📍 <b>ĐỔI ĐỊA CHỈ:</b>\n`;
+                msg += `<blockquote>❌ ${oldAddress}\n✅ ${newAddress}</blockquote>`;
+            } else if (newAddress) {
+                msg += `📍 ${newAddress}\n`;
+            }
+
+            // Detect and highlight date change
+            const oldDate = existingOrder?.ngay || existingOrder?.sale_order_date || '';
+            if (date && oldDate && date !== oldDate) {
+                const fmtOld = oldDate ? new Date(oldDate).toLocaleDateString('vi-VN') : oldDate;
+                const fmtNew = new Date(date).toLocaleDateString('vi-VN');
+                msg += `\n📅 <b>ĐỔI NGÀY:</b>\n`;
+                msg += `<blockquote>❌ ${fmtOld}\n✅ ${fmtNew}</blockquote>`;
+            }
 
             // Compare old vs new products and show changes in blockquote
             const oldProducts = existingOrder?.products || existingOrder?.cart || [];
