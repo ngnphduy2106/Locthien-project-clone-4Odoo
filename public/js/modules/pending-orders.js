@@ -159,7 +159,7 @@ const PendingOrdersModule = {
             if (orders.length === 0) {
                 return `
                     <tr>
-                        <td colspan="${isImportType ? 5 : 5}" style="text-align:center; padding:40px; color:#8c8c8c;">
+                        <td colspan="6" style="text-align:center; padding:40px; color:#8c8c8c;">
                             <i class="bi bi-inbox" style="font-size:32px; display:block; margin-bottom:12px;"></i>
                             Không có đơn hàng nào
                         </td>
@@ -172,6 +172,8 @@ const PendingOrdersModule = {
                 const customer = order.khach || order.account_name || 'N/A';
                 const driver = order.taiXe || order.custom_field13 || order.driver || '-';
                 const plate = order.bienSo || order.custom_field14 || order.plate || '-';
+                const orderDate = order.ngay || order.sale_order_date || order.expected_date || order.created_at;
+                const fmtDate = orderDate ? new Date(orderDate).toLocaleDateString('vi-VN') : '—';
 
                 const clickHandler = isImportType
                     ? `viewImportDetail && viewImportDetail('${order.id}')`
@@ -187,6 +189,7 @@ const PendingOrdersModule = {
                         <tr onclick="${clickHandler}" style="cursor:pointer;" class="history-row">
                             <td><strong style="color:#16a34a;">${orderId}</strong></td>
                             <td>${customer}</td>
+                            <td style="font-size:12px; white-space:nowrap;">${fmtDate}</td>
                             <td style="font-size:12px;">${productList || '—'}</td>
                             <td>${driver !== '-' ? `<span style="color:var(--info);">${driver}</span>` : '<span style="opacity:0.5;">—</span>'}</td>
                             <td>${plate !== '-' ? `<span style="font-family:monospace; font-weight:600;">${plate}</span>` : '<span style="opacity:0.5;">—</span>'}</td>
@@ -201,6 +204,7 @@ const PendingOrdersModule = {
                         <tr onclick="${clickHandler}" style="cursor:pointer;" class="history-row">
                             <td><strong style="color:var(--primary);">${orderId}</strong></td>
                             <td>${customer}</td>
+                            <td style="font-size:12px; white-space:nowrap;">${fmtDate}</td>
                             <td style="font-size:12px;">${productList || '—'}</td>
                             <td>${driver !== '-' ? `<span style="color:var(--info);">${driver}</span>` : '<span style="opacity:0.5;">—</span>'}</td>
                             <td>${plate !== '-' ? `<span style="font-family:monospace; font-weight:600;">${plate}</span>` : '<span style="opacity:0.5;">—</span>'}</td>
