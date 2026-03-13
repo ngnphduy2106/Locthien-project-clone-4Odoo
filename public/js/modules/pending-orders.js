@@ -181,13 +181,13 @@ const PendingOrdersModule = {
                     // Import: Mã đơn | Nhà Cung Cấp | Sản phẩm | Tài Xế | Biển Số
                     const productList = (order.products || []).map(p =>
                         `${p.name || p.code || 'SP'}: ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'Kg'}`
-                    ).join(', ');
+                    ).join('<br>');
 
                     return `
                         <tr onclick="${clickHandler}" style="cursor:pointer;" class="history-row">
                             <td><strong style="color:#16a34a;">${orderId}</strong></td>
                             <td>${customer}</td>
-                            <td style="font-size:12px; max-width:250px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${productList || '—'}</td>
+                            <td style="font-size:12px;">${productList || '—'}</td>
                             <td>${driver !== '-' ? `<span style="color:var(--info);">${driver}</span>` : '<span style="opacity:0.5;">—</span>'}</td>
                             <td>${plate !== '-' ? `<span style="font-family:monospace; font-weight:600;">${plate}</span>` : '<span style="opacity:0.5;">—</span>'}</td>
                         </tr>
@@ -196,12 +196,12 @@ const PendingOrdersModule = {
                     // Export: Mã đơn | Khách hàng | Sản phẩm | Tài Xế | Biển Số
                     const productList = (order.products || []).map(p =>
                         `${p.name || p.code || 'SP'}: ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'Kg'}`
-                    ).join(', ');
+                    ).join('<br>');
                     return `
                         <tr onclick="${clickHandler}" style="cursor:pointer;" class="history-row">
                             <td><strong style="color:var(--primary);">${orderId}</strong></td>
                             <td>${customer}</td>
-                            <td style="font-size:12px; max-width:250px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${productList || '—'}</td>
+                            <td style="font-size:12px;">${productList || '—'}</td>
                             <td>${driver !== '-' ? `<span style="color:var(--info);">${driver}</span>` : '<span style="opacity:0.5;">—</span>'}</td>
                             <td>${plate !== '-' ? `<span style="font-family:monospace; font-weight:600;">${plate}</span>` : '<span style="opacity:0.5;">—</span>'}</td>
                         </tr>
