@@ -9841,7 +9841,7 @@ async function openReviewPanel(orderId) {
         if (proofImages.length > 0) {
             imgContainer.innerHTML = proofImages.map((img, i) => `
                 <div style="position:relative;">
-                    <img src="${img.url}" style="width:100%; border-radius:8px; cursor:pointer; border:1px solid #E5E7EB;" onclick="window.open('${img.url}', '_blank')" alt="Proof ${i + 1}">
+                    <img src="${img.url}" style="width:100%; border-radius:8px; cursor:zoom-in; border:1px solid #E5E7EB;" onclick="showImageLightbox(this.src)" alt="Proof ${i + 1}">
                     <span style="position:absolute; top:4px; left:4px; background:rgba(0,0,0,0.6); color:white; padding:2px 6px; border-radius:4px; font-size:10px;">
                         ${img.driver ? '🚛 ' + img.driver : img.ticket ? '📋 ' + img.ticket : 'Ảnh ' + (i + 1)}
                     </span>
@@ -10189,3 +10189,18 @@ window.addReviewProduct = addReviewProduct;
 window.confirmReviewOrder = confirmReviewOrder;
 window.quickConfirmOrder = quickConfirmOrder;
 window.approveOrder = approveOrder;
+
+// Lightbox for proof images
+function showImageLightbox(src) {
+    if (!src) return;
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:3000;background:rgba(0,0,0,0.9);display:flex;align-items:center;justify-content:center;cursor:zoom-out;padding:20px;';
+    overlay.innerHTML = `
+        <img src="${src}" style="max-width:95%;max-height:95vh;object-fit:contain;border-radius:8px;box-shadow:0 0 40px rgba(0,0,0,0.5);">
+        <button style="position:absolute;top:16px;right:16px;background:rgba(255,255,255,0.2);border:none;color:white;border-radius:50%;width:44px;height:44px;font-size:24px;cursor:pointer;font-weight:bold;" onclick="this.parentElement.remove()">✕</button>
+    `;
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+    document.addEventListener('keydown', function esc(e) { if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', esc); } });
+    document.body.appendChild(overlay);
+}
+window.showImageLightbox = showImageLightbox;
