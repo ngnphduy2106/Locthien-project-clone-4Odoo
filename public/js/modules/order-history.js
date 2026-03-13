@@ -348,17 +348,18 @@ const OrderHistoryModule = {
             const customer = order.customerName || order.accountName || 'N/A';
             const driver = order.driverName || order.driver_name || '—';
             const assistant = order.assistantName || '—';
-            const completedDate = order.completedAt || order.completed_at;
+            const orderDate = order.orderDate || order.order_date || order.createdAt;
+            const fmtDate = orderDate ? new Date(orderDate).toLocaleDateString('vi-VN') : '—';
             const products = formatProducts(order.products);
 
             return `
             <tr onclick="OrderHistoryModule.viewDetail('${orderId}')" style="cursor:pointer;" class="history-row">
+                <td style="font-size:12px; white-space:nowrap;">${fmtDate}</td>
                 <td><strong>${orderId}</strong></td>
                 <td>${customer}</td>
                 <td style="font-size:11px; line-height:1.4;">${products}</td>
-                <td>${driver}</td>
-                <td>${assistant}</td>
                 <td>${order.plate || '—'}</td>
+                <td>${driver}</td>
             </tr>`;
         };
 
@@ -368,17 +369,18 @@ const OrderHistoryModule = {
             const supplier = order.customerName || 'N/A';
             const driver = order.driverName || '—';
             const assistant = order.assistantName || '—';
-            const completedDate = order.completedAt || order.completed_at;
+            const orderDate = order.orderDate || order.order_date || order.createdAt;
+            const fmtDate = orderDate ? new Date(orderDate).toLocaleDateString('vi-VN') : '—';
             const products = formatProducts(order.products);
 
             return `
             <tr onclick="OrderHistoryModule.viewDetail('${orderId}')" style="cursor:pointer;" class="history-row">
+                <td style="font-size:12px; white-space:nowrap;">${fmtDate}</td>
                 <td><strong style="color:#16a34a;">${orderId}</strong></td>
                 <td>${supplier}</td>
                 <td style="font-size:11px; line-height:1.4;">${products}</td>
-                <td>${driver}</td>
-                <td>${assistant}</td>
                 <td>${order.plate || '—'}</td>
+                <td>${driver}</td>
             </tr>`;
         };
 
@@ -396,12 +398,12 @@ const OrderHistoryModule = {
                         <table class="data-table" style="width:100%; font-size:12px;">
                             <thead>
                                 <tr>
+                                    <th>Ngày</th>
                                     <th>Mã Đơn</th>
                                     <th>Khách Hàng</th>
                                     <th>Sản Phẩm</th>
-                                    <th>Tài Xế</th>
-                                    <th>Phụ Xe</th>
                                     <th>Biển Số</th>
+                                    <th>Tài Xế</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -421,12 +423,12 @@ const OrderHistoryModule = {
                         <table class="data-table" style="width:100%; font-size:12px;">
                             <thead>
                                 <tr>
+                                    <th>Ngày</th>
                                     <th>Mã Đơn</th>
                                     <th>Nhà Cung Cấp</th>
                                     <th>Sản Phẩm</th>
-                                    <th>Tài Xế</th>
-                                    <th>Phụ Xe</th>
                                     <th>Biển Số</th>
+                                    <th>Tài Xế</th>
                                 </tr>
                             </thead>
                             <tbody>

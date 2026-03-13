@@ -187,12 +187,12 @@ const PendingOrdersModule = {
 
                     return `
                         <tr onclick="${clickHandler}" style="cursor:pointer;" class="history-row">
+                            <td style="font-size:12px; white-space:nowrap;">${fmtDate}</td>
                             <td><strong style="color:#16a34a;">${orderId}</strong></td>
                             <td>${customer}</td>
-                            <td style="font-size:12px; white-space:nowrap;">${fmtDate}</td>
                             <td style="font-size:12px;">${productList || '—'}</td>
-                            <td>${driver !== '-' ? `<span style="color:var(--info);">${driver}</span>` : '<span style="opacity:0.5;">—</span>'}</td>
                             <td>${plate !== '-' ? `<span style="font-family:monospace; font-weight:600;">${plate}</span>` : '<span style="opacity:0.5;">—</span>'}</td>
+                            <td>${driver !== '-' ? `<span style="color:var(--info);">${driver}</span>` : '<span style="opacity:0.5;">—</span>'}</td>
                         </tr>
                     `;
                 } else {
@@ -202,12 +202,12 @@ const PendingOrdersModule = {
                     ).join('<br>');
                     return `
                         <tr onclick="${clickHandler}" style="cursor:pointer;" class="history-row">
+                            <td style="font-size:12px; white-space:nowrap;">${fmtDate}</td>
                             <td><strong style="color:var(--primary);">${orderId}</strong></td>
                             <td>${customer}</td>
-                            <td style="font-size:12px; white-space:nowrap;">${fmtDate}</td>
                             <td style="font-size:12px;">${productList || '—'}</td>
-                            <td>${driver !== '-' ? `<span style="color:var(--info);">${driver}</span>` : '<span style="opacity:0.5;">—</span>'}</td>
                             <td>${plate !== '-' ? `<span style="font-family:monospace; font-weight:600;">${plate}</span>` : '<span style="opacity:0.5;">—</span>'}</td>
+                            <td>${driver !== '-' ? `<span style="color:var(--info);">${driver}</span>` : '<span style="opacity:0.5;">—</span>'}</td>
                         </tr>
                     `;
                 }
