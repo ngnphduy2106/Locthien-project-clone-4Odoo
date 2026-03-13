@@ -120,7 +120,7 @@ const PendingOrdersModule = {
 
             this.orders = allOrders;
 
-            // Sort by assigned driver/plate first, then date (newest first)
+            // Sort: assigned first, then by date priority: today → future → past
             this.orders.sort((a, b) => {
                 const getDriver = o => o.taiXe || o.custom_field13 || o.driver || '';
                 const getPlate = o => o.bienSo || o.custom_field14 || o.plate || '';
@@ -131,9 +131,26 @@ const PendingOrdersModule = {
                 if (isAssignedA && !isAssignedB) return -1;
                 if (!isAssignedA && isAssignedB) return 1;
 
+                // Date priority: today(0) → future(1) → past(2)
+                const now = new Date();
+                const todayStr = now.toLocaleDateString('vi-VN');
+                const getDatePriority = (o) => {
+                    const d = new Date(o.ngay || o.sale_order_date || o.created_date || 0);
+                    const dStr = d.toLocaleDateString('vi-VN');
+                    if (dStr === todayStr) return 0; // today
+                    if (d > now) return 1; // future
+                    return 2; // past
+                };
+
+                const prioA = getDatePriority(a);
+                const prioB = getDatePriority(b);
+                if (prioA !== prioB) return prioA - prioB;
+
+                // Within same priority: future ascending, past descending
                 const dateA = new Date(a.ngay || a.sale_order_date || a.created_date || 0);
                 const dateB = new Date(b.ngay || b.sale_order_date || b.created_date || 0);
-                return dateB - dateA;
+                if (prioA === 1) return dateA - dateB; // future: nearest first
+                return dateB - dateA; // today/past: newest first
             });
 
             this.filteredOrders = [...this.orders];
