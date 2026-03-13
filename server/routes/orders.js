@@ -599,11 +599,12 @@ router.get('/pending-confirm', async (req, res) => {
             return res.json(createResponse(false, 'OK', result));
         }
 
-        // Export orders: only MISA orders pending approval (local orders don't need MISA sync)
+        // Export orders: MISA orders completed but not yet admin_approved
+        // Matches both: PENDING_APPROVAL (new flow) and legacy completed orders
         const { data: orders, error } = await supabase
             .from('orders')
             .select('*')
-            .eq('crm_sync_status', 'PENDING_APPROVAL')
+            .in('status', ['Đã thực hiện', 'Hoàn thành'])
             .or('admin_approved.is.null,admin_approved.eq.false')
             .not('sale_order_no', 'is', null)
             .neq('sale_order_no', '')
