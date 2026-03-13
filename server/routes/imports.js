@@ -1054,8 +1054,8 @@ router.post('/:id/admin-confirm', async (req, res) => {
         const { confirmed_by } = req.body;
         const supabase = getSupabase();
 
-        // Find ticket by ticket_no or id
-        let ticketId = id;
+        // Find ticket by ticket_no first, then by id
+        let ticket = null;
         const { data: byNo } = await supabase
             .from('import_tickets')
             .select('id, ticket_no, supplier_name, products, assigned_driver, status')
@@ -1063,17 +1063,29 @@ router.post('/:id/admin-confirm', async (req, res) => {
             .single();
 
         if (byNo) {
-            ticketId = byNo.id;
+            ticket = byNo;
+        } else {
+            // Try by UUID id
+            const { data: byId } = await supabase
+                .from('import_tickets')
+                .select('id, ticket_no, supplier_name, products, assigned_driver, status')
+                .eq('id', id)
+                .single();
+            if (byId) ticket = byId;
         }
 
-        // Update: mark as confirmed (use status field since admin_approved column doesn't exist)
+        if (!ticket) {
+            return res.json({ error: true, msg: `Không tìm thấy phiếu nhập #${id}` });
+        }
+
+        // Update: mark as confirmed
         const { data, error } = await supabase
             .from('import_tickets')
             .update({
                 status: 'confirmed',
                 note: `Xác nhận bởi ${confirmed_by || 'Admin'} lúc ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}`
             })
-            .eq('id', ticketId)
+            .eq('id', ticket.id)
             .select()
             .single();
 

@@ -10056,7 +10056,7 @@ async function quickConfirmOrder(orderId) {
             body: JSON.stringify({ confirmed_by: userName })
         });
         const json = await res.json();
-        if (json.error) { alert('Lỗi: ' + json.message); return; }
+        if (json.error) { alert('Lỗi: ' + (json.msg || json.message || 'Không xác định')); return; }
 
         const card = window.$(`#confirm-card-${orderId}`);
         if (card) {
@@ -10256,7 +10256,7 @@ async function confirmImportOrder(ticketNo) {
         hideLoading && hideLoading();
 
         if (json.error) {
-            alert('Lỗi: ' + json.message);
+            alert('Lỗi: ' + (json.msg || json.message || 'Không xác định'));
             return;
         }
 
