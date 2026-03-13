@@ -9712,8 +9712,8 @@ async function loadPendingConfirmOrders() {
         }
 
         if (confirmCurrentTab === 'export') {
-            const isAdmin = state.user?.role === 'admin';
-            const isSales = ['staff', 'admin', 'dispatcher'].includes(state.user?.role);
+            const isAdmin = state.user?.role?.toLowerCase() === 'admin';
+            const isSales = ['staff', 'admin', 'dispatcher'].includes(state.user?.role?.toLowerCase());
             container.innerHTML = orders.map(o => {
                 const orderNo = o.sale_order_no || o.id;
                 const fmtDate = o.sale_order_date ? new Date(o.sale_order_date).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : '';
@@ -9879,7 +9879,7 @@ async function openReviewPanel(orderId) {
         // Update confirm button based on role
         const confirmBtn = panel.querySelector('#review-confirm-btn');
         if (confirmBtn) {
-            const isAdmin = state.user?.role === 'admin';
+            const isAdmin = state.user?.role?.toLowerCase() === 'admin';
             if (isAdmin) {
                 confirmBtn.innerHTML = '<i class="bi bi-cloud-upload"></i> DUYỆT & ĐẨY MISA';
                 confirmBtn.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
