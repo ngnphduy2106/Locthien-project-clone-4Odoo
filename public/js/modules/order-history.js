@@ -6,7 +6,7 @@ const OrderHistoryModule = {
     history: [],
     filteredHistory: [], // Stores filtered/sorted results
     currentPage: 1,
-    itemsPerPage: 20,
+    itemsPerPage: 500,
     totalPages: 1,
     useCardLayout: false, // Table by default - toggle with button group
     searchQuery: '',
@@ -358,7 +358,7 @@ const OrderHistoryModule = {
                 <td style="font-size:11px; line-height:1.4;">${products}</td>
                 <td>${driver}</td>
                 <td>${assistant}</td>
-                <td style="font-size:11px;">${completedDate ? new Date(completedDate).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'}</td>
+                <td>${order.plate || '—'}</td>
             </tr>`;
         };
 
@@ -378,7 +378,7 @@ const OrderHistoryModule = {
                 <td style="font-size:11px; line-height:1.4;">${products}</td>
                 <td>${driver}</td>
                 <td>${assistant}</td>
-                <td style="font-size:11px;">${completedDate ? new Date(completedDate).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'}</td>
+                <td>${order.plate || '—'}</td>
             </tr>`;
         };
 
@@ -401,7 +401,7 @@ const OrderHistoryModule = {
                                     <th>Sản Phẩm</th>
                                     <th>Tài Xế</th>
                                     <th>Phụ Xe</th>
-                                    <th>Hoàn Thành</th>
+                                    <th>Biển Số</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -426,7 +426,7 @@ const OrderHistoryModule = {
                                     <th>Sản Phẩm</th>
                                     <th>Tài Xế</th>
                                     <th>Phụ Xe</th>
-                                    <th>Hoàn Thành</th>
+                                    <th>Biển Số</th>
                                 </tr>
                             </thead>
                             <tbody>
