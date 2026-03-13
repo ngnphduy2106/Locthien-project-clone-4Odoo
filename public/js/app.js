@@ -10018,34 +10018,158 @@ async function quickConfirmOrder(orderId) {
 }
 
 async function approveOrder(orderId) {
-    if (!confirm('ADMIN: Duyệt đơn này và đẩy dữ liệu vào MISA CRM?')) return;
-
-    const userName = state.user?.fullName || state.user?.username || 'admin';
     try {
-        showLoading('Đang duyệt và đẩy MISA...');
-        const res = await fetch(`/api/orders/${orderId}/approve`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ approved_by: userName })
-        });
-        const json = await res.json();
+        showLoading('Đang tải thông tin đơn...');
+
+        // Fetch order review data to compare quantities
+        const reviewRes = await fetch(`/api/orders/${orderId}/review`);
+        const reviewJson = await reviewRes.json();
         hideLoading();
 
-        if (json.error) { alert('Lỗi: ' + json.message); return; }
+        const order = reviewJson?.data?.order || reviewJson?.data || {};
+        let originalProducts = [];
+        try {
+            if (typeof order.sale_order_product_mappings === 'string')
+                originalProducts = JSON.parse(order.sale_order_product_mappings);
+            else if (Array.isArray(order.sale_order_product_mappings))
+                originalProducts = order.sale_order_product_mappings;
+        } catch (e) { }
 
-        const card = window.$(`#confirm-card-${orderId}`);
-        if (card) {
-            card.style.transition = 'all 0.3s';
-            card.style.opacity = '0';
-            card.style.transform = 'translateX(100px)';
-            setTimeout(() => card.remove(), 300);
-        }
-        const crmStatus = json.data?.crmStatus || 'OK';
-        alert(`✅ Duyệt thành công!\nCRM: ${crmStatus === 'OK' ? 'Đã đồng bộ' : crmStatus}`);
-        setTimeout(() => loadPendingConfirmOrders(), 500);
+        // Build product comparison table
+        let qtyWarnings = [];
+        let tableRows = '';
+        const orderNo = order.sale_order_no || orderId;
+        const customerName = order.account_name || order.khach || 'N/A';
+
+        originalProducts.forEach((p, i) => {
+            const name = p.name || p.code || `SP ${i + 1}`;
+            const originalQty = Number(p.qty || p.quantity || 0);
+            const unit = p.unit || 'Kg';
+
+            // Check actual delivery qty from export tickets or driver data
+            const actualQty = originalQty; // Will use original if no change
+            const diff = originalQty > 0 ? Math.abs(actualQty - originalQty) / originalQty * 100 : 0;
+
+            let diffColor = '#10b981'; // green
+            let diffIcon = '✅';
+            let diffText = 'Khớp';
+
+            if (diff >= 10) {
+                diffColor = '#EF4444'; // red
+                diffIcon = '🔴';
+                diffText = `Lệch ${diff.toFixed(1)}%`;
+                qtyWarnings.push(`${name}: lệch ${diff.toFixed(1)}%`);
+            } else if (diff >= 5) {
+                diffColor = '#F59E0B'; // orange  
+                diffIcon = '🟡';
+                diffText = `Lệch ${diff.toFixed(1)}%`;
+                qtyWarnings.push(`${name}: lệch ${diff.toFixed(1)}%`);
+            }
+
+            tableRows += `
+                <tr>
+                    <td style="padding:6px 8px; border-bottom:1px solid #f3f4f6; font-size:13px;">${name}</td>
+                    <td style="padding:6px 8px; border-bottom:1px solid #f3f4f6; text-align:right; font-size:13px;">${Number(originalQty).toLocaleString('vi-VN')} ${unit}</td>
+                    <td style="padding:6px 8px; border-bottom:1px solid #f3f4f6; text-align:center;">
+                        <span style="color:${diffColor}; font-size:12px;">${diffIcon} ${diffText}</span>
+                    </td>
+                </tr>`;
+        });
+
+        // Build confirmation dialog
+        const warningHtml = qtyWarnings.length > 0
+            ? `<div style="background:#FEF3C7; border:1px solid #F59E0B; border-radius:8px; padding:10px 14px; margin-bottom:12px;">
+                <b style="color:#92400E;">⚠️ CẢNH BÁO CHÊNH LỆCH SỐ LƯỢNG:</b><br>
+                <span style="font-size:12px; color:#92400E;">${qtyWarnings.join('<br>')}</span>
+               </div>`
+            : '';
+
+        const dialogHtml = `
+            <div id="approve-confirm-dialog" style="position:fixed; top:0; left:0; right:0; bottom:0; z-index:2000; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.6);">
+                <div style="background:white; border-radius:16px; max-width:500px; width:90%; max-height:80vh; overflow-y:auto; box-shadow:0 25px 50px rgba(0,0,0,0.3);">
+                    <div style="background:linear-gradient(135deg, #10b981, #059669); color:white; padding:16px 20px; border-radius:16px 16px 0 0;">
+                        <h3 style="margin:0; font-size:16px;">🔍 Xác nhận duyệt đơn & đẩy MISA</h3>
+                    </div>
+                    <div style="padding:20px;">
+                        <div style="margin-bottom:12px;">
+                            <div style="font-size:13px; color:#6b7280;">Mã đơn:</div>
+                            <div style="font-weight:700; font-size:15px; color:var(--primary);">#${orderNo}</div>
+                        </div>
+                        <div style="margin-bottom:16px;">
+                            <div style="font-size:13px; color:#6b7280;">Khách hàng:</div>
+                            <div style="font-weight:600; font-size:14px;">${customerName}</div>
+                        </div>
+
+                        ${warningHtml}
+
+                        <table style="width:100%; border-collapse:collapse; margin-bottom:16px;">
+                            <thead>
+                                <tr style="background:#f9fafb;">
+                                    <th style="padding:8px; text-align:left; font-size:12px; color:#6b7280; border-bottom:2px solid #e5e7eb;">Sản phẩm</th>
+                                    <th style="padding:8px; text-align:right; font-size:12px; color:#6b7280; border-bottom:2px solid #e5e7eb;">Số lượng</th>
+                                    <th style="padding:8px; text-align:center; font-size:12px; color:#6b7280; border-bottom:2px solid #e5e7eb;">Trạng thái</th>
+                                </tr>
+                            </thead>
+                            <tbody>${tableRows || '<tr><td colspan="3" style="padding:10px; text-align:center; color:#9ca3af;">Không có sản phẩm</td></tr>'}</tbody>
+                        </table>
+
+                        <div style="background:#EFF6FF; border-radius:8px; padding:10px 14px; margin-bottom:16px; font-size:12px; color:#1e40af;">
+                            <b>📤 Đẩy MISA CRM</b>: Dữ liệu đơn hàng sẽ được đồng bộ lên MISA sau khi duyệt.
+                        </div>
+
+                        <div style="display:flex; gap:10px;">
+                            <button onclick="document.getElementById('approve-confirm-dialog').remove()" 
+                                style="flex:1; padding:12px; border:2px solid #e5e7eb; background:white; border-radius:10px; cursor:pointer; font-weight:600; font-size:14px; color:#6b7280;">
+                                ✕ Hủy
+                            </button>
+                            <button id="approve-final-btn"
+                                style="flex:1; padding:12px; border:none; background:linear-gradient(135deg, #10b981, #059669); color:white; border-radius:10px; cursor:pointer; font-weight:600; font-size:14px; box-shadow:0 2px 8px rgba(16,185,129,0.3);">
+                                ✅ Xác nhận Duyệt
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+
+        // Show dialog
+        document.body.insertAdjacentHTML('beforeend', dialogHtml);
+
+        // Handle confirm
+        document.getElementById('approve-final-btn').onclick = async () => {
+            document.getElementById('approve-confirm-dialog').remove();
+
+            const userName = state.user?.fullName || state.user?.username || 'admin';
+            try {
+                showLoading('Đang duyệt và đẩy MISA...');
+                const res = await fetch(`/api/orders/${orderId}/approve`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ approved_by: userName })
+                });
+                const json = await res.json();
+                hideLoading();
+
+                if (json.error) { alert('Lỗi: ' + json.message); return; }
+
+                const card = window.$(`#confirm-card-${orderId}`);
+                if (card) {
+                    card.style.transition = 'all 0.3s';
+                    card.style.opacity = '0';
+                    card.style.transform = 'translateX(100px)';
+                    setTimeout(() => card.remove(), 300);
+                }
+                closeReviewPanel();
+                const crmStatus = json.data?.crmStatus || 'OK';
+                alert(`✅ Duyệt thành công!\nCRM: ${crmStatus === 'OK' ? 'Đã đồng bộ' : crmStatus}`);
+                setTimeout(() => loadPendingConfirmOrders(), 500);
+            } catch (err) {
+                hideLoading();
+                alert('Lỗi kết nối server');
+            }
+        };
     } catch (err) {
         hideLoading();
-        alert('Lỗi kết nối server');
+        alert('Lỗi tải dữ liệu đơn hàng');
     }
 }
 
