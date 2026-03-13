@@ -109,9 +109,10 @@ const PendingOrdersModule = {
                     account_name: imp.supplier_name || imp.supplier || 'N/A',
                     ngay: imp.expected_date || imp.created_at,
                     sale_order_date: imp.expected_date || imp.created_at,
-                    taiXe: imp.driver_name || '-',
-                    bienSo: imp.plate || '-',
-                    _status: imp.driver_name ? 'Đang giao' : 'Chưa giao',
+                    taiXe: imp.assigned_driver || imp.driver_name || '-',
+                    bienSo: imp.assigned_plate || imp.plate || '-',
+                    products: imp.products || [],
+                    _status: imp.assigned_driver ? 'Đang giao' : 'Chưa giao',
                     _type: 'import'
                 }));
                 allOrders = [...allOrders, ...imports];
@@ -158,7 +159,7 @@ const PendingOrdersModule = {
             if (orders.length === 0) {
                 return `
                     <tr>
-                        <td colspan="5" style="text-align:center; padding:40px; color:#8c8c8c;">
+                        <td colspan="${isImportType ? 5 : 5}" style="text-align:center; padding:40px; color:#8c8c8c;">
                             <i class="bi bi-inbox" style="font-size:32px; display:block; margin-bottom:12px;"></i>
                             Không có đơn hàng nào
                         </td>
@@ -169,25 +170,42 @@ const PendingOrdersModule = {
             return orders.map(order => {
                 const orderId = order.soDon || order.sale_order_no || 'N/A';
                 const customer = order.khach || order.account_name || 'N/A';
-                const status = order._status || 'N/A';
                 const driver = order.taiXe || order.custom_field13 || order.driver || '-';
                 const plate = order.bienSo || order.custom_field14 || order.plate || '-';
-
-                const statusClass = status === 'Đang giao' ? 'warning' : 'secondary';
 
                 const clickHandler = isImportType
                     ? `viewImportDetail && viewImportDetail('${order.id}')`
                     : `viewOrderDetail && viewOrderDetail('${order.id}')`;
 
-                return `
-                    <tr onclick="${clickHandler}" style="cursor:pointer;" class="history-row">
-                        <td><strong style="color:${isImportType ? '#16a34a' : 'var(--primary)'};">${orderId}</strong></td>
-                        <td>${customer}</td>
-                        <td><span class="badge badge-${statusClass}">${status}</span></td>
-                        <td>${driver !== '-' ? `<span style="color:var(--info);">${driver}</span>` : '<span style="opacity:0.5;">—</span>'}</td>
-                        <td>${plate !== '-' ? `<span style="font-family:monospace; font-weight:600;">${plate}</span>` : '<span style="opacity:0.5;">—</span>'}</td>
-                    </tr>
-                `;
+                if (isImportType) {
+                    // Import: Mã đơn | Nhà Cung Cấp | Sản phẩm | Tài Xế | Biển Số
+                    const productList = (order.products || []).map(p =>
+                        `${p.name || p.code || 'SP'}: ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'Kg'}`
+                    ).join(', ');
+
+                    return `
+                        <tr onclick="${clickHandler}" style="cursor:pointer;" class="history-row">
+                            <td><strong style="color:#16a34a;">${orderId}</strong></td>
+                            <td>${customer}</td>
+                            <td style="font-size:12px; max-width:250px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${productList || '—'}</td>
+                            <td>${driver !== '-' ? `<span style="color:var(--info);">${driver}</span>` : '<span style="opacity:0.5;">—</span>'}</td>
+                            <td>${plate !== '-' ? `<span style="font-family:monospace; font-weight:600;">${plate}</span>` : '<span style="opacity:0.5;">—</span>'}</td>
+                        </tr>
+                    `;
+                } else {
+                    // Export: Mã đơn | Khách hàng | Trạng thái | Tài Xế | Biển Số
+                    const status = order._status || 'N/A';
+                    const statusClass = status === 'Đang giao' ? 'warning' : 'secondary';
+                    return `
+                        <tr onclick="${clickHandler}" style="cursor:pointer;" class="history-row">
+                            <td><strong style="color:var(--primary);">${orderId}</strong></td>
+                            <td>${customer}</td>
+                            <td><span class="badge badge-${statusClass}">${status}</span></td>
+                            <td>${driver !== '-' ? `<span style="color:var(--info);">${driver}</span>` : '<span style="opacity:0.5;">—</span>'}</td>
+                            <td>${plate !== '-' ? `<span style="font-family:monospace; font-weight:600;">${plate}</span>` : '<span style="opacity:0.5;">—</span>'}</td>
+                        </tr>
+                    `;
+                }
             }).join('');
         };
 
