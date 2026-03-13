@@ -200,11 +200,20 @@ router.get('/order-history', async (req, res) => {
             creatorName: o.creator_name || o.nhanVienTao || o.created_by || ''
         }));
 
-        // === FETCH IMPORT TICKETS ===
+        // === FETCH IMPORT TICKETS from Supabase ===
         let importOrders = [];
         try {
-            const importTickets = await db.getImportTickets();
-            const completedImports = importTickets.filter(t => {
+            const { createClient } = await import('@supabase/supabase-js');
+            const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+            const { data: importTickets, error: importErr } = await supabase
+                .from('import_tickets')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (importErr) throw importErr;
+
+            const completedImports = (importTickets || []).filter(t => {
                 const s = String(t.status || '').trim().toLowerCase();
                 return historyStatuses.some(hs => hs.toLowerCase() === s);
             });
@@ -229,10 +238,10 @@ router.get('/order-history', async (req, res) => {
                 status: t.status,
                 driverName: t.assigned_driver || t.driver_name || '',
                 completedAt: t.completed_at || t.updated_at,
-                address: t.supplier_address || 'Sunco',
-                products: t.items || [],
+                address: t.supplier_address || '',
+                products: t.products || [],
                 orderType: 'import',
-                creatorName: t.creator_name || t.created_by || ''
+                creatorName: t.created_by || ''
             }));
             console.log(`📦 Found ${importOrders.length} completed import tickets`);
         } catch (importErr) {
