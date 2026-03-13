@@ -9813,9 +9813,10 @@ async function openReviewPanel(orderId) {
     if (!panel) return;
 
     confirmReviewingOrderId = orderId;
-    panel.style.display = 'flex';
-    // Close on backdrop click
-    panel.onclick = (e) => { if (e.target === panel) closeReviewPanel(); };
+    panel.style.display = 'block';
+    // Close on backdrop click (the scrollable wrapper is the 3rd child)
+    const wrapper = panel.children[1]; // scrollable wrapper div
+    if (wrapper) wrapper.onclick = (e) => { if (e.target === wrapper) closeReviewPanel(); };
 
     const imgContainer = window.$('#review-images');
     const infoContainer = window.$('#review-order-info');

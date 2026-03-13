@@ -1391,53 +1391,63 @@
 
                     <!-- Review Panel (Fixed Overlay Modal) -->
                     <div id="confirm-review-panel"
-                        style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center; padding:20px;">
+                        style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; z-index:1000;">
+                        <!-- Backdrop -->
+                        <div style="position:absolute; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5);">
+                        </div>
+                        <!-- Modal Container (scrollable wrapper) -->
                         <div
-                            style="background:white; border-radius:16px; overflow:hidden; width:100%; max-width:1100px; max-height:90vh; display:flex; flex-direction:column; box-shadow:0 25px 50px rgba(0,0,0,0.25);">
-                            <div
-                                style="background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); color:white; padding:12px 20px; display:flex; justify-content:space-between; align-items:center; flex-shrink:0; position:sticky; top:0; z-index:10;">
-                                <span style="font-weight:600;"><i class="bi bi-search"></i> Kiểm tra đơn: <span
-                                        id="review-order-no"></span></span>
-                                <button onclick="closeReviewPanel()"
-                                    style="background:rgba(255,255,255,0.2); border:none; color:white; border-radius:50%; width:36px; height:36px; cursor:pointer; font-size:18px; font-weight:bold; transition:background 0.2s;"
-                                    onmouseover="this.style.background='rgba(255,255,255,0.4)'"
-                                    onmouseout="this.style.background='rgba(255,255,255,0.2)'">✕</button>
-                            </div>
-                            <div style="display:grid; grid-template-columns:1fr 1fr; flex:1; overflow:hidden;"
-                                id="review-split-container">
-                                <!-- Left: Proof Images -->
-                                <div style="border-right:1px solid #E5E7EB; padding:16px; overflow-y:auto;">
-                                    <h4 style="margin:0 0 12px; font-size:14px; color:#374151;"><i
-                                            class="bi bi-camera"></i>
-                                        Ảnh phiếu giao</h4>
-                                    <div id="review-images" style="display:flex; flex-direction:column; gap:8px;">
-                                        <!-- Images loaded here -->
-                                    </div>
+                            style="position:absolute; top:0; left:0; right:0; bottom:0; overflow-y:auto; display:flex; align-items:flex-start; justify-content:center; padding:32px 16px;">
+                            <!-- Modal Card -->
+                            <div style="background:white; border-radius:16px; width:100%; max-width:1200px; margin:auto; display:flex; flex-direction:column; box-shadow:0 25px 50px rgba(0,0,0,0.25); max-height:calc(100vh - 64px);"
+                                onclick="event.stopPropagation()">
+                                <!-- Header (always visible) -->
+                                <div
+                                    style="background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); color:white; padding:14px 24px; display:flex; justify-content:space-between; align-items:center; flex-shrink:0; border-radius:16px 16px 0 0;">
+                                    <span style="font-weight:600; font-size:15px;"><i class="bi bi-search"></i> Kiểm tra
+                                        đơn: <span id="review-order-no"></span></span>
+                                    <button onclick="closeReviewPanel()"
+                                        style="background:rgba(255,255,255,0.25); border:none; color:white; border-radius:50%; width:40px; height:40px; cursor:pointer; font-size:20px; font-weight:bold; line-height:1; transition:background 0.2s; flex-shrink:0;"
+                                        onmouseover="this.style.background='rgba(255,0,0,0.6)'"
+                                        onmouseout="this.style.background='rgba(255,255,255,0.25)'">✕</button>
                                 </div>
-                                <!-- Right: Order Details (Editable) -->
-                                <div style="padding:16px; overflow-y:auto;">
-                                    <h4 style="margin:0 0 12px; font-size:14px; color:#374151;"><i
-                                            class="bi bi-pencil-square"></i> Chi tiết đơn hàng</h4>
-                                    <div id="review-order-info" style="margin-bottom:16px; font-size:13px;"></div>
-
-                                    <div
-                                        style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                                        <h5 style="margin:0; font-size:13px; color:#374151;">Sản phẩm:</h5>
-                                        <button class="btn btn-outline btn-sm" onclick="addReviewProduct()"
-                                            style="font-size:11px; padding:2px 8px;">
-                                            <i class="bi bi-plus"></i> Thêm SP
-                                        </button>
+                                <!-- Content (scrollable) -->
+                                <div style="display:grid; grid-template-columns:1fr 1fr; flex:1; overflow:hidden; min-height:0;"
+                                    id="review-split-container">
+                                    <!-- Left: Proof Images -->
+                                    <div style="border-right:1px solid #E5E7EB; padding:20px; overflow-y:auto;">
+                                        <h4 style="margin:0 0 12px; font-size:14px; color:#374151;"><i
+                                                class="bi bi-camera"></i>
+                                            Ảnh phiếu giao</h4>
+                                        <div id="review-images" style="display:flex; flex-direction:column; gap:8px;">
+                                            <!-- Images loaded here -->
+                                        </div>
                                     </div>
-                                    <div id="review-products" style="display:flex; flex-direction:column; gap:6px;">
-                                        <!-- Editable products -->
-                                    </div>
+                                    <!-- Right: Order Details (Editable) -->
+                                    <div style="padding:20px; overflow-y:auto;">
+                                        <h4 style="margin:0 0 12px; font-size:14px; color:#374151;"><i
+                                                class="bi bi-pencil-square"></i> Chi tiết đơn hàng</h4>
+                                        <div id="review-order-info" style="margin-bottom:16px; font-size:13px;"></div>
 
-                                    <div style="margin-top:20px; padding-top:16px; border-top:1px solid #E5E7EB;">
-                                        <button id="review-confirm-btn" class="btn btn-primary"
-                                            onclick="confirmReviewOrder()"
-                                            style="width:100%; padding:12px; font-size:15px; border-radius:12px; background:linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
-                                            <i class="bi bi-check"></i> XÁC NHẬN ĐƠN
-                                        </button>
+                                        <div
+                                            style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                                            <h5 style="margin:0; font-size:13px; color:#374151;">Sản phẩm:</h5>
+                                            <button class="btn btn-outline btn-sm" onclick="addReviewProduct()"
+                                                style="font-size:11px; padding:2px 8px;">
+                                                <i class="bi bi-plus"></i> Thêm SP
+                                            </button>
+                                        </div>
+                                        <div id="review-products" style="display:flex; flex-direction:column; gap:6px;">
+                                            <!-- Editable products -->
+                                        </div>
+
+                                        <div style="margin-top:20px; padding-top:16px; border-top:1px solid #E5E7EB;">
+                                            <button id="review-confirm-btn" class="btn btn-primary"
+                                                onclick="confirmReviewOrder()"
+                                                style="width:100%; padding:12px; font-size:15px; border-radius:12px; background:linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
+                                                <i class="bi bi-check"></i> XÁC NHẬN ĐƠN
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
