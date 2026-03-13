@@ -566,6 +566,65 @@ router.get('/my/:driverName', async (req, res) => {
     }
 });
 
+// GET /api/orders/pending-confirm?type=export|import
+// MUST be defined BEFORE /:id to avoid Express matching 'pending-confirm' as :id
+router.get('/pending-confirm', async (req, res) => {
+    try {
+        const { createClient } = await import('@supabase/supabase-js');
+        const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+        const type = req.query.type || 'export';
+
+        if (type === 'import') {
+            const { data: tickets, error } = await supabase
+                .from('import_tickets')
+                .select('*')
+                .eq('status', 'completed')
+                .order('created_at', { ascending: false });
+
+            if (error) return res.json(createResponse(true, error.message));
+
+            const result = [];
+            for (const t of (tickets || [])) {
+                if (t.order_id) {
+                    const { data: order } = await supabase.from('orders')
+                        .select('sale_confirmed, admin_approved, account_name, shipping_address, sale_order_date')
+                        .eq('id', t.order_id).single();
+                    if (!order?.admin_approved) {
+                        result.push({ ...t, parent_order: order, sale_confirmed: order?.sale_confirmed || false });
+                    }
+                } else {
+                    result.push(t);
+                }
+            }
+            return res.json(createResponse(false, 'OK', result));
+        }
+
+        // Export orders: completed/delivered but not admin_approved
+        const { data: orders, error } = await supabase
+            .from('orders')
+            .select('*')
+            .in('status', ['Đã thực hiện', 'Hoàn thành'])
+            .or('admin_approved.is.null,admin_approved.eq.false')
+            .order('sale_order_date', { ascending: false });
+
+        if (error) return res.json(createResponse(true, error.message));
+
+        const mapped = (orders || []).map(o => {
+            let products = [];
+            try {
+                if (typeof o.sale_order_product_mappings === 'string') products = JSON.parse(o.sale_order_product_mappings);
+                else if (Array.isArray(o.sale_order_product_mappings)) products = o.sale_order_product_mappings;
+            } catch (e) { }
+            return { ...o, products };
+        });
+
+        res.json(createResponse(false, 'OK', mapped));
+    } catch (e) {
+        console.error('pending-confirm error:', e.message);
+        res.json(createResponse(true, e.message));
+    }
+});
+
 // GET /api/orders/:id - Get single order detail by ID
 router.get('/:id', async (req, res) => {
     try {
@@ -2567,68 +2626,7 @@ router.put('/:id/cancel', async (req, res) => {
 // ORDER CONFIRMATION (Xác nhận đơn - Sale review before CRM sync)
 // ============================================================
 
-// GET /api/orders/pending-confirm?type=export|import
-// Returns orders not yet admin_approved
-// Each order includes sale_confirmed status for UI checkmark display
-router.get('/pending-confirm', async (req, res) => {
-    try {
-        const { createClient } = await import('@supabase/supabase-js');
-        const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
-        const type = req.query.type || 'export'; // export or import
-
-        if (type === 'import') {
-            // Import tickets that are completed but parent order not admin_approved
-            const { data: tickets, error } = await supabase
-                .from('import_tickets')
-                .select('*')
-                .eq('status', 'completed')
-                .order('created_at', { ascending: false });
-
-            if (error) return res.json(createResponse(true, error.message));
-
-            // Filter out admin_approved ones (check parent order)
-            const result = [];
-            for (const t of (tickets || [])) {
-                if (t.order_id) {
-                    const { data: order } = await supabase.from('orders')
-                        .select('sale_confirmed, admin_approved, account_name, shipping_address, sale_order_date')
-                        .eq('id', t.order_id).single();
-                    if (!order?.admin_approved) {
-                        result.push({ ...t, parent_order: order, sale_confirmed: order?.sale_confirmed || false });
-                    }
-                } else {
-                    result.push(t);
-                }
-            }
-            return res.json(createResponse(false, 'OK', result));
-        }
-
-        // Export orders: completed/delivered but not admin_approved
-        const { data: orders, error } = await supabase
-            .from('orders')
-            .select('*')
-            .in('status', ['Đã thực hiện', 'Hoàn thành'])
-            .or('admin_approved.is.null,admin_approved.eq.false')
-            .order('sale_order_date', { ascending: false });
-
-        if (error) return res.json(createResponse(true, error.message));
-
-        // Parse products for each order
-        const mapped = (orders || []).map(o => {
-            let products = [];
-            try {
-                if (typeof o.sale_order_product_mappings === 'string') products = JSON.parse(o.sale_order_product_mappings);
-                else if (Array.isArray(o.sale_order_product_mappings)) products = o.sale_order_product_mappings;
-            } catch (e) { }
-            return { ...o, products };
-        });
-
-        res.json(createResponse(false, 'OK', mapped));
-    } catch (e) {
-        console.error('pending-confirm error:', e.message);
-        res.json(createResponse(true, e.message));
-    }
-});
+// pending-confirm route moved above /:id handler to fix Express route matching
 
 // GET /api/orders/:id/review - Get order details + proof images for review
 router.get('/:id/review', async (req, res) => {

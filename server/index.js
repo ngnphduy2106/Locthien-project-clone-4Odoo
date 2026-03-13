@@ -84,12 +84,12 @@ apiRouter.post('/sync', async (req, res) => {
     }
 });
 
-// Periodic Task: Retry FAILED syncs
+// Periodic Task: Retry FAILED syncs (skip PENDING_APPROVAL — those await Admin approve)
 async function retryFailedSyncs() {
     try {
         const orders = await db.getOrders();
         const failedOrders = orders.filter(o => o.crm_sync_status === 'FAILED');
-
+        // Don't retry PENDING_APPROVAL orders — they need Admin approval first
         if (failedOrders.length === 0) return;
 
         console.log(`♻️ Retrying ${failedOrders.length} failed syncs...`);
