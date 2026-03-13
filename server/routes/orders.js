@@ -585,6 +585,9 @@ router.get('/pending-confirm', async (req, res) => {
 
             const result = [];
             for (const t of (tickets || [])) {
+                // Skip already admin-confirmed imports
+                if (t.admin_approved) continue;
+
                 if (t.order_id) {
                     const { data: order } = await supabase.from('orders')
                         .select('sale_confirmed, admin_approved, account_name, shipping_address, sale_order_date')
