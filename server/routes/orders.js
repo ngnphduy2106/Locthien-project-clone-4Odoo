@@ -1491,7 +1491,26 @@ router.post('/:id/complete', async (req, res) => {
                 msg += `👤 ${isImport ? 'NCC' : 'Khách'}: ${orderInfo?.khach || 'N/A'}\n`;
                 msg += `🚛 Tài xế: ${firstDriverName || resolvedDriverName || orderInfo?.taiXe || driver_name}`;
 
-                const proofImages = images || [];
+                let proofImages = images || [];
+                // Fallback: fetch images from export/import tickets if not in request body
+                if (proofImages.length === 0) {
+                    try {
+                        const { createClient: sc } = await import('@supabase/supabase-js');
+                        const sbImg = sc(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+                        const ticketTable = isImport ? 'import_tickets' : 'export_tickets';
+                        const { data: ticket } = await sbImg
+                            .from(ticketTable)
+                            .select('images')
+                            .eq('order_id', id)
+                            .order('created_at', { ascending: false })
+                            .limit(1)
+                            .single();
+                        if (ticket?.images && Array.isArray(ticket.images) && ticket.images.length > 0) {
+                            proofImages = ticket.images;
+                            console.log(`📸 Fetched ${proofImages.length} proof images from ${ticketTable}`);
+                        }
+                    } catch (e) { /* no ticket images */ }
+                }
                 if (proofImages.length > 0) {
                     await sendTelegramPhotos(proofImages, msg, tgGroup);
                 } else {
