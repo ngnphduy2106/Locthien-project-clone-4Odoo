@@ -576,10 +576,12 @@ router.get('/pending-confirm', async (req, res) => {
 
         if (type === 'import') {
             // Only show completed (not yet confirmed) imports
+            // Exclude tickets already confirmed (note starts with [XÁC NHẬN])
             const { data: tickets, error } = await supabase
                 .from('import_tickets')
                 .select('*')
                 .eq('status', 'completed')
+                .not('note', 'like', '[XÁC NHẬN]%')
                 .order('created_at', { ascending: false });
 
             if (error) return res.json(createResponse(true, error.message));
