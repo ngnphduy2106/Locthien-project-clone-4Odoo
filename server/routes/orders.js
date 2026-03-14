@@ -1488,8 +1488,27 @@ router.post('/:id/complete', async (req, res) => {
 
                 let msg = `✅ <b>${label}</b>\n`;
                 msg += `📦 Mã: <b>#${orderNo}</b>\n`;
-                msg += `👤 ${isImport ? 'NCC' : 'Khách'}: ${orderInfo?.khach || 'N/A'}\n`;
-                msg += `🚛 Tài xế: ${firstDriverName || resolvedDriverName || orderInfo?.taiXe || driver_name}`;
+                msg += `👤 ${isImport ? 'NCC' : 'Khách'}: ${orderInfo?.khach || orderInfo?.account_name || 'N/A'}\n`;
+
+                // Driver with plate in parentheses
+                const drvName = firstDriverName || resolvedDriverName || orderInfo?.taiXe || driver_name || '';
+                const drvPlate = isMultiDriverOrder && firstDriverPlate ? firstDriverPlate : (resolvedPlate || plate || orderInfo?.bienSo || '');
+                if (drvName) msg += `🚛 TX: <b>${drvName}</b>${drvPlate ? ` (${drvPlate})` : ''}\n`;
+
+                // Assistant driver
+                const assistantName = orderInfo?.assistant_name || '';
+                if (assistantName) msg += `👷 PX: ${assistantName}\n`;
+
+                // Product list
+                const prodList = (orderInfo?.cart || orderInfo?.products || cart || []);
+                if (prodList.length > 0) {
+                    prodList.forEach(p => {
+                        const pName = p.product?.name || p.name || p.product || p.code || '';
+                        const pQty = Number(p.weight_kg || p.qty || p.quantity || 0);
+                        const pUnit = p.unit || 'Kg';
+                        if (pName) msg += `📦 ${pName} — ${pQty.toLocaleString('vi-VN')} ${pUnit}\n`;
+                    });
+                }
 
                 let proofImages = images || [];
                 // Fallback: fetch images from export/import tickets if not in request body
@@ -1733,8 +1752,25 @@ router.post('/:id/complete', async (req, res) => {
             let msg = `✅ <b>${label}</b>\n`;
             msg += `📦 Mã: <b>#${orderNo}</b>\n`;
             msg += `👤 ${isImport ? 'NCC' : 'Khách'}: ${fullOrder?.khach || fullOrder?.account_name || 'N/A'}\n`;
-            if (driverDisplay) msg += `🚛 Tài xế: ${driverDisplay}\n`;
-            if (adminResolvedPlate) msg += `🔢 Biển số: ${adminResolvedPlate}\n`;
+
+            // Driver with plate in parentheses
+            const drvPlate = adminResolvedPlate || fullOrder?.bienSo || fullOrder?.custom_field14 || '';
+            if (driverDisplay) msg += `🚛 TX: <b>${driverDisplay}</b>${drvPlate ? ` (${drvPlate})` : ''}\n`;
+
+            // Assistant driver
+            const adminAssistant = fullOrder?.assistant_name || '';
+            if (adminAssistant) msg += `👷 PX: ${adminAssistant}\n`;
+
+            // Product list
+            const adminProdList = fullOrder?.cart || fullOrder?.products || [];
+            if (adminProdList.length > 0) {
+                adminProdList.forEach(p => {
+                    const pName = p.product?.name || p.name || p.product || p.code || '';
+                    const pQty = Number(p.weight_kg || p.qty || p.quantity || 0);
+                    const pUnit = p.unit || 'Kg';
+                    if (pName) msg += `📦 ${pName} — ${pQty.toLocaleString('vi-VN')} ${pUnit}\n`;
+                });
+            }
 
             // Try to get proof images from export ticket
             let proofImages = images || [];

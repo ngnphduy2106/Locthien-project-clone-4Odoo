@@ -8249,20 +8249,29 @@ async function showDriverCompletionModal(orderId, assignmentId = null) {
 
     // Use state.completionCart for display (already has scaled qty for split orders)
     const productsHtml = state.completionCart.length > 0
-        ? state.completionCart.map((item, idx) => `
-            <div style="display:flex; align-items:center; gap:12px; padding:12px; border-bottom:1px solid var(--border); background:${idx % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.02)'};">
+        ? `<div style="display:flex; padding:8px 12px; background:var(--primary); color:white; font-size:11px; font-weight:600; border-radius:8px 8px 0 0;">
+                <div style="flex:2;">Sản phẩm</div>
+                <div style="flex:1; text-align:center;">SL Đặt</div>
+                <div style="flex:1; text-align:center;">SL Thực tế <span style="color:#fbbf24;">*</span></div>
+                <div style="width:45px; text-align:right;">ĐVT</div>
+           </div>` +
+        state.completionCart.map((item, idx) => `
+            <div style="display:flex; align-items:center; gap:8px; padding:10px 12px; border-bottom:1px solid var(--border); background:${idx % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.02)'};">
                 <div style="flex:2;">
-                    <div style="font-weight:600; color:var(--text-primary);">${item.name}</div>
-                    <div style="font-size:11px; color:var(--text-muted);">Yêu cầu: ${item.planQty} ${item.unit}</div>
+                    <div style="font-weight:600; color:var(--text-primary); font-size:13px;">${item.name}</div>
+                </div>
+                <div style="flex:1; text-align:center;">
+                    <span style="font-size:14px; font-weight:600; color:var(--text-secondary); background:var(--body-bg); padding:6px 10px; border-radius:6px; display:inline-block;">${Number(item.planQty).toLocaleString('vi-VN')}</span>
                 </div>
                 <div style="flex:1;">
-                    <input type="number" class="form-control" 
+                    <input type="number" class="form-control actual-qty-input" 
                         id="actual-qty-${idx}"
                         value="${item.actualQty}" 
                         onchange="updateCompletionQty(${idx}, this.value)"
-                        style="padding:8px; font-size:14px; font-weight:600; text-align:center;">
+                        required
+                        style="padding:6px 8px; font-size:14px; font-weight:700; text-align:center; border:2px solid var(--primary); border-radius:6px;">
                 </div>
-                <div style="width:50px; text-align:right; color:var(--text-secondary);">${item.unit}</div>
+                <div style="width:45px; text-align:right; color:var(--text-secondary); font-size:12px;">${item.unit}</div>
             </div>
         `).join('')
         : '<p style="color:var(--text-muted); padding:20px; text-align:center;">Không có sản phẩm</p>';
@@ -8330,7 +8339,7 @@ async function showDriverCompletionModal(orderId, assignmentId = null) {
 
             <div style="margin-bottom:20px;">
                 <h4 style="font-size:14px; color:var(--text-secondary); margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
-                    <span><i class="bi bi-camera"></i> Ảnh giao hàng</span>
+                    <span><i class="bi bi-camera"></i> Ảnh giao hàng <span style="color:#ef4444; font-weight:700;">* Bắt buộc</span></span>
                     <span id="completion-images-counter" style="font-size:12px; background:var(--primary); color:white; padding:2px 8px; border-radius:12px;">0/${MAX_COMPLETION_IMAGES} ảnh</span>
                 </h4>
                 <div id="completion-images-preview" style="min-height:60px; padding:12px; background:var(--body-bg); border-radius:8px; border:2px dashed var(--border);">
@@ -8381,6 +8390,31 @@ async function submitDriverCompletion() {
     if (!order) {
         alert('Không tìm thấy thông tin đơn hàng!');
         return;
+    }
+
+    // VALIDATION 1: Require at least one proof image
+    if (!completionImages || completionImages.length === 0) {
+        alert('⚠️ Vui lòng chụp ảnh giao hàng trước khi hoàn thành!');
+        // Highlight the image section
+        const imgSection = window.$('#completion-images-preview');
+        if (imgSection) {
+            imgSection.style.borderColor = '#ef4444';
+            imgSection.style.background = '#fef2f2';
+            setTimeout(() => { imgSection.style.borderColor = ''; imgSection.style.background = ''; }, 3000);
+        }
+        return;
+    }
+
+    // VALIDATION 2: Check all actual qty are filled
+    const cart = state.completionCart || [];
+    for (let i = 0; i < cart.length; i++) {
+        const qty = Number(cart[i].actualQty);
+        if (!qty || qty <= 0) {
+            alert(`⚠️ Vui lòng nhập SL thực tế cho: ${cart[i].name}`);
+            const input = window.$(`#actual-qty-${i}`);
+            if (input) { input.focus(); input.style.borderColor = '#ef4444'; }
+            return;
+        }
     }
 
     const noteEl = window.$('#completion-note');
