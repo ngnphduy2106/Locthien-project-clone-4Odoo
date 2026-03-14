@@ -1078,12 +1078,14 @@ router.post('/:id/admin-confirm', async (req, res) => {
             return res.json({ error: true, msg: `Không tìm thấy phiếu nhập #${id}` });
         }
 
-        // Update: mark as confirmed
+        // Update: mark as completed with confirmation note
+        // Note: 'confirmed' is not a valid status in import_tickets check constraint
+        // Valid statuses: pending, completed, assigned, in_transit
         const { data, error } = await supabase
             .from('import_tickets')
             .update({
-                status: 'confirmed',
-                note: `Xác nhận bởi ${confirmed_by || 'Admin'} lúc ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}`
+                status: 'completed',
+                note: `[XÁC NHẬN] bởi ${confirmed_by || 'Admin'} lúc ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}`
             })
             .eq('id', ticket.id)
             .select()
