@@ -392,9 +392,10 @@ const performSync = async () => {
                 const localDate = (existingOrder.ngay || existingOrder.sale_order_date || '').split('T')[0];
                 const dateChanged = misaDate && localDate && misaDate !== localDate;
 
-                // 7. Check if products spec/note/qty changed on MISA
+                // 7. Check if products spec/note/qty/name changed on MISA
                 let specNoteChanged = false;
                 let qtyChanged = false;
+                let productNameChanged = false;
                 const misaProducts = item.sale_order_product_mappings || [];
                 if (hasProducts && misaProducts.length > 0) {
                     for (const localP of existingOrder.products) {
@@ -404,6 +405,13 @@ const performSync = async () => {
                             const misaNote = misaP.description_product || '';
                             if ((localP.spec || '') !== misaSpec || (localP.note || '') !== misaNote) {
                                 specNoteChanged = true;
+                            }
+                            // Detect product name change from MISA (e.g. Sales corrected product name)
+                            const misaName = misaP.product_name || misaP.description || '';
+                            const localName = localP.name || '';
+                            if (misaName && localName && misaName !== localName) {
+                                productNameChanged = true;
+                                console.log(`📝 Product name changed for ${saleOrderNo}: "${localName}" → "${misaName}"`);
                             }
                             // Detect qty change from MISA (e.g. Sales corrected quantity)
                             const misaQty = Number(misaP.amount || 0);
@@ -442,13 +450,14 @@ const performSync = async () => {
                 const localCustomer = existingOrder.khach || existingOrder.account_name || '';
                 const customerChanged = misaCustomer && misaCustomer !== localCustomer;
 
-                if (!hasProducts || hasZeroQty || statusChanged || !hasMisaId || hasMissingPrice || (!hasOwnerName && misaHasOwnerName) || descriptionChanged || dateChanged || hasMissingSpec || specNoteChanged || qtyChanged || addressChanged || phoneChanged || contactChanged || customerChanged) {
+                if (!hasProducts || hasZeroQty || statusChanged || !hasMisaId || hasMissingPrice || (!hasOwnerName && misaHasOwnerName) || descriptionChanged || dateChanged || hasMissingSpec || specNoteChanged || qtyChanged || productNameChanged || addressChanged || phoneChanged || contactChanged || customerChanged) {
                     if (hasMissingPrice) console.log(`💰 Updating ${saleOrderNo} (Missing price data)...`);
                     if (!hasOwnerName && misaHasOwnerName) console.log(`👤 Updating ${saleOrderNo} (Missing owner_name)...`);
                     if (descriptionChanged) console.log(`📝 Updating ${saleOrderNo} (Description changed on MISA)`);
                     if (dateChanged) console.log(`📅 Updating ${saleOrderNo} (Date changed: ${localDate} → ${misaDate})`);
                     if (specNoteChanged) console.log(`📋 Updating ${saleOrderNo} (Product spec/note changed on MISA)`);
                     if (qtyChanged) console.log(`📦 Updating ${saleOrderNo} (Product qty changed on MISA)`);
+                    if (productNameChanged) console.log(`🏷️ Updating ${saleOrderNo} (Product name changed on MISA)`);
                     if (addressChanged) console.log(`📍 Updating ${saleOrderNo} (Address changed on MISA)`);
                     if (phoneChanged) console.log(`📞 Updating ${saleOrderNo} (Phone changed on MISA)`);
                     if (contactChanged) console.log(`👤 Updating ${saleOrderNo} (Contact changed on MISA)`);
@@ -662,6 +671,13 @@ const performSync = async () => {
                     for (const mp of misaProdsForCheck) {
                         const lp = oldOrder.products.find(p => p.code === mp.product_code);
                         if (lp) {
+                            // Check name change
+                            const mName = mp.product_name || mp.description || '';
+                            const lName = lp.name || '';
+                            if (mName && lName && mName !== lName) {
+                                changes.push(`🏷️ SP: "${lName}" → "${mName}"`);
+                            }
+                            // Check qty change
                             const mQty = Number(mp.amount || 0);
                             const lQty = Number(lp.qty || 0);
                             if (mQty > 0 && Math.abs(mQty - lQty) > 0.01) {
