@@ -596,7 +596,7 @@ const performSync = async () => {
                 }
 
                 // PRESERVE local product edits for completed/dispatched orders
-                // Compare individual product quantities: if MISA products differ, use MISA
+                // Compare individual product data: if MISA products differ, use MISA
                 if (oldOrder.status !== 'Mới' && oldOrder.products && oldOrder.products.length > 0) {
                     const misaProds = item.sale_order_product_mappings || [];
                     let misaProductsChanged = false;
@@ -606,12 +606,37 @@ const performSync = async () => {
                         for (const localP of oldOrder.products) {
                             const misaP = misaProds.find(mp => mp.product_code === localP.code);
                             if (misaP) {
+                                // Check qty change
                                 const misaQty = Number(misaP.amount || 0);
                                 const localQty = Number(localP.qty || 0);
                                 if (misaQty > 0 && Math.abs(misaQty - localQty) > 0.01) {
                                     misaProductsChanged = true;
                                     break;
                                 }
+                                // Check name change
+                                const misaName = misaP.product_name || misaP.description || '';
+                                const localName = localP.name || '';
+                                if (misaName && localName && misaName !== localName) {
+                                    misaProductsChanged = true;
+                                    break;
+                                }
+                                // Check spec/note change
+                                if ((misaP.custom_field7 || '') !== (localP.spec || '') ||
+                                    (misaP.description_product || '') !== (localP.note || '')) {
+                                    misaProductsChanged = true;
+                                    break;
+                                }
+                                // Check price change
+                                const misaPrice = Number(misaP.price || 0);
+                                const localPrice = Number(localP.price || 0);
+                                if (misaPrice > 0 && Math.abs(misaPrice - localPrice) > 0.01) {
+                                    misaProductsChanged = true;
+                                    break;
+                                }
+                            } else {
+                                // Product code not found in MISA → products changed
+                                misaProductsChanged = true;
+                                break;
                             }
                         }
                     }
