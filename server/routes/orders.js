@@ -1304,19 +1304,20 @@ router.post('/:id/complete', async (req, res) => {
                 };
             });
 
-            // For multi-driver orders: combine products from ALL assignments
-            if (isMultiDriverOrder && allDriversCompleted && allAssignments.length > 0) {
-                console.log(`📦 Combining cart from ${allAssignments.length} driver assignments...`);
+            // For multi-driver orders: ALWAYS combine products from ALL assignments
+            // This runs every time a driver completes, so the order accumulates actual quantities
+            // - Completed drivers: use actual_products (real delivered quantities)
+            // - Not-yet-completed drivers: use assigned_products (dispatch quantities as placeholder)
+            if (isMultiDriverOrder && allAssignments.length > 0) {
+                console.log(`📦 Combining products from ${allAssignments.length} driver assignments...`);
 
                 const combinedProducts = {};
 
-                // Collect ACTUAL delivered products from all assignments
-                // Priority: actual_products (real delivered) > assigned_products (original)
                 allAssignments.forEach(assign => {
-                    // Use actual_products if available (real delivered quantities)
-                    // Fallback to assigned_products if actual not saved yet
+                    // Priority: actual_products (completed) > assigned_products (pending)
                     const products = assign.actual_products || assign.assigned_products || [];
-                    console.log(`📋 Assignment ${assign.id?.slice(-8)}: using ${assign.actual_products ? 'actual_products' : 'assigned_products'}`);
+                    const source = assign.actual_products ? 'actual' : 'assigned';
+                    console.log(`📋 Assignment ${assign.id?.slice(-8)} [${assign.status}]: using ${source}_products (${products.length} items)`);
 
                     if (Array.isArray(products)) {
                         products.forEach(p => {
@@ -1345,7 +1346,7 @@ router.post('/:id/complete', async (req, res) => {
                     qty: Math.round(p.qty),  // Ensure integer
                     total: p.price > 0 ? Math.round(p.qty) * p.price : p.total
                 }));
-                console.log(`✅ Combined ${updatedProducts.length} products (from actual_products):`, updatedProducts.map(p => `${p.name}: ${p.qty}${p.unit}`));
+                console.log(`✅ Combined ${updatedProducts.length} products (sum of all drivers):`, updatedProducts.map(p => `${p.name}: ${p.qty}${p.unit}`));
             }
 
             // RESOLVE REAL DRIVER: Query order_driver_assignments for dispatched driver
