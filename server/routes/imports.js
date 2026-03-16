@@ -309,9 +309,11 @@ router.put('/:id/assign', async (req, res) => {
             const db = await import('../db/index.js');
             const users = await db.default.getUsers();
             const driverObj = users.find(u => u.fullName === driver_name || u.username === driver_name);
-            const driverTag = driverObj && driverObj.telegramUserId
-                ? ` (<a href="tg://user?id=${driverObj.telegramUserId}">${driver_name}</a>)`
-                : (driverObj && driverObj.telegramUsername ? ` (@${driverObj.telegramUsername.replace('@', '')})` : '');
+
+            // Collect mention tags for bottom (same as MISA dispatch)
+            const mentionTags = [];
+            const driverMention = getTelegramTag(driverObj?.telegramUsername, driverObj?.telegramUserId, driver_name);
+            if (driverMention) mentionTags.push(driverMention.trim());
 
             // Products list
             let products = data?.products || [];
@@ -331,9 +333,19 @@ router.put('/:id/assign', async (req, res) => {
             if (data?.supplier_address) msg += `📍 ${data.supplier_address}\n`;
             if (data?.merged_order_no) msg += `🔗 Ghép chuyến: ${data.merged_order_no}\n`;
             msg += `──────────────\n`;
-            msg += `🚗 Tài xế: <b>${driver_name}</b>${driverTag}\n`;
-            if (assistant_name) msg += `🧑‍🔧 Phụ xe: ${assistant_name}\n`;
+            msg += `🚗 Tài xế: <b>${driver_name}</b>\n`;
+            if (assistant_name) {
+                const assistantObj = users.find(u => u.fullName === assistant_name || u.username === assistant_name);
+                const assistantMention = getTelegramTag(assistantObj?.telegramUsername, assistantObj?.telegramUserId, assistant_name);
+                if (assistantMention) mentionTags.push(assistantMention.trim());
+                msg += `🧑‍🔧 Phụ xe: ${assistant_name}\n`;
+            }
             msg += `🔢 Biển số: ${plate || 'Chưa có'}\n`;
+
+            // Add mention tags at the bottom (clickable tags for driver/assistant)
+            if (mentionTags.length > 0) {
+                msg += `\n${mentionTags.join(' ')}`;
+            }
 
             await sendTelegramMessage(msg, 'DRIVER');
         } catch (tgErr) {
