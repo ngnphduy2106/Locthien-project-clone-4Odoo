@@ -2706,12 +2706,15 @@ router.get('/:id/review', async (req, res) => {
         const order = await db.getOrder(id);
         if (!order) return res.json(createResponse(true, 'Không tìm thấy đơn hàng'));
 
-        // Get proof images from driver assignments
+        // Get proof images from driver assignments (search by order_id OR soDon)
         let proofImages = [];
+        const soDon = order.soDon || order.sale_order_no || id;
+
+        // Try order_driver_assignments with both order_id formats
         const { data: assigns } = await supabase
             .from('order_driver_assignments')
             .select('id, driver_name, proof_images, actual_products, completed_at, delivery_note, actual_qty')
-            .eq('order_id', id)
+            .or(`order_id.eq.${id},order_id.eq.${soDon}`)
             .eq('status', 'completed');
 
         if (assigns) {
@@ -2722,16 +2725,19 @@ router.get('/:id/review', async (req, res) => {
             }
         }
 
-        // Also check export_tickets for images
+        // Also check export_tickets for images (search by order_id OR order_no)
         const { data: tickets } = await supabase
             .from('export_tickets')
             .select('images, ticket_no')
-            .eq('order_id', id);
+            .or(`order_id.eq.${id},order_no.eq.${soDon},order_id.eq.${soDon}`);
 
         if (tickets) {
             for (const t of tickets) {
                 if (t.images?.length > 0) {
-                    proofImages.push(...t.images.map(img => ({ url: img, ticket: t.ticket_no })));
+                    // Deduplicate: skip if URL already in proofImages
+                    const existingUrls = new Set(proofImages.map(p => p.url));
+                    const newImages = t.images.filter(img => !existingUrls.has(img));
+                    proofImages.push(...newImages.map(img => ({ url: img, ticket: t.ticket_no })));
                 }
             }
         }
@@ -2740,12 +2746,14 @@ router.get('/:id/review', async (req, res) => {
         const { data: importTickets } = await supabase
             .from('import_tickets')
             .select('images, ticket_no')
-            .eq('order_id', id);
+            .or(`order_id.eq.${id},order_id.eq.${soDon}`);
 
         if (importTickets) {
             for (const t of importTickets) {
                 if (t.images?.length > 0) {
-                    proofImages.push(...t.images.map(img => ({ url: img, ticket: t.ticket_no })));
+                    const existingUrls = new Set(proofImages.map(p => p.url));
+                    const newImages = t.images.filter(img => !existingUrls.has(img));
+                    proofImages.push(...newImages.map(img => ({ url: img, ticket: t.ticket_no })));
                 }
             }
         }
