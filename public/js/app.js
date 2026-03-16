@@ -10107,9 +10107,16 @@ async function quickConfirmOrder(orderId) {
 
 async function approveOrder(orderId) {
     try {
-        showLoading('Đang tải thông tin đơn...');
+        // Read EDITED products from the review panel DOM inputs (not from API)
+        const editedProducts = getReviewProducts();
 
-        // Fetch order review data to compare quantities
+        if (!editedProducts || editedProducts.length === 0) {
+            alert('Không có sản phẩm nào để duyệt!');
+            return;
+        }
+
+        // Fetch original order data for comparison (original MISA quantities)
+        showLoading('Đang tải thông tin đơn...');
         const reviewRes = await fetch(`/api/orders/${orderId}/review`);
         const reviewJson = await reviewRes.json();
         hideLoading();
@@ -10123,41 +10130,46 @@ async function approveOrder(orderId) {
                 originalProducts = order.sale_order_product_mappings;
         } catch (e) { }
 
-        // Build product comparison table
+        // Build comparison table: edited values vs original MISA values
         let qtyWarnings = [];
         let tableRows = '';
         const orderNo = order.sale_order_no || orderId;
         const customerName = order.account_name || order.khach || 'N/A';
 
-        originalProducts.forEach((p, i) => {
+        editedProducts.forEach((p, i) => {
             const name = p.name || p.code || `SP ${i + 1}`;
-            const originalQty = Number(p.qty || p.quantity || 0);
+            const editedQty = Number(p.qty || 0);
             const unit = p.unit || 'Kg';
 
-            // Check actual delivery qty from export tickets or driver data
-            const actualQty = originalQty; // Will use original if no change
-            const diff = originalQty > 0 ? Math.abs(actualQty - originalQty) / originalQty * 100 : 0;
+            // Find original MISA qty for comparison
+            const origProduct = originalProducts.find(op => op.code === p.code || op.name === p.name);
+            const originalQty = origProduct ? Number(origProduct.qty || origProduct.quantity || 0) : 0;
+
+            // Compare edited vs original
+            const diff = originalQty > 0 ? Math.abs(editedQty - originalQty) / originalQty * 100 : 0;
 
             let diffColor = '#10b981'; // green
             let diffIcon = '✅';
             let diffText = 'Khớp';
 
-            if (diff >= 10) {
-                diffColor = '#EF4444'; // red
-                diffIcon = '🔴';
-                diffText = `Lệch ${diff.toFixed(1)}%`;
-                qtyWarnings.push(`${name}: lệch ${diff.toFixed(1)}%`);
-            } else if (diff >= 5) {
-                diffColor = '#F59E0B'; // orange  
-                diffIcon = '🟡';
-                diffText = `Lệch ${diff.toFixed(1)}%`;
-                qtyWarnings.push(`${name}: lệch ${diff.toFixed(1)}%`);
+            if (editedQty !== originalQty) {
+                if (diff >= 10) {
+                    diffColor = '#EF4444';
+                    diffIcon = '🔴';
+                    diffText = `${originalQty.toLocaleString('vi-VN')} → ${editedQty.toLocaleString('vi-VN')}`;
+                    qtyWarnings.push(`${name}: ${originalQty.toLocaleString('vi-VN')} → ${editedQty.toLocaleString('vi-VN')} (lệch ${diff.toFixed(1)}%)`);
+                } else if (diff >= 1) {
+                    diffColor = '#F59E0B';
+                    diffIcon = '🟡';
+                    diffText = `${originalQty.toLocaleString('vi-VN')} → ${editedQty.toLocaleString('vi-VN')}`;
+                    qtyWarnings.push(`${name}: ${originalQty.toLocaleString('vi-VN')} → ${editedQty.toLocaleString('vi-VN')}`);
+                }
             }
 
             tableRows += `
                 <tr>
                     <td style="padding:6px 8px; border-bottom:1px solid #f3f4f6; font-size:13px;">${name}</td>
-                    <td style="padding:6px 8px; border-bottom:1px solid #f3f4f6; text-align:right; font-size:13px;">${Number(originalQty).toLocaleString('vi-VN')} ${unit}</td>
+                    <td style="padding:6px 8px; border-bottom:1px solid #f3f4f6; text-align:right; font-size:13px; font-weight:600;">${editedQty.toLocaleString('vi-VN')} ${unit}</td>
                     <td style="padding:6px 8px; border-bottom:1px solid #f3f4f6; text-align:center;">
                         <span style="color:${diffColor}; font-size:12px;">${diffIcon} ${diffText}</span>
                     </td>
@@ -10167,7 +10179,7 @@ async function approveOrder(orderId) {
         // Build confirmation dialog
         const warningHtml = qtyWarnings.length > 0
             ? `<div style="background:#FEF3C7; border:1px solid #F59E0B; border-radius:8px; padding:10px 14px; margin-bottom:12px;">
-                <b style="color:#92400E;">⚠️ CẢNH BÁO CHÊNH LỆCH SỐ LƯỢNG:</b><br>
+                <b style="color:#92400E;">⚠️ SỐ LƯỢNG ĐÃ CHỈNH SỬA:</b><br>
                 <span style="font-size:12px; color:#92400E;">${qtyWarnings.join('<br>')}</span>
                </div>`
             : '';
@@ -10222,7 +10234,7 @@ async function approveOrder(orderId) {
         // Show dialog
         document.body.insertAdjacentHTML('beforeend', dialogHtml);
 
-        // Handle confirm
+        // Handle confirm — send EDITED products to approve API
         document.getElementById('approve-final-btn').onclick = async () => {
             document.getElementById('approve-confirm-dialog').remove();
 
@@ -10232,7 +10244,7 @@ async function approveOrder(orderId) {
                 const res = await fetch(`/api/orders/${orderId}/approve`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ approved_by: userName })
+                    body: JSON.stringify({ approved_by: userName, products: editedProducts })
                 });
                 const json = await res.json();
                 hideLoading();

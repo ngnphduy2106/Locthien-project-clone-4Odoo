@@ -2808,7 +2808,7 @@ router.post('/:id/confirm', async (req, res) => {
 router.post('/:id/approve', async (req, res) => {
     try {
         const { id } = req.params;
-        const { approved_by } = req.body;
+        const { approved_by, products: editedProducts } = req.body;
 
         const order = await db.getOrder(id);
         if (!order) return res.json(createResponse(true, 'Không tìm thấy đơn hàng'));
@@ -2820,6 +2820,25 @@ router.post('/:id/approve', async (req, res) => {
             admin_approved_by: approved_by || 'admin'
         };
 
+        // If admin sent edited products, update them BEFORE MISA sync
+        if (editedProducts && Array.isArray(editedProducts) && editedProducts.length > 0) {
+            // Preserve price/total from original products
+            const originalPriceMap = {};
+            (order.products || []).forEach(p => {
+                originalPriceMap[p.code] = { price: Number(p.price || 0), total: Number(p.total || 0) };
+            });
+
+            updateData.cart = editedProducts.map(p => ({
+                code: p.code || '',
+                name: p.name || '',
+                qty: Number(p.qty || 0),
+                unit: p.unit || 'Kg',
+                price: originalPriceMap[p.code]?.price || Number(p.price || 0),
+                total: (originalPriceMap[p.code]?.price || Number(p.price || 0)) * Number(p.qty || 0) || originalPriceMap[p.code]?.total || 0
+            }));
+            console.log(`📝 Admin edited products for ${id}:`, updateData.cart.map(p => `${p.name}: ${p.qty} ${p.unit}`));
+        }
+
         // If sales hasn't confirmed yet, auto-confirm (admin can do both)
         if (!order.sale_confirmed) {
             updateData.sale_confirmed = true;
@@ -2829,7 +2848,7 @@ router.post('/:id/approve', async (req, res) => {
 
         await db.updateOrder(id, updateData);
 
-        // Sync to MISA CRM
+        // Sync to MISA CRM (uses the UPDATED order data)
         let crmStatus = 'OK';
         try {
             const updatedOrder = await db.getOrder(id);
