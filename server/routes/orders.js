@@ -589,6 +589,31 @@ router.get('/pending-confirm', async (req, res) => {
             return res.json(createResponse(false, 'OK', tickets || []));
         }
 
+        if (type === 'approved') {
+            // Show recently approved orders (admin_approved = true)
+            const { data: orders, error } = await supabase
+                .from('orders')
+                .select('*')
+                .eq('admin_approved', true)
+                .not('sale_order_no', 'is', null)
+                .neq('sale_order_no', '')
+                .order('admin_approved_at', { ascending: false })
+                .limit(50);
+
+            if (error) return res.json(createResponse(true, error.message));
+
+            const mapped = (orders || []).map(o => {
+                let products = [];
+                try {
+                    if (typeof o.sale_order_product_mappings === 'string') products = JSON.parse(o.sale_order_product_mappings);
+                    else if (Array.isArray(o.sale_order_product_mappings)) products = o.sale_order_product_mappings;
+                } catch (e) { }
+                return { ...o, products };
+            });
+
+            return res.json(createResponse(false, 'OK', mapped));
+        }
+
         // Export orders: MISA orders completed but not yet admin_approved
         // Matches both: PENDING_APPROVAL (new flow) and legacy completed orders
         const { data: orders, error } = await supabase

@@ -1324,7 +1324,7 @@
                     </div>
 
                     <!-- Export/Import Tabs -->
-                    <div style="display:flex; gap:8px; margin-bottom:16px;">
+                    <div style="display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap;">
                         <button id="confirm-tab-export" class="btn btn-primary btn-sm"
                             onclick="switchConfirmTab('export')" style="border-radius:20px; padding:6px 16px;">
                             <i class="bi bi-box-arrow-up"></i> Đơn xuất
@@ -1335,6 +1335,12 @@
                             onclick="switchConfirmTab('import')" style="border-radius:20px; padding:6px 16px;">
                             <i class="bi bi-box-arrow-in-down"></i> Đơn nhập
                             <span id="confirm-import-count"
+                                style="background:rgba(0,0,0,0.1); padding:1px 6px; border-radius:10px; font-size:11px; margin-left:4px;">0</span>
+                        </button>
+                        <button id="confirm-tab-approved" class="btn btn-outline btn-sm"
+                            onclick="switchConfirmTab('approved')" style="border-radius:20px; padding:6px 16px;">
+                            <i class="bi bi-check-circle-fill"></i> Đã duyệt
+                            <span id="confirm-approved-count"
                                 style="background:rgba(0,0,0,0.1); padding:1px 6px; border-radius:10px; font-size:11px; margin-left:4px;">0</span>
                         </button>
                     </div>

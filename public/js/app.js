@@ -9719,13 +9719,15 @@ async function loadPendingConfirmOrders() {
         const countEl = window.$(`#confirm-${confirmCurrentTab}-count`);
         if (countEl) countEl.textContent = orders.length;
 
-        // Also fetch the other tab count
+        // Also fetch the other tabs counts
         try {
-            const otherTab = confirmCurrentTab === 'export' ? 'import' : 'export';
-            const otherRes = await fetch(`/api/orders/pending-confirm?type=${otherTab}`);
-            const otherJson = await otherRes.json();
-            const otherCount = window.$(`#confirm-${otherTab}-count`);
-            if (otherCount) otherCount.textContent = (otherJson.data || []).length;
+            const otherTabs = ['export', 'import', 'approved'].filter(t => t !== confirmCurrentTab);
+            for (const otherTab of otherTabs) {
+                const otherRes = await fetch(`/api/orders/pending-confirm?type=${otherTab}`);
+                const otherJson = await otherRes.json();
+                const otherCount = window.$(`#confirm-${otherTab}-count`);
+                if (otherCount) otherCount.textContent = (otherJson.data || []).length;
+            }
         } catch (e) { }
 
         // Update badge
@@ -9787,7 +9789,7 @@ async function loadPendingConfirmOrders() {
                     </div>
                 </div>`;
             }).join('');
-        } else {
+        } else if (confirmCurrentTab === 'import') {
             // Import tab
             container.innerHTML = orders.map(t => {
                 const products = (t.products || []).map(p => `${p.name || p.code}: ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'Kg'}`).join(', ');
@@ -9811,6 +9813,45 @@ async function loadPendingConfirmOrders() {
                     </div>
                 </div>`;
             }).join('');
+        } else if (confirmCurrentTab === 'approved') {
+            // Approved tab — show approved orders with approver info
+            container.innerHTML = orders.map(o => {
+                const orderNo = o.sale_order_no || o.id;
+                const fmtDate = o.sale_order_date ? new Date(o.sale_order_date).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : '';
+                const products = (o.products || []).map(p => `${p.name || p.code}: ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'Kg'}`).join(', ');
+                const driver = o.custom_field13 || o.taiXe || '';
+                const approvedBy = o.admin_approved_by || 'N/A';
+                const approvedAt = o.admin_approved_at ? new Date(o.admin_approved_at).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+                const confirmedBy = o.sale_confirmed_by || '';
+
+                return `
+                <div style="background:white; border:1px solid #10b981; border-left:4px solid #10b981; border-radius:12px; padding:16px;" id="confirm-card-${o.id}">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap;">
+                        <div style="flex:1; min-width:250px;">
+                            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:6px;">
+                                <span style="color:#10b981; font-size:18px;">✅</span>
+                                <span style="font-weight:700; color:var(--primary); font-size:14px;">#${orderNo}</span>
+                                <span style="font-size:11px; color:#6B7280; background:#F3F4F6; padding:2px 8px; border-radius:4px;">${fmtDate}</span>
+                                <span style="font-size:10px; color:white; background:#10b981; padding:2px 8px; border-radius:10px;">${o.status || 'Đã duyệt'}</span>
+                            </div>
+                            <div style="font-size:13px; color:#1f2937; font-weight:600; margin-bottom:4px;">
+                                ${o.account_name || 'N/A'}
+                            </div>
+                            ${o.shipping_address ? '<div style="font-size:11px; color:#6B7280; margin-bottom:4px;">📍 ' + o.shipping_address.substring(0, 80) + '</div>' : ''}
+                            <div style="font-size:11px; color:#4B5563;">📦 ${products || 'Không có SP'}</div>
+                            ${driver ? '<div style="font-size:11px; color:#6B7280; margin-top:2px;">🚛 ' + driver + '</div>' : ''}
+                        </div>
+                        <div style="display:flex; flex-direction:column; gap:4px; flex-shrink:0; min-width:140px; text-align:right;">
+                            <div style="background:#ECFDF5; border:1px solid #A7F3D0; border-radius:8px; padding:8px 12px;">
+                                <div style="font-size:11px; color:#059669; font-weight:600;">✅ Duyệt bởi</div>
+                                <div style="font-size:13px; color:#065f46; font-weight:700;">${approvedBy}</div>
+                                <div style="font-size:10px; color:#6B7280; margin-top:2px;">${approvedAt}</div>
+                            </div>
+                            ${confirmedBy ? '<div style="font-size:10px; color:#6B7280;">☑️ Xác nhận: ' + confirmedBy + '</div>' : ''}
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
         }
     } catch (err) {
         console.error('loadPendingConfirmOrders error:', err);
@@ -9820,15 +9861,12 @@ async function loadPendingConfirmOrders() {
 
 function switchConfirmTab(tab) {
     confirmCurrentTab = tab;
-    // Update tab styles
-    const tabExport = window.$('#confirm-tab-export');
-    const tabImport = window.$('#confirm-tab-import');
-    if (tabExport) {
-        tabExport.className = tab === 'export' ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm';
-    }
-    if (tabImport) {
-        tabImport.className = tab === 'import' ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm';
-    }
+    // Update tab styles for all 3 tabs
+    const tabs = ['export', 'import', 'approved'];
+    tabs.forEach(t => {
+        const btn = window.$(`#confirm-tab-${t}`);
+        if (btn) btn.className = t === tab ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm';
+    });
     closeReviewPanel();
     loadPendingConfirmOrders();
 }
@@ -10045,7 +10083,7 @@ async function confirmReviewOrder() {
     if (!confirm('Xác nhận đơn này? (Chờ Admin duyệt trước khi đẩy MISA)')) return;
 
     const products = getReviewProducts();
-    const userName = state.user?.fullName || state.user?.username || 'sales';
+    const userName = state.user?.name || state.user?.fullName || state.user?.username || 'sales';
 
     try {
         const btn = document.querySelector('#confirm-review-panel .btn-primary');
@@ -10082,7 +10120,7 @@ async function confirmReviewOrder() {
 async function quickConfirmOrder(orderId) {
     if (!confirm('Xác nhận đơn này? (Chờ Admin duyệt)')) return;
 
-    const userName = state.user?.fullName || state.user?.username || 'sales';
+    const userName = state.user?.name || state.user?.fullName || state.user?.username || 'sales';
     try {
         const res = await fetch(`/api/orders/${orderId}/confirm`, {
             method: 'POST',
@@ -10238,7 +10276,7 @@ async function approveOrder(orderId) {
         document.getElementById('approve-final-btn').onclick = async () => {
             document.getElementById('approve-confirm-dialog').remove();
 
-            const userName = state.user?.fullName || state.user?.username || 'admin';
+            const userName = state.user?.name || state.user?.fullName || state.user?.username || 'admin';
             try {
                 showLoading('Đang duyệt và đẩy MISA...');
                 const res = await fetch(`/api/orders/${orderId}/approve`, {
@@ -10290,7 +10328,7 @@ function closeReviewPanel() {
 async function confirmImportOrder(ticketNo) {
     if (!confirm(`Xác nhận đơn nhập #${ticketNo}?`)) return;
 
-    const userName = state.user?.fullName || state.user?.username || 'admin';
+    const userName = state.user?.name || state.user?.fullName || state.user?.username || 'admin';
     try {
         showLoading && showLoading('Đang xác nhận...');
         const res = await fetch(`/api/imports/${ticketNo}/admin-confirm`, {
