@@ -597,7 +597,7 @@ router.get('/pending-confirm', async (req, res) => {
                 .eq('admin_approved', true)
                 .not('sale_order_no', 'is', null)
                 .neq('sale_order_no', '')
-                .order('admin_approved_at', { ascending: false })
+                .order('sale_order_date', { ascending: false })
                 .limit(50);
 
             if (error) return res.json(createResponse(true, error.message));
