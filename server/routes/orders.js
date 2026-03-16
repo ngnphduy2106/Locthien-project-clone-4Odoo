@@ -2731,54 +2731,90 @@ router.get('/:id/review', async (req, res) => {
         const order = await db.getOrder(id);
         if (!order) return res.json(createResponse(true, 'Không tìm thấy đơn hàng'));
 
-        // Get proof images from driver assignments (search by order_id OR soDon)
-        let proofImages = [];
+        // Build list of all IDs to search for images
         const soDon = order.soDon || order.sale_order_no || id;
+        const searchIds = new Set([id, soDon]);
 
-        // Try order_driver_assignments with both order_id formats
+        // For merged orders: also search sibling order IDs and the merged order ID
+        const mergedNo = order.merged_order_no;
+        if (mergedNo) {
+            searchIds.add(mergedNo);
+            // Find all sibling orders in the same merge group
+            const { data: siblings } = await supabase
+                .from('orders')
+                .select('id, sale_order_no')
+                .eq('merged_order_no', mergedNo);
+            if (siblings) {
+                for (const s of siblings) {
+                    searchIds.add(s.id);
+                    if (s.sale_order_no) searchIds.add(s.sale_order_no);
+                }
+            }
+        }
+
+        // Build OR filter string for all IDs
+        const allIds = [...searchIds].filter(Boolean);
+        const orAssignFilter = allIds.map(x => `order_id.eq.${x}`).join(',');
+        const orExportFilter = allIds.map(x => `order_id.eq.${x}`).join(',') + ',' + allIds.map(x => `order_no.eq.${x}`).join(',');
+        const orImportFilter = allIds.map(x => `order_id.eq.${x}`).join(',');
+
+        let proofImages = [];
+        const existingUrls = new Set();
+
+        // 1. Check order_driver_assignments
         const { data: assigns } = await supabase
             .from('order_driver_assignments')
             .select('id, driver_name, proof_images, actual_products, completed_at, delivery_note, actual_qty')
-            .or(`order_id.eq.${id},order_id.eq.${soDon}`)
+            .or(orAssignFilter)
             .eq('status', 'completed');
 
         if (assigns) {
             for (const a of assigns) {
                 if (a.proof_images?.length > 0) {
-                    proofImages.push(...a.proof_images.map(img => ({ url: img, driver: a.driver_name })));
+                    for (const img of a.proof_images) {
+                        if (!existingUrls.has(img)) {
+                            existingUrls.add(img);
+                            proofImages.push({ url: img, driver: a.driver_name });
+                        }
+                    }
                 }
             }
         }
 
-        // Also check export_tickets for images (search by order_id OR order_no)
+        // 2. Check export_tickets
         const { data: tickets } = await supabase
             .from('export_tickets')
             .select('images, ticket_no')
-            .or(`order_id.eq.${id},order_no.eq.${soDon},order_id.eq.${soDon}`);
+            .or(orExportFilter);
 
         if (tickets) {
             for (const t of tickets) {
                 if (t.images?.length > 0) {
-                    // Deduplicate: skip if URL already in proofImages
-                    const existingUrls = new Set(proofImages.map(p => p.url));
-                    const newImages = t.images.filter(img => !existingUrls.has(img));
-                    proofImages.push(...newImages.map(img => ({ url: img, ticket: t.ticket_no })));
+                    for (const img of t.images) {
+                        if (!existingUrls.has(img)) {
+                            existingUrls.add(img);
+                            proofImages.push({ url: img, ticket: t.ticket_no });
+                        }
+                    }
                 }
             }
         }
 
-        // Also check import_tickets
+        // 3. Check import_tickets
         const { data: importTickets } = await supabase
             .from('import_tickets')
             .select('images, ticket_no')
-            .or(`order_id.eq.${id},order_id.eq.${soDon}`);
+            .or(orImportFilter);
 
         if (importTickets) {
             for (const t of importTickets) {
                 if (t.images?.length > 0) {
-                    const existingUrls = new Set(proofImages.map(p => p.url));
-                    const newImages = t.images.filter(img => !existingUrls.has(img));
-                    proofImages.push(...newImages.map(img => ({ url: img, ticket: t.ticket_no })));
+                    for (const img of t.images) {
+                        if (!existingUrls.has(img)) {
+                            existingUrls.add(img);
+                            proofImages.push({ url: img, ticket: t.ticket_no });
+                        }
+                    }
                 }
             }
         }
