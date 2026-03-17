@@ -10019,9 +10019,9 @@ async function openReviewPanel(orderId, isImport = false) {
                     confirmBtn.onclick = () => confirmReviewOrder();
                 }
             }
-            // Show reject button only for admin/dispatcher
+            // Show reject button for admin/dispatcher/sales
             if (rejectBtn) {
-                rejectBtn.style.display = ['admin', 'dispatcher'].includes(state.user?.role?.toLowerCase()) ? '' : 'none';
+                rejectBtn.style.display = ['admin', 'dispatcher', 'sales'].includes(state.user?.role?.toLowerCase()) ? '' : 'none';
             }
         }
     } catch (err) {

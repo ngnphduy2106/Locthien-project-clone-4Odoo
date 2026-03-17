@@ -2981,7 +2981,8 @@ router.post('/:id/reject', async (req, res) => {
             sale_confirmed: false,
             sale_confirmed_at: null,
             sale_confirmed_by: null,
-            status: 'Từ chối',
+            status: 'Chưa thực hiện',
+            delivery_status: 'Đang giao hàng',
             description: rejectNote
         };
 
@@ -2999,7 +3000,7 @@ router.post('/:id/reject', async (req, res) => {
             if (products) msg += `📋 Sản phẩm:\n${products}\n`;
             msg += `👔 Từ chối bởi: ${rejected_by || 'admin'}\n`;
             if (reason) msg += `📝 Lý do: ${reason}`;
-            await sendTelegramMessage(msg, 'SALES');
+            await sendTelegramMessage(msg, 'NOTIFY');
         } catch (tgErr) {
             console.error('Telegram reject error:', tgErr.message);
         }
