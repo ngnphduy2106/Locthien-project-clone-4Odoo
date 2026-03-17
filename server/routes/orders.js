@@ -1518,12 +1518,13 @@ router.post('/:id/complete', async (req, res) => {
                 msg += `📦 Mã: <b>#${orderNo}</b>\n`;
                 msg += `👤 ${isImport ? 'NCC' : 'Khách'}: ${orderInfo?.khach || orderInfo?.account_name || 'N/A'}\n`;
 
-                // Driver with plate in parentheses
-                const drvName = firstDriverName || resolvedDriverName || orderInfo?.taiXe || driver_name || '';
-                const drvPlate = isMultiDriverOrder && firstDriverPlate ? firstDriverPlate : (resolvedPlate || plate || orderInfo?.bienSo || '');
+                // Driver: prefer order's assigned driver (from MISA/dispatch), NOT the person who completed
+                const orderDriver = orderInfo?.taiXe || orderInfo?.custom_field13 || '';
+                const drvName = isMultiDriverOrder ? firstDriverName : (orderDriver || resolvedDriverName || driver_name || '');
+                const drvPlate = isMultiDriverOrder && firstDriverPlate ? firstDriverPlate : (orderInfo?.bienSo || orderInfo?.custom_field14 || resolvedPlate || plate || '');
                 if (drvName) msg += `🚛 TX: <b>${drvName}</b>${drvPlate ? ` (${drvPlate})` : ''}\n`;
 
-                // Assistant driver
+                // Assistant driver from order (not the completing user)
                 const assistantName = orderInfo?.assistant_name || '';
                 if (assistantName) msg += `👷 PX: ${assistantName}\n`;
 
