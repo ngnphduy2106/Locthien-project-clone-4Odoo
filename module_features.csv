@@ -1,0 +1,156 @@
+Module,#,Chức năng,Mô tả,Loại
+Dashboard,1,Thống kê tổng quan,Hiển thị tổng đơn / doanh thu / đơn đang giao / đơn hoàn thành,Frontend
+Dashboard,2,Biểu đồ doanh thu,Chart.js biểu đồ giá trị đơn hàng theo tháng (12 tháng),Frontend
+Dashboard,3,Giao dịch gần đây,Bảng 10 đơn hàng mới nhất: mã đơn / khách / trạng thái / giá trị,Frontend
+Tạo Phiếu Nhập (create-order),1,Chọn NCC,Autocomplete từ danh sách nhà cung cấp (Supabase),Frontend
+Tạo Phiếu Nhập (create-order),2,Thêm sản phẩm,Chọn theo mã/tên từ MISA / nhập SL / đơn vị,Frontend
+Tạo Phiếu Nhập (create-order),3,Autofill mã ↔ tên,Nhập mã tự điền tên và ngược lại (datalist),Frontend
+Tạo Phiếu Nhập (create-order),4,Sync MISA Products,Nút đồng bộ danh mục hàng hóa từ MISA CRM,Frontend
+Tạo Phiếu Nhập (create-order),5,Ngày dự kiến,Chọn ngày nhập dự kiến,Frontend
+Tạo Phiếu Nhập (create-order),6,Ghi chú,Nhập ghi chú cho phiếu nhập,Frontend
+Tạo Phiếu Nhập (create-order),7,Submit,Gửi phiếu nhập → API → Telegram thông báo nhóm NHẬP,Frontend
+Điều Phối (dispatch),1,Tabs trạng thái,Chờ giao / Đang giao / Hoàn thành (cache render),Frontend
+Điều Phối (dispatch),2,Gán tài xế,Modal chọn TX + biển số + PX cho đơn,Frontend
+Điều Phối (dispatch),3,Multi-driver,Chia đơn cho nhiều TX / mỗi TX có SP riêng,Frontend
+Điều Phối (dispatch),4,Pin đơn hàng,Ghim đơn ưu tiên lên đầu,Frontend
+Điều Phối (dispatch),5,Sắp xếp thông minh,Ghim → Hôm nay → Tương lai → Quá khứ,Frontend
+Điều Phối (dispatch),6,Chi tiết đơn,Modal xem đầy đủ: TX / SP / địa chỉ / ghi chú / chat,Frontend
+Điều Phối (dispatch),7,Chat đơn hàng,Gửi tin nhắn giữa TX và ĐP trong chi tiết đơn,Frontend
+Điều Phối (dispatch),8,Hoàn thành đơn,Xác nhận giao xong + ảnh chứng minh,Frontend
+Điều Phối (dispatch),9,Tìm kiếm,Tìm theo mã đơn / khách / TX,Frontend
+Điều Phối (dispatch),10,Vỏ (Local Items),Thêm/xóa/lưu vỏ phuy / can (không sync MISA),Frontend
+Điều Phối (dispatch),11,Xóa tài xế,Gỡ TX khỏi đơn / reset về pending,Frontend
+Điều Phối (dispatch),12,Sửa tài xế,Đổi TX/biển số/PX cho đơn đã gán,Frontend
+Đơn Đang Giao (pending-orders),1,Bảng 2 cột,Đơn Xuất (trái) + Đơn Nhập (phải) song song,Frontend
+Đơn Đang Giao (pending-orders),2,Lọc trạng thái,Tất cả / Chưa giao / Đang giao / Đơn xuất / Đơn nhập,Frontend
+Đơn Đang Giao (pending-orders),3,Tìm kiếm,Tìm theo mã đơn / khách/NCC / TX,Frontend
+Đơn Đang Giao (pending-orders),4,Lọc theo ngày,Date range picker (Flatpickr),Frontend
+Đơn Đang Giao (pending-orders),5,Phân trang,15 đơn/trang,Frontend
+Đơn Đang Giao (pending-orders),6,Click xem chi tiết,Click vào dòng → mở chi tiết (export hoặc import),Frontend
+Đơn Của Tôi (my-orders),1,Danh sách đơn,Hiển thị đơn xuất + nhập được gán cho TX hiện tại,Frontend
+Đơn Của Tôi (my-orders),2,Phân nhóm,Đang giao (chưa hoàn thành) / Đã hoàn thành,Frontend
+Đơn Của Tôi (my-orders),3,Sắp xếp,Theo ngày DESC / rồi theo mã đơn DESC,Frontend
+Đơn Của Tôi (my-orders),4,Unread badge,Hiện số tin nhắn chưa đọc trên mỗi đơn,Frontend
+Đơn Của Tôi (my-orders),5,Hoàn thành xuất,Mở modal giao hàng: ảnh / SP thực tế / ghi chú,Frontend
+Đơn Của Tôi (my-orders),6,Hoàn thành nhập,Mở modal nhập hàng: ảnh / SP thực tế / kho / ghi chú,Frontend
+Đơn Của Tôi (my-orders),7,Xem chi tiết,Modal chi tiết đơn: thông tin / SP / chat / lịch sử,Frontend
+Đơn Của Tôi (my-orders),8,Split order,Hỗ trợ đơn chia nhiều TX: chỉ thấy phần của mình,Frontend
+Lịch Sử Đơn Hàng (order-history),1,Tổng quan thương mại,Stats: Tổng đơn / Doanh thu / Đã duyệt MISA,Frontend
+Lịch Sử Đơn Hàng (order-history),2,Bảng 2 cột,Xuất (trái) + Nhập (phải) song song,Frontend
+Lịch Sử Đơn Hàng (order-history),3,Chế độ xem,Toggle bảng / card (danh sách compact),Frontend
+Lịch Sử Đơn Hàng (order-history),4,Tìm kiếm,Tìm theo mã đơn / khách / TX / SP,Frontend
+Lịch Sử Đơn Hàng (order-history),5,Lọc trạng thái,Tất cả / Chưa xử lý / Đang giao / Hoàn thành,Frontend
+Lịch Sử Đơn Hàng (order-history),6,Lọc ngày,Date range picker,Frontend
+Lịch Sử Đơn Hàng (order-history),7,Sắp xếp,Theo ngày / Giá trị / Trạng thái,Frontend
+Lịch Sử Đơn Hàng (order-history),8,Phân trang,500 đơn/trang,Frontend
+Lịch Sử Đơn Hàng (order-history),9,Xem chi tiết,Click row → modal chi tiết,Frontend
+Lịch Sử Đơn Hàng (order-history),10,Export Excel,Nút xuất ra file Excel,Frontend
+Lịch Sử Đơn Hàng (order-history),11,Price masking,Ẩn giá cho Dispatcher,Frontend
+Quản Lý Đơn Hàng (orders),1,Tabs trạng thái,Pending / Delivering / Completed (cache),Frontend
+Quản Lý Đơn Hàng (orders),2,Tìm kiếm,Tìm mã đơn / khách hàng,Frontend
+Quản Lý Đơn Hàng (orders),3,Xem chi tiết,Modal chi tiết đơn,Frontend
+Quản Lý Đơn Hàng (orders),4,Render cached,Cache HTML cho chuyển tab nhanh,Frontend
+Nhân Sự (hr),1,Danh sách NV,Bảng: Tên / SĐT / Chức vụ / Biển số / Trạng thái,Frontend
+Nhân Sự (hr),2,Thêm nhân viên,Modal form: Tên / SĐT / Chức vụ (dropdown) / Biển số,Frontend
+Nhân Sự (hr),3,Roles dropdown,"ADMIN / DISPATCHER / DRIVER / ASSISTANT / SALES / ACCOUNTANT / VIEWER / IMPORT_MANAGER / STAFF",Frontend
+Nhân Sự (hr),4,Giao diện card,Card UI cho mỗi nhân viên với avatar và thông tin,Frontend
+Vật Tư (materials),1,Danh sách vật tư,Bảng: Mã / Tên / Loại / ĐV tính / Giá / Tồn kho,Frontend
+Vật Tư (materials),2,Tìm kiếm,Tìm theo mã hoặc tên vật tư,Frontend
+Vật Tư (materials),3,Thêm vật tư,Modal form: Mã / Tên / Loại / ĐV tính / Giá / Mô tả,Frontend
+Vật Tư (materials),4,Phân loại,Hóa chất / Nguyên liệu / Phụ gia / Bao bì / Khác,Frontend
+Kho Hàng (warehouse),1,Tồn kho,Danh sách SP: Tên / Mã / Kho / Số lượng / ĐV,Frontend
+Kho Hàng (warehouse),2,Cảnh báo,Alert khi tồn kho < 100 (đỏ/vàng),Frontend
+Kho Hàng (warehouse),3,Chuyển kho,Tabs: Tất cả / LT1 / LT2,Frontend
+NCC (suppliers),1,Danh sách NCC,Bảng: Tên / SĐT / Địa chỉ / Ghi chú,Frontend
+NCC (suppliers),2,Thêm NCC,Modal form: Tên / SĐT / Địa chỉ / Ghi chú,Frontend
+NCC (suppliers),3,Sửa NCC,Modal edit: cập nhật thông tin,Frontend
+NCC (suppliers),4,Xóa NCC,Xác nhận xóa,Frontend
+NCC (suppliers),5,Tìm kiếm,Tìm theo tên / SĐT,Frontend
+NCC (suppliers),6,Import Sheet,Nhập từ Google Sheet,Frontend
+Khách Hàng (customers),1,Danh sách KH,Bảng: Tên / SĐT / Địa chỉ / Ghi chú,Frontend
+Khách Hàng (customers),2,Thêm KH,Modal form,Frontend
+Khách Hàng (customers),3,Sửa KH,Modal edit,Frontend
+Khách Hàng (customers),4,Xóa KH,Xác nhận xóa,Frontend
+Khách Hàng (customers),5,Tìm kiếm,Tìm theo tên / SĐT,Frontend
+Khách Hàng (customers),6,Import Sheet,Nhập từ Google Sheet,Frontend
+Core App (app.js),1,Login,Đăng nhập SĐT + MK → API auth,Frontend
+Core App (app.js),2,RBAC,applyRoleBasedUI() ẩn/hiện nav theo role,Frontend
+Core App (app.js),3,Navigate,showSection() chuyển trang SPA,Frontend
+Core App (app.js),4,Xác nhận đơn (Confirm),Panel duyệt đơn: review SP / sửa SL / duyệt MISA,Frontend
+Core App (app.js),5,Từ chối đơn (Reject),Reject + lý do → reset driver assignments → Telegram,Frontend
+Core App (app.js),6,Import Delivery Modal,Form hoàn thành nhập: ảnh / SP / kho / ghi chú,Frontend
+Core App (app.js),7,Export Delivery Modal,Form hoàn thành xuất: ảnh / SP / vỏ / ghi chú,Frontend
+Core App (app.js),8,Chat,Gửi/nhận tin nhắn trong chi tiết đơn,Frontend
+Core App (app.js),9,Notifications,Realtime polling / badge / toast,Frontend
+Core App (app.js),10,Date Pickers,Flatpickr cho tất cả bộ lọc ngày,Frontend
+Core App (app.js),11,Price Masking,Ẩn giá cho Dispatcher/Driver,Frontend
+Auth (auth.js),1,POST /login,Đăng nhập (SĐT + MK),Backend
+Auth (auth.js),2,GET /users,Danh sách users,Backend
+Auth (auth.js),3,POST /users,Tạo user mới,Backend
+Auth (auth.js),4,PUT /users/:id,Cập nhật user,Backend
+Orders (orders.js),1,GET /,Danh sách đơn (lọc status / phân trang),Backend
+Orders (orders.js),2,GET /my,Đơn của tài xế (theo tên/role),Backend
+Orders (orders.js),3,GET /pending-all,Đơn chờ xử lý (export + import gộp),Backend
+Orders (orders.js),4,GET /:id,Chi tiết 1 đơn,Backend
+Orders (orders.js),5,PUT /:id/assign,Gán TX cho đơn,Backend
+Orders (orders.js),6,PUT /:id/complete,Hoàn thành đơn (multi-driver / ảnh / Telegram),Backend
+Orders (orders.js),7,PUT /:id/pin,Ghim/bỏ ghim đơn,Backend
+Orders (orders.js),8,POST /:id/approve,Duyệt đơn → MISA CRM sync,Backend
+Orders (orders.js),9,POST /:id/reject,Từ chối đơn → reset assignments → Telegram,Backend
+Orders (orders.js),10,PUT /:id/admin-complete,Admin hoàn thành (ảnh / Telegram),Backend
+Orders (orders.js),11,GET /stats,Thống kê dashboard,Backend
+Orders (orders.js),12,GET /history,Lịch sử đơn (phân trang / lọc),Backend
+Imports (imports.js),1,GET /,Danh sách phiếu nhập,Backend
+Imports (imports.js),2,POST /,Tạo phiếu nhập mới,Backend
+Imports (imports.js),3,PUT /:id,Sửa phiếu nhập,Backend
+Imports (imports.js),4,PUT /:id/assign,Gán TX cho phiếu nhập,Backend
+Imports (imports.js),5,PUT /:id/complete,Hoàn thành nhập (multi-driver / ảnh / Telegram),Backend
+Imports (imports.js),6,PUT /:id/pin,Ghim phiếu nhập,Backend
+Imports (imports.js),7,POST /:id/split,Chia phiếu cho nhiều TX,Backend
+Imports (imports.js),8,GET /:id/assignments,DS phân công TX,Backend
+Imports (imports.js),9,POST /:id/confirm,Xác nhận phiếu nhập,Backend
+Imports (imports.js),10,GET /:id/proof-images,Lấy ảnh chứng minh,Backend
+Imports (imports.js),11,POST /:id/proof-images,Upload ảnh chứng minh,Backend
+Imports (imports.js),12,DELETE /:id/proof-images/:idx,Xóa ảnh,Backend
+Imports (imports.js),13,GET /:id/detail,Chi tiết phiếu nhập,Backend
+Merged Orders (merged-orders.js),1,GET /,DS đơn ghép,Backend
+Merged Orders (merged-orders.js),2,GET /:id,Chi tiết đơn ghép (stops + checkins),Backend
+Merged Orders (merged-orders.js),3,POST /,Tạo đơn ghép từ nhiều đơn lẻ,Backend
+Merged Orders (merged-orders.js),4,PUT /:id/assign,Gán TX cho đơn ghép,Backend
+Merged Orders (merged-orders.js),5,POST /:id/checkin,Check-in điểm giao,Backend
+Merged Orders (merged-orders.js),6,PUT /:id/complete,Hoàn thành đơn ghép,Backend
+Chat (chat.js),1,GET /:orderId,Lấy tin nhắn của đơn,Backend
+Chat (chat.js),2,POST /:orderId,Gửi tin nhắn,Backend
+Chat (chat.js),3,GET /:orderId/unread,Đếm tin chưa đọc,Backend
+Notifications (notifications.js),1,GET /,DS thông báo (theo user/role),Backend
+Notifications (notifications.js),2,PUT /:id/read,Đánh dấu đã đọc,Backend
+Notifications (notifications.js),3,POST /,Tạo thông báo mới,Backend
+HR (hr.js),1,GET /employees,DS nhân viên,Backend
+HR (hr.js),2,POST /employees,Thêm NV,Backend
+HR (hr.js),3,PUT /employees/:id,Sửa NV,Backend
+Materials (materials.js),1,GET /,DS vật tư (từ Supabase + MISA merge),Backend
+Materials (materials.js),2,POST /,Thêm vật tư,Backend
+Materials (materials.js),3,GET /sync-misa,Đồng bộ từ MISA,Backend
+Warehouse (warehouse.js),1,GET /inventory,Tồn kho (lọc theo kho),Backend
+Warehouse (warehouse.js),2,GET /alerts,Cảnh báo tồn kho thấp,Backend
+Suppliers (suppliers.js),1,GET /,DS NCC,Backend
+Suppliers (suppliers.js),2,POST /,Thêm NCC,Backend
+Suppliers (suppliers.js),3,PUT /:id,Sửa NCC,Backend
+Suppliers (suppliers.js),4,DELETE /:id,Xóa NCC,Backend
+Customers (customers.js),1,GET /,DS KH,Backend
+Customers (customers.js),2,POST /,Thêm KH,Backend
+Customers (customers.js),3,PUT /:id,Sửa KH,Backend
+Customers (customers.js),4,DELETE /:id,Xóa KH,Backend
+Reports (reports.js),1,GET /suggestions,Gợi ý đơn hàng (AI dựa theo lịch sử),Backend
+Webhooks (webhooks.js),1,POST /n8n,Webhook cho n8n automation,Backend
+Webhooks (webhooks.js),2,POST /zalo,Webhook ZaloOA notifications,Backend
+Telegram Service,1,sendTelegramMessage,Gửi text → nhóm (XUAT/NHAP/NOTIFY/DIEUPHOI),Service
+Telegram Service,2,sendTelegramPhotos,Gửi ảnh kèm caption → nhóm,Service
+Telegram Service,3,Telegram tagging,Tag @username dựa trên telegram_username/user_id,Service
+MISA CRM Service,1,getMisaToken,Lấy/refresh OAuth token,Service
+MISA CRM Service,2,getMisaOrders,Đồng bộ đơn hàng từ MISA,Service
+MISA CRM Service,3,updateMisaOrder,Cập nhật đơn lên MISA,Service
+MISA CRM Service,4,getMisaProducts,Lấy danh mục hàng hóa,Service
+MISA CRM Service,5,pushOrderToMisa,Đẩy đơn duyệt lên MISA,Service
+Firebase Service,1,notifyDriverOrderAssigned,Push FCM cho TX khi có đơn mới,Service
+Firebase Service,2,sendPushToTopic,Push theo topic,Service

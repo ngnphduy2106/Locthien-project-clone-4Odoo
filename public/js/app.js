@@ -758,6 +758,7 @@ function applyRoleBasedUI(role) {
 
     // Import Manager restrictions - create/approve imports, see import orders
     const isImportManager = normalizedRole === 'import_manager' || normalizedRole === 'quản lý nhập';
+    console.log('🔍 IMPORT_MANAGER check:', { normalizedRole, isImportManager });
     if (isImportManager) {
         console.log('📦 Import Manager mode: Import create/approve only');
 
