@@ -765,15 +765,33 @@ router.put('/:id/complete', async (req, res) => {
                     const currentNo = data.ticket_no;
                     const sisters = mergedLog.source_order_nos.filter(no => no !== currentNo);
 
+                    // Get images from the completing order to share with sisters
+                    const currentImages = data.images && Array.isArray(data.images) && data.images.length > 0
+                        ? data.images : [];
+
                     for (const sister of sisters) {
                         console.log(`🤖 Triggering auto-completion for sister: ${sister}`);
                         try {
                             if (sister.startsWith('N')) {
-                                // Sister is another import
-                                await supabase.from('import_tickets').update({
+                                // Sister is another import — copy images from completing order
+                                const updatePayload = {
                                     status: 'completed',
                                     completed_at: new Date().toISOString()
-                                }).eq('ticket_no', sister);
+                                };
+                                // Copy images from the completing order if sister has no images
+                                if (currentImages.length > 0) {
+                                    const { data: sisterTicket } = await supabase
+                                        .from('import_tickets')
+                                        .select('images')
+                                        .eq('ticket_no', sister)
+                                        .single();
+                                    const sisterImgs = sisterTicket?.images;
+                                    if (!sisterImgs || !Array.isArray(sisterImgs) || sisterImgs.length === 0) {
+                                        updatePayload.images = currentImages;
+                                        console.log(`📸 Copying ${currentImages.length} images to sister ${sister}`);
+                                    }
+                                }
+                                await supabase.from('import_tickets').update(updatePayload).eq('ticket_no', sister);
                                 mergeMsg += ` (Đã hoàn thành kèm phiếu nhập ${sister})`;
                                 console.log(`✅ Auto-completed import sister: ${sister}`);
                             } else {
@@ -787,7 +805,8 @@ router.put('/:id/complete', async (req, res) => {
                                     body: JSON.stringify({
                                         prevent_loop: true,
                                         delivery_note: `Tự động hoàn thành theo phiếu nhập ghép ${currentNo}`,
-                                        admin_completed: true
+                                        admin_completed: true,
+                                        images: currentImages  // Pass images to export completion
                                     })
                                 });
                                 const resData = await resFetch.json();
