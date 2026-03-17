@@ -820,6 +820,36 @@ router.put('/:id/complete', async (req, res) => {
                                 await supabase.from('import_tickets').update(updatePayload).eq('ticket_no', sister);
                                 mergeMsg += ` (Đã hoàn thành kèm phiếu nhập ${sister})`;
                                 console.log(`✅ Auto-completed import sister: ${sister}`);
+
+                                // Send Telegram notification for auto-completed sister
+                                try {
+                                    const { data: sisterData } = await supabase
+                                        .from('import_tickets')
+                                        .select('*')
+                                        .eq('ticket_no', sister)
+                                        .single();
+                                    if (sisterData) {
+                                        const sisterProducts = (sisterData.products || [])
+                                            .map(p => `${p.name} — ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'Kg'}`)
+                                            .join(', ');
+                                        let sisterMsg = `✅ <b>PHIẾU NHẬP ĐÃ HOÀN THÀNH</b> (tự động)\n`;
+                                        sisterMsg += `📦 <b>#${sister}</b>\n`;
+                                        sisterMsg += `🏭 ${sisterData.supplier_name || 'N/A'}\n`;
+                                        if (sisterData.assigned_driver) sisterMsg += `🚗 TX: <b>${sisterData.assigned_driver}</b>${sisterData.assigned_plate ? ` (${sisterData.assigned_plate})` : ''}\n`;
+                                        sisterMsg += `📦 ${sisterProducts || 'Không có SP'}\n`;
+                                        sisterMsg += `🔗 Hoàn thành theo phiếu ghép ${data.ticket_no}\n`;
+
+                                        const sisterImgs = sisterData.images && Array.isArray(sisterData.images) ? sisterData.images : [];
+                                        if (sisterImgs.length > 0) {
+                                            await sendTelegramPhotos(sisterImgs, sisterMsg, 'NHAP');
+                                        } else {
+                                            await sendTelegramMessage(sisterMsg, 'NHAP');
+                                        }
+                                        console.log(`📨 Telegram sent for auto-completed sister: ${sister}`);
+                                    }
+                                } catch (tgSisterErr) {
+                                    console.error(`⚠️ Telegram error for sister ${sister}:`, tgSisterErr.message);
+                                }
                             } else {
                                 // Sister is an export order - call internal API
                                 const fetch = (await import('node-fetch')).default;
