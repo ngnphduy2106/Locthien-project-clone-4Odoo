@@ -9802,6 +9802,21 @@ let confirmReviewingOrder = null;
 async function loadPendingConfirmOrders() {
     const container = window.$('#confirm-order-list');
     if (!container) return;
+
+    // Re-apply IMPORT_MANAGER restrictions every time this loads
+    // (tabs may not exist in DOM during initial applyRoleBasedUI call)
+    const normalizedRole = (state.user?.role || '').toLowerCase();
+    if (normalizedRole === 'import_manager' || normalizedRole === 'quản lý nhập') {
+        const tabExport = window.$('#confirm-tab-export');
+        const tabApproved = window.$('#confirm-tab-approved');
+        if (tabExport) tabExport.style.display = 'none';
+        if (tabApproved) tabApproved.style.display = 'none';
+        // Force import tab if current tab is export or approved
+        if (confirmCurrentTab === 'export' || confirmCurrentTab === 'approved') {
+            confirmCurrentTab = 'import';
+        }
+    }
+
     container.innerHTML = '<div style="text-align:center; padding:40px; color:#9CA3AF;"><div class="spinner"></div><p>Đang tải...</p></div>';
 
     try {
@@ -9960,6 +9975,11 @@ async function loadPendingConfirmOrders() {
 }
 
 function switchConfirmTab(tab) {
+    // Block IMPORT_MANAGER from switching to export or approved tabs
+    const normalizedRole = (state.user?.role || '').toLowerCase();
+    if ((normalizedRole === 'import_manager' || normalizedRole === 'quản lý nhập') && (tab === 'export' || tab === 'approved')) {
+        tab = 'import';
+    }
     confirmCurrentTab = tab;
     // Update tab styles for all 3 tabs
     const tabs = ['export', 'import', 'approved'];
