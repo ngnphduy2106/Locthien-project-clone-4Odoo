@@ -615,7 +615,11 @@ router.put('/:id/start', async (req, res) => {
 router.put('/:id/complete', async (req, res) => {
     try {
         const { id } = req.params;
-        const { actual_products, note, local_items, driver, plate, assignment_id } = req.body;
+        const { actual_products, note, local_items, driver, driver_name, plate, assignment_id, warehouse } = req.body;
+
+        console.log(`\n🏁 IMPORT COMPLETE - ID: ${id}`);
+        console.log(`📦 Body keys:`, Object.keys(req.body));
+        console.log(`🔑 assignment_id: ${assignment_id || 'NONE'}, driver: ${driver || driver_name || 'N/A'}`);
 
         const supabase = getSupabase();
 
@@ -681,9 +685,24 @@ router.put('/:id/complete', async (req, res) => {
             }
         }
 
-        // Fetch original to merge (No-Delete logic)
-        const { data: original } = await getSupabase().from('import_tickets').select('*').eq('id', id).single();
-        if (!original) return res.json(createResponse(true, 'Không tìm thấy phiếu nhập'));
+        // Fetch original to merge (No-Delete logic) - try UUID first, then ticket_no
+        let original = null;
+        const { data: byId } = await getSupabase().from('import_tickets').select('*').eq('id', id).single();
+        if (byId) {
+            original = byId;
+        } else {
+            // Fallback: try by ticket_no
+            const { data: byNo } = await getSupabase().from('import_tickets').select('*').eq('ticket_no', id).single();
+            if (byNo) {
+                original = byNo;
+                console.log(`⚠️ Import found by ticket_no instead of UUID: ${id} → ${byNo.id}`);
+            }
+        }
+        if (!original) {
+            console.error(`❌ Import NOT FOUND - id: ${id}`);
+            return res.json(createResponse(true, 'Không tìm thấy phiếu nhập'));
+        }
+        console.log(`✅ Import found: ${original.ticket_no} (status: ${original.status})`);
 
         const originalProducts = original.products || [];
         const originalMap = {};
@@ -724,7 +743,7 @@ router.put('/:id/complete', async (req, res) => {
         const { data, error } = await getSupabase()
             .from('import_tickets')
             .update(updateData)
-            .eq('id', id)
+            .eq('id', original.id)
             .select()
             .single();
 
@@ -937,19 +956,40 @@ router.post('/:id/proof-images', async (req, res) => {
     try {
         const { id } = req.params;
         const { images } = req.body;
+        console.log(`📸 IMPORT PROOF-IMAGES - ID: ${id}, images count: ${images?.length || 0}, body size: ${JSON.stringify(req.body).length} bytes`);
 
         if (!images || !Array.isArray(images) || images.length === 0) {
             return res.json(createResponse(true, 'Vui lòng chọn ít nhất 1 ảnh!'));
         }
 
-        // Get existing images
-        const { data: ticket, error: fetchError } = await getSupabase()
+        // Get existing images - try UUID first, then ticket_no
+        let ticket = null;
+        let resolvedId = id;
+        const { data: byId, error: fetchError } = await getSupabase()
             .from('import_tickets')
-            .select('images')
+            .select('id, images')
             .eq('id', id)
             .single();
 
-        if (fetchError) {
+        if (byId) {
+            ticket = byId;
+            resolvedId = byId.id;
+        } else {
+            // Fallback: try by ticket_no
+            const { data: byNo } = await getSupabase()
+                .from('import_tickets')
+                .select('id, images')
+                .eq('ticket_no', id)
+                .single();
+            if (byNo) {
+                ticket = byNo;
+                resolvedId = byNo.id;
+                console.log(`⚠️ Proof-images: found by ticket_no: ${id} → ${byNo.id}`);
+            }
+        }
+
+        if (!ticket) {
+            console.error(`❌ Proof-images: Import NOT FOUND - id: ${id}`);
             return res.json(createResponse(true, 'Không tìm thấy phiếu nhập!'));
         }
 
@@ -966,7 +1006,7 @@ router.post('/:id/proof-images', async (req, res) => {
         const { error: updateError } = await getSupabase()
             .from('import_tickets')
             .update({ images: updatedImages })
-            .eq('id', id);
+            .eq('id', resolvedId);
 
         if (updateError) {
             return res.json(createResponse(true, 'Lỗi lưu ảnh: ' + updateError.message));
