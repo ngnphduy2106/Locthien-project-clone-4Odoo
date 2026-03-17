@@ -69,7 +69,7 @@ async function loginMisa() {
     }
 }
 
-// Fetch all products from MISA and sync to DB
+// Fetch all products from MISA and sync to DB (batch upsert for performance)
 export const syncMisaProducts = async () => {
     console.log('🔄 Starting MISA Product Sync...');
     if (!cachedToken) await loginMisa();
@@ -78,19 +78,15 @@ export const syncMisaProducts = async () => {
         return { success: false, error: 'MISA login failed', synced: 0 };
     }
 
-    let page = 0; // API docs: page starts from 0
+    let page = 0;
     let hasMore = true;
-    let totalSynced = 0;
-    let saveSuccess = 0;
-    let saveFailed = 0;
-    let errors = [];
+    const allProducts = []; // Collect all products first
 
     try {
-        // From swagger docs: pageSize max is 100 (not 1000!)
         const pageSize = 100;
 
+        // Phase 1: Fetch ALL products from MISA
         while (hasMore) {
-            // Use lowercase params per API docs: page, pageSize (not Page, PageSize)
             const url = `${MISA_PRODUCTS_URL}?pageSize=${pageSize}&page=${page}`;
             console.log(`📡 Fetching MISA Products page ${page}...`);
 
@@ -104,43 +100,25 @@ export const syncMisaProducts = async () => {
             });
 
             const json = await response.json();
-
-            // API uses lowercase field names
             const success = json.success;
             const data = json.data || [];
 
             console.log(`📦 MISA Products page ${page}: ${data?.length || 0} items`);
 
             if (success && Array.isArray(data) && data.length > 0) {
-                // Upsert to Database
                 for (const p of data) {
-                    try {
-                        const material = {
-                            id: p.product_code,
-                            code: p.product_code,
-                            name: p.product_name,
-                            unit: p.usage_unit || '',
-                            price: Number(p.unit_price || 0),
-                            saleprice: Number(p.unit_price || 0),
-                            category: p.product_category || 'MISA CRM',
-                            description: p.description || p.sale_description || ''
-                        };
-
-                        const result = await db.addMaterial(material);
-                        if (result) {
-                            saveSuccess++;
-                        } else {
-                            saveFailed++;
-                        }
-                    } catch (err) {
-                        saveFailed++;
-                        errors.push({ code: p.product_code, error: err.message });
-                    }
+                    allProducts.push({
+                        id: p.product_code,
+                        code: p.product_code,
+                        name: p.product_name,
+                        unit: p.usage_unit || '',
+                        price: Number(p.unit_price || 0),
+                        saleprice: Number(p.unit_price || 0),
+                        category: p.product_category || 'MISA CRM',
+                        description: p.description || p.sale_description || ''
+                    });
                 }
 
-                totalSynced += data.length;
-
-                // Continue if we got a full page (100 items)
                 if (data.length >= pageSize) {
                     page++;
                 } else {
@@ -150,11 +128,45 @@ export const syncMisaProducts = async () => {
                 hasMore = false;
             }
         }
-        console.log(`✅ MISA Product Sync: ${totalSynced} fetched, ${saveSuccess} saved, ${saveFailed} failed`);
-        return { success: true, synced: totalSynced, saved: saveSuccess, failed: saveFailed, errors };
+
+        console.log(`📦 Total products fetched from MISA: ${allProducts.length}`);
+
+        if (allProducts.length === 0) {
+            return { success: true, synced: 0, saved: 0, failed: 0, errors: [] };
+        }
+
+        // Phase 2: Batch upsert to Supabase (much faster than individual upserts)
+        const { createClient } = await import('@supabase/supabase-js');
+        const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+        // Supabase upsert supports batch — process in chunks of 500 to avoid payload limits
+        const CHUNK_SIZE = 500;
+        let saveSuccess = 0;
+        let saveFailed = 0;
+        const errors = [];
+
+        for (let i = 0; i < allProducts.length; i += CHUNK_SIZE) {
+            const chunk = allProducts.slice(i, i + CHUNK_SIZE);
+            console.log(`💾 Upserting chunk ${Math.floor(i / CHUNK_SIZE) + 1}: ${chunk.length} products...`);
+
+            const { data, error } = await supabase
+                .from('materials')
+                .upsert(chunk, { onConflict: 'id' });
+
+            if (error) {
+                console.error(`❌ Batch upsert error:`, error.message);
+                saveFailed += chunk.length;
+                errors.push({ chunk: Math.floor(i / CHUNK_SIZE), error: error.message });
+            } else {
+                saveSuccess += chunk.length;
+            }
+        }
+
+        console.log(`✅ MISA Product Sync: ${allProducts.length} fetched, ${saveSuccess} saved, ${saveFailed} failed`);
+        return { success: true, synced: allProducts.length, saved: saveSuccess, failed: saveFailed, errors };
     } catch (e) {
         console.error('❌ MISA Product Sync Error:', e.message);
-        return { success: false, error: e.message, synced: totalSynced };
+        return { success: false, error: e.message, synced: allProducts.length };
     }
 };
 
