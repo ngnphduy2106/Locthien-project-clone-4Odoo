@@ -4990,7 +4990,26 @@ async function submitImportDelivery() {
             note: item.note || ''
         }));
 
-        // Complete import
+        // Upload proof images FIRST (before complete) so Telegram notification includes them
+        if (validImages.length > 0) {
+            try {
+                const imageRes = await fetch(`/api/imports/${imp.id}/proof-images`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ images: validImages })
+                });
+                const imageData = await imageRes.json();
+                if (imageData.error) {
+                    console.warn('Image save warning:', imageData.msg || imageData.message);
+                } else {
+                    console.log('📸 Images uploaded before completion');
+                }
+            } catch (imgErr) {
+                console.error('Image upload error:', imgErr.message);
+            }
+        }
+
+        // Complete import (images already saved, backend Telegram notification will include them)
         const response = await fetch(`/api/imports/${imp.id}/complete`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
@@ -5009,23 +5028,6 @@ async function submitImportDelivery() {
             hideLoading();
             alert('Lỗi hoàn thành: ' + (data.msg || data.message));
             return;
-        }
-
-        // Add proof images
-        if (validImages.length > 0) {
-            try {
-                const imageRes = await fetch(`/api/imports/${imp.id}/add-proof-images`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ images: validImages })
-                });
-                const imageData = await imageRes.json();
-                if (imageData.error) {
-                    console.warn('Image save warning:', imageData.msg);
-                }
-            } catch (imgErr) {
-                console.error('Image upload error:', imgErr.message);
-            }
         }
 
         hideLoading();
