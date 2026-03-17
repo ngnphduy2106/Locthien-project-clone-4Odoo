@@ -440,6 +440,13 @@ const performSync = async () => {
                         console.log(`📦 Product count changed for ${saleOrderNo}: ${existingOrder.products.length} → ${misaProducts.length}`);
                     }
                 }
+                // ALSO detect if MISA has MORE products than local (even if hasProducts is false)
+                if (misaProducts.length > 0 && (!hasProducts || misaProducts.length !== (existingOrder.products || []).length)) {
+                    if (!qtyChanged) {
+                        qtyChanged = true;
+                        console.log(`📦 Product count mismatch for ${saleOrderNo}: local=${(existingOrder.products || []).length} vs MISA=${misaProducts.length}`);
+                    }
+                }
                 const hasMissingSpec = hasProducts && existingOrder.products.some(p => !p.spec);
 
                 // 8. Check if address changed on MISA (continuous sync)
@@ -655,9 +662,10 @@ const performSync = async () => {
                     if (!misaProductsChanged) {
                         // MISA products same as local → keep local (preserves local edits)
                         mappedOrder.sale_order_product_mappings = oldOrder.products;
+                        console.log(`🔒 Keeping local products for ${saleOrderNo} (no MISA change detected)`);
                     } else {
                         // MISA products changed → use MISA data
-                        console.log(`📦 MISA products changed for ${saleOrderNo} — using MISA data`);
+                        console.log(`📦 MISA products changed for ${saleOrderNo} — using MISA data (${misaProds.length} items, local had ${oldOrder.products.length})`);
                     }
                 }
 
