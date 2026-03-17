@@ -732,9 +732,9 @@ router.put('/:id/complete', async (req, res) => {
             return res.json(createResponse(true, 'Lỗi hoàn thành: ' + error.message));
         }
 
-        // Send Telegram notification
+        // Send Telegram notification with proof images
         try {
-            const { sendTelegramMessage } = await import('../services/telegram.js');
+            const { sendTelegramMessage, sendTelegramPhotos } = await import('../services/telegram.js');
             let msg = `✅ <b>PHIẾU NHẬP ĐÃ HOÀN THÀNH</b>\n`;
             msg += `📦 <b>#${data.ticket_no}</b>\n`;
             msg += `🏭 ${data.supplier_name}\n`;
@@ -743,7 +743,14 @@ router.put('/:id/complete', async (req, res) => {
             msg += `📦 ${mergedProducts.map(p => `${p.name} — ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'Kg'}`).join(', ')}\n`;
             if (note) msg += `📝 ${note}\n`;
 
-            await sendTelegramMessage(msg, 'NHAP');
+            // Send with images if available
+            const proofImages = data.images && Array.isArray(data.images) ? data.images : [];
+            if (proofImages.length > 0) {
+                await sendTelegramPhotos(proofImages, msg, 'NHAP');
+                console.log(`📸 Sent ${proofImages.length} proof images for import ${data.ticket_no}`);
+            } else {
+                await sendTelegramMessage(msg, 'NHAP');
+            }
         } catch (tgErr) {
             console.error('Telegram Error:', tgErr.message);
         }
