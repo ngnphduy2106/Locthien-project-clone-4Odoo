@@ -799,7 +799,9 @@ function applyRoleBasedUI(role) {
         // Hide export tab in confirm-orders, auto-select import tab
         const confirmTabExport = window.$('#confirm-tab-export');
         const confirmTabImport = window.$('#confirm-tab-import');
+        const confirmTabApproved = window.$('#confirm-tab-approved');
         if (confirmTabExport) confirmTabExport.style.display = 'none';
+        if (confirmTabApproved) confirmTabApproved.style.display = 'none';
         // Auto-click import tab after a short delay
         setTimeout(() => {
             if (confirmTabImport) confirmTabImport.click();
