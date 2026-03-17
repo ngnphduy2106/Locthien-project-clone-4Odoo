@@ -791,6 +791,23 @@ function applyRoleBasedUI(role) {
         if (navCreateOrder) navCreateOrder.style.display = 'block';
         if (navConfirmOrders) navConfirmOrders.style.display = 'block';
 
+        // Hide export sections in pending-orders page
+        const pendingExportSection = window.$('#pending-export-section');
+        if (pendingExportSection) pendingExportSection.style.display = 'none';
+
+        // Hide export tab in confirm-orders, auto-select import tab
+        const confirmTabExport = window.$('#confirm-tab-export');
+        const confirmTabImport = window.$('#confirm-tab-import');
+        if (confirmTabExport) confirmTabExport.style.display = 'none';
+        // Auto-click import tab after a short delay
+        setTimeout(() => {
+            if (confirmTabImport) confirmTabImport.click();
+        }, 200);
+
+        // Also hide the order-history nav (only export orders)
+        const navOrderHistory = window.$('#nav-order-history');
+        if (navOrderHistory) navOrderHistory.style.display = 'none';
+
         // Auto-navigate to pending-orders
         setTimeout(() => { showSection('pending-orders'); }, 100);
     }
