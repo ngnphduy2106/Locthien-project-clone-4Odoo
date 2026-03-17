@@ -1407,10 +1407,15 @@
                                             <!-- Editable products -->
                                         </div>
 
-                                        <div style="margin-top:20px; padding-top:16px; border-top:1px solid #E5E7EB;">
+                                        <div
+                                            style="margin-top:20px; padding-top:16px; border-top:1px solid #E5E7EB; display:flex; gap:10px;">
+                                            <button id="review-reject-btn" class="btn" onclick="rejectOrder()"
+                                                style="flex:0 0 auto; padding:12px 20px; font-size:14px; border-radius:12px; background:linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color:white; border:none; font-weight:600; cursor:pointer;">
+                                                <i class="bi bi-x-circle"></i> Từ chối
+                                            </button>
                                             <button id="review-confirm-btn" class="btn btn-primary"
                                                 onclick="confirmReviewOrder()"
-                                                style="width:100%; padding:12px; font-size:15px; border-radius:12px; background:linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
+                                                style="flex:1; padding:12px; font-size:15px; border-radius:12px; background:linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
                                                 <i class="bi bi-check"></i> XÁC NHẬN ĐƠN
                                             </button>
                                         </div>

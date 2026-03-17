@@ -2963,6 +2963,54 @@ router.post('/:id/approve', async (req, res) => {
     }
 });
 
+// POST /api/orders/:id/reject - Admin từ chối đơn (không đẩy MISA)
+router.post('/:id/reject', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { rejected_by, reason } = req.body;
+
+        const order = await db.getOrder(id);
+        if (!order) return res.json(createResponse(true, 'Không tìm thấy đơn hàng'));
+
+        // Update order with rejection - use existing columns only
+        const rejectNote = `[TỪ CHỐI] Bởi ${rejected_by || 'admin'} lúc ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}${reason ? ' - Lý do: ' + reason : ''}`;
+        const updateData = {
+            admin_approved: false,
+            admin_approved_at: null,
+            admin_approved_by: null,
+            sale_confirmed: false,
+            sale_confirmed_at: null,
+            sale_confirmed_by: null,
+            status: 'Từ chối',
+            description: rejectNote
+        };
+
+        await db.updateOrder(id, updateData);
+
+        // Telegram notification → SALES group
+        try {
+            const { sendTelegramMessage } = await import('../services/telegram.js');
+            const orderNo = order.soDon || order.sale_order_no || id;
+            const products = (order.products || []).map(p => `  • ${p.name || p.code}: ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'Kg'}`).join('\n');
+            let msg = `❌ <b>TỪ CHỐI ĐƠN</b>\n`;
+            msg += `📦 <b>#${orderNo}</b>\n`;
+            msg += `👤 ${order.khach || order.account_name || 'N/A'}\n`;
+            msg += `📍 ${order.diaChi || order.shipping_address || ''}\n`;
+            if (products) msg += `📋 Sản phẩm:\n${products}\n`;
+            msg += `👔 Từ chối bởi: ${rejected_by || 'admin'}\n`;
+            if (reason) msg += `📝 Lý do: ${reason}`;
+            await sendTelegramMessage(msg, 'SALES');
+        } catch (tgErr) {
+            console.error('Telegram reject error:', tgErr.message);
+        }
+
+        res.json(createResponse(false, 'Đã từ chối đơn hàng!'));
+    } catch (e) {
+        console.error('reject error:', e.message);
+        res.json(createResponse(true, e.message));
+    }
+});
+
 export default router;
 
 

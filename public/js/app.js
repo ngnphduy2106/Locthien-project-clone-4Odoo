@@ -10001,10 +10001,14 @@ async function openReviewPanel(orderId, isImport = false) {
             const products = order.products || [];
             renderReviewProducts(products);
 
+            // Store orderId on panel for reject and other buttons
+            panel.dataset.orderId = orderId;
+
             // Update confirm button based on role
             const confirmBtn = panel.querySelector('#review-confirm-btn');
+            const rejectBtn = panel.querySelector('#review-reject-btn');
+            const canApprove = ['admin', 'sales', 'staff', 'dispatcher'].includes(state.user?.role?.toLowerCase());
             if (confirmBtn) {
-                const canApprove = ['admin', 'sales', 'staff', 'dispatcher'].includes(state.user?.role?.toLowerCase());
                 if (canApprove) {
                     confirmBtn.innerHTML = '<i class="bi bi-cloud-upload"></i> DUYỆT & ĐẨY MISA';
                     confirmBtn.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
@@ -10014,6 +10018,10 @@ async function openReviewPanel(orderId, isImport = false) {
                     confirmBtn.style.background = 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)';
                     confirmBtn.onclick = () => confirmReviewOrder();
                 }
+            }
+            // Show reject button only for admin/dispatcher
+            if (rejectBtn) {
+                rejectBtn.style.display = ['admin', 'dispatcher'].includes(state.user?.role?.toLowerCase()) ? '' : 'none';
             }
         }
     } catch (err) {
@@ -10363,6 +10371,47 @@ window.addReviewProduct = addReviewProduct;
 window.confirmReviewOrder = confirmReviewOrder;
 window.confirmImportOrder = confirmImportOrder;
 window.approveOrder = approveOrder;
+window.rejectOrder = rejectOrder;
+
+async function rejectOrder() {
+    const panel = window.$('#confirm-review-panel');
+    const orderId = panel?.dataset?.orderId;
+    if (!orderId) { alert('Không xác định được đơn hàng!'); return; }
+
+    const reason = prompt('📝 Nhập lý do từ chối:');
+    if (reason === null) return; // User cancelled
+    if (!reason.trim()) { alert('Vui lòng nhập lý do từ chối!'); return; }
+
+    if (!confirm(`❌ Xác nhận TỪ CHỐI đơn #${orderId}?\n\nLý do: ${reason}`)) return;
+
+    const userName = state.user?.name || state.user?.fullName || state.user?.username || 'admin';
+    try {
+        showLoading('Đang từ chối đơn...');
+        const res = await fetch(`/api/orders/${orderId}/reject`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ rejected_by: userName, reason: reason.trim() })
+        });
+        const json = await res.json();
+        hideLoading();
+
+        if (json.error) { alert('Lỗi: ' + json.message); return; }
+
+        const card = window.$(`#confirm-card-${orderId}`);
+        if (card) {
+            card.style.transition = 'all 0.3s';
+            card.style.opacity = '0';
+            card.style.transform = 'translateX(-100px)';
+            setTimeout(() => card.remove(), 300);
+        }
+        closeReviewPanel();
+        alert('❌ Đã từ chối đơn hàng!');
+        setTimeout(() => loadPendingConfirmOrders(), 500);
+    } catch (err) {
+        hideLoading();
+        alert('Lỗi kết nối server');
+    }
+}
 
 // Lightbox for proof images
 function showImageLightbox(src) {
