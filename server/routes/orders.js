@@ -2989,6 +2989,21 @@ router.post('/:id/reject', async (req, res) => {
 
         await db.updateOrder(id, updateData);
 
+        // Reset driver assignments from completed → pending
+        try {
+            const { createClient } = await import('@supabase/supabase-js');
+            const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+            const { error: assignErr } = await supabase
+                .from('order_driver_assignments')
+                .update({ status: 'pending' })
+                .eq('order_id', id)
+                .eq('status', 'completed');
+            if (assignErr) console.error('Reset assignments error:', assignErr.message);
+            else console.log(`🔄 Reset driver assignments to pending for order ${id}`);
+        } catch (assignResetErr) {
+            console.error('Assignment reset error:', assignResetErr.message);
+        }
+
         // Telegram notification → SALES group
         try {
             const { sendTelegramMessage } = await import('../services/telegram.js');
