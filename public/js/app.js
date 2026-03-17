@@ -474,7 +474,7 @@ function initApp() {
         const userName = state.user.name || state.user.fullName || state.user.phone || 'User';
         // Normalize role to lowercase
         const normalizedRole = (state.user.role || '').toLowerCase();
-        const roleLabels = { admin: 'Quản trị viên', driver: 'Tài xế', sales: 'Nhân viên', accountant: 'Kế toán', 'kế toán': 'Kế toán', 'ke toan': 'Kế toán', ketoan: 'Kế toán' };
+        const roleLabels = { admin: 'Quản trị viên', driver: 'Tài xế', sales: 'Nhân viên', accountant: 'Kế toán', 'kế toán': 'Kế toán', 'ke toan': 'Kế toán', import_manager: 'QL Nhập hàng', staff: 'Nhân viên', ketoan: 'Kế toán' };
 
         console.log('👤 User info:', { name: userName, role: state.user.role, normalized: normalizedRole });
 
@@ -754,6 +754,84 @@ function applyRoleBasedUI(role) {
 
         // Also hide nav-users
         if (navUsers) navUsers.style.display = 'none';
+    }
+
+    // Import Manager restrictions - create/approve imports, see import orders
+    const isImportManager = normalizedRole === 'import_manager' || normalizedRole === 'quản lý nhập';
+    if (isImportManager) {
+        console.log('📦 Import Manager mode: Import create/approve only');
+
+        // Hide dashboard
+        const navDashboard = window.$('#nav-dashboard');
+        if (navDashboard) navDashboard.style.display = 'none';
+
+        // Hide export/dispatch related
+        const navDispatch = window.$('#nav-dispatch');
+        const navCreateExport = window.$('#nav-create-export');
+        const navMyOrders = window.$('#nav-my-orders');
+        const navMergeOrders = window.$('#nav-merge-orders');
+        if (navDispatch) navDispatch.style.display = 'none';
+        if (navCreateExport) navCreateExport.style.display = 'none';
+        if (navMyOrders) navMyOrders.style.display = 'none';
+        if (navMergeOrders) navMergeOrders.style.display = 'none';
+        if (navSuppliers) navSuppliers.style.display = 'none';
+        if (navCustomers) navCustomers.style.display = 'none';
+
+        // Hide HR, Materials, Warehouse
+        const navHr = window.$('#nav-hr');
+        const navMaterials = window.$('#nav-materials');
+        const navWarehouse = window.$('#nav-warehouse');
+        if (navHr) navHr.style.display = 'none';
+        if (navMaterials) navMaterials.style.display = 'none';
+        if (navWarehouse) navWarehouse.style.display = 'none';
+        if (navUsers) navUsers.style.display = 'none';
+
+        // Show create-order (imports) and confirm-orders
+        const navCreateOrder = window.$('#nav-create-order');
+        if (navCreateOrder) navCreateOrder.style.display = 'block';
+        if (navConfirmOrders) navConfirmOrders.style.display = 'block';
+
+        // Auto-navigate to pending-orders
+        setTimeout(() => { showSection('pending-orders'); }, 100);
+    }
+
+    // Staff restrictions - view export orders in ERP (pending + history + confirm)
+    const isStaff = normalizedRole === 'staff' || normalizedRole === 'nhân viên';
+    if (isStaff) {
+        console.log('👔 Staff mode: View export orders only');
+
+        // Hide dashboard
+        const navDashboard = window.$('#nav-dashboard');
+        if (navDashboard) navDashboard.style.display = 'none';
+
+        // Hide order management items
+        const navDispatch = window.$('#nav-dispatch');
+        const navCreateOrder = window.$('#nav-create-order');
+        const navCreateExport = window.$('#nav-create-export');
+        const navMyOrders = window.$('#nav-my-orders');
+        const navMergeOrders = window.$('#nav-merge-orders');
+        if (navDispatch) navDispatch.style.display = 'none';
+        if (navCreateOrder) navCreateOrder.style.display = 'none';
+        if (navCreateExport) navCreateExport.style.display = 'none';
+        if (navMyOrders) navMyOrders.style.display = 'none';
+        if (navMergeOrders) navMergeOrders.style.display = 'none';
+        if (navSuppliers) navSuppliers.style.display = 'none';
+        if (navCustomers) navCustomers.style.display = 'none';
+
+        // Hide HR, Materials, Warehouse
+        const navHr = window.$('#nav-hr');
+        const navMaterials = window.$('#nav-materials');
+        const navWarehouse = window.$('#nav-warehouse');
+        if (navHr) navHr.style.display = 'none';
+        if (navMaterials) navMaterials.style.display = 'none';
+        if (navWarehouse) navWarehouse.style.display = 'none';
+        if (navUsers) navUsers.style.display = 'none';
+
+        // Show confirm-orders for checking export orders
+        if (navConfirmOrders) navConfirmOrders.style.display = 'block';
+
+        // Auto-navigate to pending-orders
+        setTimeout(() => { showSection('pending-orders'); }, 100);
     }
 
     // Update my-orders badge for all roles
@@ -10009,7 +10087,7 @@ async function openReviewPanel(orderId, isImport = false) {
             // Update confirm button based on role
             const confirmBtn = panel.querySelector('#review-confirm-btn');
             const rejectBtn = panel.querySelector('#review-reject-btn');
-            const canApprove = ['admin', 'sales', 'staff', 'dispatcher'].includes(state.user?.role?.toLowerCase());
+            const canApprove = ['admin', 'sales', 'staff', 'dispatcher', 'import_manager'].includes(state.user?.role?.toLowerCase());
             if (confirmBtn) {
                 if (canApprove) {
                     confirmBtn.innerHTML = '<i class="bi bi-cloud-upload"></i> DUYỆT & ĐẨY MISA';
@@ -10023,7 +10101,7 @@ async function openReviewPanel(orderId, isImport = false) {
             }
             // Show reject button for admin/dispatcher/sales
             if (rejectBtn) {
-                rejectBtn.style.display = ['admin', 'dispatcher', 'sales'].includes(state.user?.role?.toLowerCase()) ? '' : 'none';
+                rejectBtn.style.display = ['admin', 'dispatcher', 'sales', 'import_manager'].includes(state.user?.role?.toLowerCase()) ? '' : 'none';
             }
         }
     } catch (err) {
