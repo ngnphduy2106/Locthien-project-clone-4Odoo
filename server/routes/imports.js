@@ -762,12 +762,56 @@ router.put('/:id/complete', async (req, res) => {
             msg += `📦 ${mergedProducts.map(p => `${p.name} — ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'Kg'}`).join(', ')}\n`;
             if (note) msg += `📝 ${note}\n`;
 
-            // Send with images if available
-            const proofImages = data.images && Array.isArray(data.images) ? data.images : [];
+            // Send with images if available — re-fetch ticket to get latest images
+            // (proof-images are uploaded separately BEFORE this endpoint is called)
+            let proofImages = [];
+
+            // 1. Check data.images from the update result (Supabase returns all columns)
+            if (data.images && Array.isArray(data.images) && data.images.length > 0) {
+                proofImages = data.images;
+                console.log(`📸 Found ${proofImages.length} images from update result`);
+            }
+
+            // 2. Fallback: re-fetch the ticket in case images were saved separately
+            if (proofImages.length === 0) {
+                try {
+                    const { data: freshTicket } = await getSupabase()
+                        .from('import_tickets')
+                        .select('images')
+                        .eq('id', original.id)
+                        .single();
+                    if (freshTicket?.images && Array.isArray(freshTicket.images) && freshTicket.images.length > 0) {
+                        proofImages = freshTicket.images;
+                        console.log(`📸 Re-fetched ${proofImages.length} images from ticket ${original.id}`);
+                    }
+                } catch (e) { /* ignore */ }
+            }
+
+            // 3. Fallback: check import_driver_assignments for images
+            if (proofImages.length === 0) {
+                try {
+                    const { data: assigns } = await supabase
+                        .from('import_driver_assignments')
+                        .select('proof_images')
+                        .eq('import_id', original.id);
+                    if (assigns) {
+                        for (const a of assigns) {
+                            if (a.proof_images && Array.isArray(a.proof_images) && a.proof_images.length > 0) {
+                                proofImages = [...proofImages, ...a.proof_images];
+                            }
+                        }
+                        if (proofImages.length > 0) {
+                            console.log(`📸 Found ${proofImages.length} images from import assignments`);
+                        }
+                    }
+                } catch (e) { /* ignore */ }
+            }
+
             if (proofImages.length > 0) {
                 await sendTelegramPhotos(proofImages, msg, 'NHAP');
                 console.log(`📸 Sent ${proofImages.length} proof images for import ${data.ticket_no}`);
             } else {
+                console.log(`⚠️ No proof images found for import ${data.ticket_no} — sending text only`);
                 await sendTelegramMessage(msg, 'NHAP');
             }
         } catch (tgErr) {
