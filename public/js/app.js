@@ -9136,6 +9136,9 @@ function viewProofImage(idx) {
     const existingViewer = document.getElementById('proof-image-viewer');
     if (existingViewer) existingViewer.remove();
 
+    // Reset rotation state
+    window._currentImageRotation = 0;
+
     const viewer = document.createElement('div');
     viewer.id = 'proof-image-viewer';
     viewer.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:10001; display:flex; align-items:center; justify-content:center; flex-direction:column;';
@@ -9143,8 +9146,12 @@ function viewProofImage(idx) {
     const hasMultiple = images.length > 1;
 
     viewer.innerHTML = `
-        <div style="position:absolute; top:20px; right:20px; display:flex; gap:12px;">
+        <div style="position:absolute; top:20px; right:20px; display:flex; gap:8px; align-items:center;">
             <span style="color:white; font-size:14px; padding:8px 16px; background:rgba(255,255,255,0.2); border-radius:20px;">${idx + 1} / ${images.length}</span>
+            <button onclick="rotateViewerImage(-90)" title="Xoay trái"
+                style="width:40px; height:40px; border-radius:50%; background:rgba(255,255,255,0.2); color:white; border:none; cursor:pointer; font-size:18px;">↺</button>
+            <button onclick="rotateViewerImage(90)" title="Xoay phải"
+                style="width:40px; height:40px; border-radius:50%; background:rgba(255,255,255,0.2); color:white; border:none; cursor:pointer; font-size:18px;">↻</button>
             <button onclick="document.getElementById('proof-image-viewer').remove()" 
                 style="width:40px; height:40px; border-radius:50%; background:rgba(255,255,255,0.2); color:white; border:none; cursor:pointer; font-size:20px;">×</button>
         </div>
@@ -9160,7 +9167,7 @@ function viewProofImage(idx) {
         </button>
         ` : ''}
         
-        <img id="proof-image-main" src="${images[idx]}" style="max-width:90%; max-height:85%; border-radius:8px; box-shadow:0 4px 30px rgba(0,0,0,0.5);">
+        <img id="proof-image-main" src="${images[idx]}" style="max-width:90%; max-height:85%; border-radius:8px; box-shadow:0 4px 30px rgba(0,0,0,0.5); transition:transform 0.3s ease;">
     `;
 
     viewer.onclick = (e) => {
@@ -9168,6 +9175,15 @@ function viewProofImage(idx) {
     };
 
     document.body.appendChild(viewer);
+}
+
+// Rotate image in viewers (proof-image-viewer and lightbox)
+function rotateViewerImage(deg) {
+    window._currentImageRotation = (window._currentImageRotation || 0) + deg;
+    const img = document.getElementById('proof-image-main') || document.getElementById('lightbox-image-main');
+    if (img) {
+        img.style.transform = `rotate(${window._currentImageRotation}deg)`;
+    }
 }
 
 // Navigate between proof images
@@ -9181,6 +9197,9 @@ function navigateProofImage(direction, currentIdx, total) {
     const viewer = document.getElementById('proof-image-viewer');
 
     if (mainImg && images[newIdx]) {
+        // Reset rotation when navigating
+        window._currentImageRotation = 0;
+        mainImg.style.transform = 'rotate(0deg)';
         mainImg.src = images[newIdx];
 
         // Update counter
@@ -9188,8 +9207,8 @@ function navigateProofImage(direction, currentIdx, total) {
         if (counterSpan) counterSpan.textContent = `${newIdx + 1} / ${total}`;
 
         // Update navigation buttons
-        const leftBtn = viewer.querySelector('button:nth-of-type(2)');
-        const rightBtn = viewer.querySelector('button:nth-of-type(3)');
+        const leftBtn = viewer.querySelector('button:nth-of-type(4)');
+        const rightBtn = viewer.querySelector('button:nth-of-type(5)');
         if (leftBtn) leftBtn.setAttribute('onclick', `navigateProofImage(-1, ${newIdx}, ${total})`);
         if (rightBtn) rightBtn.setAttribute('onclick', `navigateProofImage(1, ${newIdx}, ${total})`);
     }
@@ -9425,6 +9444,7 @@ async function deleteImportProofImage(importId, imageIndex) {
 // Export proof images functions
 window.loadProofImages = loadProofImages;
 window.viewProofImage = viewProofImage;
+window.rotateViewerImage = rotateViewerImage;
 window.navigateProofImage = navigateProofImage;
 window.handleAddProofImages = handleAddProofImages;
 window.deleteProofImage = deleteProofImage;
@@ -10536,11 +10556,18 @@ async function rejectOrder() {
 // Lightbox for proof images
 function showImageLightbox(src) {
     if (!src) return;
+    window._currentImageRotation = 0;
     const overlay = document.createElement('div');
     overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:3000;background:rgba(0,0,0,0.9);display:flex;align-items:center;justify-content:center;cursor:zoom-out;padding:20px;';
     overlay.innerHTML = `
-        <img src="${src}" style="max-width:95%;max-height:95vh;object-fit:contain;border-radius:8px;box-shadow:0 0 40px rgba(0,0,0,0.5);">
-        <button style="position:absolute;top:16px;right:16px;background:rgba(255,255,255,0.2);border:none;color:white;border-radius:50%;width:44px;height:44px;font-size:24px;cursor:pointer;font-weight:bold;" onclick="this.parentElement.remove()">✕</button>
+        <div style="position:absolute;top:16px;right:16px;display:flex;gap:8px;align-items:center;z-index:3001;">
+            <button onclick="rotateViewerImage(-90)" title="Xoay trái"
+                style="width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,0.2);border:none;color:white;cursor:pointer;font-size:20px;">↺</button>
+            <button onclick="rotateViewerImage(90)" title="Xoay phải"
+                style="width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,0.2);border:none;color:white;cursor:pointer;font-size:20px;">↻</button>
+            <button style="width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,0.2);border:none;color:white;cursor:pointer;font-size:24px;font-weight:bold;" onclick="this.closest('div').parentElement.remove()">✕</button>
+        </div>
+        <img id="lightbox-image-main" src="${src}" style="max-width:95%;max-height:95vh;object-fit:contain;border-radius:8px;box-shadow:0 0 40px rgba(0,0,0,0.5);transition:transform 0.3s ease;">
     `;
     overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
     document.addEventListener('keydown', function esc(e) { if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', esc); } });
