@@ -1466,6 +1466,35 @@ router.post('/:id/complete', async (req, res) => {
                     local_items: local_items || [],
                     images: images || []
                 });
+
+                // Also update any existing assignment with proof_images and status
+                // (Single-driver flow doesn't send assignment_id, so we update by order_id)
+                if (images && images.length > 0) {
+                    try {
+                        const { data: existingAssigns } = await supabase
+                            .from('order_driver_assignments')
+                            .select('id, status')
+                            .or(`order_id.eq.${id},order_id.eq.${orderInfo?.soDon || id}`)
+                            .eq('status', 'pending');
+
+                        if (existingAssigns && existingAssigns.length > 0) {
+                            for (const assign of existingAssigns) {
+                                await supabase
+                                    .from('order_driver_assignments')
+                                    .update({
+                                        status: 'completed',
+                                        proof_images: images,
+                                        delivery_note: note || delivery_note || '',
+                                        completed_at: new Date().toISOString()
+                                    })
+                                    .eq('id', assign.id);
+                                console.log(`✅ Updated assignment ${assign.id} with ${images.length} proof images`);
+                            }
+                        }
+                    } catch (assignErr) {
+                        console.error('Assignment update error (non-critical):', assignErr.message);
+                    }
+                }
             } catch (err) {
                 console.error('Supabase Export Ticket Error:', err.message);
             }
@@ -2803,9 +2832,8 @@ router.get('/:id/review', async (req, res) => {
         // 1. Check order_driver_assignments
         const { data: assigns } = await supabase
             .from('order_driver_assignments')
-            .select('id, driver_name, proof_images, actual_products, completed_at, delivery_note, actual_qty')
-            .or(orAssignFilter)
-            .eq('status', 'completed');
+            .select('id, driver_name, proof_images, actual_products, completed_at, delivery_note, actual_qty, status')
+            .or(orAssignFilter);
 
         if (assigns) {
             for (const a of assigns) {
