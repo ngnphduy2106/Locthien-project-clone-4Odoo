@@ -1170,6 +1170,19 @@ router.post('/:id/complete', async (req, res) => {
         const { createClient } = await import('@supabase/supabase-js');
         const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
+        // Guard: Check if order is already completed (prevents duplicate Telegram when both driver + assistant click complete)
+        let alreadyCompleted = false;
+        try {
+            const existingOrder = await db.getOrder(id);
+            if (existingOrder) {
+                const s = (existingOrder.status || '').toLowerCase();
+                if (s === 'đã thực hiện' || s === 'completed' || s === 'hoàn thành') {
+                    alreadyCompleted = true;
+                    console.log(`⚠️ Order ${id} already completed (status: ${existingOrder.status}) — will skip Telegram notification`);
+                }
+            }
+        } catch (e) { /* ignore */ }
+
         // ============================================================
         // MULTI-DRIVER COMPLETION: Check if this is a split order
         // ============================================================
@@ -1535,68 +1548,72 @@ router.post('/:id/complete', async (req, res) => {
                 console.error('Admin notification error:', notifyErr.message);
             }
 
-            // Send Telegram notification for order completion (ALWAYS runs)
-            try {
-                const { sendTelegramMessage, sendTelegramPhotos } = await import('../services/telegram.js');
-                const orderNo = orderInfo?.soDon || orderInfo?.sale_order_no || id;
-                const isImport = type === 'NHAP';
-                const tgGroup = isImport ? 'NHAP' : 'XUAT';
-                const label = isImport ? 'ĐƠN NHẬP HOÀN THÀNH' : 'ĐƠN ĐÃ HOÀN THÀNH';
+            // Send Telegram notification for order completion (ALWAYS runs — unless already completed by another user)
+            if (alreadyCompleted) {
+                console.log(`⏭️ Skipping Telegram notification for ${id} — order was already completed by another user`);
+            } else {
+                try {
+                    const { sendTelegramMessage, sendTelegramPhotos } = await import('../services/telegram.js');
+                    const orderNo = orderInfo?.soDon || orderInfo?.sale_order_no || id;
+                    const isImport = type === 'NHAP';
+                    const tgGroup = isImport ? 'NHAP' : 'XUAT';
+                    const label = isImport ? 'ĐƠN NHẬP HOÀN THÀNH' : 'ĐƠN ĐÃ HOÀN THÀNH';
 
-                let msg = `✅ <b>${label}</b>\n`;
-                msg += `📦 Mã: <b>#${orderNo}</b>\n`;
-                msg += `👤 ${isImport ? 'NCC' : 'Khách'}: ${orderInfo?.khach || orderInfo?.account_name || 'N/A'}\n`;
+                    let msg = `✅ <b>${label}</b>\n`;
+                    msg += `📦 Mã: <b>#${orderNo}</b>\n`;
+                    msg += `👤 ${isImport ? 'NCC' : 'Khách'}: ${orderInfo?.khach || orderInfo?.account_name || 'N/A'}\n`;
 
-                // Driver: prefer order's assigned driver (from MISA/dispatch), NOT the person who completed
-                const orderDriver = orderInfo?.taiXe || orderInfo?.custom_field13 || '';
-                const drvName = isMultiDriverOrder ? firstDriverName : (orderDriver || resolvedDriverName || driver_name || '');
-                const drvPlate = isMultiDriverOrder && firstDriverPlate ? firstDriverPlate : (orderInfo?.bienSo || orderInfo?.custom_field14 || resolvedPlate || plate || '');
-                if (drvName) msg += `🚛 TX: <b>${drvName}</b>${drvPlate ? ` (${drvPlate})` : ''}\n`;
+                    // Driver: prefer order's assigned driver (from MISA/dispatch), NOT the person who completed
+                    const orderDriver = orderInfo?.taiXe || orderInfo?.custom_field13 || '';
+                    const drvName = isMultiDriverOrder ? firstDriverName : (orderDriver || resolvedDriverName || driver_name || '');
+                    const drvPlate = isMultiDriverOrder && firstDriverPlate ? firstDriverPlate : (orderInfo?.bienSo || orderInfo?.custom_field14 || resolvedPlate || plate || '');
+                    if (drvName) msg += `🚛 TX: <b>${drvName}</b>${drvPlate ? ` (${drvPlate})` : ''}\n`;
 
-                // Assistant driver from order (not the completing user)
-                const assistantName = orderInfo?.assistant_name || '';
-                if (assistantName) msg += `👷 PX: ${assistantName}\n`;
+                    // Assistant driver from order (not the completing user)
+                    const assistantName = orderInfo?.assistant_name || '';
+                    if (assistantName) msg += `👷 PX: ${assistantName}\n`;
 
-                // Product list
-                const prodList = (orderInfo?.cart || orderInfo?.products || cart || []);
-                if (prodList.length > 0) {
-                    prodList.forEach(p => {
-                        const pName = p.product?.name || p.name || p.product || p.code || '';
-                        const pQty = Number(p.weight_kg || p.qty || p.quantity || 0);
-                        const pUnit = p.unit || 'Kg';
-                        if (pName) msg += `📦 ${pName} — ${pQty.toLocaleString('vi-VN')} ${pUnit}\n`;
-                    });
+                    // Product list
+                    const prodList = (orderInfo?.cart || orderInfo?.products || cart || []);
+                    if (prodList.length > 0) {
+                        prodList.forEach(p => {
+                            const pName = p.product?.name || p.name || p.product || p.code || '';
+                            const pQty = Number(p.weight_kg || p.qty || p.quantity || 0);
+                            const pUnit = p.unit || 'Kg';
+                            if (pName) msg += `📦 ${pName} — ${pQty.toLocaleString('vi-VN')} ${pUnit}\n`;
+                        });
+                    }
+
+                    let proofImages = images || [];
+                    // Fallback: fetch images from export/import tickets if not in request body
+                    if (proofImages.length === 0) {
+                        try {
+                            const { createClient: sc } = await import('@supabase/supabase-js');
+                            const sbImg = sc(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+                            const ticketTable = isImport ? 'import_tickets' : 'export_tickets';
+                            const { data: ticket } = await sbImg
+                                .from(ticketTable)
+                                .select('images')
+                                .eq('order_id', id)
+                                .order('created_at', { ascending: false })
+                                .limit(1)
+                                .single();
+                            if (ticket?.images && Array.isArray(ticket.images) && ticket.images.length > 0) {
+                                proofImages = ticket.images;
+                                console.log(`📸 Fetched ${proofImages.length} proof images from ${ticketTable}`);
+                            }
+                        } catch (e) { /* no ticket images */ }
+                    }
+                    if (proofImages.length > 0) {
+                        await sendTelegramPhotos(proofImages, msg, tgGroup);
+                    } else {
+                        await sendTelegramMessage(msg, tgGroup);
+                    }
+                    console.log(`📨 Telegram completion sent to ${tgGroup} for ${orderNo}`);
+                } catch (tgErr) {
+                    console.error('Telegram completion error:', tgErr.message);
                 }
-
-                let proofImages = images || [];
-                // Fallback: fetch images from export/import tickets if not in request body
-                if (proofImages.length === 0) {
-                    try {
-                        const { createClient: sc } = await import('@supabase/supabase-js');
-                        const sbImg = sc(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
-                        const ticketTable = isImport ? 'import_tickets' : 'export_tickets';
-                        const { data: ticket } = await sbImg
-                            .from(ticketTable)
-                            .select('images')
-                            .eq('order_id', id)
-                            .order('created_at', { ascending: false })
-                            .limit(1)
-                            .single();
-                        if (ticket?.images && Array.isArray(ticket.images) && ticket.images.length > 0) {
-                            proofImages = ticket.images;
-                            console.log(`📸 Fetched ${proofImages.length} proof images from ${ticketTable}`);
-                        }
-                    } catch (e) { /* no ticket images */ }
-                }
-                if (proofImages.length > 0) {
-                    await sendTelegramPhotos(proofImages, msg, tgGroup);
-                } else {
-                    await sendTelegramMessage(msg, tgGroup);
-                }
-                console.log(`📨 Telegram completion sent to ${tgGroup} for ${orderNo}`);
-            } catch (tgErr) {
-                console.error('Telegram completion error:', tgErr.message);
-            }
+            } // end alreadyCompleted else
 
             // AUTO-COMPLETE SISTER ORDERS IN MERGED TRIP (DRIVER FLOW)
             let mergeMsg = '';
