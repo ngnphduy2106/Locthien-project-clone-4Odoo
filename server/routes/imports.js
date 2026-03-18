@@ -1251,20 +1251,37 @@ router.post('/:id/admin-confirm', async (req, res) => {
 
         // Send Telegram notification
         try {
-            const { sendTelegramMessage } = await import('../services/telegram.js');
+            const { sendTelegramMessage, sendTelegramPhotos } = await import('../services/telegram.js');
             const products = data.products || [];
             const productList = products.map(p =>
-                `- ${p.name || p.code}: ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'Kg'}`
-            ).join('\n');
+                `${p.name || p.code} — ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'Kg'}`
+            ).join(', ');
 
-            let msg = `✅ <b>ĐƠN NHẬP ĐÃ XÁC NHẬN</b>\n`;
-            msg += `📦 <b>#${data.ticket_no}</b>\n`;
-            msg += `🏭 ${data.supplier_name || 'N/A'}\n`;
-            if (data.assigned_driver) msg += `🚗 TX: ${data.assigned_driver}\n`;
-            if (productList) msg += `\n${productList}\n`;
-            msg += `\n👤 Xác nhận bởi: ${confirmed_by || 'Admin'}`;
+            // 1. Send completion notification to NHAP group (safety net — in case driver completion didn't send)
+            let nhapMsg = `✅ <b>PHIẾU NHẬP ĐÃ HOÀN THÀNH</b>\n`;
+            nhapMsg += `📦 <b>#${data.ticket_no}</b>\n`;
+            nhapMsg += `🏭 ${data.supplier_name || 'N/A'}\n`;
+            if (data.assigned_driver) nhapMsg += `🚗 TX: <b>${data.assigned_driver}</b>${data.assigned_plate ? ` (${data.assigned_plate})` : ''}\n`;
+            if (data.assistant_name) nhapMsg += `🧑‍🔧 PX: ${data.assistant_name}\n`;
+            if (productList) nhapMsg += `📦 ${productList}\n`;
+            nhapMsg += `👤 XN bởi: ${confirmed_by || 'Admin'}`;
 
-            await sendTelegramMessage(msg, 'SALES');
+            const proofImages = data.images && Array.isArray(data.images) && data.images.length > 0 ? data.images : [];
+            if (proofImages.length > 0) {
+                await sendTelegramPhotos(proofImages, nhapMsg, 'NHAP');
+            } else {
+                await sendTelegramMessage(nhapMsg, 'NHAP');
+            }
+
+            // 2. Send confirmation notification to SALES group
+            let salesMsg = `✅ <b>ĐƠN NHẬP ĐÃ XÁC NHẬN</b>\n`;
+            salesMsg += `📦 <b>#${data.ticket_no}</b>\n`;
+            salesMsg += `🏭 ${data.supplier_name || 'N/A'}\n`;
+            if (data.assigned_driver) salesMsg += `🚗 TX: ${data.assigned_driver}\n`;
+            if (productList) salesMsg += `📦 ${productList}\n`;
+            salesMsg += `\n👤 Xác nhận bởi: ${confirmed_by || 'Admin'}`;
+
+            await sendTelegramMessage(salesMsg, 'SALES');
         } catch (tgErr) {
             console.error('Telegram import confirm error:', tgErr.message);
         }
