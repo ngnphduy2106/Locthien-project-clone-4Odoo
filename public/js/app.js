@@ -7564,6 +7564,9 @@ async function cancelDispatch(orderId, type = 'export') {
         } else {
             toastSuccess(data.msg || data.message || 'Đã hủy điều phối!');
             closeOrderModal();
+            // Also close import modal if open
+            const importModal = window.$('#modal-import-detail');
+            if (importModal) importModal.classList.add('hidden');
             // Refresh the appropriate list
             if (type === 'import') {
                 state._cache.imports = 0;
@@ -7572,6 +7575,9 @@ async function cancelDispatch(orderId, type = 'export') {
                 state._cache.dispatch = 0;
                 if (typeof loadDispatchOrders === 'function') loadDispatchOrders();
             }
+            // Also refresh My Orders for drivers
+            if (typeof loadMyOrders === 'function') loadMyOrders();
+            if (window.MyOrdersModule?.loadMyOrders) window.MyOrdersModule.loadMyOrders();
         }
     } catch (e) {
         hideLoading();

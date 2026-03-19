@@ -243,8 +243,8 @@ router.get('/my/:driverName', async (req, res) => {
         const { createClient } = await import('@supabase/supabase-js');
         const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
-        const orders = await db.getOrders();
-        const users = await db.getUsers();
+        // Parallel fetch orders + users
+        const [orders, users] = await Promise.all([db.getOrders(), db.getUsers()]);
         const internalDrivers = users
             .filter(u => u.role === CONFIG.ROLES.DRIVER)
             .map(u => (u.fullName || '').toUpperCase());
@@ -296,46 +296,46 @@ router.get('/my/:driverName', async (req, res) => {
             console.log(`📋 Assignment query result: ${assignments.length} rows`);
 
             if (assignments && assignments.length > 0) {
-                console.log(`📦 Found ${assignments.length} driver assignments:`,
-                    assignments.map(a => ({ id: a.id, driver_name: a.driver_name, order_id: a.order_id, qty: a.assigned_qty, assigned_products: a.assigned_products })));
+                console.log(`📦 Found ${assignments.length} driver assignments`);
+
+                // BATCH: Fetch all assignments for the relevant order_ids in ONE query
+                const orderIds = [...new Set(assignments.map(a => a.order_id))];
+                const { data: batchAllAssigns } = await supabase
+                    .from('order_driver_assignments')
+                    .select('id, status, assigned_qty, actual_qty, driver_name, order_id')
+                    .in('order_id', orderIds);
+
+                // Group by order_id for fast lookup
+                const assignsByOrder = {};
+                (batchAllAssigns || []).forEach(a => {
+                    if (!assignsByOrder[a.order_id]) assignsByOrder[a.order_id] = [];
+                    assignsByOrder[a.order_id].push(a);
+                });
 
                 for (const assign of assignments) {
-                    // Find the parent order
                     const order = orders.find(o =>
                         o.id === assign.order_id ||
                         o.soDon === assign.order_id ||
                         String(o.id) === String(assign.order_id)
                     );
 
-                    if (!order) {
-                        console.log(`⚠️ Order not found for assignment: ${assign.order_id}`);
-                        continue;
-                    }
+                    if (!order) continue;
 
-                    // Calculate status based on assignment status
                     let statusCode = 'CHO_NHAN';
                     if (assign.status === 'delivering') statusCode = 'DANG_GIAO';
                     else if (assign.status === 'completed') statusCode = 'HOAN_THANH';
 
-                    // Check if this is a split order (multiple assignments)
-                    const { data: allAssignments } = await supabase
-                        .from('order_driver_assignments')
-                        .select('id, status, assigned_qty, actual_qty, driver_name')
-                        .eq('order_id', assign.order_id);
-
-                    const isSplitOrder = allAssignments && allAssignments.length > 1;
-                    const completedCount = allAssignments?.filter(a => a.status === 'completed').length || 0;
-                    const totalCount = allAssignments?.length || 1;
-
-                    // DEBUG: Log what we're returning to frontend
-                    console.log(`🚀 Returning to frontend - assignment_id: ${assign.id}, assigned_products:`, assign.assigned_products);
+                    // Use pre-fetched assignments (no extra query per iteration)
+                    const allAssignments = assignsByOrder[assign.order_id] || [];
+                    const isSplitOrder = allAssignments.length > 1;
+                    const completedCount = allAssignments.filter(a => a.status === 'completed').length;
+                    const totalCount = allAssignments.length || 1;
 
                     myOrders.push({
                         ...order,
-                        // Override with assignment-specific data
                         assignment_id: assign.id,
                         assigned_qty: assign.assigned_qty,
-                        assigned_products: assign.assigned_products, // Custom products for this driver
+                        assigned_products: assign.assigned_products,
                         actual_qty: assign.actual_qty || 0,
                         assignment_status: assign.status,
                         assignment_plate: assign.plate,
@@ -344,7 +344,6 @@ router.get('/my/:driverName', async (req, res) => {
                         all_assignments: allAssignments,
                         statusCode,
                         type: 'export',
-                        // Use assignment driver info
                         taiXe: assign.driver_name,
                         bienSo: assign.plate || order.bienSo
                     });
@@ -435,28 +434,38 @@ router.get('/my/:driverName', async (req, res) => {
             if (importAssignments && importAssignments.length > 0) {
                 console.log(`📦 Found ${importAssignments.length} import driver assignments`);
 
-                for (const assign of importAssignments) {
-                    const { data: imp } = await supabase
-                        .from('import_tickets')
-                        .select('*')
-                        .eq('id', assign.import_id)
-                        .single();
+                // BATCH: Fetch all import tickets and all import assignments in parallel
+                const importIds = [...new Set(importAssignments.map(a => a.import_id))];
+                const [ticketsResult, batchImportAssigns] = await Promise.all([
+                    supabase.from('import_tickets').select('*').in('id', importIds),
+                    supabase.from('import_driver_assignments')
+                        .select('id, status, assigned_qty, actual_qty, driver_name, plate, import_id')
+                        .in('import_id', importIds)
+                ]);
 
+                // Index tickets by id
+                const ticketMap = {};
+                (ticketsResult.data || []).forEach(t => { ticketMap[t.id] = t; });
+
+                // Group assignments by import_id
+                const importAssignsByTicket = {};
+                (batchImportAssigns.data || []).forEach(a => {
+                    if (!importAssignsByTicket[a.import_id]) importAssignsByTicket[a.import_id] = [];
+                    importAssignsByTicket[a.import_id].push(a);
+                });
+
+                for (const assign of importAssignments) {
+                    const imp = ticketMap[assign.import_id];
                     if (!imp) continue;
 
                     let statusCode = 'CHO_NHAN';
                     if (assign.status === 'delivering') statusCode = 'DANG_GIAO';
                     else if (assign.status === 'completed') statusCode = 'HOAN_THANH';
 
-                    // Check for split
-                    const { data: allImportAssigns } = await supabase
-                        .from('import_driver_assignments')
-                        .select('id, status, assigned_qty, actual_qty, driver_name, plate')
-                        .eq('import_id', assign.import_id);
-
-                    const isSplitOrder = allImportAssigns && allImportAssigns.length > 1;
-                    const completedCount = allImportAssigns?.filter(a => a.status === 'completed').length || 0;
-                    const totalCount = allImportAssigns?.length || 1;
+                    const allImportAssigns = importAssignsByTicket[assign.import_id] || [];
+                    const isSplitOrder = allImportAssigns.length > 1;
+                    const completedCount = allImportAssigns.filter(a => a.status === 'completed').length;
+                    const totalCount = allImportAssigns.length || 1;
 
                     myOrders.push({
                         id: imp.id,
@@ -473,20 +482,13 @@ router.get('/my/:driverName', async (req, res) => {
                         actual_qty: assign.actual_qty || 0,
                         is_split_order: isSplitOrder,
                         split_progress: isSplitOrder ? `${completedCount}/${totalCount}` : null,
-                        all_assignments: allImportAssigns || [],  // Include all assignments for frontend display
+                        all_assignments: allImportAssigns,
                         type: 'import',
                         statusCode,
-                        // Date fields - extract directly from ISO string (no parsing)
                         ngay: (() => {
                             const raw = String(imp.expected_date || imp.created_at || '');
-                            console.log(`📅 Import ${imp.id} expected_date raw:`, imp.expected_date, '| created_at:', imp.created_at, '| raw string:', raw);
-                            // ISO format: YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss
                             const parts = raw.split('T')[0].split('-');
-                            if (parts.length === 3) {
-                                const result = `${parts[2]}/${parts[1]}/${parts[0]}`; // DD/MM/YYYY
-                                console.log(`📅 Import ${imp.id} formatted ngay:`, result);
-                                return result;
-                            }
+                            if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
                             return raw;
                         })(),
                         expected_date: imp.expected_date,
