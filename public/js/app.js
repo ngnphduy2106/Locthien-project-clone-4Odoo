@@ -4310,6 +4310,36 @@ function closeUserProfileModal(event) {
 window.showUserProfile = showUserProfile;
 window.closeUserProfileModal = closeUserProfileModal;
 
+// Clear all app cache and reload
+function clearAppCache() {
+    if (!confirm('Xóa toàn bộ cache ứng dụng?\n\nBạn sẽ cần đăng nhập lại sau khi xóa.')) return;
+
+    try {
+        // Clear localStorage
+        localStorage.clear();
+        // Clear sessionStorage
+        sessionStorage.clear();
+        // Unregister service workers
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(regs => {
+                regs.forEach(r => r.unregister());
+            });
+        }
+        // Clear Cache API
+        if ('caches' in window) {
+            caches.keys().then(names => {
+                names.forEach(name => caches.delete(name));
+            });
+        }
+        // Reload page
+        setTimeout(() => window.location.reload(true), 300);
+    } catch (e) {
+        console.error('Clear cache error:', e);
+        window.location.reload(true);
+    }
+}
+window.clearAppCache = clearAppCache;
+
 // === DELIVERY MODAL (HOÀN THÀNH ĐƠN) ===
 
 function openDeliveryModal(orderId) {
