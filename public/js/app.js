@@ -527,6 +527,37 @@ function initApp() {
     } else {
         showSection('dashboard');
     }
+
+    // Check for remote force-reload flag
+    checkForceReload();
+    // Check every 60 seconds
+    setInterval(checkForceReload, 60000);
+}
+
+// Check if admin has requested a remote cache reset for this user
+async function checkForceReload() {
+    try {
+        const userId = state.user?.id;
+        if (!userId) return;
+        const res = await fetch(`/api/auth/check-reload/${userId}`);
+        const data = await res.json();
+        if (data.reload) {
+            console.log('🔄 Force reload triggered by admin');
+            localStorage.clear();
+            sessionStorage.clear();
+            if ('caches' in window) {
+                const names = await caches.keys();
+                for (const name of names) await caches.delete(name);
+            }
+            if ('serviceWorker' in navigator) {
+                const regs = await navigator.serviceWorker.getRegistrations();
+                for (const r of regs) r.unregister();
+            }
+            window.location.reload(true);
+        }
+    } catch (e) {
+        // Silent fail - don't break app if check fails
+    }
 }
 // Initialize all date pickers with Vietnamese format
 function initDatePickers() {
@@ -7633,9 +7664,12 @@ function renderUsersTable() {
                 </span>
             </td>
             <td>
-                <div style="display:flex; gap:6px;">
+                <div style="display:flex; gap:6px; flex-wrap:wrap;">
                     <button class="btn btn-outline btn-sm" onclick="editUser('${u.id}')" title="Sửa">
                         <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="btn btn-outline btn-sm" onclick="forceReloadUser('${u.id}', '${(u.fullName || '').replace(/'/g, '')}')" title="Reset cache" style="color:var(--warning); border-color:var(--warning);">
+                        <i class="bi bi-arrow-clockwise"></i>
                     </button>
                     ${u.status === 'ACTIVE' ? `
                         <button class="btn btn-danger btn-sm" onclick="updateUserStatus('${u.id}', 'INACTIVE')" title="Khóa">
@@ -7907,9 +7941,29 @@ initApp = async function () {
 window.loadUsers = loadUsers;
 window.renderUsersTable = renderUsersTable;
 window.showCreateUserModal = showCreateUserModal;
+// Force reload a user's app remotely (admin only)
+async function forceReloadUser(userId, userName) {
+    if (!confirm(`Reset cache cho người dùng ${userName || userId}?\n\nApp của họ sẽ tự động tải lại trong vòng 60 giây.`)) return;
+    try {
+        showLoading('Đang gửi lệnh reset...');
+        const res = await fetch(`/api/auth/force-reload/${userId}`, { method: 'POST' });
+        const data = await res.json();
+        hideLoading();
+        if (data.error) {
+            toastError(data.msg || 'Lỗi');
+        } else {
+            toastSuccess(`Đã gửi lệnh reset cache cho ${userName || userId}!`);
+        }
+    } catch (e) {
+        hideLoading();
+        toastError('Lỗi: ' + e.message);
+    }
+}
+
 window.closeCreateUserModal = closeCreateUserModal;
 window.submitCreateUser = submitCreateUser;
 window.editUser = editUser;
+window.forceReloadUser = forceReloadUser;
 window.updateUserStatus = updateUserStatus;
 window.closeEditUserModal = closeEditUserModal;
 window.submitEditUser = submitEditUser;

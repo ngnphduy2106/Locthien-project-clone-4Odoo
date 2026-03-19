@@ -205,4 +205,34 @@ router.post('/register-fcm-token', async (req, res) => {
     }
 });
 
+// POST /api/auth/force-reload/:id - Admin triggers remote cache reset for a user
+router.post('/force-reload/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        await db.updateUser(id, { force_reload: true });
+        console.log(`🔄 Force reload set for user ${id}`);
+        res.json(createResponse(false, 'Đã yêu cầu reset cache cho người dùng!'));
+    } catch (e) {
+        res.json(createResponse(true, 'Lỗi: ' + e.message));
+    }
+});
+
+// GET /api/auth/check-reload/:id - Frontend checks if force reload is needed
+router.get('/check-reload/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { createClient } = await import('@supabase/supabase-js');
+        const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+        const { data } = await supabase.from('users').select('force_reload').eq('id', id).single();
+        if (data?.force_reload) {
+            // Reset the flag
+            await supabase.from('users').update({ force_reload: false }).eq('id', id);
+            return res.json({ reload: true });
+        }
+        res.json({ reload: false });
+    } catch (e) {
+        res.json({ reload: false });
+    }
+});
+
 export default router;
