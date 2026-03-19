@@ -564,6 +564,84 @@ router.post('/:id/assign-multi', async (req, res) => {
     }
 });
 
+// PUT /api/imports/:id/unassign - Cancel dispatch for import (hủy điều phối nhập)
+router.put('/:id/unassign', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { reason } = req.body;
+        console.log(`\n⚠️ UNASSIGN IMPORT - ID: ${id}, reason: ${reason || 'Không có lý do'}`);
+
+        const supabase = getSupabase();
+
+        // Find ticket by UUID or ticket_no
+        let ticket = null;
+        const { data: byNo } = await supabase.from('import_tickets').select('*').eq('ticket_no', id).single();
+        if (byNo) {
+            ticket = byNo;
+        } else {
+            const { data: byId } = await supabase.from('import_tickets').select('*').eq('id', id).single();
+            if (byId) ticket = byId;
+        }
+
+        if (!ticket) {
+            return res.json(createResponse(true, 'Không tìm thấy phiếu nhập!'));
+        }
+
+        // Check if already completed
+        if (ticket.status === 'completed') {
+            return res.json(createResponse(true, 'Không thể hủy điều phối phiếu nhập đã hoàn thành!'));
+        }
+
+        const previousDriver = ticket.assigned_driver || '';
+        const previousPlate = ticket.assigned_plate || '';
+
+        // 1. Delete import driver assignments
+        const { data: deletedAssigns } = await supabase
+            .from('import_driver_assignments')
+            .delete()
+            .eq('import_id', ticket.id)
+            .select();
+        console.log(`🗑️ Deleted ${deletedAssigns?.length || 0} import driver assignments`);
+
+        // 2. Reset import ticket to pending
+        const { error: updateErr } = await supabase
+            .from('import_tickets')
+            .update({
+                status: 'pending',
+                assigned_driver: null,
+                assigned_plate: null,
+                assistant_name: null,
+                note: reason ? `[HỦY ĐIỀU PHỐI] ${reason}` : '[HỦY ĐIỀU PHỐI]'
+            })
+            .eq('id', ticket.id);
+
+        if (updateErr) {
+            return res.json(createResponse(true, 'Lỗi cập nhật: ' + updateErr.message));
+        }
+        console.log(`✅ Import ${ticket.ticket_no} reset to pending`);
+
+        // 3. Send Telegram notification
+        try {
+            const { sendTelegramMessage } = await import('../services/telegram.js');
+            let msg = `⚠️ <b>ĐÃ HỦY ĐIỀU PHỐI NHẬP</b>\n`;
+            msg += `📦 <b>#${ticket.ticket_no}</b>\n`;
+            msg += `🏭 ${ticket.supplier_name || 'N/A'}\n`;
+            if (previousDriver) msg += `🚗 TX cũ: ${previousDriver}${previousPlate ? ` (${previousPlate})` : ''}\n`;
+            if (reason) msg += `📝 Lý do: ${reason}\n`;
+            msg += `🔄 Phiếu nhập đã về trạng thái <b>Chờ xử lý</b>`;
+            await sendTelegramMessage(msg, 'DRIVER');
+        } catch (tgErr) {
+            console.error('Telegram import unassign error:', tgErr.message);
+        }
+
+        res.json(createResponse(false, `Đã hủy điều phối phiếu nhập #${ticket.ticket_no}!`));
+
+    } catch (e) {
+        console.error('Unassign import error:', e);
+        res.json(createResponse(true, 'Lỗi: ' + e.message));
+    }
+});
+
 // PUT /api/imports/:id/start - Start import delivery (supports multi-driver)
 router.put('/:id/start', async (req, res) => {
     try {

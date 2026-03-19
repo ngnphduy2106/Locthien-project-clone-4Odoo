@@ -3571,6 +3571,9 @@ async function viewOrderDetail(orderId, options = {}) {
                     <button class="btn btn-info" onclick="closeOrderModal(); assignDriver('${order.id}')" style="background:var(--info); color:white;">
                         <i class="bi bi-person-gear"></i> Đổi tài xế
                     </button>
+                    <button class="btn btn-outline" onclick="cancelDispatch('${order.id}', 'export')" style="color:var(--danger); border-color:var(--danger);">
+                        <i class="bi bi-arrow-counterclockwise"></i> Hủy điều phối
+                    </button>
                 ` : ''}
             ${!isReadonly && (order.status === 'Đang thực hiện' || order.status === 'Chờ giao' || order.status === 'assigned') && (isAdminRole() || isSales) ? `
                     <button class="btn btn-success" onclick="showDriverCompletionModal('${order.id}')">
@@ -6453,6 +6456,9 @@ async function viewImportDetail(importId) {
                     <button class="btn btn-info" onclick="closeOrderModal(); assignImportDriver('${imp.id}')" style="background:var(--info); color:white;">
                         <i class="bi bi-person-gear"></i> Đổi tài xế
                     </button>
+                    <button class="btn btn-outline" onclick="cancelDispatch('${imp.id}', 'import')" style="color:var(--danger); border-color:var(--danger);">
+                        <i class="bi bi-arrow-counterclockwise"></i> Hủy điều phối
+                    </button>
                     <button class="btn btn-success" onclick="adminCompleteImport('${imp.id}')">
                         <i class="bi bi-check-circle"></i> Admin hoàn thành
                     </button>
@@ -7469,6 +7475,50 @@ async function cancelOrder(orderId) {
 
 window.cancelOrder = cancelOrder;
 
+// Cancel dispatch (hủy điều phối) for export or import orders
+async function cancelDispatch(orderId, type = 'export') {
+    const typeLabel = type === 'import' ? 'phiếu nhập' : 'đơn hàng';
+    if (!confirm(`Bạn có chắc muốn HỦY ĐIỀU PHỐI ${typeLabel} này?\n\nTài xế sẽ bị gỡ khỏi đơn và đơn sẽ về trạng thái chờ phân công.`)) {
+        return;
+    }
+
+    const reason = prompt('Lý do hủy điều phối (có thể bỏ trống):') || '';
+
+    try {
+        showLoading('Đang hủy điều phối...');
+        const url = type === 'import'
+            ? `/api/imports/${orderId}/unassign`
+            : `/api/orders/${orderId}/unassign`;
+
+        const res = await fetch(url, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reason })
+        });
+        const data = await res.json();
+        hideLoading();
+
+        if (data.error) {
+            toastError('Lỗi: ' + (data.msg || data.message || 'Không thể hủy điều phối'));
+        } else {
+            toastSuccess(data.msg || data.message || 'Đã hủy điều phối!');
+            closeOrderModal();
+            // Refresh the appropriate list
+            if (type === 'import') {
+                state._cache.imports = 0;
+                if (typeof loadImports === 'function') loadImports();
+            } else {
+                state._cache.dispatch = 0;
+                if (typeof loadDispatchOrders === 'function') loadDispatchOrders();
+            }
+        }
+    } catch (e) {
+        hideLoading();
+        console.error('Cancel dispatch error:', e);
+        toastError('Lỗi kết nối: ' + e.message);
+    }
+}
+
 // Cancel Import Ticket
 async function cancelImportTicket(importId) {
     if (!confirm('Bạn có chắc muốn HỦY đơn nhập này?\n\nĐơn sẽ được chuyển sang trạng thái "Đã hủy".')) {
@@ -7498,6 +7548,7 @@ async function cancelImportTicket(importId) {
 }
 
 window.cancelImportTicket = cancelImportTicket;
+window.cancelDispatch = cancelDispatch;
 // Keep old name for backward compatibility
 window.deleteImportTicket = cancelImportTicket;
 

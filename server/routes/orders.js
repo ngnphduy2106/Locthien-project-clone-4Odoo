@@ -1109,6 +1109,89 @@ router.put('/:id/update-products', async (req, res) => {
     }
 });
 
+// PUT /api/orders/:id/unassign - Cancel dispatch (hủy điều phối)
+router.put('/:id/unassign', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { reason } = req.body;
+        console.log(`\n⚠️ UNASSIGN ORDER - ID: ${id}, reason: ${reason || 'Không có lý do'}`);
+
+        // Get order info first
+        const order = await db.getOrder(id);
+        if (!order) {
+            return res.json(createResponse(true, 'Không tìm thấy đơn hàng!'));
+        }
+
+        // Check if order is already completed
+        const currentStatus = String(order.status || '').toLowerCase();
+        if (currentStatus === 'completed' || currentStatus === 'đã thực hiện') {
+            return res.json(createResponse(true, 'Không thể hủy điều phối đơn đã hoàn thành!'));
+        }
+
+        const previousDriver = order.taiXe || order.driver_name || '';
+        const previousPlate = order.bienSo || order.plate || '';
+        const orderNo = order.soDon || order.sale_order_no || id;
+
+        // 1. Delete driver assignments
+        const supabase = getSupabase();
+        const { data: deletedAssigns } = await supabase
+            .from('order_driver_assignments')
+            .delete()
+            .or(`order_id.eq.${id},order_id.eq.${orderNo}`)
+            .select();
+        console.log(`🗑️ Deleted ${deletedAssigns?.length || 0} driver assignments`);
+
+        // 2. Reset order status to pending
+        await db.updateOrder(id, {
+            taiXe: '',
+            bienSo: '',
+            assistant_name: '',
+            delivery_time: '',
+            status: 'Mới',
+            delivery_status: 'Mới',
+            note: reason ? `[HỦY ĐIỀU PHỐI] ${reason}` : '[HỦY ĐIỀU PHỐI]'
+        });
+        console.log(`✅ Order ${orderNo} reset to pending`);
+
+        // 3. Sync to MISA
+        try {
+            const syncResult = await updateMisaOrder(order.sale_order_no || id, {
+                misa_id: order.misa_id,
+                delivery_status: 'Mới',
+                status: 'Mới',
+                driver: '',
+                plate: '',
+                cart: order.cart || order.products || []
+            });
+            if (syncResult.success) {
+                console.log(`✅ MISA synced: order ${orderNo} -> Mới`);
+            }
+        } catch (misaErr) {
+            console.error('MISA sync error during unassign:', misaErr.message);
+        }
+
+        // 4. Send Telegram notification
+        try {
+            const { sendTelegramMessage } = await import('../services/telegram.js');
+            let msg = `⚠️ <b>ĐÃ HỦY ĐIỀU PHỐI</b>\n`;
+            msg += `📦 <b>#${orderNo}</b>\n`;
+            msg += `🏢 ${order.khach || order.account_name || 'N/A'}\n`;
+            if (previousDriver) msg += `🚗 TX cũ: ${previousDriver}${previousPlate ? ` (${previousPlate})` : ''}\n`;
+            if (reason) msg += `📝 Lý do: ${reason}\n`;
+            msg += `🔄 Đơn đã về trạng thái <b>Mới</b>`;
+            await sendTelegramMessage(msg, 'DRIVER');
+        } catch (tgErr) {
+            console.error('Telegram unassign error:', tgErr.message);
+        }
+
+        res.json(createResponse(false, `Đã hủy điều phối đơn #${orderNo}!`));
+
+    } catch (e) {
+        console.error('Unassign order error:', e);
+        res.json(createResponse(true, 'Lỗi: ' + e.message));
+    }
+});
+
 // PUT /api/orders/:id/start - Driver starts order (supports multi-driver)
 router.put('/:id/start', async (req, res) => {
     try {
