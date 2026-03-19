@@ -412,7 +412,11 @@
                 <section id="section-dispatch" class="hidden">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
                         <h2 class="page-heading" style="margin-bottom:0;">Quản lý đơn hàng</h2>
-                        <!-- Sync button hidden - auto sync runs every 15s -->
+                        <button class="btn btn-outline"
+                            onclick="state._cache.dispatch=0; state._cache.imports=0; loadDispatchOrders(); loadImports();"
+                            style="padding:8px 14px;" title="Tải lại đơn hàng">
+                            <i class="bi bi-arrow-clockwise"></i> Tải lại
+                        </button>
                     </div>
 
                     <!-- Order Type Toggle -->
