@@ -1147,18 +1147,18 @@ router.put('/:id/unassign', async (req, res) => {
             bienSo: '',
             assistant_name: '',
             delivery_time: '',
-            status: 'Mới',
-            delivery_status: 'Mới',
+            status: CONFIG.STATUS.NEW,
+            delivery_status: CONFIG.STATUS.NEW,
             note: reason ? `[HỦY ĐIỀU PHỐI] ${reason}` : '[HỦY ĐIỀU PHỐI]'
         });
-        console.log(`✅ Order ${orderNo} reset to pending`);
+        console.log(`✅ Order ${orderNo} reset to ${CONFIG.STATUS.NEW}`);
 
         // 3. Sync to MISA
         try {
             const syncResult = await updateMisaOrder(order.sale_order_no || id, {
                 misa_id: order.misa_id,
-                delivery_status: 'Mới',
-                status: 'Mới',
+                delivery_status: CONFIG.STATUS.NEW,
+                status: CONFIG.STATUS.NEW,
                 driver: '',
                 plate: '',
                 cart: order.cart || order.products || []
@@ -1178,7 +1178,7 @@ router.put('/:id/unassign', async (req, res) => {
             msg += `🏢 ${order.khach || order.account_name || 'N/A'}\n`;
             if (previousDriver) msg += `🚗 TX cũ: ${previousDriver}${previousPlate ? ` (${previousPlate})` : ''}\n`;
             if (reason) msg += `📝 Lý do: ${reason}\n`;
-            msg += `🔄 Đơn đã về trạng thái <b>Mới</b>`;
+            msg += `🔄 Đơn đã về trạng thái <b>${CONFIG.STATUS.NEW}</b>`;
             await sendTelegramMessage(msg, 'DRIVER');
         } catch (tgErr) {
             console.error('Telegram unassign error:', tgErr.message);
