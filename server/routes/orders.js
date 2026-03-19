@@ -1133,7 +1133,8 @@ router.put('/:id/unassign', async (req, res) => {
         const orderNo = order.soDon || order.sale_order_no || id;
 
         // 1. Delete driver assignments
-        const supabase = getSupabase();
+        const { createClient } = await import('@supabase/supabase-js');
+        const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
         const { data: deletedAssigns } = await supabase
             .from('order_driver_assignments')
             .delete()
