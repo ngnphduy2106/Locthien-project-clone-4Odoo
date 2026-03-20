@@ -1445,6 +1445,12 @@ function renderImportList() {
         const groupA = getImportSortGroup(a);
         const groupB = getImportSortGroup(b);
         if (groupA !== groupB) return groupA - groupB;
+        const dateA = getImportDate(a);
+        const dateB = getImportDate(b);
+        if (dateA !== dateB) {
+            // Future (group 3): ASC (closest date first), Past (group 4): DESC (newest first)
+            return groupA === 3 ? dateA.localeCompare(dateB) : dateB.localeCompare(dateA);
+        }
         return getImportCreatedTime(b) - getImportCreatedTime(a);
     });
 
@@ -1691,7 +1697,16 @@ function renderDispatchOrders() {
         const groupB = getSortGroup(b);
         if (groupA !== groupB) return groupA - groupB;
 
-        // Within same group: sort by created_date DESC (newest first)
+        // Within same group: sort by ORDER DATE
+        const dateA = getOrderDate(a);
+        const dateB = getOrderDate(b);
+        if (dateA !== dateB) {
+            // Future (group 3): ASC — closest upcoming date first (21/03 → 23/03 → 24/03)
+            // Past (group 4): DESC — most recent past first
+            return groupA === 3 ? dateA.localeCompare(dateB) : dateB.localeCompare(dateA);
+        }
+
+        // Same date: sort by created_date DESC as tiebreaker
         const createdA = getCreatedTime(a);
         const createdB = getCreatedTime(b);
         return createdB - createdA;
