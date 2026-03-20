@@ -289,22 +289,40 @@ async function getMisaOrderDetail(idOrName, isUuid = false) {
     }
 }
 
+// Track sync start time for stale lock detection
+let syncStartTime = 0;
+const SYNC_TIMEOUT_MS = 60_000;      // 60s max for a single sync cycle
+const STALE_LOCK_MS = 5 * 60_000;    // 5 min = definitely stuck
+
 export const syncMisaOrders = async () => {
+    // STALE LOCK RECOVERY: If sync has been "running" for > 5 min, force reset
+    if (isSyncing && syncStartTime > 0 && (Date.now() - syncStartTime > STALE_LOCK_MS)) {
+        console.error(`🔓 Force-resetting stale sync lock (stuck for ${Math.round((Date.now() - syncStartTime) / 1000)}s)`);
+        isSyncing = false;
+    }
+
     if (isSyncing) {
         console.log('⚠️ Sync already in progress. Skipping...');
         return;
     }
 
     isSyncing = true;
+    syncStartTime = Date.now();
     console.log('🔄 Starting MISA Sync...');
 
     try {
-        await performSync();
-
+        // TIMEOUT: Prevent performSync from hanging forever
+        await Promise.race([
+            performSync(),
+            new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Sync timeout (60s)')), SYNC_TIMEOUT_MS)
+            )
+        ]);
     } catch (e) {
         console.error('❌ MISA Sync Fatal Error:', e.message);
     } finally {
         isSyncing = false;
+        syncStartTime = 0;
     }
 };
 
