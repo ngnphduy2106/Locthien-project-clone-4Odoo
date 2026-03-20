@@ -382,6 +382,9 @@ const performSync = async () => {
 
         let shouldFetchDetail = false;
 
+        // Calculate Status from MISA Item (used in both new/existing paths)
+        const newStatus = mapMisaStatus(item);
+
         if (!existingIds.has(saleOrderNo)) {
             // New Order
             shouldFetchDetail = true;
@@ -389,9 +392,6 @@ const performSync = async () => {
         } else {
             // Existing Order: Check if it has products. If not, update it.
             const existingOrder = dbOrders.find(o => o.id === saleOrderNo || o.soDon === saleOrderNo);
-
-            // Calculate Status from MISA Item (List View)
-            const newStatus = mapMisaStatus(item);
 
             if (existingOrder) {
                 // 1. Missing Data Check
