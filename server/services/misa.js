@@ -753,14 +753,23 @@ const performSync = async () => {
                 }
 
                 if (changes.length > 0) {
-                    let changeMsg = `🔄 <b>CẬP NHẬT ĐƠN HÀNG TỪ MISA</b>\n`;
-                    changeMsg += `📦 Mã: <b>#${saleOrderNo}</b>\n`;
-                    changeMsg += `👤 KH: <b>${item.account_name || oldOrder.khach || 'N/A'}</b>\n`;
-                    changeMsg += `<blockquote>${changes.join('\n')}</blockquote>`;
-                    console.log(`📢 Sending change notification for ${saleOrderNo}: ${changes.length} changes`);
-                    sendTelegramMessage(changeMsg, 'NOTIFY', oldOrder.telegram_message_id || null)
-                        .then(() => console.log(`✅ Change notification sent for ${saleOrderNo}`))
-                        .catch(err => console.error(`❌ Change notification FAILED for ${saleOrderNo}:`, err.message));
+                    // Only send Telegram notification for orders NOT yet dispatched/completed
+                    // (Completed orders have qty diffs from actual delivery — no need to notify)
+                    const localStatus = oldOrder.status || '';
+                    const shouldNotify = ['Mới', 'Chưa thực hiện'].includes(localStatus);
+
+                    if (shouldNotify) {
+                        let changeMsg = `🔄 <b>CẬP NHẬT ĐƠN HÀNG TỪ MISA</b>\n`;
+                        changeMsg += `📦 Mã: <b>#${saleOrderNo}</b>\n`;
+                        changeMsg += `👤 KH: <b>${item.account_name || oldOrder.khach || 'N/A'}</b>\n`;
+                        changeMsg += `<blockquote>${changes.join('\n')}</blockquote>`;
+                        console.log(`📢 Sending change notification for ${saleOrderNo}: ${changes.length} changes`);
+                        sendTelegramMessage(changeMsg, 'NOTIFY', oldOrder.telegram_message_id || null)
+                            .then(() => console.log(`✅ Change notification sent for ${saleOrderNo}`))
+                            .catch(err => console.error(`❌ Change notification FAILED for ${saleOrderNo}:`, err.message));
+                    } else {
+                        console.log(`🔇 Skipping change notification for ${saleOrderNo} (status: ${localStatus})`);
+                    }
                 }
             }
             await db.updateOrder(saleOrderNo, mappedOrder);
