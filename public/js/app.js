@@ -10251,6 +10251,9 @@ async function openReviewPanel(orderId, isImport = false) {
                 confirmBtn.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
                 confirmBtn.onclick = () => confirmImportOrder(orderId);
             }
+            // Store orderId + type on panel for reject button
+            panel.dataset.orderId = orderId;
+            panel.dataset.isImport = 'true';
         } else {
             // === EXPORT order review (existing logic) ===
             const { order, proofImages, driverAssignments } = json.data;
@@ -10299,6 +10302,7 @@ async function openReviewPanel(orderId, isImport = false) {
 
             // Store orderId on panel for reject and other buttons
             panel.dataset.orderId = orderId;
+            panel.dataset.isImport = 'false';
 
             // Update confirm button based on role
             const confirmBtn = panel.querySelector('#review-confirm-btn');
@@ -10683,7 +10687,9 @@ async function rejectOrder() {
     const userName = state.user?.name || state.user?.fullName || state.user?.username || 'admin';
     try {
         showLoading('Đang từ chối đơn...');
-        const res = await fetch(`/api/orders/${orderId}/reject`, {
+        const isImport = panel?.dataset?.isImport === 'true';
+        const apiBase = isImport ? '/api/imports' : '/api/orders';
+        const res = await fetch(`${apiBase}/${orderId}/reject`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ rejected_by: userName, reason: reason.trim() })

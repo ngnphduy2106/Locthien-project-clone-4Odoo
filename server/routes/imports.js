@@ -1377,4 +1377,88 @@ router.post('/:id/admin-confirm', async (req, res) => {
     }
 });
 
+// POST /api/imports/:id/reject - Admin từ chối phiếu nhập
+router.post('/:id/reject', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { rejected_by, reason } = req.body;
+        const supabase = getSupabase();
+
+        // Find ticket by ticket_no first, then by id
+        let ticket = null;
+        const { data: byNo } = await supabase
+            .from('import_tickets')
+            .select('*')
+            .eq('ticket_no', id)
+            .single();
+
+        if (byNo) {
+            ticket = byNo;
+        } else {
+            const { data: byId } = await supabase
+                .from('import_tickets')
+                .select('*')
+                .eq('id', id)
+                .single();
+            if (byId) ticket = byId;
+        }
+
+        if (!ticket) {
+            return res.json({ error: true, msg: `Không tìm thấy phiếu nhập #${id}` });
+        }
+
+        const rejectNote = `[TỪ CHỐI] Bởi ${rejected_by || 'admin'} lúc ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}${reason ? ' - Lý do: ' + reason : ''}`;
+
+        // Reset status to pending and store rejection note
+        const { data, error } = await supabase
+            .from('import_tickets')
+            .update({
+                status: 'pending',
+                note: rejectNote
+            })
+            .eq('id', ticket.id)
+            .select()
+            .single();
+
+        if (error) {
+            return res.json(createResponse(true, 'Lỗi từ chối: ' + error.message));
+        }
+
+        // Reset driver assignments
+        try {
+            await supabase
+                .from('import_driver_assignments')
+                .update({ status: 'pending' })
+                .eq('import_id', ticket.id)
+                .eq('status', 'completed');
+            console.log(`🔄 Reset import driver assignments for ${ticket.ticket_no}`);
+        } catch (assignErr) {
+            console.error('Reset import assignments error:', assignErr.message);
+        }
+
+        // Telegram notification → NOTIFY group
+        try {
+            const { sendTelegramMessage } = await import('../services/telegram.js');
+            const products = (ticket.products || []).map(p =>
+                `  • ${p.name || p.code}: ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'Kg'}`
+            ).join('\n');
+            let msg = `❌ <b>TỪ CHỐI PHIẾU NHẬP</b>\n`;
+            msg += `📦 <b>#${ticket.ticket_no}</b>\n`;
+            msg += `🏭 ${ticket.supplier_name || 'N/A'}\n`;
+            if (products) msg += `📋 Sản phẩm:\n${products}\n`;
+            msg += `👔 Từ chối bởi: ${rejected_by || 'admin'}\n`;
+            if (reason) msg += `📝 Lý do: ${reason}`;
+            await sendTelegramMessage(msg, 'NOTIFY');
+        } catch (tgErr) {
+            console.error('Telegram import reject error:', tgErr.message);
+        }
+
+        console.log(`❌ Import ${ticket.ticket_no} rejected by ${rejected_by}`);
+        res.json(createResponse(false, `Đã từ chối phiếu nhập #${ticket.ticket_no}!`));
+    } catch (e) {
+        console.error('Import reject error:', e.message);
+        res.json(createResponse(true, 'Lỗi: ' + e.message));
+    }
+});
+
 export default router;
