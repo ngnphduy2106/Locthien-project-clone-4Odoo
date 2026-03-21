@@ -1658,7 +1658,7 @@ router.post('/:id/complete', async (req, res) => {
                                                 const { data: sd } = await supabase.from('import_tickets').select('*').eq('ticket_no', sister).single();
                                                 if (sd) {
                                                     const { sendTelegramMessage: stm, sendTelegramPhotos: stp } = await import('../services/telegram.js');
-                                                    const sp = (sd.products || []).map(p => `${p.name} — ${Number(p.qty||0).toLocaleString('vi-VN')} ${p.unit||'Kg'}`).join(', ');
+                                                    const sp = (sd.products || []).map(p => `${p.name} — ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'Kg'}`).join(', ');
                                                     let sm = `✅ <b>PHIẾU NHẬP ĐÃ HOÀN THÀNH</b> (tự động)\n📦 <b>#${sister}</b>\n🏭 ${sd.supplier_name || 'N/A'}\n`;
                                                     if (sd.assigned_driver) sm += `🚗 TX: <b>${sd.assigned_driver}</b>${sd.assigned_plate ? ` (${sd.assigned_plate})` : ''}\n`;
                                                     sm += `📦 ${sp || 'Không có SP'}\n🔗 Hoàn thành theo đơn ghép\n`;
@@ -1810,7 +1810,7 @@ router.post('/:id/complete', async (req, res) => {
             const orderNo = fullOrder?.soDon || fullOrder?.sale_order_no || id;
             const driverDisplay = adminResolvedDriver || fullOrder?.custom_field13 || fullOrder?.taiXe || '';
             const isImport = type === 'NHAP';
-            const tgGroup = isImport ? 'NHAP' : 'XUAT';
+            const tgGroup = isImport ? 'NOTIFY' : 'XUAT'; // Import admin-complete → NOTIFY (duyệt đơn), Export → XUAT
             const label = isImport ? 'ĐƠN NHẬP HOÀN THÀNH' : 'ĐƠN ĐÃ HOÀN THÀNH';
 
             let msg = `✅ <b>${label}</b>\n`;

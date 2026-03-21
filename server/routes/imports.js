@@ -1335,8 +1335,9 @@ router.post('/:id/admin-confirm', async (req, res) => {
                 `${p.name || p.code} — ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'Kg'}`
             ).join(', ');
 
-            // 1. Send completion notification to NHAP group (safety net — in case driver completion didn't send)
-            let nhapMsg = `✅ <b>PHIẾU NHẬP ĐÃ HOÀN THÀNH</b>\n`;
+            // 1. Send confirmation notification to NOTIFY group (nhóm duyệt đơn)
+            // Note: NHAP group only receives driver completion notifications
+            let nhapMsg = `✅ <b>PHIẾU NHẬP ĐÃ XÁC NHẬN</b>\n`;
             nhapMsg += `📦 <b>#${data.ticket_no}</b>\n`;
             nhapMsg += `🏭 ${data.supplier_name || 'N/A'}\n`;
             if (data.assigned_driver) nhapMsg += `🚗 TX: <b>${data.assigned_driver}</b>${data.assigned_plate ? ` (${data.assigned_plate})` : ''}\n`;
@@ -1346,9 +1347,9 @@ router.post('/:id/admin-confirm', async (req, res) => {
 
             const proofImages = data.images && Array.isArray(data.images) && data.images.length > 0 ? data.images : [];
             if (proofImages.length > 0) {
-                await sendTelegramPhotos(proofImages, nhapMsg, 'NHAP');
+                await sendTelegramPhotos(proofImages, nhapMsg, 'NOTIFY');
             } else {
-                await sendTelegramMessage(nhapMsg, 'NHAP');
+                await sendTelegramMessage(nhapMsg, 'NOTIFY');
             }
 
             // 2. Send confirmation notification to SALES group
