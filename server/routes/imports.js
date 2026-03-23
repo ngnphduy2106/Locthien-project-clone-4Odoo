@@ -1338,32 +1338,21 @@ router.post('/:id/admin-confirm', async (req, res) => {
                 `${p.name || p.code} — ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'Kg'}`
             ).join(', ');
 
-            // 1. Send confirmation notification to NOTIFY group (nhóm duyệt đơn)
-            // Note: NHAP group only receives driver completion notifications
-            let nhapMsg = `✅ <b>PHIẾU NHẬP ĐÃ XÁC NHẬN</b>\n`;
-            nhapMsg += `📦 <b>#${data.ticket_no}</b>\n`;
-            nhapMsg += `🏭 ${data.supplier_name || 'N/A'}\n`;
-            if (data.assigned_driver) nhapMsg += `🚗 TX: <b>${data.assigned_driver}</b>${data.assigned_plate ? ` (${data.assigned_plate})` : ''}\n`;
-            if (data.assistant_name) nhapMsg += `🧑‍🔧 PX: ${data.assistant_name}\n`;
-            if (productList) nhapMsg += `📦 ${productList}\n`;
-            nhapMsg += `👤 XN bởi: ${confirmed_by || 'Admin'}`;
+            // Chỉ gửi thông báo xác nhận vào nhóm SALES (-1003246064846)
+            let confirmMsg = `✅ <b>PHIẾU NHẬP ĐÃ XÁC NHẬN</b>\n`;
+            confirmMsg += `📦 <b>#${data.ticket_no}</b>\n`;
+            confirmMsg += `🏭 ${data.supplier_name || 'N/A'}\n`;
+            if (data.assigned_driver) confirmMsg += `🚗 TX: <b>${data.assigned_driver}</b>${data.assigned_plate ? ` (${data.assigned_plate})` : ''}\n`;
+            if (data.assistant_name) confirmMsg += `🧑‍🔧 PX: ${data.assistant_name}\n`;
+            if (productList) confirmMsg += `📦 ${productList}\n`;
+            confirmMsg += `👤 XN bởi: ${confirmed_by || 'Admin'}`;
 
             const proofImages = data.images && Array.isArray(data.images) && data.images.length > 0 ? data.images : [];
             if (proofImages.length > 0) {
-                await sendTelegramPhotos(proofImages, nhapMsg, 'NOTIFY');
+                await sendTelegramPhotos(proofImages, confirmMsg, 'SALES');
             } else {
-                await sendTelegramMessage(nhapMsg, 'NOTIFY');
+                await sendTelegramMessage(confirmMsg, 'SALES');
             }
-
-            // 2. Send confirmation notification to SALES group
-            let salesMsg = `✅ <b>ĐƠN NHẬP ĐÃ XÁC NHẬN</b>\n`;
-            salesMsg += `📦 <b>#${data.ticket_no}</b>\n`;
-            salesMsg += `🏭 ${data.supplier_name || 'N/A'}\n`;
-            if (data.assigned_driver) salesMsg += `🚗 TX: ${data.assigned_driver}\n`;
-            if (productList) salesMsg += `📦 ${productList}\n`;
-            salesMsg += `\n👤 Xác nhận bởi: ${confirmed_by || 'Admin'}`;
-
-            await sendTelegramMessage(salesMsg, 'SALES');
         } catch (tgErr) {
             console.error('Telegram import confirm error:', tgErr.message);
         }
@@ -1439,7 +1428,7 @@ router.post('/:id/reject', async (req, res) => {
             console.error('Reset import assignments error:', assignErr.message);
         }
 
-        // Telegram notification → NOTIFY group
+        // Telegram notification → SALES group only (-1003246064846)
         try {
             const { sendTelegramMessage } = await import('../services/telegram.js');
             const products = (ticket.products || []).map(p =>
@@ -1451,7 +1440,7 @@ router.post('/:id/reject', async (req, res) => {
             if (products) msg += `📋 Sản phẩm:\n${products}\n`;
             msg += `👔 Từ chối bởi: ${rejected_by || 'admin'}\n`;
             if (reason) msg += `📝 Lý do: ${reason}`;
-            await sendTelegramMessage(msg, 'NOTIFY');
+            await sendTelegramMessage(msg, 'SALES');
         } catch (tgErr) {
             console.error('Telegram import reject error:', tgErr.message);
         }
