@@ -1816,7 +1816,7 @@ router.post('/:id/complete', async (req, res) => {
             const orderNo = fullOrder?.soDon || fullOrder?.sale_order_no || id;
             const driverDisplay = adminResolvedDriver || fullOrder?.custom_field13 || fullOrder?.taiXe || '';
             const isImport = type === 'NHAP';
-            const tgGroup = isImport ? 'NOTIFY' : 'XUAT'; // Import admin-complete → NOTIFY (duyệt đơn), Export → XUAT
+            const tgGroup = isImport ? 'SALES' : 'XUAT'; // Import admin-complete → SALES, Export → XUAT
             const label = isImport ? 'ĐƠN NHẬP HOÀN THÀNH' : 'ĐƠN ĐÃ HOÀN THÀNH';
 
             let msg = `✅ <b>${label}</b>\n`;
@@ -3075,7 +3075,7 @@ router.post('/:id/reject', async (req, res) => {
             if (products) msg += `📋 Sản phẩm:\n${products}\n`;
             msg += `👔 Từ chối bởi: ${rejected_by || 'admin'}\n`;
             if (reason) msg += `📝 Lý do: ${reason}`;
-            await sendTelegramMessage(msg, 'NOTIFY');
+            await sendTelegramMessage(msg, 'SALES');
         } catch (tgErr) {
             console.error('Telegram reject error:', tgErr.message);
         }

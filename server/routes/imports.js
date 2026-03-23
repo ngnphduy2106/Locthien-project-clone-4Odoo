@@ -1059,7 +1059,7 @@ router.delete('/:id', async (req, res) => {
             let msg = `❌ <b>ĐƠN NHẬP ĐÃ HỦY</b>\n`;
             msg += `📦 <b>#${ticket?.ticket_no || id}</b>\n`;
             msg += `🏭 ${ticket?.supplier_name || 'N/A'}`;
-            await sendTelegramMessage(msg, 'NOTIFY');
+            await sendTelegramMessage(msg, 'SALES');
         } catch (tgErr) {
             console.error('Telegram cancel import error:', tgErr.message);
         }
