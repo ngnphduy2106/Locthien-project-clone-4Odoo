@@ -10173,6 +10173,10 @@ async function openReviewPanel(orderId, isImport = false) {
 
     confirmReviewingOrderId = orderId;
 
+    // Store orderId + type EARLY so reject button always works
+    panel.dataset.orderId = orderId;
+    panel.dataset.isImport = isImport ? 'true' : 'false';
+
     // Move panel to <body> to avoid parent container constraints
     if (!panel._originalParent) {
         panel._originalParent = panel.parentElement;
@@ -10251,9 +10255,7 @@ async function openReviewPanel(orderId, isImport = false) {
                 confirmBtn.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
                 confirmBtn.onclick = () => confirmImportOrder(orderId);
             }
-            // Store orderId + type on panel for reject button
-            panel.dataset.orderId = orderId;
-            panel.dataset.isImport = 'true';
+
         } else {
             // === EXPORT order review (existing logic) ===
             const { order, proofImages, driverAssignments } = json.data;
@@ -10300,9 +10302,7 @@ async function openReviewPanel(orderId, isImport = false) {
             const products = order.products || [];
             renderReviewProducts(products);
 
-            // Store orderId on panel for reject and other buttons
-            panel.dataset.orderId = orderId;
-            panel.dataset.isImport = 'false';
+
 
             // Update confirm button based on role
             const confirmBtn = panel.querySelector('#review-confirm-btn');
