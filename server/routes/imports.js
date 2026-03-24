@@ -196,9 +196,9 @@ router.put('/:id', async (req, res) => {
             return res.json(createResponse(true, 'Lỗi cập nhật: ' + error.message));
         }
 
-        // Send Telegram notification — but SKIP for completed tickets
-        // (When driver already completed, admin just updates actual qty → no notification needed)
-        if (data.status !== 'completed') {
+        // Send Telegram notification — ONLY for pending tickets (not yet dispatched/completed)
+        // Once dispatched (assigned/in_transit) or completed, edits are qty adjustments → no notification
+        if (data.status === 'pending') {
             try {
                 const { sendTelegramMessage } = await import('../services/telegram.js');
                 const ticketNo = data?.ticket_no || id;
