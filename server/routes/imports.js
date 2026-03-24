@@ -1347,12 +1347,7 @@ router.post('/:id/admin-confirm', async (req, res) => {
             if (productList) confirmMsg += `📦 ${productList}\n`;
             confirmMsg += `👤 XN bởi: ${confirmed_by || 'Admin'}`;
 
-            const proofImages = data.images && Array.isArray(data.images) && data.images.length > 0 ? data.images : [];
-            if (proofImages.length > 0) {
-                await sendTelegramPhotos(proofImages, confirmMsg, 'SALES');
-            } else {
-                await sendTelegramMessage(confirmMsg, 'SALES');
-            }
+            await sendTelegramMessage(confirmMsg, 'SALES');
         } catch (tgErr) {
             console.error('Telegram import confirm error:', tgErr.message);
         }
