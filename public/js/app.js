@@ -8226,7 +8226,7 @@ let completionImages = []; // Store compressed images for completion
 const MAX_COMPLETION_IMAGES = 10;
 
 // Compress image to reduce size
-function compressImage(file, maxWidth = 1200, quality = 0.8) {
+function compressImage(file, maxWidth = 800, quality = 0.5) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = (e) => {
@@ -8276,16 +8276,14 @@ async function handleCompletionImagesSelect(input) {
         alert(`Chỉ có thể thêm ${remaining} ảnh nữa (tối đa ${MAX_COMPLETION_IMAGES} ảnh)`);
     }
 
-    showLoading('Đang xử lý ảnh...');
-
-    for (const file of toProcess) {
-        try {
-            const compressed = await compressImage(file);
-            completionImages.push(compressed);
-        } catch (err) {
-            console.error('Image compression error:', err);
-        }
-    }
+    // Compress all images in parallel for faster processing
+    const results = await Promise.allSettled(
+        toProcess.map(file => compressImage(file))
+    );
+    results.forEach(r => {
+        if (r.status === 'fulfilled') completionImages.push(r.value);
+        else console.error('Image compression error:', r.reason);
+    });
 
     hideLoading();
     renderCompletionImagesPreviews();
@@ -9380,7 +9378,7 @@ async function handleAddProofImages(input, orderId) {
     const images = [];
     for (const file of files.slice(0, 10)) {
         try {
-            const compressed = await compressImage(file, 1200, 0.8);
+            const compressed = await compressImage(file, 800, 0.5);
             images.push(compressed);
         } catch (err) {
             console.error('Image compression error:', err);
@@ -9530,7 +9528,7 @@ async function handleAddImportProofImages(input, importId) {
     const images = [];
     for (const file of files.slice(0, 10)) {
         try {
-            const compressed = await compressImage(file, 1200, 0.8);
+            const compressed = await compressImage(file, 800, 0.5);
             images.push(compressed);
         } catch (err) {
             console.error('Image compression error:', err);
