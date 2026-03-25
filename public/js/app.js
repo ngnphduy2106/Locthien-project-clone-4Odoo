@@ -8496,7 +8496,7 @@ async function showDriverCompletionModal(orderId, assignmentId = null) {
                 code: p.code || p.product_code || '',
                 name: p.name || p.product || p.productName || '-',
                 planQty: productQty,
-                actualQty: productQty, // Default to planned qty
+                actualQty: '', // Empty — driver must fill in
                 unit: p.unit || 'Kg',
                 note: ''
             };
@@ -8824,7 +8824,7 @@ function showImportCompletionModal(importId, assignmentId = null) {
     // Store products in state for submission with actual quantities
     state.completionImportProducts = products.map((p, idx) => ({
         ...p,
-        actualQty: p.qty || p.quantity || 0  // Default actual = planned
+        actualQty: ''  // Empty — driver must fill in
     }));
 
     const productsHtml = products.length > 0
@@ -8842,7 +8842,7 @@ function showImportCompletionModal(importId, assignmentId = null) {
                         <div style="font-size:11px; color:var(--text-muted);">Thực tế</div>
                         <input type="number" id="import-actual-qty-${idx}" class="form-control" 
                             style="padding:6px 8px; font-size:13px;"
-                            value="${p.qty || p.quantity || 0}" 
+                            value="" 
                             onchange="updateImportCompletionQty(${idx}, this.value)">
                     </div>
                     <div>
