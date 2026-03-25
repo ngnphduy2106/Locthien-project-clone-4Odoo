@@ -10087,8 +10087,9 @@ async function loadPendingConfirmOrders() {
                 return `
                 <div style="background:white; border:1px solid #E5E7EB; border-radius:12px; padding:12px 16px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
                     <div style="flex:1; min-width:200px;">
-                        <div style="display:flex; align-items:center; gap:8px;">
+                        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                             <span style="font-weight:600; color:#dc2626; font-size:13px;">#${t.ticket_no || t.id}</span>
+                            ${t.merged_order_no ? `<span style="background:#dcfce7; color:#16a34a; font-size:10px; padding:2px 6px; border-radius:4px; font-weight:600;">🔗Ghép: ${t.merged_order_no}</span>` : ''}
                             <span style="font-size:11px; color:#6B7280;">${t.created_at ? new Date(t.created_at).toLocaleDateString('vi-VN') : ''}</span>
                         </div>
                         <div style="font-size:12px; color:#374151; margin-top:2px;"><b>${t.supplier_name || t.parent_order?.account_name || 'N/A'}</b></div>
