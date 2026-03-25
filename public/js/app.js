@@ -591,7 +591,7 @@ function initDatePickers() {
                 // Convert dd/mm/yyyy to yyyy-mm-dd for filtering
                 if (selectedDates.length > 0) {
                     const d = selectedDates[0];
-                    const isoDate = d.toISOString().split('T')[0];
+                    const isoDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
                     filterByDate(isoDate);
                 }
             }
@@ -1422,7 +1422,7 @@ function renderImportList() {
     }
 
     // Sort imports: pinned → today → future → past, then by created_at DESC
-    const today = new Date().toISOString().split('T')[0];
+    const _n = new Date(); const today = `${_n.getFullYear()}-${String(_n.getMonth() + 1).padStart(2, '0')}-${String(_n.getDate()).padStart(2, '0')}`;
     const getImportDate = (imp) => {
         const dateStr = imp.expected_date || imp.created_at || '';
         const isoMatch = String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})/);
@@ -1659,7 +1659,7 @@ function renderDispatchOrders() {
     }
 
     // Sort orders: pinned → today → future → past, then by created_date DESC
-    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    const _now = new Date(); const today = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`; // YYYY-MM-DD
 
     // Parse order date to YYYY-MM-DD format
     const getOrderDate = (order) => {
@@ -1832,7 +1832,7 @@ async function initCreateOrder() {
     // Set default date
     const dateInput = window.$('#order-date');
     if (dateInput) {
-        dateInput.value = new Date().toISOString().split('T')[0];
+        const _d = new Date(); dateInput.value = `${_d.getFullYear()}-${String(_d.getMonth() + 1).padStart(2, '0')}-${String(_d.getDate()).padStart(2, '0')}`;
     }
 
     // Load suggestions
@@ -2191,7 +2191,7 @@ function initCreateExport() {
     state.exportMaterials = state.exportMaterials || [];  // Store MISA materials for export
     state.exportCustomers = state.exportCustomers || [];  // Store customers for export
     const dateEl = window.$('#export-date');
-    if (dateEl) dateEl.value = new Date().toISOString().split('T')[0];
+    if (dateEl) { const _d = new Date(); dateEl.value = `${_d.getFullYear()}-${String(_d.getMonth() + 1).padStart(2, '0')}-${String(_d.getDate()).padStart(2, '0')}`; }
     window.$('#export-customer') && (window.$('#export-customer').value = '');
     window.$('#export-address') && (window.$('#export-address').value = '');
     window.$('#export-description') && (window.$('#export-description').value = '');
