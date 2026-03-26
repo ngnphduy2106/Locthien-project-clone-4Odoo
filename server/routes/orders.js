@@ -975,50 +975,42 @@ router.put('/:id/assign', async (req, res) => {
 
         // Send Telegram notification to DRIVER group (async, don't block response)
         try {
-            console.log(`📨 [TELEGRAM DEBUG] Starting Telegram notification for order ${id}, driver: ${driverName}`);
-            const { sendTelegramMessage } = await import('../services/telegram.js');
+            // === COMPACT FORMAT: PO giao [products] [customer]. [driver] + [assistant] ===
             const orderInfo = await db.getOrder(id);
-            console.log(`📨 [TELEGRAM DEBUG] Order info retrieved:`, { soDon: orderInfo?.soDon, khach: orderInfo?.khach });
+            const poNo = orderInfo?.soDon || orderInfo?.sale_order_no || id;
 
-            let msg = `🚛 <b>PHÂN CÔNG TÀI XẾ</b>\n`;
-            msg += `#${orderInfo?.soDon || orderInfo?.sale_order_no || id}\n`;
-            msg += `👤 KH: <b>${orderInfo?.khach || orderInfo?.account_name || ''}</b>\n`;
-            if (orderInfo?.sale_order_date) {
-                const fmtDate = new Date(orderInfo.sale_order_date).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
-                msg += `📅 Ngày: ${fmtDate}\n`;
-            }
-            msg += `📍 ${orderInfo?.diaChi || orderInfo?.shipping_address || ''}\n`;
+            // Parse products — short names only
+            let prods = orderInfo?.products || orderInfo?.sale_order_product_mappings || [];
+            if (typeof prods === 'string') { try { prods = JSON.parse(prods); } catch (e) { prods = []; } }
+            const prodNames = (Array.isArray(prods) ? prods : []).map(p =>
+                (p.name || p.code || '').replace(/^(Hóa chất |HC |Hoá chất )/i, '').split(' ')[0]
+            ).filter(Boolean).join('+') || '';
 
-            // Merged order info
-            if (orderInfo?.merged_order_no) {
-                msg += `🔗 Ghép chuyến: ${orderInfo.merged_order_no}\n`;
-            }
+            const customer = (orderInfo?.khach || orderInfo?.account_name || '').replace(/^(Công ty|CTY|TNHH|CP)\s*/i, '').trim();
+            const drvShort = driverName || '';
+            const asstShort = assistantName || '';
+            const fmtDate = orderInfo?.sale_order_date ? new Date(orderInfo.sale_order_date).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit', month: '2-digit' }) : '';
 
-            msg += `──────────────\n`;
+            // Build compact message with basic icons
+            let msg = `🚛 <b>${poNo}</b> | 📅 ${fmtDate} | 📦 ${prodNames}\n→ ${customer}. ${drvShort}${asstShort ? ' + ' + asstShort : ''}${plate ? ' 🚗' + plate : ''}`;
 
-            // Lookup telegram user IDs for bottom mentions
+            // Merged order info (appended if present)
+            if (orderInfo?.merged_order_no) msg += ` 🔗${orderInfo.merged_order_no}`;
+            if (deliveryTime) msg += ` ⏰${deliveryTime}`;
+            if (note) msg += `\n📝 ${note}`;
+
+            // Mention tags at the bottom
             const users = await db.getUsers();
-            const driverObj = users.find(u => u.fullName === driverName || u.username === driverName);
-
             const mentionTags = [];
+            const driverObj = users.find(u => u.fullName === driverName || u.username === driverName);
             const driverMention = getTelegramTag(driverObj?.telegramUsername, driverObj?.telegramUserId, driverName);
             if (driverMention) mentionTags.push(driverMention.trim());
-
-            msg += `🚗 Tài xế: <b>${driverName}</b>\n`;
             if (assistantName) {
                 const assistantObj = users.find(u => u.fullName === assistantName || u.username === assistantName);
                 const assistantMention = getTelegramTag(assistantObj?.telegramUsername, assistantObj?.telegramUserId, assistantName);
                 if (assistantMention) mentionTags.push(assistantMention.trim());
-                msg += `🧑‍🔧 Phụ xe: ${assistantName}\n`;
             }
-            msg += `🔢 Biển số: ${plate || 'Chưa có'}\n`;
-            if (deliveryTime) msg += `⏰ Tgian giao: ${deliveryTime}\n`;
-            if (note) msg += `📝 Ghi chú: ${note}\n`;
-
-            // Add mention tags at the bottom
-            if (mentionTags.length > 0) {
-                msg += `\n${mentionTags.join(' ')}`;
-            }
+            if (mentionTags.length > 0) msg += `\n${mentionTags.join(' ')}`;
 
             console.log(`📨 [TELEGRAM DEBUG] Calling sendTelegramMessage to DRIVER group...`);
             await sendTelegramMessage(msg, 'DRIVER');
@@ -2201,72 +2193,52 @@ router.post('/:id/assign-multi', async (req, res) => {
             console.log(`📨 Sending Telegram for ${assignments.length} driver assignment on order ${id}...`);
             const { sendTelegramMessage } = await import('../services/telegram.js');
             const orderInfo = await db.getOrder(id);
+            const poNo = orderInfo?.soDon || id;
 
-            // Determine notification type based on:
-            // 1. Number of drivers (1 vs multi)
-            // 2. Whether this is a new assignment or change
-            let notificationType;
-            if (hadPreviousAssignments) {
-                notificationType = 'THAY ĐỔI TÀI XẾ';
-            } else {
-                notificationType = assignments.length > 1 ? 'PHÂN CÔNG NHIỀU TÀI XẾ' : 'PHÂN CÔNG TÀI XẾ';
-            }
+            // Parse products  — short names only
+            let prods = orderInfo?.products || orderInfo?.sale_order_product_mappings || [];
+            if (typeof prods === 'string') { try { prods = JSON.parse(prods); } catch (e) { prods = []; } }
+            const prodNames = (Array.isArray(prods) ? prods : []).map(p =>
+                (p.name || p.code || '').replace(/^(Hóa chất |HC |Hoá chất )/i, '').split(' ')[0]
+            ).filter(Boolean).join('+') || '';
 
-            let msg = `🚛 <b>${notificationType}</b>\n`;
-            msg += `#${orderInfo?.soDon || id}\n`;
-            msg += `👤 KH: <b>${orderInfo?.khach || ''}</b>\n`;
-            if (orderInfo?.sale_order_date) {
-                const fmtDate = new Date(orderInfo.sale_order_date).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
-                msg += `📅 Ngày: ${fmtDate}\n`;
-            }
+            const customer = (orderInfo?.khach || orderInfo?.account_name || '').replace(/^(Công ty|CTY|TNHH|CP)\s*/i, '').trim();
 
-            // Merged order info
-            if (orderInfo?.merged_order_no) {
-                msg += `🔗 Ghép chuyến: ${orderInfo.merged_order_no}\n`;
-            }
-            // Split driver info
-            if (assignments.length > 1) {
-                msg += `✂️ Chia ${assignments.length} tài xế\n`;
-            }
-
-            // Show previous drivers if this is a change
-            if (hadPreviousAssignments && previousDrivers.length > 0) {
-                msg += `\n<b>Tài xế cũ:</b> ${previousDrivers.join(', ')}\n`;
-            }
-
-            msg += `\n<b>Danh sách tài xế${hadPreviousAssignments ? ' mới' : ''}:</b>\n`;
-
+            // Build compact single-line per driver
             const users = await db.getUsers();
             const mentionTags = [];
 
-            assignments.forEach((a, i) => {
-                const typeLabel = a.type === 'external' ? '(Ngoài)' : '(NB)';
+            // Header with icons
+            const fmtDate = orderInfo?.sale_order_date ? new Date(orderInfo.sale_order_date).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit', month: '2-digit' }) : '';
+            let msg = `🚛 <b>${poNo}</b> | 📅 ${fmtDate} | 📦 ${prodNames}`;
+            if (orderInfo?.merged_order_no) msg += ` 🔗${orderInfo.merged_order_no}`;
 
-                // Collect tags for bottom mention
+            // Driver list
+            const driverParts = assignments.map((a, i) => {
                 const driverObj = users.find(u => u.fullName === a.driver_name || u.username === a.driver_name);
                 const driverMention = getTelegramTag(driverObj?.telegramUsername, driverObj?.telegramUserId, a.driver_name);
                 if (driverMention) mentionTags.push(driverMention.trim());
-
-                let assistantLine = '';
                 if (a.assistant_name) {
                     const assistantObj = users.find(u => u.fullName === a.assistant_name || u.username === a.assistant_name);
                     const assistantMention = getTelegramTag(assistantObj?.telegramUsername, assistantObj?.telegramUserId, a.assistant_name);
                     if (assistantMention) mentionTags.push(assistantMention.trim());
-                    assistantLine = `\n    🧑‍🔧 PX: ${a.assistant_name}`;
                 }
-
-                msg += `${i + 1}. <b>${a.driver_name}</b> ${typeLabel} - ${Number(a.qty).toLocaleString('vi-VN')}kg${assistantLine}\n`;
-                if (a.plate) msg += `    🔢 Xe: ${a.plate}\n`;
-                if (a.delivery_time) msg += `    ⏰ Giao: ${a.delivery_time}\n`;
-                if (a.note) msg += `    📝 Ghi chú: ${a.note}\n`;
+                const qtyStr = assignments.length > 1 ? ` ${Number(a.qty).toLocaleString('vi-VN')}kg` : '';
+                const asstStr = a.assistant_name ? ` + ${a.assistant_name}` : '';
+                const plateStr = a.plate ? ` 🚗${a.plate}` : '';
+                return `${a.driver_name}${qtyStr}${asstStr}${plateStr}`;
             });
 
-            // Add mention tags at the bottom instead of @sales
-            if (mentionTags.length > 0) {
-                msg += `\n${mentionTags.join(' ')}`;
+            msg += `\n→ ${customer}. ${driverParts.join(', ')}`;
+
+            // Show old drivers if this is a change
+            if (hadPreviousAssignments && previousDrivers.length > 0) {
+                msg += ` (cũ: ${previousDrivers.join(', ')})`;
             }
 
-            console.log(`📤 Telegram message to DRIVER group:\n${msg}`);
+            if (mentionTags.length > 0) msg += `\n${mentionTags.join(' ')}`;
+
+            console.log(`📤 Telegram compact msg: ${msg}`);
             await sendTelegramMessage(msg, 'DRIVER');
             console.log(`✅ Telegram DRIVER notification sent for order ${id}`);
         } catch (tgErr) {
