@@ -832,193 +832,173 @@ router.put('/:id/complete', async (req, res) => {
             return res.json(createResponse(true, 'Lỗi hoàn thành: ' + error.message));
         }
 
-        // Send Telegram notification with proof images
-        try {
-            const { sendTelegramMessage, sendTelegramPhotos } = await import('../services/telegram.js');
-            let msg = `✅ <b>PHIẾU NHẬP ĐÃ HOÀN THÀNH</b>\n`;
-            msg += `📦 <b>#${data.ticket_no}</b>\n`;
-            msg += `🏭 ${data.supplier_name}\n`;
-            if (data.assigned_driver) msg += `🚗 TX: <b>${data.assigned_driver}</b>${data.assigned_plate ? ` (${data.assigned_plate})` : ''}\n`;
-            if (data.assistant_name) msg += `🧑‍🔧 PX: ${data.assistant_name}\n`;
-            msg += `📦 ${mergedProducts.map(p => `${p.name} — ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'Kg'}`).join(', ')}\n`;
-            if (note) msg += `📝 ${note}\n`;
-
-            // Send with images if available — re-fetch ticket to get latest images
-            // (proof-images are uploaded separately BEFORE this endpoint is called)
-            let proofImages = [];
-
-            // 1. Check data.images from the update result (Supabase returns all columns)
-            if (data.images && Array.isArray(data.images) && data.images.length > 0) {
-                proofImages = data.images;
-                console.log(`📸 Found ${proofImages.length} images from update result`);
-            }
-
-            // 2. Fallback: re-fetch the ticket in case images were saved separately
-            if (proofImages.length === 0) {
-                try {
-                    const { data: freshTicket } = await getSupabase()
-                        .from('import_tickets')
-                        .select('images')
-                        .eq('id', original.id)
-                        .single();
-                    if (freshTicket?.images && Array.isArray(freshTicket.images) && freshTicket.images.length > 0) {
-                        proofImages = freshTicket.images;
-                        console.log(`📸 Re-fetched ${proofImages.length} images from ticket ${original.id}`);
-                    }
-                } catch (e) { /* ignore */ }
-            }
-
-            // 3. Fallback: check import_driver_assignments for images
-            if (proofImages.length === 0) {
-                try {
-                    const { data: assigns } = await supabase
-                        .from('import_driver_assignments')
-                        .select('proof_images')
-                        .eq('import_id', original.id);
-                    if (assigns) {
-                        for (const a of assigns) {
-                            if (a.proof_images && Array.isArray(a.proof_images) && a.proof_images.length > 0) {
-                                proofImages = [...proofImages, ...a.proof_images];
-                            }
-                        }
-                        if (proofImages.length > 0) {
-                            console.log(`📸 Found ${proofImages.length} images from import assignments`);
-                        }
-                    }
-                } catch (e) { /* ignore */ }
-            }
-
-            if (proofImages.length > 0) {
-                await sendTelegramPhotos(proofImages, msg, 'NHAP');
-                console.log(`📸 Sent ${proofImages.length} proof images for import ${data.ticket_no}`);
-            } else {
-                console.log(`⚠️ No proof images found for import ${data.ticket_no} — sending text only`);
-                await sendTelegramMessage(msg, 'NHAP');
-            }
-        } catch (tgErr) {
-            console.error('Telegram Error:', tgErr.message);
-        }
-
-        // ============================================================
-        // AUTO-COMPLETE SISTER ORDERS IN MERGED TRIP
-        // ============================================================
-        let mergeMsg = '';
-        if (data.merged_order_no && !req.body.prevent_loop) {
-            console.log(`🔗 [Import Complete] Auto-completing sisters for merged trip: ${data.merged_order_no}`);
-            try {
-                const { data: mergedLog } = await supabase
-                    .from('merged_orders')
-                    .select('source_order_nos')
-                    .eq('merged_no', data.merged_order_no)
-                    .single();
-
-                if (mergedLog && mergedLog.source_order_nos) {
-                    const currentNo = data.ticket_no;
-                    const sisters = mergedLog.source_order_nos.filter(no => no !== currentNo);
-
-                    // Get images from the completing order to share with sisters
-                    const currentImages = data.images && Array.isArray(data.images) && data.images.length > 0
-                        ? data.images : [];
-
-                    for (const sister of sisters) {
-                        console.log(`🤖 Triggering auto-completion for sister: ${sister}`);
-                        try {
-                            if (sister.startsWith('N')) {
-                                // Sister is another import — copy images from completing order
-                                const updatePayload = {
-                                    status: 'completed',
-                                    completed_at: new Date().toISOString()
-                                };
-                                // Copy images from the completing order if sister has no images
-                                if (currentImages.length > 0) {
-                                    const { data: sisterTicket } = await supabase
-                                        .from('import_tickets')
-                                        .select('images')
-                                        .eq('ticket_no', sister)
-                                        .single();
-                                    const sisterImgs = sisterTicket?.images;
-                                    if (!sisterImgs || !Array.isArray(sisterImgs) || sisterImgs.length === 0) {
-                                        updatePayload.images = currentImages;
-                                        console.log(`📸 Copying ${currentImages.length} images to sister ${sister}`);
-                                    }
-                                }
-                                await supabase.from('import_tickets').update(updatePayload).eq('ticket_no', sister);
-                                mergeMsg += ` (Đã hoàn thành kèm phiếu nhập ${sister})`;
-                                console.log(`✅ Auto-completed import sister: ${sister}`);
-
-                                // Send Telegram notification for auto-completed sister
-                                try {
-                                    const { data: sisterData } = await supabase
-                                        .from('import_tickets')
-                                        .select('*')
-                                        .eq('ticket_no', sister)
-                                        .single();
-                                    if (sisterData) {
-                                        const sisterProducts = (sisterData.products || [])
-                                            .map(p => `${p.name} — ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'Kg'}`)
-                                            .join(', ');
-                                        let sisterMsg = `✅ <b>PHIẾU NHẬP ĐÃ HOÀN THÀNH</b> (tự động)\n`;
-                                        sisterMsg += `📦 <b>#${sister}</b>\n`;
-                                        sisterMsg += `🏭 ${sisterData.supplier_name || 'N/A'}\n`;
-                                        if (sisterData.assigned_driver) sisterMsg += `🚗 TX: <b>${sisterData.assigned_driver}</b>${sisterData.assigned_plate ? ` (${sisterData.assigned_plate})` : ''}\n`;
-                                        sisterMsg += `📦 ${sisterProducts || 'Không có SP'}\n`;
-                                        sisterMsg += `🔗 Hoàn thành theo phiếu ghép ${data.ticket_no}\n`;
-
-                                        const sisterImgs = sisterData.images && Array.isArray(sisterData.images) ? sisterData.images : [];
-                                        if (sisterImgs.length > 0) {
-                                            await sendTelegramPhotos(sisterImgs, sisterMsg, 'NHAP');
-                                        } else {
-                                            await sendTelegramMessage(sisterMsg, 'NHAP');
-                                        }
-                                        console.log(`📨 Telegram sent for auto-completed sister: ${sister}`);
-                                    }
-                                } catch (tgSisterErr) {
-                                    console.error(`⚠️ Telegram error for sister ${sister}:`, tgSisterErr.message);
-                                }
-                            } else {
-                                // Sister is an export order - call internal API
-                                const fetch = (await import('node-fetch')).default;
-                                const protocol = req.protocol || 'http';
-                                const host = req.get('host') || 'localhost:3000';
-                                const resFetch = await fetch(`${protocol}://${host}/api/orders/${sister}/complete`, {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({
-                                        prevent_loop: true,
-                                        delivery_note: `Tự động hoàn thành theo phiếu nhập ghép ${currentNo}`,
-                                        admin_completed: true,
-                                        images: currentImages  // Pass images to export completion
-                                    })
-                                });
-                                const resData = await resFetch.json();
-                                if (!resData.error) {
-                                    mergeMsg += ` (Đã hoàn thành kèm đơn xuất ${sister})`;
-                                    console.log(`✅ Auto-completed export sister: ${sister}`);
-                                } else {
-                                    console.error(`❌ Auto-complete failed for ${sister}:`, resData.message);
-                                }
-                            }
-                        } catch (loopErr) {
-                            console.error(`❌ Auto-complete error for ${sister}:`, loopErr.message);
-                        }
-                    }
-
-                    // Mark merged order as completed
-                    await supabase.from('merged_orders').update({
-                        status: 'completed',
-                        completed_at: new Date().toISOString()
-                    }).eq('merged_no', data.merged_order_no);
-                }
-            } catch (err) {
-                console.error('Auto-complete merged orders error:', err.message);
-            }
-        }
-
+        // PERF: Send response to driver IMMEDIATELY — don't wait for Telegram/auto-complete
         res.json({
             error: false,
-            msg: 'Hoàn thành phiếu nhập!' + mergeMsg,
+            msg: 'Hoàn thành phiếu nhập!',
             data
         });
+
+        // BACKGROUND: Telegram notifications + auto-complete (fire-and-forget)
+        setImmediate(async () => {
+            try {
+                // Send Telegram notification with proof images
+                try {
+                    const { sendTelegramMessage, sendTelegramPhotos } = await import('../services/telegram.js');
+                    let msg = `✅ <b>PHIẾU NHẬP ĐÃ HOÀN THÀNH</b>\n`;
+                    msg += `📦 <b>#${data.ticket_no}</b>\n`;
+                    msg += `🏭 ${data.supplier_name}\n`;
+                    if (data.assigned_driver) msg += `🚗 TX: <b>${data.assigned_driver}</b>${data.assigned_plate ? ` (${data.assigned_plate})` : ''}\n`;
+                    if (data.assistant_name) msg += `🧑‍🔧 PX: ${data.assistant_name}\n`;
+                    msg += `📦 ${mergedProducts.map(p => `${p.name} — ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'Kg'}`).join(', ')}\n`;
+                    if (note) msg += `📝 ${note}\n`;
+
+                    // Find proof images from multiple sources
+                    let proofImages = [];
+
+                    // 1. Check data.images from the update result
+                    if (data.images && Array.isArray(data.images) && data.images.length > 0) {
+                        proofImages = data.images;
+                    }
+
+                    // 2. Fallback: re-fetch ticket
+                    if (proofImages.length === 0) {
+                        try {
+                            const { data: freshTicket } = await getSupabase()
+                                .from('import_tickets')
+                                .select('images')
+                                .eq('id', original.id)
+                                .single();
+                            if (freshTicket?.images?.length > 0) proofImages = freshTicket.images;
+                        } catch (e) { /* ignore */ }
+                    }
+
+                    // 3. Fallback: check import_driver_assignments
+                    if (proofImages.length === 0) {
+                        try {
+                            const { data: assigns } = await supabase
+                                .from('import_driver_assignments')
+                                .select('proof_images')
+                                .eq('import_id', original.id);
+                            if (assigns) {
+                                for (const a of assigns) {
+                                    if (a.proof_images?.length > 0) proofImages = [...proofImages, ...a.proof_images];
+                                }
+                            }
+                        } catch (e) { /* ignore */ }
+                    }
+
+                    if (proofImages.length > 0) {
+                        await sendTelegramPhotos(proofImages, msg, 'NHAP');
+                    } else {
+                        await sendTelegramMessage(msg, 'NHAP');
+                    }
+                    console.log(`📨 Telegram sent for import ${data.ticket_no}`);
+                } catch (tgErr) {
+                    console.error('Telegram Error:', tgErr.message);
+                }
+
+                // AUTO-COMPLETE SISTER ORDERS IN MERGED TRIP
+                if (data.merged_order_no && !req.body.prevent_loop) {
+                    console.log(`🔗 [Import Complete] Auto-completing sisters for merged trip: ${data.merged_order_no}`);
+                    try {
+                        const { data: mergedLog } = await supabase
+                            .from('merged_orders')
+                            .select('source_order_nos')
+                            .eq('merged_no', data.merged_order_no)
+                            .single();
+
+                        if (mergedLog && mergedLog.source_order_nos) {
+                            const currentNo = data.ticket_no;
+                            const sisters = mergedLog.source_order_nos.filter(no => no !== currentNo);
+
+                            const currentImages = data.images && Array.isArray(data.images) && data.images.length > 0
+                                ? data.images : [];
+
+                            for (const sister of sisters) {
+                                console.log(`🤖 Triggering auto-completion for sister: ${sister}`);
+                                try {
+                                    if (sister.startsWith('N')) {
+                                        const updatePayload = {
+                                            status: 'completed',
+                                            completed_at: new Date().toISOString()
+                                        };
+                                        if (currentImages.length > 0) {
+                                            const { data: sisterTicket } = await supabase
+                                                .from('import_tickets')
+                                                .select('images')
+                                                .eq('ticket_no', sister)
+                                                .single();
+                                            const sisterImgs = sisterTicket?.images;
+                                            if (!sisterImgs || !Array.isArray(sisterImgs) || sisterImgs.length === 0) {
+                                                updatePayload.images = currentImages;
+                                            }
+                                        }
+                                        await supabase.from('import_tickets').update(updatePayload).eq('ticket_no', sister);
+                                        console.log(`✅ Auto-completed import sister: ${sister}`);
+
+                                        // Send Telegram for sister
+                                        try {
+                                            const { sendTelegramMessage, sendTelegramPhotos } = await import('../services/telegram.js');
+                                            const { data: sisterData } = await supabase
+                                                .from('import_tickets').select('*').eq('ticket_no', sister).single();
+                                            if (sisterData) {
+                                                const sisterProducts = (sisterData.products || [])
+                                                    .map(p => `${p.name} — ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'Kg'}`)
+                                                    .join(', ');
+                                                let sisterMsg = `✅ <b>PHIẾU NHẬP ĐÃ HOÀN THÀNH</b> (tự động)\n`;
+                                                sisterMsg += `📦 <b>#${sister}</b>\n`;
+                                                sisterMsg += `🏭 ${sisterData.supplier_name || 'N/A'}\n`;
+                                                if (sisterData.assigned_driver) sisterMsg += `🚗 TX: <b>${sisterData.assigned_driver}</b>${sisterData.assigned_plate ? ` (${sisterData.assigned_plate})` : ''}\n`;
+                                                sisterMsg += `📦 ${sisterProducts || 'Không có SP'}\n`;
+                                                sisterMsg += `🔗 Hoàn thành theo phiếu ghép ${data.ticket_no}\n`;
+                                                const imgs = sisterData.images && Array.isArray(sisterData.images) ? sisterData.images : [];
+                                                if (imgs.length > 0) await sendTelegramPhotos(imgs, sisterMsg, 'NHAP');
+                                                else await sendTelegramMessage(sisterMsg, 'NHAP');
+                                            }
+                                        } catch (tgSisterErr) {
+                                            console.error(`⚠️ Telegram error for sister ${sister}:`, tgSisterErr.message);
+                                        }
+                                    } else {
+                                        // Sister is an export order
+                                        const fetch = (await import('node-fetch')).default;
+                                        const protocol = req.protocol || 'http';
+                                        const host = req.get('host') || 'localhost:3000';
+                                        const resFetch = await fetch(`${protocol}://${host}/api/orders/${sister}/complete`, {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({
+                                                prevent_loop: true,
+                                                delivery_note: `Tự động hoàn thành theo phiếu nhập ghép ${currentNo}`,
+                                                admin_completed: true,
+                                                images: currentImages
+                                            })
+                                        });
+                                        const resData = await resFetch.json();
+                                        if (!resData.error) console.log(`✅ Auto-completed export sister: ${sister}`);
+                                        else console.error(`❌ Auto-complete failed for ${sister}:`, resData.message);
+                                    }
+                                } catch (loopErr) {
+                                    console.error(`❌ Auto-complete error for ${sister}:`, loopErr.message);
+                                }
+                            }
+
+                            // Mark merged order as completed
+                            await supabase.from('merged_orders').update({
+                                status: 'completed',
+                                completed_at: new Date().toISOString()
+                            }).eq('merged_no', data.merged_order_no);
+                        }
+                    } catch (err) {
+                        console.error('Auto-complete merged orders error:', err.message);
+                    }
+                }
+            } catch (bgErr) {
+                console.error('Background task error:', bgErr.message);
+            }
+        }); // end setImmediate
+
+        return; // Response already sent
 
     } catch (e) {
         res.json(createResponse(true, e.message));
