@@ -22,6 +22,7 @@ export const sendTelegramMessage = async (text, type = 'NOTIFY', replyToMessageI
 
     // Select chat ID based on type
     let chatId = process.env.TELEGRAM_CHAT_NOTIFY;
+    if (type === 'NOTIFY_NHAP') chatId = process.env.TELEGRAM_CHAT_NOTIFY_NHAP;
     if (type === 'NHAP') chatId = process.env.TELEGRAM_CHAT_NHAP;
     if (type === 'XUAT') chatId = process.env.TELEGRAM_CHAT_XUAT;
     if (type === 'DRIVER') chatId = process.env.TELEGRAM_CHAT_DRIVER;
@@ -78,6 +79,7 @@ export const sendTelegramPhotos = async (photoUrls, caption = '', type = 'XUAT',
     const token = process.env.TELEGRAM_TOKEN;
 
     let chatId = process.env.TELEGRAM_CHAT_NOTIFY;
+    if (type === 'NOTIFY_NHAP') chatId = process.env.TELEGRAM_CHAT_NOTIFY_NHAP;
     if (type === 'NHAP') chatId = process.env.TELEGRAM_CHAT_NHAP;
     if (type === 'XUAT') chatId = process.env.TELEGRAM_CHAT_XUAT;
     if (type === 'DRIVER') chatId = process.env.TELEGRAM_CHAT_DRIVER;

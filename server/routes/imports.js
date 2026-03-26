@@ -151,7 +151,7 @@ router.post('/', async (req, res) => {
             if (supplier_address) msg += `📍 ${supplier_address}\n`;
             if (description || note) msg += `📝 ${description || note}\n`;
 
-            await sendTelegramMessage(msg, 'NOTIFY');
+            await sendTelegramMessage(msg, 'NOTIFY_NHAP');
         } catch (tgErr) {
             console.error('Telegram Error:', tgErr.message);
         }
@@ -221,7 +221,7 @@ router.put('/:id', async (req, res) => {
 
                 if (note) msg += `\n📝 Ghi chú: ${note}`;
 
-                await sendTelegramMessage(msg, 'NOTIFY');
+                await sendTelegramMessage(msg, 'NOTIFY_NHAP');
             } catch (tgErr) {
                 console.error('Telegram Import Edit Notification Error:', tgErr.message);
             }
@@ -848,7 +848,10 @@ router.put('/:id/complete', async (req, res) => {
                     let msg = `✅ <b>PHIẾU NHẬP ĐÃ HOÀN THÀNH</b>\n`;
                     msg += `📦 <b>#${data.ticket_no}</b>\n`;
                     msg += `🏭 ${data.supplier_name}\n`;
-                    if (data.assigned_driver) msg += `🚗 TX: <b>${data.assigned_driver}</b>${data.assigned_plate ? ` (${data.assigned_plate})` : ''}\n`;
+                    if (data.assigned_driver) {
+                        const isDriverReporter = !req.body.admin_completed;
+                        msg += `🚗 TX: ${isDriverReporter ? '<b>' + data.assigned_driver + '</b>' : data.assigned_driver}${data.assigned_plate ? ` (${data.assigned_plate})` : ''}\n`;
+                    }
                     if (data.assistant_name) msg += `🧑‍🔧 PX: ${data.assistant_name}\n`;
                     msg += `📦 ${mergedProducts.map(p => `${p.name} — ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'Kg'}`).join(', ')}\n`;
                     if (note) msg += `📝 ${note}\n`;
@@ -1039,7 +1042,7 @@ router.delete('/:id', async (req, res) => {
             let msg = `❌ <b>ĐƠN NHẬP ĐÃ HỦY</b>\n`;
             msg += `📦 <b>#${ticket?.ticket_no || id}</b>\n`;
             msg += `🏭 ${ticket?.supplier_name || 'N/A'}`;
-            await sendTelegramMessage(msg, 'SALES');
+            await sendTelegramMessage(msg, 'NOTIFY_NHAP');
         } catch (tgErr) {
             console.error('Telegram cancel import error:', tgErr.message);
         }

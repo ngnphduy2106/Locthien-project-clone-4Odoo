@@ -1634,8 +1634,14 @@ router.post('/:id/complete', async (req, res) => {
                             const orderDriver = orderInfo?.taiXe || orderInfo?.custom_field13 || '';
                             const drvName = isMultiDriverOrder ? firstDriverName : (orderDriver || resolvedDriverName || driver_name || '');
                             const drvPlate = isMultiDriverOrder && firstDriverPlate ? firstDriverPlate : (orderInfo?.bienSo || orderInfo?.custom_field14 || resolvedPlate || plate || '');
-                            if (drvName) msg += `🚛 TX: <b>${drvName}</b>${drvPlate ? ` (${drvPlate})` : ''}\n`;
-                            if (orderInfo?.assistant_name) msg += `👷 PX: ${orderInfo.assistant_name}\n`;
+                            if (drvName) {
+                                const isSenderDriver = !admin_completed && (!sender || sender === drvName);
+                                msg += `🚛 TX: ${isSenderDriver ? '<b>' + drvName + '</b>' : drvName}${drvPlate ? ` (${drvPlate})` : ''}\n`;
+                            }
+                            if (orderInfo?.assistant_name) {
+                                const isSenderPX = !admin_completed && sender === orderInfo.assistant_name;
+                                msg += `👷 PX: ${isSenderPX ? '<b>' + orderInfo.assistant_name + '</b>' : orderInfo.assistant_name}\n`;
+                            }
                             (updatedProducts || orderInfo?.cart || orderInfo?.products || cart || []).forEach(p => {
                                 const pName = p.product?.name || p.name || p.product || p.code || '';
                                 const pQty = Number(p.weight_kg || p.qty || p.quantity || 0);
@@ -1830,7 +1836,7 @@ router.post('/:id/complete', async (req, res) => {
 
             // Driver with plate in parentheses
             const drvPlate = adminResolvedPlate || fullOrder?.bienSo || fullOrder?.custom_field14 || '';
-            if (driverDisplay) msg += `🚛 TX: <b>${driverDisplay}</b>${drvPlate ? ` (${drvPlate})` : ''}\n`;
+            if (driverDisplay) msg += `🚛 TX: ${driverDisplay}${drvPlate ? ` (${drvPlate})` : ''}\n`;
 
             // Assistant driver
             const adminAssistant = fullOrder?.assistant_name || '';
