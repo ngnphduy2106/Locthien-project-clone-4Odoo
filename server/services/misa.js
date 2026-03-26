@@ -982,8 +982,13 @@ const DEFAULT_STOCK = "HH";
 
 const UNIT_MAPPING = {
     "kg": "kg", "Kg": "kg", "KG": "kg",
-    "cái": "cái", "Cái": "cái",
-    "lit": "lít", "lít": "lít"
+    "Cái": "Cái", "cái": "Cái", "cai": "Cái",
+    "lit": "Lít", "lít": "Lít", "Lít": "Lít",
+    "Can": "Can", "can": "Can",
+    "Phuy": "Phuy", "phuy": "Phuy",
+    "Tank": "Tank", "tank": "Tank",
+    "Tấn": "Tấn", "tấn": "Tấn", "tan": "Tấn",
+    "Bộ": "Bộ", "bộ": "Bộ"
 };
 
 export const updateMisaOrder = async (orderId, updateData) => {
