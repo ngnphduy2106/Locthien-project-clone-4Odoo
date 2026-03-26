@@ -1630,9 +1630,20 @@ function renderDispatchOrders() {
     // Apply date filter if set
     if (currentDateFilter) {
         orders = orders.filter(order => {
-            const orderDate = order.ngay || order.sale_order_date || '';
-            // Compare date strings (YYYY-MM-DD format)
-            return orderDate.startsWith(currentDateFilter);
+            // Check all possible date fields
+            const candidates = [
+                order.ngay, order.sale_order_date,
+                order.expected_date, order.assigned_at, order.created_at
+            ].filter(Boolean);
+            return candidates.some(d => {
+                // Parse to YYYY-MM-DD for consistent comparison
+                const s = String(d);
+                const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+                if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}` === currentDateFilter;
+                const dmy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+                if (dmy) return `${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}` === currentDateFilter;
+                return false;
+            });
         });
     }
 
@@ -4798,23 +4809,6 @@ async function submitDelivery() {
                 return;
             }
         } else {
-            // PERF: Upload images FIRST via lightweight endpoint, then complete without images
-            if (validImages.length > 0) {
-                try {
-                    showLoading(`Đang tải ${validImages.length} ảnh...`);
-                    const imageRes = await fetch(`/api/orders/${order.id}/add-proof-images`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ images: validImages })
-                    });
-                    const imageData = await imageRes.json();
-                    if (imageData.error) console.warn('⚠️ Image save warning:', imageData.msg);
-                    else console.log('✅ Proof images uploaded separately');
-                } catch (imgErr) {
-                    console.error('Image upload error:', imgErr.message);
-                }
-            }
-
             showLoading('Đang hoàn thành đơn...');
 
             const completePayload = {
@@ -4827,13 +4821,11 @@ async function submitDelivery() {
                 local_items: localItems,
                 delivery_note: note || `Hoàn thành bởi ${driverName}`,
                 sender: driverName
-                // NOTE: images NOT sent here — already uploaded above
+                // NOTE: images uploaded AFTER completion (export ticket must exist first)
             };
 
-            console.log('📤 Step 1: Complete order:', {
-                orderId: order.id,
-                cartItems: cart.length,
-                localItems: localItems.length
+            console.log('📤 Step 1: Complete order (no images in body):', {
+                orderId: order.id, cartItems: cart.length
             });
 
             completeRes = await api.completeOrder(order.id, completePayload);
@@ -4842,6 +4834,23 @@ async function submitDelivery() {
                 hideLoading();
                 alert('Lỗi hoàn thành đơn: ' + (completeRes.msg || completeRes.message));
                 return;
+            }
+
+            // Step 2: Upload images AFTER completion — export ticket now exists
+            if (validImages.length > 0) {
+                try {
+                    showLoading(`Đang tải ${validImages.length} ảnh...`);
+                    const imageRes = await fetch(`/api/orders/${order.id}/add-proof-images`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ images: validImages })
+                    });
+                    const imageData = await imageRes.json();
+                    if (imageData.error) console.warn('⚠️ Image save warning:', imageData.msg);
+                    else console.log('✅ Proof images saved to export ticket');
+                } catch (imgErr) {
+                    console.error('Image upload error (non-critical):', imgErr.message);
+                }
             }
         }
 
@@ -8717,25 +8726,6 @@ async function submitDriverCompletion() {
     showLoading('Đang xử lý hoàn thành đơn...');
 
     try {
-        // PERF: Upload images FIRST via lightweight endpoint, then complete without images
-        if (completionImages.length > 0) {
-            showLoading(`Đang tải ${completionImages.length} ảnh...`);
-            try {
-                const imgRes = await fetch(`/api/orders/${order.id}/add-proof-images`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ images: completionImages })
-                });
-                const imgData = await imgRes.json();
-                if (imgData.error) console.warn('⚠️ Image upload warning:', imgData.msg);
-                else console.log(`✅ ${completionImages.length} images uploaded separately`);
-            } catch (imgErr) {
-                console.error('Image pre-upload error:', imgErr.message);
-            }
-        }
-
-        showLoading('Đang hoàn thành đơn...');
-
         // Build cart from completionCart (has user-edited actual quantities)
         const cart = (state.completionCart || []).map(item => ({
             product: {
@@ -8758,39 +8748,49 @@ async function submitDriverCompletion() {
         const driverName = state.user?.fullName || state.user?.name || order.taiXe || order.driver_name || '';
         const driverPlate = state.user?.plate || order.bienSo || order.plate || '';
 
-        console.log('📦 Submitting completion:');
-        console.log('  - cart items:', cart.length);
-        console.log('  - driver:', driverName, ', plate:', driverPlate);
-        console.log('  - assignment_id:', order.assignment_id || 'NONE');
-        console.log('  - order id:', order.id);
+        console.log('📦 Submitting completion (no images in body):');
+        console.log('  - cart items:', cart.length, ', driver:', driverName);
 
         const res = await api.completeOrder(order.id, {
-            // Driver complete fields (backend expects these)
             cart: cart,
             driver_name: driverName,
             plate: driverPlate,
             warehouse: 'Kho Lộc Thiên',
             partner: order.khach || order.account_name || order.customerName || '',
             type: 'XUAT',
-            // Common fields
-            // NOTE: images NOT sent here — uploaded separately below
             delivery_note: deliveryNote,
             note: deliveryNote,
             local_items: completionLocalItems,
             sender: driverName,
-            // Multi-driver support
             assignment_id: order.assignment_id || null,
-            // Also send products for admin flow compatibility  
             products: parsedProducts,
             admin_completed: isAdminRole()
         });
 
-        hideLoading();
-
         if (res.error) {
+            hideLoading();
             alert('Lỗi: ' + (res.msg || res.message || 'Không thể hoàn thành đơn'));
             return;
         }
+
+        // Upload images AFTER completion — export ticket now exists
+        if (completionImages.length > 0) {
+            try {
+                showLoading(`Đang tải ${completionImages.length} ảnh...`);
+                const imgRes = await fetch(`/api/orders/${order.id}/add-proof-images`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ images: completionImages })
+                });
+                const imgData = await imgRes.json();
+                if (imgData.error) console.warn('⚠️ Image upload warning:', imgData.msg);
+                else console.log(`✅ ${completionImages.length} images saved to export ticket`);
+            } catch (imgErr) {
+                console.error('Image upload error (non-critical):', imgErr.message);
+            }
+        }
+
+        hideLoading();
 
         // Show partial completion message if applicable
         if (res.data?.partial) {

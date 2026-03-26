@@ -30,7 +30,14 @@
     <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/vn.js"></script>
 </head>
 
-<body>
+<body style="opacity:0; transition:opacity 0.2s ease;">
+    <!-- Anti-flash: body hidden until app ready -->
+    <script>
+        // Show body once CSS is loaded
+        document.addEventListener('DOMContentLoaded', function () {
+            document.body.style.opacity = '1';
+        });
+    </script>
     <!-- Loading Overlay -->
     <div id="loading" class="loading-overlay hidden">
         <div class="loading-spinner"></div>
