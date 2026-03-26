@@ -1839,6 +1839,21 @@ function renderDispatchOrders() {
                         <span style="font-weight:500; color:var(--text-primary); font-size:12px;">${customer}</span>
                         <span style="font-size:10px; color:var(--text-muted);"><i class="bi bi-geo-alt" style="font-size:9px;"></i> ${address}</span>
                     </div>
+
+                    <!-- ROW 3: Products & Quantities -->
+                    ${(() => {
+                let prods = order.products || order.sale_order_product_mappings || [];
+                if (typeof prods === 'string') { try { prods = JSON.parse(prods); } catch (e) { prods = []; } }
+                if (!Array.isArray(prods) || prods.length === 0) return '';
+                const shown = prods.slice(0, 3).map(p => {
+                    const name = (p.name || p.code || '').replace(/^(Hóa chất |HC )/, '');
+                    const qty = Number(p.qty || p.weight_kg || 0);
+                    const unit = p.unit || 'Kg';
+                    return `<span style="background:var(--body-bg); padding:1px 5px; border-radius:4px; font-size:10px; color:var(--text-secondary); white-space:nowrap;">${name.substring(0, 20)}: <b>${qty.toLocaleString('vi-VN')}</b> ${unit}</span>`;
+                }).join('');
+                const more = prods.length > 3 ? `<span style="font-size:10px; color:var(--text-muted);">+${prods.length - 3}</span>` : '';
+                return `<div style="display:flex; gap:4px; flex-wrap:wrap; align-items:center; width:100%;">${shown}${more}</div>`;
+            })()}
                 </div>`;
     }).join('')}
         </div>
@@ -10156,7 +10171,7 @@ async function loadPendingConfirmOrders() {
 
         // Also fetch the other tabs counts
         try {
-            const otherTabs = ['export', 'import', 'approved'].filter(t => t !== confirmCurrentTab);
+            const otherTabs = ['export', 'import', 'approved', 'rejected'].filter(t => t !== confirmCurrentTab);
             for (const otherTab of otherTabs) {
                 const otherRes = await fetch(`/api/orders/pending-confirm?type=${otherTab}`);
                 const otherJson = await otherRes.json();
@@ -10288,6 +10303,42 @@ async function loadPendingConfirmOrders() {
                     </div>
                 </div>`;
             }).join('');
+        } else if (confirmCurrentTab === 'rejected') {
+            // Rejected tab — show rejected import tickets with rejection info
+            container.innerHTML = orders.map(t => {
+                const products = (t.products || []).map(p => `${p.name || p.code}: ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'Kg'}`).join(', ');
+                // Parse rejection note: [TỪ CHỐI] Bởi X lúc Y - Lý do: Z
+                const note = t.note || '';
+                const rejMatch = note.match(/\[TỪ CHỐI\] Bởi (.+?) lúc ([^-]+)(?:- Lý do: (.+))?/);
+                const rejBy = rejMatch?.[1] || 'N/A';
+                const rejAt = rejMatch?.[2]?.trim() || '';
+                const rejReason = rejMatch?.[3]?.trim() || '';
+
+                return `
+                <div style="background:white; border:1px solid #fca5a5; border-left:4px solid #ef4444; border-radius:12px; padding:12px 16px;">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap;">
+                        <div style="flex:1; min-width:200px;">
+                            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:4px;">
+                                <span style="color:#ef4444; font-size:16px;">❌</span>
+                                <span style="font-weight:600; color:#dc2626; font-size:13px;">#${t.ticket_no || t.id}</span>
+                                <span style="font-size:10px; color:white; background:#ef4444; padding:2px 8px; border-radius:10px;">Từ chối</span>
+                                <span style="font-size:11px; color:#6B7280;">${t.created_at ? new Date(t.created_at).toLocaleDateString('vi-VN') : ''}</span>
+                            </div>
+                            <div style="font-size:12px; color:#374151; font-weight:600; margin-bottom:2px;">${t.supplier_name || 'N/A'}</div>
+                            <div style="font-size:11px; color:#6B7280; margin-bottom:2px;">📦 ${products || 'Không có SP'}</div>
+                            ${t.assigned_driver ? `<div style="font-size:11px; color:#6B7280;">🚛 ${t.assigned_driver}</div>` : ''}
+                        </div>
+                        <div style="flex-shrink:0; min-width:130px;">
+                            <div style="background:#FEF2F2; border:1px solid #FECACA; border-radius:8px; padding:8px 12px;">
+                                <div style="font-size:11px; color:#dc2626; font-weight:600;">❌ Từ chối bởi</div>
+                                <div style="font-size:13px; color:#991b1b; font-weight:700;">${rejBy}</div>
+                                <div style="font-size:10px; color:#6B7280; margin-top:2px;">${rejAt}</div>
+                                ${rejReason ? `<div style="font-size:10px; color:#b91c1c; margin-top:4px;">📝 ${rejReason}</div>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
         }
     } catch (err) {
         console.error('loadPendingConfirmOrders error:', err);
@@ -10303,7 +10354,7 @@ function switchConfirmTab(tab) {
     }
     confirmCurrentTab = tab;
     // Update tab styles for all 3 tabs
-    const tabs = ['export', 'import', 'approved'];
+    const tabs = ['export', 'import', 'approved', 'rejected'];
     tabs.forEach(t => {
         const btn = window.$(`#confirm-tab-${t}`);
         if (btn) btn.className = t === tab ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm';

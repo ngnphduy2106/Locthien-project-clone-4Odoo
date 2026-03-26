@@ -576,6 +576,19 @@ router.get('/pending-confirm', async (req, res) => {
         const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
         const type = req.query.type || 'export';
 
+        if (type === 'rejected') {
+            // Show rejected import tickets (note starts with [TỪ CHỐI])
+            const { data: tickets, error } = await supabase
+                .from('import_tickets')
+                .select('*')
+                .like('note', '[TỪ CHỐI]%')
+                .order('created_at', { ascending: false })
+                .limit(50);
+
+            if (error) return res.json(createResponse(true, error.message));
+            return res.json(createResponse(false, 'OK', tickets || []));
+        }
+
         if (type === 'import') {
             // Only show completed (not yet confirmed) imports
             // Exclude tickets already confirmed (note starts with [XÁC NHẬN])
