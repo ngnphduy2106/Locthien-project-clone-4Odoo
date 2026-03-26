@@ -10215,6 +10215,7 @@ async function loadPendingConfirmOrders() {
                             <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:6px;">
                                 ${isConfirmed ? '<span style="color:#10b981; font-size:18px;" title="Sales đã xác nhận">☑️</span>' : '<span style="color:#d1d5db; font-size:18px;">☐</span>'}
                                 <span style="font-weight:700; color:var(--primary); font-size:14px;">#${orderNo}</span>
+                                ${o.merged_order_no ? `<span style="background:#4c6ef5; color:#fff; font-size:9px; padding:2px 6px; border-radius:8px; font-weight:600; white-space:nowrap;"><i class="bi bi-link-45deg"></i> Ghép: ${o.merged_order_no}</span>` : ''}
                                 <span style="font-size:11px; color:#6B7280; background:#F3F4F6; padding:2px 8px; border-radius:4px;">${fmtDate}</span>
                                 <span style="font-size:10px; color:white; background:${o.status === 'Hoàn thành' ? '#10b981' : '#6366f1'}; padding:2px 8px; border-radius:10px;">${o.status}</span>
                                 ${isConfirmed ? '<span style="font-size:10px; color:#10b981; background:#ECFDF5; padding:2px 8px; border-radius:10px;">✓ ' + (o.sale_confirmed_by || 'Sales') + '</span>' : ''}
@@ -10282,6 +10283,7 @@ async function loadPendingConfirmOrders() {
                             <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:6px;">
                                 <span style="color:#10b981; font-size:18px;">✅</span>
                                 <span style="font-weight:700; color:var(--primary); font-size:14px;">#${orderNo}</span>
+                                ${o.merged_order_no ? `<span style="background:#4c6ef5; color:#fff; font-size:9px; padding:2px 6px; border-radius:8px; font-weight:600; white-space:nowrap;"><i class="bi bi-link-45deg"></i> Ghép: ${o.merged_order_no}</span>` : ''}
                                 <span style="font-size:11px; color:#6B7280; background:#F3F4F6; padding:2px 8px; border-radius:4px;">${fmtDate}</span>
                                 <span style="font-size:10px; color:white; background:#10b981; padding:2px 8px; border-radius:10px;">${o.status || 'Đã duyệt'}</span>
                             </div>
