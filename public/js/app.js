@@ -1505,7 +1505,7 @@ function renderImportList() {
                                 </button>
                             ` : ''}
                             ${state.currentDispatchTab === 'assigned' && isAdminRole() ? `
-                                <button class="btn btn-success btn-sm" onclick="adminCompleteImport('${imp.id}')" style="padding:2px; font-size:9px; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center;">
+                                <button class="btn btn-success btn-sm" onclick="showImportCompletionModal('${imp.id}')" style="padding:2px; font-size:9px; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center;">
                                     <i class="bi bi-check"></i>
                                 </button>
                             ` : ''}
@@ -6531,8 +6531,8 @@ async function viewImportDetail(importId) {
                     <button class="btn btn-outline" onclick="cancelDispatch('${imp.id}', 'import')" style="color:var(--danger); border-color:var(--danger);">
                         <i class="bi bi-arrow-counterclockwise"></i> Hủy điều phối
                     </button>
-                    <button class="btn btn-success" onclick="adminCompleteImport('${imp.id}')">
-                        <i class="bi bi-check-circle"></i> Admin hoàn thành
+                    <button class="btn btn-success" onclick="showImportCompletionModal('${imp.id}')">
+                        <i class="bi bi-check-circle"></i> Hoàn thành
                     </button>
                 ` : ''}
                 ${isAdminRole() ? `
