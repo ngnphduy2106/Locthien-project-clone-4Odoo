@@ -188,6 +188,41 @@ app.get('/api/admin/sync-drivers', async (req, res) => {
     }
 });
 
+// Error reporting endpoint — sends frontend errors to Telegram
+apiRouter.post('/report-error', async (req, res) => {
+    try {
+        const { message, source, line, col, stack, user, page, userAgent } = req.body;
+        if (!message) return res.json({ ok: true });
+
+        const { sendTelegramMessage } = await import('./services/telegram.js');
+        const now = new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+        const shortUA = (userAgent || '').slice(0, 80);
+
+        const text = [
+            `🚨 <b>LỖI APP — ${now}</b>`,
+            ``,
+            `👤 <b>User:</b> ${user || 'unknown'}`,
+            `📄 <b>Trang:</b> ${page || '/'}`,
+            ``,
+            `❌ <b>Lỗi:</b> <code>${(message || '').slice(0, 300)}</code>`,
+            source ? `📍 <b>File:</b> ${source}:${line || '?'}:${col || '?'}` : '',
+            stack ? `\n<pre>${stack.slice(0, 500)}</pre>` : '',
+            ``,
+            `📱 <code>${shortUA}</code>`
+        ].filter(Boolean).join('\n');
+
+        // Fire-and-forget — don't slow down the client
+        sendTelegramMessage(text, 'ERROR').catch(e =>
+            console.error('Error report TG failed:', e.message)
+        );
+
+        res.json({ ok: true });
+    } catch (e) {
+        console.error('Report-error endpoint:', e.message);
+        res.json({ ok: true }); // Never fail the client
+    }
+});
+
 // Health check
 app.get('/api/health', (req, res) => {
     res.json({

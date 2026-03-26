@@ -26,6 +26,7 @@ export const sendTelegramMessage = async (text, type = 'NOTIFY', replyToMessageI
     if (type === 'XUAT') chatId = process.env.TELEGRAM_CHAT_XUAT;
     if (type === 'DRIVER') chatId = process.env.TELEGRAM_CHAT_DRIVER;
     if (type === 'SALES') chatId = process.env.TELEGRAM_CHAT_SALES;
+    if (type === 'ERROR') chatId = process.env.TELEGRAM_CHAT_ERROR;
 
     if (!token || !chatId || token.includes('YOUR_')) {
         console.warn(`⚠️ Telegram not configured for ${type}. Skipping notification.`);
@@ -81,6 +82,7 @@ export const sendTelegramPhotos = async (photoUrls, caption = '', type = 'XUAT',
     if (type === 'XUAT') chatId = process.env.TELEGRAM_CHAT_XUAT;
     if (type === 'DRIVER') chatId = process.env.TELEGRAM_CHAT_DRIVER;
     if (type === 'SALES') chatId = process.env.TELEGRAM_CHAT_SALES;
+    if (type === 'ERROR') chatId = process.env.TELEGRAM_CHAT_ERROR;
 
     if (!token || !chatId || !photoUrls?.length) return null;
 

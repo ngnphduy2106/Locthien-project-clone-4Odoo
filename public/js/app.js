@@ -3,6 +3,51 @@
 // Rewritten for new UI Design
 // ===============================================
 
+// ===============================================
+// GLOBAL ERROR REPORTER → Telegram ERROR channel
+// Rate-limited: max 5 reports/minute
+// ===============================================
+(function () {
+    let _errCount = 0;
+    const _MAX = 5;
+    setInterval(() => { _errCount = 0; }, 60000); // Reset every minute
+
+    function reportError(msg, source, line, col, stack) {
+        if (_errCount >= _MAX) return; // Rate limit
+        _errCount++;
+        try {
+            const user = window.state?.user;
+            navigator.sendBeacon('/api/report-error', new Blob([JSON.stringify({
+                message: String(msg).slice(0, 500),
+                source: source || '',
+                line: line || 0,
+                col: col || 0,
+                stack: (stack || '').slice(0, 600),
+                user: user ? `${user.fullName || user.name || '?'} (${user.role || '?'})` : 'not-logged-in',
+                page: location.hash || location.pathname,
+                userAgent: navigator.userAgent
+            })], { type: 'application/json' }));
+        } catch (_) { /* never throw from error handler */ }
+    }
+
+    // Catch uncaught exceptions
+    window.onerror = function (msg, source, line, col, err) {
+        reportError(msg, source, line, col, err?.stack);
+    };
+
+    // Catch unhandled promise rejections
+    window.addEventListener('unhandledrejection', function (e) {
+        const reason = e.reason;
+        reportError(
+            reason?.message || String(reason),
+            reason?.fileName || '',
+            reason?.lineNumber || 0,
+            0,
+            reason?.stack
+        );
+    });
+})();
+
 // === STATE ===
 let state = {
     user: null,
