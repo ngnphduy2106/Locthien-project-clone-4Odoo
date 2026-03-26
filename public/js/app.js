@@ -4798,6 +4798,25 @@ async function submitDelivery() {
                 return;
             }
         } else {
+            // PERF: Upload images FIRST via lightweight endpoint, then complete without images
+            if (validImages.length > 0) {
+                try {
+                    showLoading(`Đang tải ${validImages.length} ảnh...`);
+                    const imageRes = await fetch(`/api/orders/${order.id}/add-proof-images`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ images: validImages })
+                    });
+                    const imageData = await imageRes.json();
+                    if (imageData.error) console.warn('⚠️ Image save warning:', imageData.msg);
+                    else console.log('✅ Proof images uploaded separately');
+                } catch (imgErr) {
+                    console.error('Image upload error:', imgErr.message);
+                }
+            }
+
+            showLoading('Đang hoàn thành đơn...');
+
             const completePayload = {
                 type: 'XUAT',
                 warehouse: warehouse,
@@ -4807,8 +4826,8 @@ async function submitDelivery() {
                 cart: cart,
                 local_items: localItems,
                 delivery_note: note || `Hoàn thành bởi ${driverName}`,
-                sender: driverName,
-                images: validImages // Send images with completion
+                sender: driverName
+                // NOTE: images NOT sent here — already uploaded above
             };
 
             console.log('📤 Step 1: Complete order:', {
@@ -4823,29 +4842,6 @@ async function submitDelivery() {
                 hideLoading();
                 alert('Lỗi hoàn thành đơn: ' + (completeRes.msg || completeRes.message));
                 return;
-            }
-        }
-
-        // STEP 2: Add proof images using separate API (backup - also save via add-proof-images)
-        if (validImages.length > 0) {
-            console.log(`📸 Step 2: Adding ${validImages.length} proof images...`);
-
-            try {
-                const imageRes = await fetch(`/api/orders/${order.id}/add-proof-images`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ images: validImages })
-                });
-
-                const imageData = await imageRes.json();
-
-                if (imageData.error) {
-                    console.warn('⚠️ Image save warning:', imageData.msg);
-                } else {
-                    console.log('✅ Proof images saved:', imageData.msg);
-                }
-            } catch (imgErr) {
-                console.error('Image upload error:', imgErr.message);
             }
         }
 
@@ -8263,7 +8259,7 @@ function compressImage(file, maxWidth = 600, quality = 0.5) {
 }
 
 
-// Handle image selection for completion form
+// Handle image selection for completion form — PROGRESSIVE UPLOAD
 async function handleCompletionImagesSelect(input) {
     const files = Array.from(input.files || []);
     if (!files.length) return;
@@ -8279,16 +8275,50 @@ async function handleCompletionImagesSelect(input) {
         alert(`Chỉ có thể thêm ${remaining} ảnh nữa (tối đa ${MAX_COMPLETION_IMAGES} ảnh)`);
     }
 
-    showLoading('Đang nén ảnh...');
+    const order = state.currentCompletionOrder;
+    const orderId = order?.id;
+    const isImport = order?.ticket_no?.startsWith('N');
 
-    // Compress all images in parallel for faster processing
+    // Compress all images in parallel
+    showLoading(`Đang nén ${toProcess.length} ảnh...`);
     const results = await Promise.allSettled(
         toProcess.map(file => compressImage(file))
     );
-    results.forEach(r => {
-        if (r.status === 'fulfilled') completionImages.push(r.value);
-        else console.error('Image compression error:', r.reason);
-    });
+    const compressed = results.filter(r => r.status === 'fulfilled').map(r => r.value);
+
+    if (compressed.length === 0) {
+        hideLoading();
+        alert('Không thể xử lý ảnh, vui lòng thử lại!');
+        input.value = '';
+        return;
+    }
+
+    // Upload images to server immediately (progressive upload)
+    if (orderId) {
+        showLoading(`Đang tải ${compressed.length} ảnh lên...`);
+        try {
+            const uploadUrl = isImport
+                ? `/api/imports/${orderId}/proof-images`
+                : `/api/orders/${orderId}/add-proof-images`;
+            const uploadRes = await fetch(uploadUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ images: compressed })
+            });
+            const uploadData = await uploadRes.json();
+            if (uploadData.error) {
+                console.error('Image upload error:', uploadData.msg);
+            } else {
+                console.log(`📸 Uploaded ${compressed.length} images to server`);
+            }
+        } catch (uploadErr) {
+            console.error('Image upload failed:', uploadErr.message);
+            // Images still saved locally as fallback
+        }
+    }
+
+    // Save locally for preview + fallback
+    compressed.forEach(img => completionImages.push(img));
 
     hideLoading();
     renderCompletionImagesPreviews();
@@ -8687,6 +8717,25 @@ async function submitDriverCompletion() {
     showLoading('Đang xử lý hoàn thành đơn...');
 
     try {
+        // PERF: Upload images FIRST via lightweight endpoint, then complete without images
+        if (completionImages.length > 0) {
+            showLoading(`Đang tải ${completionImages.length} ảnh...`);
+            try {
+                const imgRes = await fetch(`/api/orders/${order.id}/add-proof-images`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ images: completionImages })
+                });
+                const imgData = await imgRes.json();
+                if (imgData.error) console.warn('⚠️ Image upload warning:', imgData.msg);
+                else console.log(`✅ ${completionImages.length} images uploaded separately`);
+            } catch (imgErr) {
+                console.error('Image pre-upload error:', imgErr.message);
+            }
+        }
+
+        showLoading('Đang hoàn thành đơn...');
+
         // Build cart from completionCart (has user-edited actual quantities)
         const cart = (state.completionCart || []).map(item => ({
             product: {
@@ -8724,9 +8773,9 @@ async function submitDriverCompletion() {
             partner: order.khach || order.account_name || order.customerName || '',
             type: 'XUAT',
             // Common fields
+            // NOTE: images NOT sent here — uploaded separately below
             delivery_note: deliveryNote,
             note: deliveryNote,
-            images: completionImages,
             local_items: completionLocalItems,
             sender: driverName,
             // Multi-driver support
