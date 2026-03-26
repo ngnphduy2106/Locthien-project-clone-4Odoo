@@ -8225,40 +8225,43 @@ window.showAdjustInventoryModal = showAdjustInventoryModal;
 let completionImages = []; // Store compressed images for completion
 const MAX_COMPLETION_IMAGES = 10;
 
-// Compress image to reduce size
-function compressImage(file, maxWidth = 800, quality = 0.5) {
+// Compress image — optimized for iPhone HEIC + mobile data
+// Uses createObjectURL (fast) instead of FileReader.readAsDataURL (slow for HEIC)
+function compressImage(file, maxWidth = 600, quality = 0.5) {
     return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const img = new Image();
-            img.onload = () => {
-                const canvas = document.createElement('canvas');
-                let width = img.width;
-                let height = img.height;
+        const objectUrl = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = () => {
+            URL.revokeObjectURL(objectUrl); // Free memory immediately
 
-                // Calculate new dimensions
-                if (width > maxWidth) {
-                    height = (height * maxWidth) / width;
-                    width = maxWidth;
-                }
+            const canvas = document.createElement('canvas');
+            let width = img.width;
+            let height = img.height;
 
-                canvas.width = width;
-                canvas.height = height;
+            // Scale down — 600px is enough for proof photos
+            if (width > maxWidth) {
+                height = (height * maxWidth) / width;
+                width = maxWidth;
+            }
 
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, width, height);
+            canvas.width = width;
+            canvas.height = height;
 
-                // Convert to compressed base64
-                const compressed = canvas.toDataURL('image/jpeg', quality);
-                resolve(compressed);
-            };
-            img.onerror = reject;
-            img.src = e.target.result;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+
+            // Convert to compressed base64
+            const compressed = canvas.toDataURL('image/jpeg', quality);
+            resolve(compressed);
         };
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
+        img.onerror = () => {
+            URL.revokeObjectURL(objectUrl);
+            reject(new Error('Failed to load image'));
+        };
+        img.src = objectUrl;
     });
 }
+
 
 // Handle image selection for completion form
 async function handleCompletionImagesSelect(input) {
@@ -8275,6 +8278,8 @@ async function handleCompletionImagesSelect(input) {
     if (files.length > remaining) {
         alert(`Chỉ có thể thêm ${remaining} ảnh nữa (tối đa ${MAX_COMPLETION_IMAGES} ảnh)`);
     }
+
+    showLoading('Đang nén ảnh...');
 
     // Compress all images in parallel for faster processing
     const results = await Promise.allSettled(
@@ -9378,7 +9383,7 @@ async function handleAddProofImages(input, orderId) {
     const images = [];
     for (const file of files.slice(0, 10)) {
         try {
-            const compressed = await compressImage(file, 800, 0.5);
+            const compressed = await compressImage(file);
             images.push(compressed);
         } catch (err) {
             console.error('Image compression error:', err);
@@ -9528,7 +9533,7 @@ async function handleAddImportProofImages(input, importId) {
     const images = [];
     for (const file of files.slice(0, 10)) {
         try {
-            const compressed = await compressImage(file, 800, 0.5);
+            const compressed = await compressImage(file);
             images.push(compressed);
         } catch (err) {
             console.error('Image compression error:', err);
