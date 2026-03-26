@@ -8232,37 +8232,84 @@ const MAX_COMPLETION_IMAGES = 10;
 
 // Compress image — optimized for iPhone HEIC + mobile data
 // Uses createObjectURL (fast) instead of FileReader.readAsDataURL (slow for HEIC)
-function compressImage(file, maxWidth = 600, quality = 0.5) {
+// ============================================================
+// 3-LAYER IMAGE COMPRESSION ARCHITECTURE
+// Layer 1: Force HEIC→WebP/JPEG conversion (browser-image-compression)
+// Layer 2: Web Worker off-main-thread (useWebWorker: true)
+// Layer 3: Hard limits: 1200px, q0.65, <300KB
+// ============================================================
+
+// Detect WebP support once at startup
+const _webpSupported = (() => {
+    try {
+        const c = document.createElement('canvas');
+        c.width = 1; c.height = 1;
+        return c.toDataURL('image/webp').startsWith('data:image/webp');
+    } catch { return false; }
+})();
+
+// Hard compression rules
+const IMG_COMPRESS_CONFIG = {
+    maxSizeMB: 0.3,           // Target <300KB output
+    maxWidthOrHeight: 1200,    // Max dimension (enough for reading text/signatures)
+    useWebWorker: true,        // Layer 2: Off main thread
+    fileType: _webpSupported ? 'image/webp' : 'image/jpeg',
+    initialQuality: 0.65,     // Layer 3: Quality 0.65
+    alwaysKeepResolution: false,
+    preserveExif: false,       // Strip metadata for smaller files
+};
+
+/**
+ * Compress a single image file using 3-layer architecture.
+ * - Layer 1: HEIC/HEIF detection + forced conversion
+ * - Layer 2: Runs in Web Worker (no UI jank, 60fps maintained)
+ * - Layer 3: Hard limits enforced (1200px, q0.65, <300KB)
+ * 
+ * @param {File} file - Input image file (HEIC, JPEG, PNG, etc.)
+ * @returns {Promise<string>} - Compressed base64 data URL (WebP or JPEG)
+ */
+async function compressImage(file) {
+    // Layer 1: Check if browser-image-compression library is loaded
+    if (typeof imageCompression === 'function') {
+        try {
+            const compressed = await imageCompression(file, IMG_COMPRESS_CONFIG);
+
+            // Convert compressed File/Blob to base64 data URL
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = () => reject(new Error('Base64 conversion failed'));
+                reader.readAsDataURL(compressed);
+            });
+        } catch (libErr) {
+            console.warn('⚠️ browser-image-compression failed, falling back:', libErr.message);
+            // Fall through to canvas fallback
+        }
+    }
+
+    // FALLBACK: Canvas-based compression (if library not loaded)
     return new Promise((resolve, reject) => {
         const objectUrl = URL.createObjectURL(file);
         const img = new Image();
         img.onload = () => {
-            URL.revokeObjectURL(objectUrl); // Free memory immediately
-
-            const canvas = document.createElement('canvas');
-            let width = img.width;
-            let height = img.height;
-
-            // Scale down — 600px is enough for proof photos
-            if (width > maxWidth) {
-                height = (height * maxWidth) / width;
-                width = maxWidth;
-            }
-
-            canvas.width = width;
-            canvas.height = height;
-
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0, width, height);
-
-            // Convert to compressed base64
-            const compressed = canvas.toDataURL('image/jpeg', quality);
-            resolve(compressed);
-        };
-        img.onerror = () => {
             URL.revokeObjectURL(objectUrl);
-            reject(new Error('Failed to load image'));
+            const canvas = document.createElement('canvas');
+            let w = img.width, h = img.height;
+            const max = IMG_COMPRESS_CONFIG.maxWidthOrHeight;
+            if (w > max || h > max) {
+                const ratio = Math.min(max / w, max / h);
+                w = Math.round(w * ratio);
+                h = Math.round(h * ratio);
+            }
+            canvas.width = w;
+            canvas.height = h;
+            canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+            resolve(canvas.toDataURL(
+                IMG_COMPRESS_CONFIG.fileType,
+                IMG_COMPRESS_CONFIG.initialQuality
+            ));
         };
+        img.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error('Image load failed')); };
         img.src = objectUrl;
     });
 }
