@@ -975,28 +975,34 @@ router.put('/:id/assign', async (req, res) => {
 
         // Send Telegram notification to DRIVER group (async, don't block response)
         try {
-            // === COMPACT FORMAT: PO giao [products] [customer]. [driver] + [assistant] ===
+            // === DISPATCH FORMAT: Clean multi-line with full product details ===
             const orderInfo = await db.getOrder(id);
             const poNo = orderInfo?.soDon || orderInfo?.sale_order_no || id;
 
-            // Parse products — short names only
+            // Parse products — full names with qty
             let prods = orderInfo?.products || orderInfo?.sale_order_product_mappings || [];
             if (typeof prods === 'string') { try { prods = JSON.parse(prods); } catch (e) { prods = []; } }
-            const prodNames = (Array.isArray(prods) ? prods : []).map(p =>
-                (p.name || p.code || '').replace(/^(Hóa chất |HC |Hoá chất )/i, '').split(' ')[0]
-            ).filter(Boolean).join('+') || '';
+            const prodLines = (Array.isArray(prods) ? prods : []).map(p => {
+                const name = (p.name || p.code || '').replace(/^(Hóa chất |HC |Hoá chất )/i, '');
+                const qty = Number(p.qty || p.weight_kg || 0);
+                return `  • ${name}: ${qty.toLocaleString('vi-VN')} ${p.unit || 'Kg'}`;
+            }).filter(Boolean);
 
-            const customer = (orderInfo?.khach || orderInfo?.account_name || '').replace(/^(Công ty|CTY|TNHH|CP)\s*/i, '').trim();
+            const customer = orderInfo?.khach || orderInfo?.account_name || '';
+            const address = orderInfo?.diaChi || orderInfo?.shipping_address || '';
             const drvShort = driverName || '';
             const asstShort = assistantName || '';
             const fmtDate = orderInfo?.sale_order_date ? new Date(orderInfo.sale_order_date).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit', month: '2-digit' }) : '';
 
-            // Build compact message with basic icons
-            let msg = `🚛 <b>${poNo}</b> | 📅 ${fmtDate} | 📦 ${prodNames}\n→ ${customer}. ${drvShort}${asstShort ? ' + ' + asstShort : ''}${plate ? ' 🚗' + plate : ''}`;
-
-            // Merged order info (appended if present)
-            if (orderInfo?.merged_order_no) msg += ` 🔗${orderInfo.merged_order_no}`;
-            if (deliveryTime) msg += ` ⏰${deliveryTime}`;
+            // Build clean multi-line message
+            let msg = `🚛 <b>ĐIỀU PHỐI</b> | 📅 ${fmtDate}`;
+            if (orderInfo?.merged_order_no) msg += ` | 🔗 ${orderInfo.merged_order_no}`;
+            msg += `\n📦 <b>${poNo}</b>`;
+            msg += `\n👤 ${customer}`;
+            if (address) msg += `\n📍 ${address.substring(0, 80)}`;
+            if (prodLines.length > 0) msg += `\n${prodLines.join('\n')}`;
+            msg += `\n🚗 <b>${drvShort}</b>${asstShort ? ' + ' + asstShort : ''}${plate ? ' (' + plate + ')' : ''}`;
+            if (deliveryTime) msg += ` ⏰ ${deliveryTime}`;
             if (note) msg += `\n📝 ${note}`;
 
             // Mention tags at the bottom
@@ -2183,26 +2189,33 @@ router.post('/:id/assign-multi', async (req, res) => {
             const orderInfo = await db.getOrder(id);
             const poNo = orderInfo?.soDon || id;
 
-            // Parse products  — short names only
+            // Parse products — full names with qty
             let prods = orderInfo?.products || orderInfo?.sale_order_product_mappings || [];
             if (typeof prods === 'string') { try { prods = JSON.parse(prods); } catch (e) { prods = []; } }
-            const prodNames = (Array.isArray(prods) ? prods : []).map(p =>
-                (p.name || p.code || '').replace(/^(Hóa chất |HC |Hoá chất )/i, '').split(' ')[0]
-            ).filter(Boolean).join('+') || '';
+            const prodLines = (Array.isArray(prods) ? prods : []).map(p => {
+                const name = (p.name || p.code || '').replace(/^(Hóa chất |HC |Hoá chất )/i, '');
+                const qty = Number(p.qty || p.weight_kg || 0);
+                return `  • ${name}: ${qty.toLocaleString('vi-VN')} ${p.unit || 'Kg'}`;
+            }).filter(Boolean);
 
-            const customer = (orderInfo?.khach || orderInfo?.account_name || '').replace(/^(Công ty|CTY|TNHH|CP)\s*/i, '').trim();
+            const customer = orderInfo?.khach || orderInfo?.account_name || '';
+            const address = orderInfo?.diaChi || orderInfo?.shipping_address || '';
 
-            // Build compact single-line per driver
+            // Build clean multi-line per driver
             const users = await db.getUsers();
             const mentionTags = [];
 
-            // Header with icons
+            // Header
             const fmtDate = orderInfo?.sale_order_date ? new Date(orderInfo.sale_order_date).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit', month: '2-digit' }) : '';
-            let msg = `🚛 <b>${poNo}</b> | 📅 ${fmtDate} | 📦 ${prodNames}`;
-            if (orderInfo?.merged_order_no) msg += ` 🔗${orderInfo.merged_order_no}`;
+            let msg = `🚛 <b>ĐIỀU PHỐI</b> | 📅 ${fmtDate}`;
+            if (orderInfo?.merged_order_no) msg += ` | 🔗 ${orderInfo.merged_order_no}`;
+            msg += `\n📦 <b>${poNo}</b>`;
+            msg += `\n👤 ${customer}`;
+            if (address) msg += `\n📍 ${address.substring(0, 80)}`;
+            if (prodLines.length > 0) msg += `\n${prodLines.join('\n')}`;
 
             // Driver list
-            const driverParts = assignments.map((a, i) => {
+            assignments.forEach((a, i) => {
                 const driverObj = users.find(u => u.fullName === a.driver_name || u.username === a.driver_name);
                 const driverMention = getTelegramTag(driverObj?.telegramUsername, driverObj?.telegramUserId, a.driver_name);
                 if (driverMention) mentionTags.push(driverMention.trim());
@@ -2212,16 +2225,14 @@ router.post('/:id/assign-multi', async (req, res) => {
                     if (assistantMention) mentionTags.push(assistantMention.trim());
                 }
                 const qtyStr = assignments.length > 1 ? ` ${Number(a.qty).toLocaleString('vi-VN')}kg` : '';
-                const asstStr = a.assistant_name ? ` + ${a.assistant_name}` : '';
-                const plateStr = a.plate ? ` 🚗${a.plate}` : '';
-                return `${a.driver_name}${qtyStr}${asstStr}${plateStr}`;
+                const asstStr = a.assistant_name ? ' + ' + a.assistant_name : '';
+                const plateStr = a.plate ? ` (${a.plate})` : '';
+                msg += `\n🚗 <b>${a.driver_name}</b>${qtyStr}${asstStr}${plateStr}`;
             });
-
-            msg += `\n→ ${customer}. ${driverParts.join(', ')}`;
 
             // Show old drivers if this is a change
             if (hadPreviousAssignments && previousDrivers.length > 0) {
-                msg += ` (cũ: ${previousDrivers.join(', ')})`;
+                msg += `\n⚠️ Cũ: ${previousDrivers.join(', ')}`;
             }
 
             if (mentionTags.length > 0) msg += `\n${mentionTags.join(' ')}`;
