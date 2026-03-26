@@ -1520,102 +1520,84 @@ router.post('/:id/complete', async (req, res) => {
                 sync_error: null
             });
 
-            // Create warehouse tickets
-            for (const item of cart) {
-                if (item.isShell) continue;
+            // PERF: crm_sync_status already set in merged updateOrder above
+            const crmSyncStatus = 'PENDING_APPROVAL';
 
-                const data = {
-                    id: ticketId,
-                    date: ts.date,
-                    warehouse,
-                    partner,
-                    driver: isMultiDriverOrder ? firstDriverName : (resolvedDriverName || driver_name),
-                    plate: isMultiDriverOrder && firstDriverPlate ? firstDriverPlate : (resolvedPlate || plate),
-                    product: standardizeData(item.product, 'PRODUCT'),
-                    density: item.density,
-                    qty: Number(item.weight_kg),
-                    note,
-                    sender
-                };
+            // PERF: Send response to driver IMMEDIATELY — move heavy I/O to background
+            const orderNo = orderInfo?.soDon || orderInfo?.sale_order_no || id;
+            res.json(createResponse(false, 'Đơn của bạn đã hoàn thành!', { ticketId, crmStatus: crmSyncStatus }));
 
-                if (type === 'NHAP') {
-                    await db.addDataNhap(data);
-                } else {
-                    await db.addDataXuat(data);
-                }
-            }
-
-            // Sync to MISA & Supabase
-
-            // 1. Create Export Ticket in Supabase
-            try {
-                // PERF: Reuse supabase + orderInfo from parent scope
-                const totalQty = cart.reduce((sum, c) => sum + Number(c.weight_kg || c.qty || 0), 0);
-
-                await supabase.from('export_tickets').insert({
-                    ticket_no: ticketId,
-                    order_id: id,
-                    order_no: orderInfo?.soDon || id,
-                    customer_name: partner,
-                    customer_address: orderInfo?.diaChi || '',
-                    driver_name: isMultiDriverOrder ? firstDriverName : (resolvedDriverName || driver_name),
-                    plate: isMultiDriverOrder && firstDriverPlate ? firstDriverPlate : (resolvedPlate || plate),
-                    warehouse: warehouse,
-                    products: cart.map(c => ({
-                        code: c.product?.code || c.code || '',
-                        name: c.product?.name || c.product || c.name || '',
-                        qty: Number(c.weight_kg || c.qty || 0),
-                        unit: c.unit || 'kg',
-                        isShell: c.isShell || false
-                    })),
-                    total_qty: totalQty,
-                    note: note || delivery_note || `Tạo bởi: ${sender || driver_name}`,
-                    local_items: local_items || [],
-                    images: images || []
-                });
-
-                // Also update any existing assignment with proof_images and status
-                // (Single-driver flow doesn't send assignment_id, so we update by order_id)
-                if (images && images.length > 0) {
+            // BACKGROUND: Warehouse tickets, export ticket, notifications, merged auto-complete
+            setImmediate(async () => {
+                try {
+                    // 0a. Create warehouse tickets (moved from blocking path)
                     try {
-                        const { data: existingAssigns } = await supabase
-                            .from('order_driver_assignments')
-                            .select('id, status')
-                            .or(`order_id.eq.${id},order_id.eq.${orderInfo?.soDon || id}`)
-                            .eq('status', 'pending');
+                        for (const item of cart) {
+                            if (item.isShell) continue;
+                            const data = {
+                                id: ticketId,
+                                date: ts.date,
+                                warehouse,
+                                partner,
+                                driver: isMultiDriverOrder ? firstDriverName : (resolvedDriverName || driver_name),
+                                plate: isMultiDriverOrder && firstDriverPlate ? firstDriverPlate : (resolvedPlate || plate),
+                                product: standardizeData(item.product, 'PRODUCT'),
+                                density: item.density,
+                                qty: Number(item.weight_kg),
+                                note,
+                                sender
+                            };
+                            if (type === 'NHAP') await db.addDataNhap(data);
+                            else await db.addDataXuat(data);
+                        }
+                    } catch (whErr) { console.error('BG: Warehouse ticket error:', whErr.message); }
 
-                        if (existingAssigns && existingAssigns.length > 0) {
-                            for (const assign of existingAssigns) {
-                                await supabase
-                                    .from('order_driver_assignments')
-                                    .update({
+                    // 0b. Create Export Ticket in Supabase (moved from blocking path)
+                    try {
+                        const totalQty = cart.reduce((sum, c) => sum + Number(c.weight_kg || c.qty || 0), 0);
+                        await supabase.from('export_tickets').insert({
+                            ticket_no: ticketId,
+                            order_id: id,
+                            order_no: orderInfo?.soDon || id,
+                            customer_name: partner,
+                            customer_address: orderInfo?.diaChi || '',
+                            driver_name: isMultiDriverOrder ? firstDriverName : (resolvedDriverName || driver_name),
+                            plate: isMultiDriverOrder && firstDriverPlate ? firstDriverPlate : (resolvedPlate || plate),
+                            warehouse: warehouse,
+                            products: cart.map(c => ({
+                                code: c.product?.code || c.code || '',
+                                name: c.product?.name || c.product || c.name || '',
+                                qty: Number(c.weight_kg || c.qty || 0),
+                                unit: c.unit || 'kg',
+                                isShell: c.isShell || false
+                            })),
+                            total_qty: totalQty,
+                            note: note || delivery_note || `Tạo bởi: ${sender || driver_name}`,
+                            local_items: local_items || [],
+                            images: images || []
+                        });
+                    } catch (etErr) { console.error('BG: Export ticket error:', etErr.message); }
+
+                    // 0c. Update assignment proof images (moved from blocking path)
+                    if (images && images.length > 0) {
+                        try {
+                            const { data: existingAssigns } = await supabase
+                                .from('order_driver_assignments')
+                                .select('id, status')
+                                .or(`order_id.eq.${id},order_id.eq.${orderInfo?.soDon || id}`)
+                                .eq('status', 'pending');
+                            if (existingAssigns && existingAssigns.length > 0) {
+                                for (const assign of existingAssigns) {
+                                    await supabase.from('order_driver_assignments').update({
                                         status: 'completed',
                                         proof_images: images,
                                         delivery_note: note || delivery_note || '',
                                         completed_at: new Date().toISOString()
-                                    })
-                                    .eq('id', assign.id);
-                                console.log(`✅ Updated assignment ${assign.id} with ${images.length} proof images`);
+                                    }).eq('id', assign.id);
+                                }
                             }
-                        }
-                    } catch (assignErr) {
-                        console.error('Assignment update error (non-critical):', assignErr.message);
+                        } catch (assignErr) { console.error('BG: Assignment update error:', assignErr.message); }
                     }
-                }
-            } catch (err) {
-                console.error('Supabase Export Ticket Error:', err.message);
-            }
-
-            // PERF: crm_sync_status already set in merged updateOrder above
-            const crmSyncStatus = 'PENDING_APPROVAL';
-
-            // PERF: Send response to driver IMMEDIATELY
-            const orderNo = orderInfo?.soDon || orderInfo?.sale_order_no || id;
-            res.json(createResponse(false, 'Đơn của bạn đã hoàn thành!', { ticketId, crmStatus: crmSyncStatus }));
-
-            // BACKGROUND: Notifications, Telegram, merged auto-complete
-            setImmediate(async () => {
-                try {
                     // 1. Admin notification
                     try {
                         await createNotification('ADMIN', 'order_completed', '✅ Đơn hoàn thành',
