@@ -3577,7 +3577,7 @@ async function viewOrderDetail(orderId, options = {}) {
                 <div style="margin-top:12px;">
                     <label style="display:inline-flex; align-items:center; gap:8px; padding:8px 16px; background:var(--success); color:white; border-radius:8px; cursor:pointer; font-size:13px;">
                         <i class="bi bi-plus-circle"></i> Bổ sung ảnh
-                        <input type="file" accept="image/*" multiple onchange="handleAddProofImages(this, '${order.soDon || order.sale_order_no || order.id}')" style="display:none;">
+                        <input type="file" accept="image/jpeg,image/png,image/heic,image/heif" multiple onchange="handleAddProofImages(this, '${order.soDon || order.sale_order_no || order.id}')" style="display:none;">
                     </label>
                     <span style="margin-left:8px; font-size:12px; color:var(--text-muted);">Tối đa 10 ảnh</span>
                 </div>
@@ -3603,7 +3603,7 @@ async function viewOrderDetail(orderId, options = {}) {
                     </div>
                     <label class="btn btn-outline" style="cursor:pointer; padding:8px 12px;">
                         <i class="bi bi-image"></i>
-                        <input type="file" id="chatImageInput" accept="image/*" onchange="previewChatImage(this)" style="display:none;">
+                        <input type="file" id="chatImageInput" accept="image/jpeg,image/png,image/heic,image/heif" onchange="previewChatImage(this)" style="display:none;">
                     </label>
                     <button class="btn btn-primary" onclick="sendChatMessage()" style="padding:8px 16px;">
                         <i class="bi bi-send"></i>
@@ -4555,7 +4555,7 @@ function openDeliveryModal(orderId) {
                 </div>
                 <label style="display:inline-flex; align-items:center; gap:8px; padding:8px 16px; background:var(--success); color:white; border-radius:8px; cursor:pointer; font-size:13px;">
                     <i class="bi bi-plus-circle"></i> Thêm ảnh
-                    <input type="file" id="inp-del-img" accept="image/*" multiple onchange="handleImageSelect(this)" style="display:none;">
+                    <input type="file" id="inp-del-img" accept="image/jpeg,image/png,image/heic,image/heif" multiple onchange="handleImageSelect(this)" style="display:none;">
                 </label>
                 <span style="margin-left:8px; font-size:12px; color:var(--text-muted);">Tối đa 10 ảnh</span>
             </div>
@@ -4996,7 +4996,7 @@ function openImportDeliveryModal(importId) {
                 </div>
                 <label style="display:inline-flex; align-items:center; gap:8px; padding:8px 16px; background:var(--success); color:white; border-radius:8px; cursor:pointer; font-size:13px;">
                     <i class="bi bi-plus-circle"></i> Thêm ảnh
-                    <input type="file" id="inp-import-del-img" accept="image/*" multiple onchange="handleImportImageSelect(this)" style="display:none;">
+                    <input type="file" id="inp-import-del-img" accept="image/jpeg,image/png,image/heic,image/heif" multiple onchange="handleImportImageSelect(this)" style="display:none;">
                 </label>
                 <span style="margin-left:8px; font-size:12px; color:var(--text-muted);">Tối đa 10 ảnh</span>
             </div>
@@ -6488,7 +6488,7 @@ async function viewImportDetail(importId) {
                 ${isAdminRole() || imp.status === 'completed' ? `
                 <label style="display:inline-flex; align-items:center; gap:8px; margin-top:12px; padding:8px 16px; background:var(--primary); color:white; border-radius:8px; cursor:pointer; font-weight:500; font-size:13px;">
                     <i class="bi bi-plus-circle"></i> Thêm ảnh
-                    <input type="file" accept="image/*" multiple onchange="handleAddImportProofImages(this, '${imp.id}')" style="display:none;">
+                    <input type="file" accept="image/jpeg,image/png,image/heic,image/heif" multiple onchange="handleAddImportProofImages(this, '${imp.id}')" style="display:none;">
                 </label>
                 ` : ''}
             </div>
@@ -6512,7 +6512,7 @@ async function viewImportDetail(importId) {
                     </div>
                     <label class="btn btn-outline" style="cursor:pointer; padding:8px 12px;">
                         <i class="bi bi-image"></i>
-                        <input type="file" id="chatImageInput" accept="image/*" onchange="previewChatImage(this)" style="display:none;">
+                        <input type="file" id="chatImageInput" accept="image/jpeg,image/png,image/heic,image/heif" onchange="previewChatImage(this)" style="display:none;">
                     </label>
                     <button class="btn btn-primary" onclick="sendImportChatMessage()" style="padding:8px 16px;">
                         <i class="bi bi-send"></i>
@@ -8645,7 +8645,7 @@ async function showDriverCompletionModal(orderId, assignmentId = null) {
                 </div>
                 <label style="display:inline-flex; align-items:center; gap:8px; margin-top:12px; padding:10px 16px; background:var(--primary); color:white; border-radius:8px; cursor:pointer; font-weight:500;">
                     <i class="bi bi-plus-circle"></i> Chọn ảnh
-                    <input type="file" accept="image/*" multiple onchange="handleCompletionImagesSelect(this)" style="display:none;">
+                    <input type="file" accept="image/jpeg,image/png,image/heic,image/heif" multiple onchange="handleCompletionImagesSelect(this)" style="display:none;">
                 </label>
                 <span style="margin-left:12px; font-size:12px; color:var(--text-muted);">Tối đa ${MAX_COMPLETION_IMAGES} ảnh, tự động nén</span>
             </div>
@@ -8980,7 +8980,7 @@ function showImportCompletionModal(importId, assignmentId = null) {
                 </div>
                 <label style="display:inline-flex; align-items:center; gap:8px; margin-top:12px; padding:10px 16px; background:#4CAF50; color:white; border-radius:8px; cursor:pointer; font-weight:500;">
                     <i class="bi bi-plus-circle"></i> Thêm ảnh
-                    <input type="file" accept="image/*" multiple onchange="handleAddImportProofImages(this, '${imp.id}')" style="display:none;">
+                    <input type="file" accept="image/jpeg,image/png,image/heic,image/heif" multiple onchange="handleAddImportProofImages(this, '${imp.id}')" style="display:none;">
                 </label>
                 <span style="margin-left:12px; font-size:12px; color:var(--text-muted);">Tối đa 10 ảnh, tự động nén & lưu</span>
             </div>
