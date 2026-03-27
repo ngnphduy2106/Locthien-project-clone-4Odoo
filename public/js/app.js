@@ -8832,8 +8832,8 @@ function updateCompletionQty(idx, value) {
                 warningEl.style.border = '1px solid #fecaca';
                 warningEl.innerHTML = `⚠️ ${diff > 0 ? 'Vượt' : 'Thiếu'} <b>${absPct}%</b> so với SL đặt!`;
                 if (input) input.style.borderColor = '#dc2626';
-            } else if (absPct > 5) {
-                // YELLOW: 5-20% deviation — mild warning
+            } else if (absPct > 10) {
+                // YELLOW: 10-20% deviation — mild warning
                 warningEl.style.display = 'block';
                 warningEl.style.background = '#fffbeb';
                 warningEl.style.color = '#d97706';
@@ -8841,7 +8841,7 @@ function updateCompletionQty(idx, value) {
                 warningEl.innerHTML = `⚡ ${diff > 0 ? 'Nhiều hơn' : 'Ít hơn'} <b>${absPct}%</b>`;
                 if (input) input.style.borderColor = '#f59e0b';
             } else {
-                // OK: <5% deviation
+                // OK: <10% deviation
                 warningEl.style.display = 'none';
                 if (input) input.style.borderColor = '#10b981';
             }
@@ -9208,7 +9208,7 @@ function updateImportCompletionQty(index, value) {
                 warningEl.style.border = '1px solid #fecaca';
                 warningEl.innerHTML = `⚠️ ${diff > 0 ? 'Vượt' : 'Thiếu'} <b>${absPct}%</b> so với SL đặt!`;
                 if (input) input.style.borderColor = '#dc2626';
-            } else if (absPct > 5) {
+            } else if (absPct > 10) {
                 warningEl.style.display = 'block';
                 warningEl.style.background = '#fffbeb';
                 warningEl.style.color = '#d97706';
