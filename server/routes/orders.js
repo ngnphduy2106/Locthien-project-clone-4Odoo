@@ -2927,11 +2927,13 @@ router.post('/:id/confirm', async (req, res) => {
         const order = await db.getOrder(id);
         if (!order) return res.json(createResponse(true, 'Không tìm thấy đơn hàng'));
 
-        // Sales confirm: only set checkmark, no MISA sync
+        // Sales confirm: set checkmark + change order status
         const updateData = {
             sale_confirmed: true,
             sale_confirmed_at: new Date().toISOString(),
-            sale_confirmed_by: confirmed_by || 'sales'
+            sale_confirmed_by: confirmed_by || 'sales',
+            status: 'Đã thực hiện',
+            delivery_status: 'Đã giao hàng'
         };
 
         if (products && Array.isArray(products)) {
