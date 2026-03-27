@@ -1,4 +1,4 @@
-﻿/* ===============================================
+/* ===============================================
    Lá»˜C THIÃŠN ERP - DESIGN SYSTEM V3
    Based on reference UI screenshots
    =============================================== */
@@ -660,8 +660,49 @@ body {
     font-size: 14px;
     font-weight: 500;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all 0.15s ease;
     border: none;
+    position: relative;
+    overflow: hidden;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+/* Ripple effect container */
+.btn::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.35);
+    transform: translate(-50%, -50%);
+    opacity: 0;
+    transition: width 0.4s ease, height 0.4s ease, opacity 0.4s ease;
+}
+
+.btn:active::after {
+    width: 200%;
+    height: 200%;
+    opacity: 0;
+    transition: 0s;
+}
+
+/* Press-down effect — gives tactile "click" feel */
+.btn:active {
+    transform: scale(0.95);
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.15);
+    transition: transform 0.06s ease, box-shadow 0.06s ease;
+}
+
+/* Hover glow for desktop */
+.btn:hover:not(:active) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .btn-primary {
@@ -673,14 +714,44 @@ body {
     background: #6b4de6;
 }
 
+.btn-primary:active {
+    background: #5a3dd4;
+}
+
 .btn-info {
     background: var(--info);
     color: white;
 }
 
+.btn-info:active {
+    background: #3a8fd4;
+}
+
 .btn-success {
     background: var(--success);
     color: white;
+}
+
+.btn-success:active {
+    background: #0da55e;
+}
+
+.btn-warning {
+    background: var(--warning);
+    color: white;
+}
+
+.btn-warning:active {
+    background: #d49a08;
+}
+
+.btn-danger {
+    background: var(--danger);
+    color: white;
+}
+
+.btn-danger:active {
+    background: #c82333;
 }
 
 .btn-outline {
@@ -689,14 +760,81 @@ body {
     color: var(--text-secondary);
 }
 
+.btn-outline::after {
+    background: rgba(0, 0, 0, 0.08);
+}
+
 .btn-outline:hover {
     border-color: var(--primary);
     color: var(--primary);
 }
 
+.btn-outline:active {
+    background: var(--primary-light);
+    border-color: var(--primary);
+}
+
 .btn-sm {
     padding: 6px 12px;
     font-size: 12px;
+}
+
+/* Tab buttons — same tactile feel */
+.tab-btn {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    position: relative;
+    overflow: hidden;
+}
+
+.tab-btn:active {
+    transform: scale(0.96);
+    transition: transform 0.06s ease;
+}
+
+/* Compact order rows — press feedback for mobile */
+.compact-order-row {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+}
+
+.compact-order-row:active {
+    transform: scale(0.98) !important;
+    opacity: 0.85 !important;
+    transition: transform 0.06s ease, opacity 0.06s ease !important;
+}
+
+/* Card click feedback */
+.order-card:active,
+.history-order-card:active,
+.stat-card:active {
+    transform: scale(0.98);
+    transition: transform 0.06s ease;
+}
+
+/* Modal buttons — stronger feedback */
+.modal-footer .btn:active {
+    transform: scale(0.93);
+}
+
+/* Sidebar nav items */
+.nav-item:active {
+    transform: scale(0.97);
+    transition: transform 0.06s ease;
+}
+
+/* Global touch optimization for all interactive elements */
+button, a, [onclick], [role="button"], input[type="submit"] {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+}
+
+/* Disabled state — no effects */
+.btn:disabled, .btn.disabled {
+    pointer-events: none;
+    opacity: 0.6;
+    transform: none !important;
+    box-shadow: none !important;
 }
 
 /* === Status Badge === */
