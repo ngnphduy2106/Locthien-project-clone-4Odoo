@@ -2970,11 +2970,13 @@ router.post('/:id/approve', async (req, res) => {
         const order = await db.getOrder(id);
         if (!order) return res.json(createResponse(true, 'Không tìm thấy đơn hàng'));
 
-        // Update admin approval fields
+        // Update admin approval fields + change order status to completed
         const updateData = {
             admin_approved: true,
             admin_approved_at: new Date().toISOString(),
-            admin_approved_by: approved_by || 'admin'
+            admin_approved_by: approved_by || 'admin',
+            status: 'Đã thực hiện',
+            delivery_status: 'Đã giao hàng'
         };
 
         // If admin sent edited products, update them BEFORE MISA sync
