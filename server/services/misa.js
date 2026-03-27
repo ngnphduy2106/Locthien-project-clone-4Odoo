@@ -632,9 +632,14 @@ const performSync = async () => {
                     delete mappedOrder.custom_field14;
                 }
 
-                // PRESERVE local product edits for completed/dispatched orders
-                // Compare individual product data: if MISA products differ, use MISA
-                if (oldOrder.status !== 'Mới' && oldOrder.products && oldOrder.products.length > 0) {
+                // PRESERVE local product quantities for completed/dispatched orders
+                // After driver completion, local qty reflects ACTUAL delivery — never overwrite with MISA original qty
+                const completedStatuses = ['Đã thực hiện', 'Hoàn thành', 'PENDING_APPROVAL'];
+                if (completedStatuses.includes(oldOrder.status)) {
+                    // Order is completed — ALWAYS keep local products (actual delivery)
+                    mappedOrder.sale_order_product_mappings = oldOrder.products;
+                    console.log(`🔒 Keeping local products for ${saleOrderNo} (order completed, preserving actual delivery qty)`);
+                } else if (oldOrder.status !== 'Mới' && oldOrder.products && oldOrder.products.length > 0) {
                     const misaProds = item.sale_order_product_mappings || [];
                     let misaProductsChanged = false;
                     if (misaProds.length !== oldOrder.products.length) {
@@ -682,7 +687,7 @@ const performSync = async () => {
                         mappedOrder.sale_order_product_mappings = oldOrder.products;
                         console.log(`🔒 Keeping local products for ${saleOrderNo} (no MISA change detected)`);
                     } else {
-                        // MISA products changed → use MISA data
+                        // MISA products changed → use MISA data (only for non-completed orders)
                         console.log(`📦 MISA products changed for ${saleOrderNo} — using MISA data (${misaProds.length} items, local had ${oldOrder.products.length})`);
                     }
                 }

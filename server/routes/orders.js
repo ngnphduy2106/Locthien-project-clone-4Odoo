@@ -694,13 +694,10 @@ router.get('/pending-confirm', async (req, res) => {
         if (error) return res.json(createResponse(true, error.message));
 
         const mapped = (orders || []).map(o => {
-            // Priority: cart (actual delivery) > sale_order_product_mappings (original MISA)
+            // Parse sale_order_product_mappings (contains actual delivery qty after driver completion)
             let products = [];
             try {
-                const cartData = o.cart;
-                if (cartData && Array.isArray(cartData) && cartData.length > 0) {
-                    products = cartData;
-                } else if (typeof o.sale_order_product_mappings === 'string') {
+                if (typeof o.sale_order_product_mappings === 'string') {
                     products = JSON.parse(o.sale_order_product_mappings);
                 } else if (Array.isArray(o.sale_order_product_mappings)) {
                     products = o.sale_order_product_mappings;
