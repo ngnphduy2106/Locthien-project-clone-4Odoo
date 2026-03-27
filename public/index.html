@@ -917,39 +917,39 @@
                 <section id="section-my-orders" class="hidden">
                     <h2 class="page-heading">Đơn Của Tôi</h2>
 
-                    <!-- Stat Cards - 3 columns -->
+                    <!-- Stat Cards - 3 columns (clickable) -->
                     <div class="stat-cards" style="grid-template-columns: repeat(3, 1fr); margin-bottom:20px;">
-                        <div class="stat-card" style="background: linear-gradient(135deg, #ffa94d, #fd7e14);">
+                        <div class="stat-card" style="background: linear-gradient(135deg, #ffa94d, #fd7e14); cursor:pointer;" onclick="switchMyOrdersTab('pending')">
                             <div class="stat-card-content">
                                 <div class="stat-card-label" style="color:#fff; opacity:0.9;">Chờ nhận</div>
                                 <div class="stat-card-value" id="my-orders-pending" style="color:#fff; font-size:2rem;">
                                     0</div>
                             </div>
-                            <div class="stat-card-icon" style="background:rgba(255,255,255,0.2);">
-                                <i class="bi bi-inbox" style="color:white;"></i>
-                            </div>
+                            <button class="btn" onclick="event.stopPropagation(); switchMyOrdersTab('pending')" style="background:rgba(255,255,255,0.25); border:2px solid rgba(255,255,255,0.5); width:44px; height:44px; border-radius:12px; padding:0; display:flex; align-items:center; justify-content:center; transition:all 0.15s ease;" onmouseenter="this.style.background='rgba(255,255,255,0.45)'; this.style.transform='scale(1.1)'" onmouseleave="this.style.background='rgba(255,255,255,0.25)'; this.style.transform='scale(1)'">
+                                <i class="bi bi-inbox" style="color:white; font-size:20px;"></i>
+                            </button>
                         </div>
 
-                        <div class="stat-card" style="background: linear-gradient(135deg, #4dabf7, #339af0);">
+                        <div class="stat-card" style="background: linear-gradient(135deg, #4dabf7, #339af0); cursor:pointer;" onclick="switchMyOrdersTab('delivering')">
                             <div class="stat-card-content">
                                 <div class="stat-card-label" style="color:#fff; opacity:0.9;">Đang giao</div>
                                 <div class="stat-card-value" id="my-orders-delivering"
                                     style="color:#fff; font-size:2rem;">0</div>
                             </div>
-                            <div class="stat-card-icon" style="background:rgba(255,255,255,0.2);">
-                                <i class="bi bi-truck" style="color:white;"></i>
-                            </div>
+                            <button class="btn" onclick="event.stopPropagation(); switchMyOrdersTab('delivering')" style="background:rgba(255,255,255,0.25); border:2px solid rgba(255,255,255,0.5); width:44px; height:44px; border-radius:12px; padding:0; display:flex; align-items:center; justify-content:center; transition:all 0.15s ease;" onmouseenter="this.style.background='rgba(255,255,255,0.45)'; this.style.transform='scale(1.1)'" onmouseleave="this.style.background='rgba(255,255,255,0.25)'; this.style.transform='scale(1)'">
+                                <i class="bi bi-truck" style="color:white; font-size:20px;"></i>
+                            </button>
                         </div>
 
-                        <div class="stat-card" style="background: linear-gradient(135deg, #51cf66, #40c057);">
+                        <div class="stat-card" style="background: linear-gradient(135deg, #51cf66, #40c057); cursor:pointer;" onclick="switchMyOrdersTab('completed')">
                             <div class="stat-card-content">
                                 <div class="stat-card-label" style="color:#fff; opacity:0.9;">Đã giao</div>
                                 <div class="stat-card-value" id="my-orders-completed"
                                     style="color:#fff; font-size:2rem;">0</div>
                             </div>
-                            <div class="stat-card-icon" style="background:rgba(255,255,255,0.2);">
-                                <i class="bi bi-check-circle" style="color:white;"></i>
-                            </div>
+                            <button class="btn" onclick="event.stopPropagation(); switchMyOrdersTab('completed')" style="background:rgba(255,255,255,0.25); border:2px solid rgba(255,255,255,0.5); width:44px; height:44px; border-radius:12px; padding:0; display:flex; align-items:center; justify-content:center; transition:all 0.15s ease;" onmouseenter="this.style.background='rgba(255,255,255,0.45)'; this.style.transform='scale(1.1)'" onmouseleave="this.style.background='rgba(255,255,255,0.25)'; this.style.transform='scale(1)'">
+                                <i class="bi bi-check-circle" style="color:white; font-size:20px;"></i>
+                            </button>
                         </div>
                     </div>
 
