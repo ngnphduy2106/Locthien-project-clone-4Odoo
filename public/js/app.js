@@ -8691,6 +8691,7 @@ async function showDriverCompletionModal(orderId, assignmentId = null) {
             <div style="display:flex; align-items:center; gap:8px; padding:10px 12px; border-bottom:1px solid var(--border); background:${idx % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.02)'};">
                 <div style="flex:2;">
                     <div style="font-weight:600; color:var(--text-primary); font-size:13px;">${item.name}</div>
+                    <div id="qty-warning-${idx}" style="display:none; font-size:11px; margin-top:4px; padding:4px 8px; border-radius:6px; font-weight:600;"></div>
                 </div>
                 <div style="flex:1; text-align:center;">
                     <span style="font-size:14px; font-weight:600; color:var(--text-secondary); background:var(--body-bg); padding:6px 10px; border-radius:6px; display:inline-block;">${Number(item.planQty).toLocaleString('vi-VN')}</span>
@@ -8698,7 +8699,9 @@ async function showDriverCompletionModal(orderId, assignmentId = null) {
                 <div style="flex:1;">
                     <input type="number" class="form-control actual-qty-input" 
                         id="actual-qty-${idx}"
+                        data-plan-qty="${item.planQty}"
                         value="${item.actualQty}" 
+                        oninput="updateCompletionQty(${idx}, this.value)"
                         onchange="updateCompletionQty(${idx}, this.value)"
                         required
                         style="padding:6px 8px; font-size:14px; font-weight:700; text-align:center; border:2px solid var(--primary); border-radius:6px;">
@@ -8805,11 +8808,47 @@ async function showDriverCompletionModal(orderId, assignmentId = null) {
     if (modal) modal.classList.remove('hidden');
 }
 
-// Update actual quantity in completion cart
+// Update actual quantity in completion cart + show deviation warning
 function updateCompletionQty(idx, value) {
     if (state.completionCart && state.completionCart[idx]) {
-        state.completionCart[idx].actualQty = Number(value) || 0;
-        console.log(`📝 Updated product ${idx} actual qty: ${value}`);
+        const actual = Number(value) || 0;
+        state.completionCart[idx].actualQty = actual;
+
+        // Calculate deviation from planned qty
+        const planned = Number(state.completionCart[idx].planQty || 0);
+        const input = window.$(`#actual-qty-${idx}`);
+        const warningEl = window.$(`#qty-warning-${idx}`);
+
+        if (planned > 0 && actual > 0 && warningEl) {
+            const diff = actual - planned;
+            const pct = Math.round((diff / planned) * 100);
+            const absPct = Math.abs(pct);
+
+            if (absPct > 20) {
+                // RED: >20% deviation — critical warning
+                warningEl.style.display = 'block';
+                warningEl.style.background = '#fef2f2';
+                warningEl.style.color = '#dc2626';
+                warningEl.style.border = '1px solid #fecaca';
+                warningEl.innerHTML = `⚠️ ${diff > 0 ? 'Vượt' : 'Thiếu'} <b>${absPct}%</b> so với SL đặt!`;
+                if (input) input.style.borderColor = '#dc2626';
+            } else if (absPct > 5) {
+                // YELLOW: 5-20% deviation — mild warning
+                warningEl.style.display = 'block';
+                warningEl.style.background = '#fffbeb';
+                warningEl.style.color = '#d97706';
+                warningEl.style.border = '1px solid #fed7aa';
+                warningEl.innerHTML = `⚡ ${diff > 0 ? 'Nhiều hơn' : 'Ít hơn'} <b>${absPct}%</b>`;
+                if (input) input.style.borderColor = '#f59e0b';
+            } else {
+                // OK: <5% deviation
+                warningEl.style.display = 'none';
+                if (input) input.style.borderColor = '#10b981';
+            }
+        } else if (warningEl) {
+            warningEl.style.display = 'none';
+            if (input) input.style.borderColor = 'var(--primary)';
+        }
     }
 }
 
@@ -9027,8 +9066,10 @@ function showImportCompletionModal(importId, assignmentId = null) {
                     <div>
                         <div style="font-size:11px; color:var(--text-muted);">Thực tế</div>
                         <input type="number" id="import-actual-qty-${idx}" class="form-control" 
+                            data-plan-qty="${p.qty || p.quantity || 0}"
                             style="padding:6px 8px; font-size:13px;"
                             value="" 
+                            oninput="updateImportCompletionQty(${idx}, this.value)"
                             onchange="updateImportCompletionQty(${idx}, this.value)">
                     </div>
                     <div>
@@ -9036,6 +9077,7 @@ function showImportCompletionModal(importId, assignmentId = null) {
                         <div style="font-weight:600; padding-top:6px;">${p.unit || 'Kg'}</div>
                     </div>
                 </div>
+                <div id="import-qty-warning-${idx}" style="display:none; font-size:11px; margin-top:6px; padding:4px 8px; border-radius:6px; font-weight:600;"></div>
             </div>
         `).join('')
         : '<p style="color:var(--text-muted);">Không có sản phẩm</p>';
@@ -9143,11 +9185,44 @@ function showImportCompletionModal(importId, assignmentId = null) {
     loadImportProofImages(imp.id);
 }
 
-// Update import completion product quantity when user edits input
+// Update import completion product quantity with deviation warning
 function updateImportCompletionQty(index, value) {
     if (state.completionImportProducts && state.completionImportProducts[index]) {
-        state.completionImportProducts[index].actualQty = Number(value) || 0;
-        console.log(`Updated product ${index} actual qty to ${value}`);
+        const actual = Number(value) || 0;
+        state.completionImportProducts[index].actualQty = actual;
+
+        // Calculate deviation from planned qty
+        const planned = Number(state.completionImportProducts[index].qty || state.completionImportProducts[index].quantity || 0);
+        const input = window.$(`#import-actual-qty-${index}`);
+        const warningEl = window.$(`#import-qty-warning-${index}`);
+
+        if (planned > 0 && actual > 0 && warningEl) {
+            const diff = actual - planned;
+            const pct = Math.round((diff / planned) * 100);
+            const absPct = Math.abs(pct);
+
+            if (absPct > 20) {
+                warningEl.style.display = 'block';
+                warningEl.style.background = '#fef2f2';
+                warningEl.style.color = '#dc2626';
+                warningEl.style.border = '1px solid #fecaca';
+                warningEl.innerHTML = `⚠️ ${diff > 0 ? 'Vượt' : 'Thiếu'} <b>${absPct}%</b> so với SL đặt!`;
+                if (input) input.style.borderColor = '#dc2626';
+            } else if (absPct > 5) {
+                warningEl.style.display = 'block';
+                warningEl.style.background = '#fffbeb';
+                warningEl.style.color = '#d97706';
+                warningEl.style.border = '1px solid #fed7aa';
+                warningEl.innerHTML = `⚡ ${diff > 0 ? 'Nhiều hơn' : 'Ít hơn'} <b>${absPct}%</b>`;
+                if (input) input.style.borderColor = '#f59e0b';
+            } else {
+                warningEl.style.display = 'none';
+                if (input) input.style.borderColor = '#10b981';
+            }
+        } else if (warningEl) {
+            warningEl.style.display = 'none';
+            if (input) input.style.borderColor = '';
+        }
     }
 }
 // Export for inline onclick
