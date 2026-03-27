@@ -7680,7 +7680,7 @@ async function cancelDispatch(orderId, type = 'export') {
                 if (typeof loadImports === 'function') loadImports();
             } else {
                 state._cache.dispatch = 0;
-                if (typeof loadDispatchOrders === 'function') loadDispatchOrders();
+                if (window.DispatchModule?.loadOrders) window.DispatchModule.loadOrders();
             }
             // Also refresh My Orders for drivers
             if (typeof loadMyOrders === 'function') loadMyOrders();
