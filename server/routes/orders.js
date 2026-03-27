@@ -2962,7 +2962,6 @@ router.post('/:id/confirm', async (req, res) => {
             const syncResult = await updateMisaOrder(updatedOrder?.sale_order_no || id, {
                 misa_id: updatedOrder?.misa_id,
                 delivery_status: 'Đã giao hàng',
-                status: 'Đã thực hiện',
                 driver: updatedOrder?.taiXe || updatedOrder?.custom_field13 || '',
                 plate: updatedOrder?.bienSo || updatedOrder?.custom_field14 || '',
                 cart: updatedOrder?.products || []
@@ -3049,7 +3048,6 @@ router.post('/:id/approve', async (req, res) => {
             const syncResult = await updateMisaOrder(updatedOrder?.sale_order_no || id, {
                 misa_id: updatedOrder?.misa_id,
                 delivery_status: 'Đã giao hàng',
-                status: 'Đã thực hiện',
                 driver: updatedOrder?.taiXe || updatedOrder?.custom_field13 || '',
                 plate: updatedOrder?.bienSo || updatedOrder?.custom_field14 || '',
                 cart: updatedOrder?.products || []
