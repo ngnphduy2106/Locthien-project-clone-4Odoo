@@ -2942,7 +2942,28 @@ router.post('/:id/confirm', async (req, res) => {
 
         await db.updateOrder(id, updateData);
 
-        // Telegram: notify sales confirmed (no CRM sync)
+        // Sync to MISA CRM
+        let crmStatus = 'OK';
+        try {
+            const updatedOrder = await db.getOrder(id);
+            const syncResult = await updateMisaOrder(updatedOrder?.sale_order_no || id, {
+                misa_id: updatedOrder?.misa_id,
+                delivery_status: 'Đã giao hàng',
+                status: 'Đã thực hiện',
+                driver: updatedOrder?.taiXe || updatedOrder?.custom_field13 || '',
+                plate: updatedOrder?.bienSo || updatedOrder?.custom_field14 || '',
+                cart: updatedOrder?.products || []
+            });
+            if (!syncResult?.success) {
+                crmStatus = syncResult?.message || 'MISA sync failed';
+                console.error('MISA confirm sync failed:', crmStatus);
+            }
+        } catch (syncErr) {
+            crmStatus = syncErr.message;
+            console.error('MISA confirm sync error:', syncErr.message);
+        }
+
+        // Telegram: notify sales confirmed
         try {
             const { sendTelegramMessage } = await import('../services/telegram.js');
             const orderNo = order.soDon || order.sale_order_no || id;
@@ -2950,13 +2971,13 @@ router.post('/:id/confirm', async (req, res) => {
             msg += `📦 <b>#${orderNo}</b>\n`;
             msg += `👤 ${order.khach || order.account_name || 'N/A'}\n`;
             msg += `👔 Bởi: ${confirmed_by || 'sales'}\n`;
-            msg += `⏳ Chờ Admin duyệt`;
+            msg += `📤 CRM: ${crmStatus === 'OK' ? '✅ Đã đồng bộ' : '⚠️ ' + crmStatus}`;
             await sendTelegramMessage(msg, 'NOTIFY');
         } catch (tgErr) {
             console.error('Telegram confirm error:', tgErr.message);
         }
 
-        res.json(createResponse(false, 'Đã xác nhận! Chờ Admin duyệt.'));
+        res.json(createResponse(false, 'Đã xác nhận & đồng bộ MISA!', { crmStatus }));
     } catch (e) {
         console.error('confirm error:', e.message);
         res.json(createResponse(true, e.message));
