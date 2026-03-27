@@ -793,6 +793,26 @@ const performSync = async () => {
             mappedOrder.createdAt = new Date().toISOString();
             const addResult = await db.addOrder(mappedOrder);
 
+            // DB-LEVEL DEDUP: If upsert returned a record that already has a telegram_message_id,
+            // it was already notified in a previous server lifecycle — skip notification
+            if (addResult && addResult.telegram_message_id) {
+                console.log(`⏭️ Skipping notification for ${saleOrderNo} — already has telegram_message_id`);
+                newCount++;
+                continue;
+            }
+
+            // TIME-BASED GUARD: Skip notification for orders created > 2 hours ago on MISA
+            // (Prevents re-notifying old orders after server restart)
+            if (item.created_date) {
+                const orderCreatedMs = new Date(item.created_date).getTime();
+                const twoHoursAgo = Date.now() - (2 * 60 * 60 * 1000);
+                if (orderCreatedMs < twoHoursAgo) {
+                    console.log(`⏭️ Skipping notification for ${saleOrderNo} — created ${item.created_date} (older than 2h)`);
+                    newCount++;
+                    continue;
+                }
+            }
+
             // Auto-clean dedup map: remove entries older than 24 hours
             for (const [key, ts] of notifiedNewOrders) {
                 if (Date.now() - ts > 24 * 60 * 60 * 1000) notifiedNewOrders.delete(key);
