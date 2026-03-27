@@ -2941,11 +2941,12 @@ router.post('/:id/confirm', async (req, res) => {
         const order = await db.getOrder(id);
         if (!order) return res.json(createResponse(true, 'Không tìm thấy đơn hàng'));
 
-        // Sales confirm: set checkmark only (no status change)
+        // Sales confirm: set checkmark + update delivery status
         const updateData = {
             sale_confirmed: true,
             sale_confirmed_at: new Date().toISOString(),
-            sale_confirmed_by: confirmed_by || 'sales'
+            sale_confirmed_by: confirmed_by || 'sales',
+            delivery_status: 'Đã giao hàng'
         };
 
         if (products && Array.isArray(products)) {
@@ -3005,11 +3006,12 @@ router.post('/:id/approve', async (req, res) => {
         const order = await db.getOrder(id);
         if (!order) return res.json(createResponse(true, 'Không tìm thấy đơn hàng'));
 
-        // Update admin approval fields only (no status change)
+        // Update admin approval fields + delivery status
         const updateData = {
             admin_approved: true,
             admin_approved_at: new Date().toISOString(),
-            admin_approved_by: approved_by || 'admin'
+            admin_approved_by: approved_by || 'admin',
+            delivery_status: 'Đã giao hàng'
         };
 
         // If admin sent edited products, update them BEFORE MISA sync
