@@ -1840,19 +1840,46 @@ function renderDispatchOrders() {
                         <span style="font-size:10px; color:var(--text-muted);"><i class="bi bi-geo-alt" style="font-size:9px;"></i> ${address}</span>
                     </div>
 
-                    <!-- ROW 3: Products & Quantities -->
+                    <!-- ROW 3: Products & Quantities (with remaining if partially dispatched) -->
                     ${(() => {
                 let prods = order.products || order.sale_order_product_mappings || [];
                 if (typeof prods === 'string') { try { prods = JSON.parse(prods); } catch (e) { prods = []; } }
                 if (!Array.isArray(prods) || prods.length === 0) return '';
+
+                // Check if this order has partial dispatch
+                const dispatched = order.dispatched_products || [];
+                const hasPartialDispatch = dispatched.length > 0;
+
                 const shown = prods.slice(0, 3).map(p => {
                     const name = (p.name || p.code || '').replace(/^(Hóa chất |HC )/, '');
-                    const qty = Number(p.qty || p.weight_kg || 0);
+                    const originalQty = Number(p.qty || p.weight_kg || 0);
                     const unit = p.unit || 'Kg';
-                    return `<span style="background:var(--body-bg); padding:1px 5px; border-radius:4px; font-size:10px; color:var(--text-secondary); white-space:nowrap;">${name.substring(0, 20)}: <b>${qty.toLocaleString('vi-VN')}</b> ${unit}</span>`;
+
+                    // Find how much of this product has been dispatched
+                    let dispatchedQty = 0;
+                    if (hasPartialDispatch) {
+                        const match = dispatched.find(d => d.code === p.code || d.name === p.name);
+                        if (match) dispatchedQty = Number(match.qty || 0);
+                    }
+                    const remainingQty = originalQty - dispatchedQty;
+
+                    if (hasPartialDispatch && dispatchedQty > 0 && remainingQty > 0) {
+                        // Partially dispatched: show original (struck) → remaining (orange)
+                        return `<span style="background:var(--body-bg); padding:1px 5px; border-radius:4px; font-size:10px; color:var(--text-secondary); white-space:nowrap;">${name.substring(0, 20)}: <s>${originalQty.toLocaleString('vi-VN')}</s> → <b style="color:#f59e0b;">${remainingQty.toLocaleString('vi-VN')}</b> ${unit}</span>`;
+                    } else if (hasPartialDispatch && remainingQty <= 0) {
+                        // Fully dispatched: show green checkmark
+                        return `<span style="background:#ecfdf5; padding:1px 5px; border-radius:4px; font-size:10px; color:#10b981; white-space:nowrap;">${name.substring(0, 20)}: ✓ ${originalQty.toLocaleString('vi-VN')} ${unit}</span>`;
+                    } else {
+                        // No dispatch yet: show normal
+                        return `<span style="background:var(--body-bg); padding:1px 5px; border-radius:4px; font-size:10px; color:var(--text-secondary); white-space:nowrap;">${name.substring(0, 20)}: <b>${originalQty.toLocaleString('vi-VN')}</b> ${unit}</span>`;
+                    }
                 }).join('');
                 const more = prods.length > 3 ? `<span style="font-size:10px; color:var(--text-muted);">+${prods.length - 3}</span>` : '';
-                return `<div style="display:flex; gap:4px; flex-wrap:wrap; align-items:center; width:100%;">${shown}${more}</div>`;
+
+                // Show driver count badge if partially dispatched
+                const driverBadge = hasPartialDispatch && order.driver_count ? `<span style="background:#fef3c7; color:#92400e; font-size:9px; padding:1px 5px; border-radius:4px; font-weight:600; white-space:nowrap;">🚛×${order.driver_count}</span>` : '';
+
+                return `<div style="display:flex; gap:4px; flex-wrap:wrap; align-items:center; width:100%;">${shown}${more}${driverBadge}</div>`;
             })()}
                 </div>`;
     }).join('')}

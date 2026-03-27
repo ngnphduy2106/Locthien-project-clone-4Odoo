@@ -67,6 +67,50 @@ router.get('/', async (req, res) => {
             }
         }
 
+        // Fetch all active driver assignments in one batch to show remaining qty on dispatch tab
+        try {
+            const { createClient } = await import('@supabase/supabase-js');
+            const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+            const { data: allAssignments } = await supabase
+                .from('order_driver_assignments')
+                .select('order_id, assigned_products, status')
+                .in('status', ['pending', 'completed']);
+
+            if (allAssignments && allAssignments.length > 0) {
+                // Group assignments by order_id
+                const assignmentsByOrder = {};
+                for (const a of allAssignments) {
+                    if (!a.order_id) continue;
+                    if (!assignmentsByOrder[a.order_id]) assignmentsByOrder[a.order_id] = [];
+                    assignmentsByOrder[a.order_id].push(a);
+                }
+
+                // Attach dispatched_products to each order (pending + assigned)
+                for (const order of [...pending, ...assigned]) {
+                    const orderId = order.soDon || order.sale_order_no || order.id;
+                    const assigns = assignmentsByOrder[orderId] || assignmentsByOrder[order.id] || [];
+                    if (assigns.length === 0) continue;
+
+                    // Sum up assigned products across all drivers
+                    const dispatchedMap = {};
+                    for (const a of assigns) {
+                        let prods = a.assigned_products;
+                        if (typeof prods === 'string') { try { prods = JSON.parse(prods); } catch (e) { continue; } }
+                        if (!Array.isArray(prods)) continue;
+                        for (const p of prods) {
+                            const key = p.code || p.name;
+                            if (!dispatchedMap[key]) dispatchedMap[key] = { code: p.code, name: p.name, qty: 0, unit: p.unit };
+                            dispatchedMap[key].qty += Number(p.qty || 0);
+                        }
+                    }
+                    order.dispatched_products = Object.values(dispatchedMap);
+                    order.driver_count = assigns.length;
+                }
+            }
+        } catch (assignErr) {
+            console.warn('Assignment batch fetch error (non-critical):', assignErr.message);
+        }
+
         const drivers = users
             .filter(u => u.status === 'ACTIVE' && u.role === CONFIG.ROLES.DRIVER)
             .map(u => ({ name: u.fullName, plate: u.plate }));
