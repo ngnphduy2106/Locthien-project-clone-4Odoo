@@ -662,10 +662,17 @@ router.get('/pending-confirm', async (req, res) => {
             if (error) return res.json(createResponse(true, error.message));
 
             const mapped = (orders || []).map(o => {
+                // Priority: cart (actual delivery) > sale_order_product_mappings (original MISA)
                 let products = [];
                 try {
-                    if (typeof o.sale_order_product_mappings === 'string') products = JSON.parse(o.sale_order_product_mappings);
-                    else if (Array.isArray(o.sale_order_product_mappings)) products = o.sale_order_product_mappings;
+                    const cartData = o.cart;
+                    if (cartData && Array.isArray(cartData) && cartData.length > 0) {
+                        products = cartData;
+                    } else if (typeof o.sale_order_product_mappings === 'string') {
+                        products = JSON.parse(o.sale_order_product_mappings);
+                    } else if (Array.isArray(o.sale_order_product_mappings)) {
+                        products = o.sale_order_product_mappings;
+                    }
                 } catch (e) { }
                 return { ...o, products };
             });
@@ -687,10 +694,17 @@ router.get('/pending-confirm', async (req, res) => {
         if (error) return res.json(createResponse(true, error.message));
 
         const mapped = (orders || []).map(o => {
+            // Priority: cart (actual delivery) > sale_order_product_mappings (original MISA)
             let products = [];
             try {
-                if (typeof o.sale_order_product_mappings === 'string') products = JSON.parse(o.sale_order_product_mappings);
-                else if (Array.isArray(o.sale_order_product_mappings)) products = o.sale_order_product_mappings;
+                const cartData = o.cart;
+                if (cartData && Array.isArray(cartData) && cartData.length > 0) {
+                    products = cartData;
+                } else if (typeof o.sale_order_product_mappings === 'string') {
+                    products = JSON.parse(o.sale_order_product_mappings);
+                } else if (Array.isArray(o.sale_order_product_mappings)) {
+                    products = o.sale_order_product_mappings;
+                }
             } catch (e) { }
             return { ...o, products };
         });

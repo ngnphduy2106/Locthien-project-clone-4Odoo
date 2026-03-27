@@ -10598,8 +10598,8 @@ async function openReviewPanel(orderId, isImport = false) {
                 ` : ''}
             `;
 
-            // Render editable products
-            const products = order.products || [];
+            // Render editable products — prioritize cart (actual delivery) over products (original order)
+            const products = (order.cart && order.cart.length > 0) ? order.cart : (order.products || []);
             renderReviewProducts(products);
 
 
