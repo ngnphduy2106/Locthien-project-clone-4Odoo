@@ -9536,21 +9536,45 @@ async function loadProofImages(orderId) {
             return;
         }
 
+        // Use lazy loading: show skeleton thumbnails, load actual images on scroll
         gallery.innerHTML = images.map((src, idx) => `
-            <div style="position:relative;">
-                <img src="${src}" 
-                     style="width:80px; height:80px; object-fit:cover; border-radius:8px; cursor:pointer; border:2px solid var(--border); transition:transform 0.2s;"
+            <div style="position:relative; width:80px; height:80px;">
+                <div class="img-skeleton" data-idx="${idx}" 
+                     style="width:80px; height:80px; border-radius:8px; background:linear-gradient(110deg, var(--border) 8%, var(--body-bg) 18%, var(--border) 33%); background-size:200% 100%; animation:shimmer 1.5s linear infinite;">
+                </div>
+                <img data-src="${src}" 
+                     loading="lazy"
+                     style="width:80px; height:80px; object-fit:cover; border-radius:8px; cursor:pointer; border:2px solid var(--border); transition:transform 0.2s; position:absolute; top:0; left:0; opacity:0; transition:opacity 0.3s;"
                      onclick="viewProofImage(${idx})"
+                     onload="this.style.opacity='1'; this.previousElementSibling.style.display='none';"
                      onmouseover="this.style.transform='scale(1.05)'"
                      onmouseout="this.style.transform='scale(1)'"
                      title="Click để xem lớn">
                 ${isAdminRole() ? `
                 <button onclick="deleteProofImage('${orderId}', ${idx})" 
-                        style="position:absolute; top:-6px; right:-6px; width:20px; height:20px; border-radius:50%; background:var(--danger); color:white; border:none; cursor:pointer; font-size:12px; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.3);"
+                        style="position:absolute; top:-6px; right:-6px; width:20px; height:20px; border-radius:50%; background:var(--danger); color:white; border:none; cursor:pointer; font-size:12px; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.3); z-index:2;"
                         title="Xóa ảnh này">×</button>
                 ` : ''}
             </div>
         `).join('');
+
+        // Lazy load: only set src when image scrolls into view
+        const lazyImgs = gallery.querySelectorAll('img[data-src]');
+        if ('IntersectionObserver' in window) {
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const img = entry.target;
+                        img.src = img.dataset.src;
+                        observer.unobserve(img);
+                    }
+                });
+            }, { rootMargin: '100px' });
+            lazyImgs.forEach(img => observer.observe(img));
+        } else {
+            // Fallback: load all immediately
+            lazyImgs.forEach(img => { img.src = img.dataset.src; });
+        }
 
         // Store images globally for viewer
         window._currentProofImages = images;

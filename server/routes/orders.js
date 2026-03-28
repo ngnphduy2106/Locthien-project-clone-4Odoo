@@ -2314,126 +2314,61 @@ router.get('/:id/proof-images', async (req, res) => {
         const { createClient } = await import('@supabase/supabase-js');
         const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
-        console.log(`📸 Loading proof images for order: ${id}`);
-
-        let allImages = [];
-        let ticketInfo = null;
-
-        // First, try to get the actual order to find correct UUID
-        let orderUuid = id;
-        let orderSoDon = id;
+        // Resolve order UUID and soDon once
         const orderInfo = await db.getOrder(id);
-        if (orderInfo) {
-            orderUuid = orderInfo.id || id;
-            orderSoDon = orderInfo.soDon || orderInfo.sale_order_no || id;
-            console.log(`   Resolved order: UUID=${orderUuid}, soDon=${orderSoDon}`);
-        }
+        const orderUuid = orderInfo?.id || id;
+        const orderSoDon = orderInfo?.soDon || orderInfo?.sale_order_no || id;
+        const lookupIds = [...new Set([orderUuid, orderSoDon, id])]; // Deduplicate IDs
 
-        // STEP 1: Check order_driver_assignments (search by UUID)
-        try {
-            let { data: assignments } = await supabase
+        // Run BOTH lookups in parallel for speed
+        const [assignResult, ticketResult] = await Promise.all([
+            // 1. order_driver_assignments
+            supabase
                 .from('order_driver_assignments')
-                .select('id, driver_name, proof_images, completed_at')
-                .eq('order_id', orderUuid)
-                .order('created_at', { ascending: false });
-
-            // If not found by UUID, also try soDon in case order_id was stored as soDon
-            if (!assignments || assignments.length === 0) {
-                const result = await supabase
-                    .from('order_driver_assignments')
-                    .select('id, driver_name, proof_images, completed_at')
-                    .eq('order_id', orderSoDon)
-                    .order('created_at', { ascending: false });
-
-                if (result.data && result.data.length > 0) {
-                    assignments = result.data;
-                }
-            }
-
-            if (assignments && assignments.length > 0) {
-                for (const a of assignments) {
-                    if (a.proof_images && Array.isArray(a.proof_images) && a.proof_images.length > 0) {
-                        allImages = [...allImages, ...a.proof_images];
-                        console.log(`   Found ${a.proof_images.length} images from assignment (driver: ${a.driver_name})`);
-                    }
-                }
-            }
-        } catch (assignErr) {
-            console.warn('Assignment image lookup error:', assignErr.message);
-        }
-
-        // STEP 2: Also check export_tickets
-        let { data, error } = await supabase
-            .from('export_tickets')
-            .select('ticket_no, images, created_at, driver_name')
-            .eq('order_id', id)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single();
-
-        if (error || !data) {
-            // Try by order_no
-            const result = await supabase
+                .select('driver_name, proof_images')
+                .in('order_id', lookupIds)
+                .order('created_at', { ascending: false }),
+            // 2. export_tickets
+            supabase
                 .from('export_tickets')
                 .select('ticket_no, images, created_at, driver_name')
-                .eq('order_no', id)
+                .or(lookupIds.map(lid => `order_id.eq.${lid},order_no.eq.${lid}`).join(','))
                 .order('created_at', { ascending: false })
                 .limit(1)
-                .single();
+        ]);
 
-            if (!result.error && result.data) {
-                data = result.data;
-            }
-        }
+        const allImages = [];
+        const seen = new Set();
 
-        // If still not found, try soDon
-        if (!data) {
-            const orderInfo = await db.getOrder(id);
-            if (orderInfo?.soDon) {
-                const result = await supabase
-                    .from('export_tickets')
-                    .select('ticket_no, images, created_at, driver_name')
-                    .eq('order_no', orderInfo.soDon)
-                    .order('created_at', { ascending: false })
-                    .limit(1)
-                    .single();
-
-                if (!result.error) {
-                    data = result.data;
-                }
-            }
-        }
-
-        if (data) {
-            ticketInfo = {
-                ticket_no: data.ticket_no,
-                created_at: data.created_at,
-                driver_name: data.driver_name
-            };
-
-            if (data.images && Array.isArray(data.images)) {
-                // Merge with assignment images, avoid duplicates
-                for (const img of data.images) {
-                    if (!allImages.includes(img)) {
-                        allImages.push(img);
+        // Collect from assignments
+        if (assignResult.data) {
+            for (const a of assignResult.data) {
+                if (Array.isArray(a.proof_images)) {
+                    for (const img of a.proof_images) {
+                        if (!seen.has(img)) { seen.add(img); allImages.push(img); }
                     }
                 }
-                console.log(`   Found ${data.images.length} images from export_ticket`);
             }
         }
 
-        console.log(`📸 Total: ${allImages.length} images found`);
+        // Collect from export ticket
+        const ticket = ticketResult.data?.[0];
+        if (ticket?.images && Array.isArray(ticket.images)) {
+            for (const img of ticket.images) {
+                if (!seen.has(img)) { seen.add(img); allImages.push(img); }
+            }
+        }
 
         res.json({
             error: false,
             images: allImages,
-            ticket_no: ticketInfo?.ticket_no || null,
-            created_at: ticketInfo?.created_at || null,
-            driver_name: ticketInfo?.driver_name || null
+            ticket_no: ticket?.ticket_no || null,
+            created_at: ticket?.created_at || null,
+            driver_name: ticket?.driver_name || null
         });
     } catch (e) {
         console.error('Get proof images error:', e.message);
-        res.json({ error: false, images: [] }); // Return empty array on error
+        res.json({ error: false, images: [] });
     }
 });
 

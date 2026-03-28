@@ -91,6 +91,12 @@ body {
   }
 }
 
+@keyframes shimmer {
+  to {
+    background-position-x: -200%;
+  }
+}
+
 /* === LOGIN === */
 .view-login {
   display: flex;
