@@ -8335,13 +8335,13 @@ const _webpSupported = (() => {
     } catch { return false; }
 })();
 
-// Hard compression rules
+// Hard compression rules — OPTIMIZED FOR 3G
 const IMG_COMPRESS_CONFIG = {
-    maxSizeMB: 0.3,           // Target <300KB output
-    maxWidthOrHeight: 1200,    // Max dimension (enough for reading text/signatures)
+    maxSizeMB: 0.15,           // Target <150KB output (was 300KB — halved for 3G)
+    maxWidthOrHeight: 800,     // Max dimension 800px (was 1200 — sufficient for proof photos)
     useWebWorker: true,        // Layer 2: Off main thread
     fileType: _webpSupported ? 'image/webp' : 'image/jpeg',
-    initialQuality: 0.65,     // Layer 3: Quality 0.65
+    initialQuality: 0.55,     // Layer 3: Quality 0.55 (was 0.65 — more compression for 3G)
     alwaysKeepResolution: false,
     preserveExif: false,       // Strip metadata for smaller files
 };
@@ -8436,27 +8436,47 @@ async function handleCompletionImagesSelect(input) {
         return;
     }
 
-    // Upload images to server immediately (progressive upload)
+    // Upload images SEQUENTIALLY (one-by-one) for 3G reliability
+    // If connection drops mid-batch, already-uploaded images are preserved
     if (orderId) {
-        showLoading(`Đang tải ${compressed.length} ảnh lên...`);
-        try {
-            const uploadUrl = isImport
-                ? `/api/imports/${orderId}/proof-images`
-                : `/api/orders/${orderId}/add-proof-images`;
-            const uploadRes = await fetch(uploadUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ images: compressed })
-            });
-            const uploadData = await uploadRes.json();
-            if (uploadData.error) {
-                console.error('Image upload error:', uploadData.msg);
-            } else {
-                console.log(`📸 Uploaded ${compressed.length} images to server`);
+        const uploadUrl = isImport
+            ? `/api/imports/${orderId}/proof-images`
+            : `/api/orders/${orderId}/add-proof-images`;
+        let uploadedCount = 0;
+        let failedCount = 0;
+
+        for (let i = 0; i < compressed.length; i++) {
+            showLoading(`Đang tải ảnh ${i + 1}/${compressed.length}...`);
+            
+            // Retry logic: try up to 2 times per image
+            let success = false;
+            for (let attempt = 0; attempt < 2 && !success; attempt++) {
+                try {
+                    const uploadRes = await fetch(uploadUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ images: [compressed[i]] })
+                    });
+                    const uploadData = await uploadRes.json();
+                    if (!uploadData.error) {
+                        uploadedCount++;
+                        success = true;
+                        console.log(`📸 Uploaded image ${i + 1}/${compressed.length}`);
+                    } else {
+                        console.warn(`⚠️ Image ${i + 1} error:`, uploadData.msg);
+                    }
+                } catch (uploadErr) {
+                    console.warn(`⚠️ Image ${i + 1} attempt ${attempt + 1} failed:`, uploadErr.message);
+                    if (attempt === 0) await new Promise(r => setTimeout(r, 1000)); // Wait 1s before retry
+                }
             }
-        } catch (uploadErr) {
-            console.error('Image upload failed:', uploadErr.message);
-            // Images still saved locally as fallback
+            if (!success) failedCount++;
+        }
+
+        if (failedCount > 0) {
+            console.warn(`📸 Upload: ${uploadedCount} OK, ${failedCount} failed`);
+        } else {
+            console.log(`📸 All ${uploadedCount} images uploaded successfully`);
         }
     }
 
