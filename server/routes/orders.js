@@ -1390,17 +1390,22 @@ router.post('/:id/complete', async (req, res) => {
             console.log(`🔧 Updating assignment id: ${assignment_id} to status: completed`);
             console.log(`📊 Saving actual_products:`, actualProducts);
 
-            const { data: updateResult, error: updateErr } = await supabase
-                .from('order_driver_assignments')
-                .update({
+            const assignUpdate = {
                     status: 'completed',
                     actual_qty: myActualQty,
-                    actual_products: actualProducts,  // NEW: store actual delivered products
+                    actual_products: actualProducts,
                     local_items: local_items || [],
                     delivery_note: note || delivery_note || '',
-                    proof_images: images || [],
-                    completed_at: new Date().toISOString() // Track completion time for MISA priority
-                })
+                    completed_at: new Date().toISOString()
+                };
+            // Only set proof_images if provided in body (merged orders send images with completion)
+            // For normal orders, images are uploaded separately via add-proof-images endpoint
+            if (images && images.length > 0) {
+                assignUpdate.proof_images = images;
+            }
+            const { data: updateResult, error: updateErr } = await supabase
+                .from('order_driver_assignments')
+                .update(assignUpdate)
                 .eq('id', assignment_id)
                 .select();
 

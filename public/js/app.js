@@ -4923,22 +4923,8 @@ async function submitDelivery() {
                 return;
             }
 
-            // Step 2: Upload images AFTER completion — export ticket now exists
-            if (validImages.length > 0) {
-                try {
-                    showLoading(`Đang tải ${validImages.length} ảnh...`);
-                    const imageRes = await fetch(`/api/orders/${order.id}/add-proof-images`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ images: validImages })
-                    });
-                    const imageData = await imageRes.json();
-                    if (imageData.error) console.warn('⚠️ Image save warning:', imageData.msg);
-                    else console.log('✅ Proof images saved to export ticket');
-                } catch (imgErr) {
-                    console.error('Image upload error (non-critical):', imgErr.message);
-                }
-            }
+            // Step 2: Upload images in BACKGROUND — don't block driver UI
+            // Driver sees "Hoàn thành" immediately, images upload silently
         }
 
         hideLoading();
@@ -4950,6 +4936,29 @@ async function submitDelivery() {
         if (typeof loadMyOrders === 'function') loadMyOrders();
         if (window.DispatchModule?.loadOrders) window.DispatchModule.loadOrders();
         if (window.MyOrdersModule?.loadMyOrders) window.MyOrdersModule.loadMyOrders();
+
+        // BACKGROUND: Upload images one-by-one (non-blocking, with retry)
+        if (validImages.length > 0 && !order.merged_order_no) {
+            const uploadUrl = `/api/orders/${order.id}/add-proof-images`;
+            (async () => {
+                for (let i = 0; i < validImages.length; i++) {
+                    for (let attempt = 0; attempt < 2; attempt++) {
+                        try {
+                            const r = await fetch(uploadUrl, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ images: [validImages[i]] })
+                            });
+                            const d = await r.json();
+                            if (!d.error) { console.log(`📸 BG: image ${i+1}/${validImages.length} OK`); break; }
+                        } catch (e) {
+                            if (attempt === 0) await new Promise(r => setTimeout(r, 1500));
+                            else console.warn(`📸 BG: image ${i+1} failed after retry`);
+                        }
+                    }
+                }
+            })();
+        }
 
     } catch (e) {
         hideLoading();
@@ -5259,22 +5268,24 @@ async function submitImportDelivery() {
             note: item.note || ''
         }));
 
-        // Upload proof images FIRST (before complete) so Telegram notification includes them
+        // Upload proof images one-by-one BEFORE completion (for Telegram notification)
         if (validImages.length > 0) {
-            try {
-                const imageRes = await fetch(`/api/imports/${imp.id}/proof-images`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ images: validImages })
-                });
-                const imageData = await imageRes.json();
-                if (imageData.error) {
-                    console.warn('Image save warning:', imageData.msg || imageData.message);
-                } else {
-                    console.log('📸 Images uploaded before completion');
+            for (let i = 0; i < validImages.length; i++) {
+                showLoading(`Đang tải ảnh ${i+1}/${validImages.length}...`);
+                for (let attempt = 0; attempt < 2; attempt++) {
+                    try {
+                        const imageRes = await fetch(`/api/imports/${imp.id}/proof-images`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ images: [validImages[i]] })
+                        });
+                        const imageData = await imageRes.json();
+                        if (!imageData.error) { console.log(`📸 Import image ${i+1}/${validImages.length} OK`); break; }
+                    } catch (imgErr) {
+                        if (attempt === 0) await new Promise(r => setTimeout(r, 1500));
+                        else console.warn(`📸 Import image ${i+1} failed after retry`);
+                    }
                 }
-            } catch (imgErr) {
-                console.error('Image upload error:', imgErr.message);
             }
         }
 
