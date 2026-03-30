@@ -726,22 +726,6 @@ router.put('/:id/edit-assignment', async (req, res) => {
             }).eq('id', assignment.import_id);
         }
 
-        // Telegram
-        try {
-            const { sendTelegramMessage } = await import('../services/telegram.js');
-            const { data: imp } = await supabase.from('import_tickets').select('ticket_no').eq('id', assignment.import_id).single();
-
-            let msg = `✏️ <b>CHỈNH SỬA TÀI XẾ (NHẬP)</b>\n`;
-            msg += `📦 <b>#${imp?.ticket_no || id}</b>\n`;
-            msg += `──────────────\n`;
-            msg += `❌ Cũ: ${oldDriverName}${oldPlate ? ` (${oldPlate})` : ''}\n`;
-            msg += `✅ Mới: ${driver_name}${plate ? ` (${plate})` : ''}\n`;
-
-            await sendTelegramMessage(msg, 'DRIVER');
-        } catch (tgErr) {
-            console.error('Telegram edit-import-assignment error:', tgErr.message);
-        }
-
         console.log(`✅ Import assignment ${assignment_id} updated: ${oldDriverName} → ${driver_name}`);
         res.json(createResponse(false, `Đã cập nhật tài xế: ${driver_name}!`));
 

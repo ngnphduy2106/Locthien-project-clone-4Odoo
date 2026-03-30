@@ -1340,23 +1340,6 @@ router.put('/:id/edit-assignment', async (req, res) => {
             }
         }
 
-        // Send Telegram notification about the change
-        try {
-            const { sendTelegramMessage } = await import('../services/telegram.js');
-            const orderInfo = await db.getOrder(assignment.order_id);
-            const orderNo = orderInfo?.soDon || orderInfo?.sale_order_no || id;
-
-            let msg = `✏️ <b>CHỈNH SỬA TÀI XẾ</b>\n`;
-            msg += `📦 <b>#${orderNo}</b>\n`;
-            msg += `──────────────\n`;
-            msg += `❌ Cũ: ${oldDriverName}${oldPlate ? ` (${oldPlate})` : ''}\n`;
-            msg += `✅ Mới: ${driver_name}${plate ? ` (${plate})` : ''}\n`;
-
-            await sendTelegramMessage(msg, 'DRIVER');
-        } catch (tgErr) {
-            console.error('Telegram edit-assignment error:', tgErr.message);
-        }
-
         console.log(`✅ Assignment ${assignment_id} updated: ${oldDriverName} → ${driver_name}`);
         res.json(createResponse(false, `Đã cập nhật tài xế: ${driver_name}!`));
 
