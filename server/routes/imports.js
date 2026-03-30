@@ -3,7 +3,7 @@
 // ===============================================
 
 import { Router } from 'express';
-import { createResponse, getTimestamp } from '../config.js';
+import { createResponse, getTimestamp, generateOrderCode } from '../config.js';
 import { createClient } from '@supabase/supabase-js';
 
 const router = Router();
@@ -106,8 +106,7 @@ router.post('/', async (req, res) => {
             return res.json(createResponse(true, 'Thiếu thông tin nhà cung cấp hoặc sản phẩm'));
         }
 
-        const ts = getTimestamp();
-        const ticketNo = 'N' + ts.short;
+        const ticketNo = await generateOrderCode('N'); // N2603001 format
 
         const totalQty = products.reduce((sum, p) => sum + Number(p.qty || 0), 0);
 

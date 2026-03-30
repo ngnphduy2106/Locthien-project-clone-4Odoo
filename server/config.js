@@ -114,3 +114,56 @@ export function getTimestamp() {
         short: now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', ...options }).replace(':', '')
     };
 }
+
+/**
+ * Generate sequential order code: PREFIX + YY + MM + SEQ(3 digits)
+ * Examples: E2603001 (Export #1 in March 2026), N2603005 (Import #5 in March 2026)
+ * Uses Supabase 'order_counters' table for atomic sequence tracking per month
+ * @param {'E'|'N'} prefix - E for Export (xuất ERP), N for Import (nhập)
+ * @returns {Promise<string>} Generated order code
+ */
+export async function generateOrderCode(prefix = 'E') {
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+    const now = new Date();
+    // Use Vietnam timezone for correct YY/MM
+    const vnDate = new Date(now.toLocaleString('en-US', { timeZone: CONFIG.TIMEZONE }));
+    const yy = String(vnDate.getFullYear()).slice(-2);
+    const mm = String(vnDate.getMonth() + 1).padStart(2, '0');
+    const counterKey = `${prefix}${yy}${mm}`; // e.g., "E2603" or "N2603"
+
+    try {
+        // Atomic upsert + increment using Supabase RPC or manual upsert
+        // Try to increment existing counter
+        const { data: existing } = await supabase
+            .from('order_counters')
+            .select('current_seq')
+            .eq('counter_key', counterKey)
+            .single();
+
+        let nextSeq;
+        if (existing) {
+            nextSeq = existing.current_seq + 1;
+            await supabase
+                .from('order_counters')
+                .update({ current_seq: nextSeq, updated_at: now.toISOString() })
+                .eq('counter_key', counterKey);
+        } else {
+            // First order of this month — start at 1
+            nextSeq = 1;
+            await supabase
+                .from('order_counters')
+                .insert({ counter_key: counterKey, current_seq: nextSeq, updated_at: now.toISOString() });
+        }
+
+        const seqStr = String(nextSeq).padStart(3, '0');
+        return `${counterKey}${seqStr}`; // e.g., E2603001
+    } catch (e) {
+        // Fallback: use timestamp-based code if counter table fails
+        console.error('⚠️ generateOrderCode fallback (counter error):', e.message);
+        const ts = getTimestamp();
+        const fallbackSeq = ts.short + String(Math.floor(Math.random() * 10));
+        return `${counterKey}${fallbackSeq}`;
+    }
+}

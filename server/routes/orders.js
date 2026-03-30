@@ -3,7 +3,7 @@
 // ===============================================
 
 import { Router } from 'express';
-import { CONFIG, createResponse, formatDate, getTimestamp, standardizeData } from '../config.js';
+import { CONFIG, createResponse, formatDate, getTimestamp, standardizeData, generateOrderCode } from '../config.js';
 import db from '../db/index.js';
 import { updateMisaOrder } from '../services/misa.js';
 import { createNotification } from './notifications.js';
@@ -2629,8 +2629,7 @@ router.post('/local', async (req, res) => {
         const { createClient } = await import('@supabase/supabase-js');
         const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
-        const ts = getTimestamp();
-        const orderNo = 'X' + ts.short;  // Prefix X for export
+        const orderNo = await generateOrderCode('E'); // E2603001 format
 
         const totalQty = products.reduce((sum, p) => sum + Number(p.qty || 0), 0);
         const totalAmount = products.reduce((sum, p) => sum + Number(p.total || p.qty * (p.price || 0) || 0), 0);
