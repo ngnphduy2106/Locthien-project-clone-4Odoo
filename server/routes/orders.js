@@ -1340,6 +1340,55 @@ router.put('/:id/edit-assignment', async (req, res) => {
             }
         }
 
+        // Sync to merged/sister orders — same truck should have same driver info
+        try {
+            const orderInfo = await db.getOrder(assignment.order_id);
+            if (orderInfo?.merged_order_no) {
+                const { data: mergedLog } = await supabase
+                    .from('merged_orders')
+                    .select('source_order_nos')
+                    .eq('merged_no', orderInfo.merged_order_no)
+                    .single();
+
+                if (mergedLog?.source_order_nos) {
+                    const currentNo = orderInfo.soDon || orderInfo.sale_order_no || assignment.order_id;
+                    const sisters = mergedLog.source_order_nos.filter(no => no !== currentNo);
+
+                    for (const sisterNo of sisters) {
+                        // Update assignment for sister order (match by driver name to find the right one)
+                        const { data: sisterAssigns } = await supabase
+                            .from('order_driver_assignments')
+                            .select('id, driver_name, status')
+                            .eq('order_id', sisterNo)
+                            .eq('driver_name', oldDriverName)
+                            .neq('status', 'completed');
+
+                        if (sisterAssigns) {
+                            for (const sa of sisterAssigns) {
+                                await supabase.from('order_driver_assignments').update({
+                                    driver_name: driver_name.trim(),
+                                    plate: (plate || '').trim()
+                                }).eq('id', sa.id);
+                            }
+                        }
+
+                        // Also update order-level driver
+                        const sisterOrder = await db.getOrder(sisterNo);
+                        if (sisterOrder && sisterOrder.taiXe === oldDriverName) {
+                            await db.updateOrder(sisterNo, {
+                                taiXe: driver_name.trim(),
+                                bienSo: (plate || '').trim()
+                            });
+                        }
+
+                        console.log(`🔗 Synced driver to sister order: ${sisterNo}`);
+                    }
+                }
+            }
+        } catch (mergeErr) {
+            console.error('Merge sync error (non-critical):', mergeErr.message);
+        }
+
         console.log(`✅ Assignment ${assignment_id} updated: ${oldDriverName} → ${driver_name}`);
         res.json(createResponse(false, `Đã cập nhật tài xế: ${driver_name}!`));
 
