@@ -1267,6 +1267,104 @@ router.put('/:id/unassign', async (req, res) => {
     }
 });
 
+// PUT /api/orders/:id/edit-assignment - Edit driver name & plate for external driver assignments
+// Allows updating external driver info without re-dispatching the entire order
+router.put('/:id/edit-assignment', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { assignment_id, driver_name, plate } = req.body;
+
+        if (!assignment_id) {
+            return res.json(createResponse(true, 'Thiếu assignment_id!'));
+        }
+        if (!driver_name) {
+            return res.json(createResponse(true, 'Vui lòng nhập tên tài xế!'));
+        }
+
+        console.log(`\n✏️ EDIT ASSIGNMENT - Order: ${id}, Assignment: ${assignment_id}`);
+        console.log(`   New driver: ${driver_name}, plate: ${plate}`);
+
+        const { createClient } = await import('@supabase/supabase-js');
+        const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+        // Verify assignment exists and belongs to this order
+        const { data: assignment, error: lookupErr } = await supabase
+            .from('order_driver_assignments')
+            .select('id, order_id, driver_name, plate, status')
+            .eq('id', assignment_id)
+            .single();
+
+        if (lookupErr || !assignment) {
+            return res.json(createResponse(true, 'Không tìm thấy phân công!'));
+        }
+
+        // Don't allow editing completed assignments
+        if (assignment.status === 'completed') {
+            return res.json(createResponse(true, 'Không thể chỉnh sửa phân công đã hoàn thành!'));
+        }
+
+        const oldDriverName = assignment.driver_name;
+        const oldPlate = assignment.plate;
+
+        // Update assignment
+        const { error: updateErr } = await supabase
+            .from('order_driver_assignments')
+            .update({
+                driver_name: driver_name.trim(),
+                plate: (plate || '').trim()
+            })
+            .eq('id', assignment_id);
+
+        if (updateErr) {
+            return res.json(createResponse(true, 'Lỗi cập nhật: ' + updateErr.message));
+        }
+
+        // Also update the order's main driver fields if this is the primary assignment
+        // (first/only assignment determines order-level driver)
+        const { data: allAssignments } = await supabase
+            .from('order_driver_assignments')
+            .select('id, driver_name, plate')
+            .eq('order_id', assignment.order_id)
+            .order('created_at', { ascending: true });
+
+        if (allAssignments && allAssignments.length > 0) {
+            const primary = allAssignments[0];
+            if (primary.id === assignment_id) {
+                // This is the primary driver — sync to order level
+                await db.updateOrder(assignment.order_id, {
+                    taiXe: driver_name.trim(),
+                    bienSo: (plate || '').trim()
+                });
+                console.log(`✅ Also updated order-level driver: ${driver_name}`);
+            }
+        }
+
+        // Send Telegram notification about the change
+        try {
+            const { sendTelegramMessage } = await import('../services/telegram.js');
+            const orderInfo = await db.getOrder(assignment.order_id);
+            const orderNo = orderInfo?.soDon || orderInfo?.sale_order_no || id;
+
+            let msg = `✏️ <b>CHỈNH SỬA TÀI XẾ</b>\n`;
+            msg += `📦 <b>#${orderNo}</b>\n`;
+            msg += `──────────────\n`;
+            msg += `❌ Cũ: ${oldDriverName}${oldPlate ? ` (${oldPlate})` : ''}\n`;
+            msg += `✅ Mới: ${driver_name}${plate ? ` (${plate})` : ''}\n`;
+
+            await sendTelegramMessage(msg, 'DRIVER');
+        } catch (tgErr) {
+            console.error('Telegram edit-assignment error:', tgErr.message);
+        }
+
+        console.log(`✅ Assignment ${assignment_id} updated: ${oldDriverName} → ${driver_name}`);
+        res.json(createResponse(false, `Đã cập nhật tài xế: ${driver_name}!`));
+
+    } catch (e) {
+        console.error('Edit assignment error:', e);
+        res.json(createResponse(true, 'Lỗi: ' + e.message));
+    }
+});
+
 // PUT /api/orders/:id/start - Driver starts order (supports multi-driver)
 router.put('/:id/start', async (req, res) => {
     try {

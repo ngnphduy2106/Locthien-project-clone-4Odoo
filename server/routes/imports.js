@@ -644,6 +644,93 @@ router.put('/:id/unassign', async (req, res) => {
     }
 });
 
+// PUT /api/imports/:id/edit-assignment - Edit driver name & plate for import assignments
+router.put('/:id/edit-assignment', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { assignment_id, driver_name, plate } = req.body;
+
+        if (!assignment_id) {
+            return res.json(createResponse(true, 'Thiếu assignment_id!'));
+        }
+        if (!driver_name) {
+            return res.json(createResponse(true, 'Vui lòng nhập tên tài xế!'));
+        }
+
+        console.log(`\n✏️ EDIT IMPORT ASSIGNMENT - Import: ${id}, Assignment: ${assignment_id}`);
+
+        const supabase = getSupabase();
+
+        // Verify assignment exists
+        const { data: assignment, error: lookupErr } = await supabase
+            .from('import_driver_assignments')
+            .select('id, import_id, driver_name, plate, status')
+            .eq('id', assignment_id)
+            .single();
+
+        if (lookupErr || !assignment) {
+            return res.json(createResponse(true, 'Không tìm thấy phân công!'));
+        }
+
+        if (assignment.status === 'completed') {
+            return res.json(createResponse(true, 'Không thể chỉnh sửa phân công đã hoàn thành!'));
+        }
+
+        const oldDriverName = assignment.driver_name;
+        const oldPlate = assignment.plate;
+
+        // Update assignment
+        const { error: updateErr } = await supabase
+            .from('import_driver_assignments')
+            .update({
+                driver_name: driver_name.trim(),
+                plate: (plate || '').trim()
+            })
+            .eq('id', assignment_id);
+
+        if (updateErr) {
+            return res.json(createResponse(true, 'Lỗi cập nhật: ' + updateErr.message));
+        }
+
+        // Update import ticket main driver if this is the primary
+        const { data: allAssignments } = await supabase
+            .from('import_driver_assignments')
+            .select('id, driver_name, plate')
+            .eq('import_id', assignment.import_id)
+            .order('created_at', { ascending: true });
+
+        if (allAssignments && allAssignments.length > 0 && allAssignments[0].id === assignment_id) {
+            await supabase.from('import_tickets').update({
+                assigned_driver: driver_name.trim(),
+                assigned_plate: (plate || '').trim()
+            }).eq('id', assignment.import_id);
+        }
+
+        // Telegram
+        try {
+            const { sendTelegramMessage } = await import('../services/telegram.js');
+            const { data: imp } = await supabase.from('import_tickets').select('ticket_no').eq('id', assignment.import_id).single();
+
+            let msg = `✏️ <b>CHỈNH SỬA TÀI XẾ (NHẬP)</b>\n`;
+            msg += `📦 <b>#${imp?.ticket_no || id}</b>\n`;
+            msg += `──────────────\n`;
+            msg += `❌ Cũ: ${oldDriverName}${oldPlate ? ` (${oldPlate})` : ''}\n`;
+            msg += `✅ Mới: ${driver_name}${plate ? ` (${plate})` : ''}\n`;
+
+            await sendTelegramMessage(msg, 'DRIVER');
+        } catch (tgErr) {
+            console.error('Telegram edit-import-assignment error:', tgErr.message);
+        }
+
+        console.log(`✅ Import assignment ${assignment_id} updated: ${oldDriverName} → ${driver_name}`);
+        res.json(createResponse(false, `Đã cập nhật tài xế: ${driver_name}!`));
+
+    } catch (e) {
+        console.error('Edit import assignment error:', e);
+        res.json(createResponse(true, 'Lỗi: ' + e.message));
+    }
+});
+
 // PUT /api/imports/:id/start - Start import delivery (supports multi-driver)
 router.put('/:id/start', async (req, res) => {
     try {

@@ -3460,13 +3460,20 @@ async function viewOrderDetail(orderId, options = {}) {
                         }
 
                         return `
-                        <div style="background:white; border-radius:10px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+                        <div style="background:white; border-radius:10px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,0.1);" id="assignment-card-${a.id}">
                             <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 16px; border-bottom:1px solid #e5e7eb;">
                                 <div>
-                                    <span style="font-weight:600; font-size:14px;">${a.driver_name || 'Tài xế'}</span>
-                                    ${a.plate ? `<span style="color:#666; font-size:12px; margin-left:8px;">🚚 ${a.plate}</span>` : ''}
+                                    <span style="font-weight:600; font-size:14px;" id="assign-name-${a.id}">${a.driver_name || 'Tài xế'}</span>
+                                    <span style="color:#666; font-size:12px; margin-left:8px;" id="assign-plate-${a.id}">${a.plate ? `🚚 ${a.plate}` : ''}</span>
                                 </div>
-                                <div style="display:flex; align-items:center; gap:12px;">
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    ${a.status !== 'completed' ? `
+                                    <button onclick="editAssignmentInline('${order.id || order.soDon}', '${a.id}', '${(a.driver_name || '').replace(/'/g, "\\'")}', '${(a.plate || '').replace(/'/g, "\\'")}')" 
+                                        style="background:none; border:1px solid #d1d5db; border-radius:6px; padding:4px 8px; cursor:pointer; font-size:12px; color:#6b7280; display:flex; align-items:center; gap:4px;"
+                                        title="Chỉnh sửa tài xế & biển số">
+                                        <i class="bi bi-pencil" style="font-size:11px;"></i> Sửa
+                                    </button>
+                                    ` : ''}
                                     <span style="color:#8B5CF6; font-weight:700; font-size:15px;">${a.assigned_qty || 0}kg</span>
                                     <span class="badge" style="font-size:11px; padding:4px 10px; border-radius:12px; ${a.status === 'completed' ? 'background:#dcfce7; color:#16a34a;' :
                                 a.status === 'delivering' ? 'background:#dbeafe; color:#2563eb;' :
@@ -7621,6 +7628,123 @@ window.removeDriverAssignmentRow = removeDriverAssignmentRow;
 window.renderDriverAssignmentsList = renderDriverAssignmentsList;
 window.updateQtySummaryDisplay = updateQtySummaryDisplay;
 window.submitMultiDriverAssignment = submitMultiDriverAssignment;
+
+// Edit assignment driver name & plate (for external drivers — no re-dispatch needed)
+async function editAssignmentInline(orderId, assignmentId, currentName, currentPlate) {
+    // Show edit dialog
+    const container = document.getElementById(`assignment-card-${assignmentId}`);
+    if (!container) return;
+
+    // Create inline edit form
+    const headerDiv = container.querySelector('div:first-child');
+    const originalHtml = headerDiv.innerHTML;
+
+    headerDiv.innerHTML = `
+        <div style="width:100%; padding:4px 0;">
+            <div style="display:flex; gap:8px; margin-bottom:8px;">
+                <div style="flex:1;">
+                    <label style="font-size:11px; color:#6b7280; display:block; margin-bottom:2px;">Tên tài xế</label>
+                    <input type="text" id="edit-driver-name-${assignmentId}" value="${currentName}" 
+                        style="width:100%; padding:8px 10px; border:2px solid #8B5CF6; border-radius:8px; font-size:14px; outline:none;"
+                        placeholder="Nhập tên tài xế...">
+                </div>
+                <div style="flex:1;">
+                    <label style="font-size:11px; color:#6b7280; display:block; margin-bottom:2px;">Biển số xe</label>
+                    <input type="text" id="edit-driver-plate-${assignmentId}" value="${currentPlate}" 
+                        style="width:100%; padding:8px 10px; border:2px solid #d1d5db; border-radius:8px; font-size:14px; outline:none;"
+                        placeholder="Biển số...">
+                </div>
+            </div>
+            <div style="display:flex; gap:8px; justify-content:flex-end;">
+                <button onclick="cancelEditAssignment('${assignmentId}')" 
+                    style="padding:6px 14px; border:1px solid #d1d5db; border-radius:8px; background:white; cursor:pointer; font-size:13px; color:#6b7280;">
+                    Hủy
+                </button>
+                <button onclick="saveEditAssignment('${orderId}', '${assignmentId}')" 
+                    style="padding:6px 14px; border:none; border-radius:8px; background:#8B5CF6; color:white; cursor:pointer; font-size:13px; font-weight:600;">
+                    ✓ Lưu
+                </button>
+            </div>
+        </div>
+    `;
+
+    // Store original HTML for cancel
+    container.dataset.originalHtml = originalHtml;
+
+    // Focus name input
+    setTimeout(() => {
+        document.getElementById(`edit-driver-name-${assignmentId}`)?.focus();
+    }, 100);
+}
+
+function cancelEditAssignment(assignmentId) {
+    const container = document.getElementById(`assignment-card-${assignmentId}`);
+    if (!container) return;
+    const headerDiv = container.querySelector('div:first-child');
+    if (headerDiv && container.dataset.originalHtml) {
+        headerDiv.innerHTML = container.dataset.originalHtml;
+    }
+}
+
+async function saveEditAssignment(orderId, assignmentId) {
+    const nameInput = document.getElementById(`edit-driver-name-${assignmentId}`);
+    const plateInput = document.getElementById(`edit-driver-plate-${assignmentId}`);
+    
+    const newName = nameInput?.value?.trim();
+    const newPlate = plateInput?.value?.trim() || '';
+
+    if (!newName) {
+        alert('Vui lòng nhập tên tài xế!');
+        nameInput?.focus();
+        return;
+    }
+
+    try {
+        // Determine if this is an export or import order
+        const isImport = orderId.startsWith('N') || document.querySelector('.import-detail-active');
+        
+        let res;
+        if (isImport) {
+            res = await api.editImportAssignment(orderId, {
+                assignment_id: assignmentId,
+                driver_name: newName,
+                plate: newPlate
+            });
+        } else {
+            res = await api.editAssignment(orderId, {
+                assignment_id: assignmentId,
+                driver_name: newName,
+                plate: newPlate
+            });
+        }
+
+        if (res.error) {
+            alert(res.msg || 'Lỗi cập nhật!');
+            return;
+        }
+
+        // Update UI in-place
+        const nameEl = document.getElementById(`assign-name-${assignmentId}`);
+        const plateEl = document.getElementById(`assign-plate-${assignmentId}`);
+        if (nameEl) nameEl.textContent = newName;
+        if (plateEl) plateEl.innerHTML = newPlate ? `🚚 ${newPlate}` : '';
+
+        // Restore card layout
+        cancelEditAssignment(assignmentId);
+
+        // Re-render the card header with new values
+        if (nameEl) nameEl.textContent = newName;
+        if (plateEl) plateEl.innerHTML = newPlate ? `🚚 ${newPlate}` : '';
+
+        alert(res.msg || 'Đã cập nhật tài xế!');
+    } catch (e) {
+        alert('Lỗi: ' + e.message);
+    }
+}
+
+window.editAssignmentInline = editAssignmentInline;
+window.cancelEditAssignment = cancelEditAssignment;
+window.saveEditAssignment = saveEditAssignment;
 
 // Cancel Export Order
 async function cancelOrder(orderId) {

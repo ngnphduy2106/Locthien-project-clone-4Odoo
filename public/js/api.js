@@ -129,6 +129,24 @@ const api = {
         return res.json();
     },
 
+    editAssignment: async (orderId, data) => {
+        const res = await fetch(`${API_BASE}/orders/${orderId}/edit-assignment`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        return res.json();
+    },
+
+    editImportAssignment: async (importId, data) => {
+        const res = await fetch(`${API_BASE}/imports/${importId}/edit-assignment`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        return res.json();
+    },
+
     // === HR ===
     getEmployees: async () => {
         const res = await fetch(`${API_BASE}/hr/employees`);
