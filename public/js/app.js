@@ -1550,8 +1550,11 @@ function renderImportList() {
                                 </button>
                             ` : ''}
                             ${state.currentDispatchTab === 'assigned' && isAdminRole() ? `
-                                <button class="btn btn-success btn-sm" onclick="showImportCompletionModal('${imp.id}')" style="padding:2px; font-size:9px; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center;">
+                                <button class="btn btn-success btn-sm" onclick="showImportCompletionModal('${imp.id}')" style="padding:2px; font-size:9px; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center;" title="Hoàn thành">
                                     <i class="bi bi-check"></i>
+                                </button>
+                                <button class="btn btn-outline btn-sm" onclick="quickEditDriver('${imp.id}', '${imp.ticket_no || imp.id}', true)" style="padding:2px; font-size:9px; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center;" title="Sửa tài xế">
+                                    <i class="bi bi-pencil"></i>
                                 </button>
                             ` : ''}
                         </div>
@@ -1826,8 +1829,11 @@ function renderDispatchOrders() {
                                 </button>
                             ` : ''}
                             ${state.currentDispatchTab === 'assigned' && isAdminRole() ? `
-                                <button class="btn btn-success btn-sm" onclick="showDriverCompletionModal('${orderId}')" style="padding:2px; font-size:9px; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center;">
+                                <button class="btn btn-success btn-sm" onclick="showDriverCompletionModal('${orderId}')" style="padding:2px; font-size:9px; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center;" title="Hoàn thành">
                                     <i class="bi bi-check"></i>
+                                </button>
+                                <button class="btn btn-outline btn-sm" onclick="quickEditDriver('${orderId}', '${orderNo}')" style="padding:2px; font-size:9px; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center;" title="Sửa tài xế">
+                                    <i class="bi bi-pencil"></i>
                                 </button>
                             ` : ''}
                         </div>
@@ -7745,6 +7751,159 @@ async function saveEditAssignment(orderId, assignmentId) {
 window.editAssignmentInline = editAssignmentInline;
 window.cancelEditAssignment = cancelEditAssignment;
 window.saveEditAssignment = saveEditAssignment;
+
+// Quick Edit Driver — standalone modal from order list (no need to open detail)
+async function quickEditDriver(orderId, orderNo, isImport = false) {
+    event?.stopPropagation();
+
+    // Create overlay
+    const overlay = document.createElement('div');
+    overlay.id = 'quick-edit-driver-overlay';
+    overlay.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:9999; display:flex; align-items:center; justify-content:center; padding:16px;';
+    overlay.innerHTML = `
+        <div style="background:var(--card-bg, #fff); border-radius:16px; width:100%; max-width:420px; max-height:90vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+            <div style="padding:16px 20px; border-bottom:1px solid rgba(0,0,0,0.1); display:flex; align-items:center; justify-content:space-between;">
+                <div>
+                    <div style="font-weight:700; font-size:16px; color:var(--text-primary);">✏️ Sửa tài xế</div>
+                    <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">#${orderNo}</div>
+                </div>
+                <button onclick="closeQuickEditDriver()" style="background:none; border:none; font-size:22px; cursor:pointer; color:var(--text-muted); padding:4px;">✕</button>
+            </div>
+            <div id="quick-edit-driver-body" style="padding:16px 20px;">
+                <div style="text-align:center; padding:24px; color:var(--text-muted);">
+                    <div class="spinner-border" style="width:24px; height:24px; border-width:2px;"></div>
+                    <div style="margin-top:8px; font-size:13px;">Đang tải...</div>
+                </div>
+            </div>
+        </div>
+    `;
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) closeQuickEditDriver(); });
+    document.body.appendChild(overlay);
+
+    // Fetch assignments
+    try {
+        const endpoint = isImport 
+            ? `/api/imports/${encodeURIComponent(orderId)}/assignments`
+            : `/api/orders/${encodeURIComponent(orderId)}/assignments`;
+        const res = await fetch(endpoint);
+        const json = await res.json();
+        const assignments = json.data || [];
+
+        const body = document.getElementById('quick-edit-driver-body');
+        if (!body) return;
+
+        if (assignments.length === 0) {
+            body.innerHTML = `
+                <div style="text-align:center; padding:24px; color:var(--text-muted);">
+                    <i class="bi bi-person-x" style="font-size:36px; opacity:0.5;"></i>
+                    <div style="margin-top:8px;">Chưa có phân công tài xế</div>
+                </div>
+            `;
+            return;
+        }
+
+        body.innerHTML = assignments.map(a => `
+            <div style="background:var(--bg-secondary, #f8f9fa); border-radius:12px; padding:14px 16px; margin-bottom:12px; border-left:3px solid ${a.status === 'completed' ? '#16a34a' : '#8B5CF6'};" id="qe-card-${a.id}">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <span class="badge" style="font-size:11px; padding:3px 8px; border-radius:8px; ${a.status === 'completed' ? 'background:#dcfce7; color:#16a34a;' :
+                        a.status === 'delivering' ? 'background:#dbeafe; color:#2563eb;' :
+                        'background:#fef3c7; color:#d97706;'
+                    }">${a.status === 'completed' ? '✓ Hoàn thành' : a.status === 'delivering' ? 'Đang giao' : 'Chờ nhận'}</span>
+                    <span style="font-size:12px; color:var(--text-muted);">${a.assigned_qty || a.qty || 0} kg</span>
+                </div>
+                ${a.status === 'completed' ? `
+                    <div style="font-size:13px; color:#16a34a;">
+                        <strong>${a.driver_name}</strong> ${a.plate ? `• 🚚 ${a.plate}` : ''}
+                    </div>
+                    <div style="font-size:11px; color:var(--text-muted); margin-top:4px;">(Không thể chỉnh sửa — đã hoàn thành)</div>
+                ` : `
+                    <div style="display:flex; gap:8px; margin-bottom:8px;">
+                        <div style="flex:1;">
+                            <label style="font-size:11px; color:var(--text-muted); display:block; margin-bottom:3px;">Tên tài xế</label>
+                            <input type="text" id="qe-name-${a.id}" value="${a.driver_name || ''}" 
+                                style="width:100%; padding:8px 10px; border:1.5px solid #d1d5db; border-radius:8px; font-size:14px; background:var(--card-bg, #fff);"
+                                placeholder="Nhập tên...">
+                        </div>
+                        <div style="flex:1;">
+                            <label style="font-size:11px; color:var(--text-muted); display:block; margin-bottom:3px;">Biển số xe</label>
+                            <input type="text" id="qe-plate-${a.id}" value="${a.plate || ''}" 
+                                style="width:100%; padding:8px 10px; border:1.5px solid #d1d5db; border-radius:8px; font-size:14px; background:var(--card-bg, #fff);"
+                                placeholder="Biển số...">
+                        </div>
+                    </div>
+                    <button onclick="saveQuickEditDriver('${orderId}', '${a.id}', ${isImport})" 
+                        style="width:100%; padding:8px; background:linear-gradient(135deg, #8B5CF6, #7c3aed); color:white; border:none; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer;">
+                        💾 Lưu thay đổi
+                    </button>
+                `}
+            </div>
+        `).join('');
+    } catch (e) {
+        const body = document.getElementById('quick-edit-driver-body');
+        if (body) body.innerHTML = `<div style="text-align:center; color:var(--danger); padding:24px;">❌ Lỗi: ${e.message}</div>`;
+    }
+}
+
+function closeQuickEditDriver() {
+    document.getElementById('quick-edit-driver-overlay')?.remove();
+}
+
+async function saveQuickEditDriver(orderId, assignmentId, isImport) {
+    const nameInput = document.getElementById(`qe-name-${assignmentId}`);
+    const plateInput = document.getElementById(`qe-plate-${assignmentId}`);
+    const newName = nameInput?.value?.trim();
+    const newPlate = plateInput?.value?.trim() || '';
+
+    if (!newName) {
+        alert('Vui lòng nhập tên tài xế!');
+        nameInput?.focus();
+        return;
+    }
+
+    const btn = event?.target;
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Đang lưu...'; }
+
+    try {
+        let res;
+        if (isImport) {
+            res = await api.editImportAssignment(orderId, { assignment_id: assignmentId, driver_name: newName, plate: newPlate });
+        } else {
+            res = await api.editAssignment(orderId, { assignment_id: assignmentId, driver_name: newName, plate: newPlate });
+        }
+
+        if (res.error) {
+            alert(res.msg || 'Lỗi cập nhật!');
+            if (btn) { btn.disabled = false; btn.textContent = '💾 Lưu thay đổi'; }
+            return;
+        }
+
+        // Show success
+        const card = document.getElementById(`qe-card-${assignmentId}`);
+        if (card) {
+            card.style.borderLeftColor = '#16a34a';
+            card.innerHTML = `
+                <div style="display:flex; align-items:center; gap:8px; padding:4px 0;">
+                    <span style="color:#16a34a; font-size:18px;">✅</span>
+                    <div>
+                        <div style="font-weight:600; font-size:14px;">${newName}</div>
+                        <div style="font-size:12px; color:var(--text-muted);">🚚 ${newPlate || 'Chưa có biển số'}</div>
+                    </div>
+                    <span style="margin-left:auto; font-size:12px; color:#16a34a;">Đã lưu!</span>
+                </div>
+            `;
+        }
+
+        // Refresh dispatch list in background
+        if (typeof loadDispatchOrders === 'function') loadDispatchOrders();
+    } catch (e) {
+        alert('Lỗi: ' + e.message);
+        if (btn) { btn.disabled = false; btn.textContent = '💾 Lưu thay đổi'; }
+    }
+}
+
+window.quickEditDriver = quickEditDriver;
+window.closeQuickEditDriver = closeQuickEditDriver;
+window.saveQuickEditDriver = saveQuickEditDriver;
 
 // Cancel Export Order
 async function cancelOrder(orderId) {
