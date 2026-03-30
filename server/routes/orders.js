@@ -2581,6 +2581,7 @@ router.post('/:id/add-proof-images', async (req, res) => {
 });
 
 // DELETE /api/orders/:id/proof-images/:imageIndex - Remove specific proof image
+// Searches BOTH export_tickets AND order_driver_assignments (matching GET logic)
 router.delete('/:id/proof-images/:imageIndex', async (req, res) => {
     try {
         const { id, imageIndex } = req.params;
@@ -2593,54 +2594,91 @@ router.delete('/:id/proof-images/:imageIndex', async (req, res) => {
         const { createClient } = await import('@supabase/supabase-js');
         const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
-        // Find export ticket
-        let { data: ticket, error } = await supabase
-            .from('export_tickets')
-            .select('id, images')
-            .eq('order_id', id)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single();
+        // Resolve order IDs (same logic as GET proof-images)
+        const orderInfo = await db.getOrder(id);
+        const orderUuid = orderInfo?.id || id;
+        const orderSoDon = orderInfo?.soDon || orderInfo?.sale_order_no || id;
+        const lookupIds = [...new Set([orderUuid, orderSoDon, id])];
 
-        // If not found by order_id, try by order_no
-        if (error || !ticket) {
-            const orderInfo = await db.getOrder(id);
-            if (orderInfo?.soDon) {
-                const result = await supabase
-                    .from('export_tickets')
-                    .select('id, images')
-                    .eq('order_no', orderInfo.soDon)
-                    .order('created_at', { ascending: false })
-                    .limit(1)
-                    .single();
+        // Rebuild the same allImages list as GET (to find the image at idx)
+        const [assignResult, ticketResult] = await Promise.all([
+            supabase
+                .from('order_driver_assignments')
+                .select('id, driver_name, proof_images')
+                .in('order_id', lookupIds)
+                .order('created_at', { ascending: false }),
+            supabase
+                .from('export_tickets')
+                .select('id, ticket_no, images')
+                .or(lookupIds.map(lid => `order_id.eq.${lid},order_no.eq.${lid}`).join(','))
+                .order('created_at', { ascending: false })
+                .limit(1)
+        ]);
 
-                if (!result.error) ticket = result.data;
+        // Build ordered list with source tracking
+        const allImages = []; // { url, source: 'assignment'|'ticket', sourceId, indexInSource }
+        const seen = new Set();
+
+        // 1. assignment images first (same order as GET)
+        if (assignResult.data) {
+            for (const a of assignResult.data) {
+                if (Array.isArray(a.proof_images)) {
+                    a.proof_images.forEach((img, i) => {
+                        if (!seen.has(img)) {
+                            seen.add(img);
+                            allImages.push({ url: img, source: 'assignment', sourceId: a.id, indexInSource: i });
+                        }
+                    });
+                }
             }
         }
 
-        if (!ticket) {
-            return res.json(createResponse(true, 'Không tìm thấy phiếu xuất!'));
+        // 2. export ticket images
+        const ticket = ticketResult.data?.[0];
+        if (ticket?.images && Array.isArray(ticket.images)) {
+            ticket.images.forEach((img, i) => {
+                if (!seen.has(img)) {
+                    seen.add(img);
+                    allImages.push({ url: img, source: 'ticket', sourceId: ticket.id, indexInSource: i });
+                }
+            });
         }
 
-        const images = ticket.images || [];
-        if (idx >= images.length) {
+        if (idx >= allImages.length) {
             return res.json(createResponse(true, 'Ảnh không tồn tại!'));
         }
 
-        // Remove image at index
-        images.splice(idx, 1);
+        const target = allImages[idx];
+        console.log(`🗑️ Deleting image #${idx}: source=${target.source}, sourceId=${target.sourceId}`);
 
-        // Update database
-        const { error: updateError } = await supabase
-            .from('export_tickets')
-            .update({ images })
-            .eq('id', ticket.id);
+        // Remove from the correct source
+        if (target.source === 'assignment') {
+            // Remove from order_driver_assignments.proof_images
+            const { data: assign } = await supabase
+                .from('order_driver_assignments')
+                .select('proof_images')
+                .eq('id', target.sourceId)
+                .single();
 
-        if (updateError) {
-            return res.json(createResponse(true, 'Lỗi xóa ảnh: ' + updateError.message));
+            if (assign) {
+                const updatedImages = (assign.proof_images || []).filter(img => img !== target.url);
+                await supabase
+                    .from('order_driver_assignments')
+                    .update({ proof_images: updatedImages })
+                    .eq('id', target.sourceId);
+                console.log(`✅ Removed from assignment ${target.sourceId} (${updatedImages.length} remaining)`);
+            }
+        } else {
+            // Remove from export_tickets.images
+            const updatedImages = (ticket.images || []).filter(img => img !== target.url);
+            await supabase
+                .from('export_tickets')
+                .update({ images: updatedImages })
+                .eq('id', target.sourceId);
+            console.log(`✅ Removed from ticket ${target.sourceId} (${updatedImages.length} remaining)`);
         }
 
-        res.json(createResponse(false, `Đã xóa ảnh (còn ${images.length}/10)!`));
+        res.json(createResponse(false, `Đã xóa ảnh (còn ${allImages.length - 1} ảnh)!`));
 
     } catch (e) {
         console.error('Delete proof image error:', e.message);
