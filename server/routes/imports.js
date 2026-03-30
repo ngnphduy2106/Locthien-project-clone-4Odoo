@@ -55,10 +55,30 @@ router.get('/', async (req, res) => {
         if (error) {
             return res.json(createResponse(true, 'Lỗi tải phiếu nhập: ' + error.message));
         }
+        // Batch-fetch import assignments to detect external drivers
+        const imports = data || [];
+        try {
+            const { data: allAssigns } = await getSupabase()
+                .from('import_driver_assignments')
+                .select('import_id, driver_type')
+                .in('status', ['pending', 'delivering', 'completed']);
+
+            if (allAssigns && allAssigns.length > 0) {
+                const externalByImport = {};
+                for (const a of allAssigns) {
+                    if (a.driver_type === 'external') externalByImport[a.import_id] = true;
+                }
+                for (const imp of imports) {
+                    if (externalByImport[imp.id]) imp.has_external_driver = true;
+                }
+            }
+        } catch (assignErr) {
+            // Non-critical — just skip the flag
+        }
 
         res.json({
             error: false,
-            data: data || []
+            data: imports
         });
 
     } catch (e) {

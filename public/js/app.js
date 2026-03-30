@@ -1553,9 +1553,11 @@ function renderImportList() {
                                 <button class="btn btn-success btn-sm" onclick="showImportCompletionModal('${imp.id}')" style="padding:2px; font-size:9px; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center;" title="Hoàn thành">
                                     <i class="bi bi-check"></i>
                                 </button>
-                                <button class="btn btn-outline btn-sm" onclick="quickEditDriver('${imp.id}', '${imp.ticket_no || imp.id}', true)" style="padding:2px; font-size:9px; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center;" title="Sửa tài xế">
+                                ${imp.has_external_driver ? `
+                                <button class="btn btn-outline btn-sm" onclick="quickEditDriver('${imp.id}', '${imp.ticket_no || imp.id}', true)" style="padding:2px; font-size:9px; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center;" title="Sửa tài xế ngoài">
                                     <i class="bi bi-pencil"></i>
                                 </button>
+                                ` : ''}
                             ` : ''}
                         </div>
                         ${(imp.assigned_driver || imp.driver_name) ? `<span style="font-size:10px; color:var(--info); margin-left:auto; white-space:nowrap;">${imp.assigned_driver || imp.driver_name}</span>` : ''}
@@ -1832,9 +1834,11 @@ function renderDispatchOrders() {
                                 <button class="btn btn-success btn-sm" onclick="showDriverCompletionModal('${orderId}')" style="padding:2px; font-size:9px; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center;" title="Hoàn thành">
                                     <i class="bi bi-check"></i>
                                 </button>
-                                <button class="btn btn-outline btn-sm" onclick="quickEditDriver('${orderId}', '${orderNo}')" style="padding:2px; font-size:9px; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center;" title="Sửa tài xế">
+                                ${order.has_external_driver ? `
+                                <button class="btn btn-outline btn-sm" onclick="quickEditDriver('${orderId}', '${orderNo}')" style="padding:2px; font-size:9px; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center;" title="Sửa tài xế ngoài">
                                     <i class="bi bi-pencil"></i>
                                 </button>
+                                ` : ''}
                             ` : ''}
                         </div>
                         ${driver ? `<span style="font-size:10px; color:var(--info); margin-left:auto; white-space:nowrap;">${driver}</span>` : ''}

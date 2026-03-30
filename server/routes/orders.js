@@ -73,7 +73,7 @@ router.get('/', async (req, res) => {
             const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
             const { data: allAssignments } = await supabase
                 .from('order_driver_assignments')
-                .select('order_id, assigned_products, status')
+                .select('order_id, assigned_products, status, driver_type')
                 .in('status', ['pending', 'completed']);
 
             if (allAssignments && allAssignments.length > 0) {
@@ -105,6 +105,7 @@ router.get('/', async (req, res) => {
                     }
                     order.dispatched_products = Object.values(dispatchedMap);
                     order.driver_count = assigns.length;
+                    order.has_external_driver = assigns.some(a => a.driver_type === 'external');
                 }
             }
         } catch (assignErr) {
