@@ -72,8 +72,7 @@ async function loginMisa() {
 // Fetch all products from MISA and sync to DB (batch upsert for performance)
 export const syncMisaProducts = async () => {
     console.log('🔄 Starting MISA Product Sync...');
-    if (!cachedToken) await loginMisa();
-    if (!cachedToken) {
+    if (!await ensureToken()) {
         console.error('❌ MISA Product Sync: No token available (login failed)');
         return { success: false, error: 'MISA login failed', synced: 0 };
     }
@@ -170,9 +169,25 @@ export const syncMisaProducts = async () => {
     }
 };
 
+// Token management: track when token was obtained
+let tokenObtainedAt = 0;
+const TOKEN_TTL_MS = 4 * 60 * 60 * 1000; // Force re-login every 4 hours
+
+async function ensureToken() {
+    // Force re-login if token is older than TTL
+    if (cachedToken && (Date.now() - tokenObtainedAt > TOKEN_TTL_MS)) {
+        console.log('🔑 Token expired (>4h), re-authenticating...');
+        cachedToken = null;
+    }
+    if (!cachedToken) {
+        await loginMisa();
+        if (cachedToken) tokenObtainedAt = Date.now();
+    }
+    return !!cachedToken;
+}
+
 export async function getMisaOrders(retryCount = 0, fullSync = true) {
-    if (!cachedToken) await loginMisa();
-    if (!cachedToken) return [];
+    if (!await ensureToken()) return [];
 
     const headers = {
         'Content-Type': 'application/json',
@@ -181,18 +196,28 @@ export async function getMisaOrders(retryCount = 0, fullSync = true) {
     };
 
     const orderMap = new Map();
+    const PAGE_SIZE = 1000;
 
     // PRIORITY 1: Fetch newest orders (no Page param = realtime data)
     try {
         console.log(`📡 [REALTIME] Fetching newest orders...`);
-        const url = `${MISA_ORDERS_URL}?PageSize=1000`;
+        const url = `${MISA_ORDERS_URL}?PageSize=${PAGE_SIZE}`;
         const response = await fetch(url, { method: 'GET', headers });
+
+        // Handle 401: token expired on MISA side
+        if (response.status === 401 && retryCount < 1) {
+            console.warn('🔑 MISA returned 401, re-authenticating...');
+            cachedToken = null;
+            return getMisaOrders(retryCount + 1, fullSync);
+        }
 
         if (response.ok) {
             const json = await response.json();
             const data = json.Data || json.data || [];
             data.forEach(order => orderMap.set(order.sale_order_no, order));
             console.log(`   ✅ Got ${data.length} newest orders`);
+        } else {
+            console.error(`❌ MISA API error: ${response.status} ${response.statusText}`);
         }
     } catch (e) {
         console.error(`❌ Realtime fetch error:`, e.message);
@@ -204,7 +229,7 @@ export async function getMisaOrders(retryCount = 0, fullSync = true) {
             try {
                 await new Promise(r => setTimeout(r, 200));
                 console.log(`📡 [HISTORICAL] Page ${page}...`);
-                const url = `${MISA_ORDERS_URL}?PageSize=1000&Page=${page}`;
+                const url = `${MISA_ORDERS_URL}?PageSize=${PAGE_SIZE}&Page=${page}`;
                 const response = await fetch(url, { method: 'GET', headers });
 
                 if (!response.ok) break;
@@ -217,7 +242,7 @@ export async function getMisaOrders(retryCount = 0, fullSync = true) {
                 data.forEach(order => orderMap.set(order.sale_order_no, order));
                 console.log(`   + ${data.length} orders, ${orderMap.size - before} new`);
 
-                if (data.length < 100) break;
+                if (data.length < PAGE_SIZE) break; // Fixed: was < 100, should be < PAGE_SIZE
             } catch (e) {
                 console.error(`❌ Page ${page} error:`, e.message);
                 break;
@@ -231,8 +256,7 @@ export async function getMisaOrders(retryCount = 0, fullSync = true) {
 
 // Helper to get detailed order info (including products) from MISA
 async function getMisaOrderDetail(idOrName, isUuid = false) {
-    if (!cachedToken) await loginMisa();
-    if (!cachedToken) return null;
+    if (!await ensureToken()) return null;
 
     try {
         let url;
@@ -1018,7 +1042,7 @@ const UNIT_MAPPING = {
 
 export const updateMisaOrder = async (orderId, updateData) => {
     if (!orderId) return;
-    if (!cachedToken) await loginMisa();
+    if (!await ensureToken()) return { success: false, message: 'MISA login failed' };
 
     console.log(`📡 Pushing update to MISA for Order ${orderId}...`);
     console.log('📋 Update Data:', JSON.stringify(updateData, null, 2));
