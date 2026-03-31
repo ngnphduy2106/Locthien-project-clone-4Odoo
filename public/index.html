@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=5">
     <title>Lộc Thiên ERP - Hệ thống Quản lý Kho vận</title>
 
     <!-- PWA Manifest -->
@@ -22,16 +22,17 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
 
     <!-- Custom Styles -->
-    <link rel="stylesheet" href="/css/styles.css?v=20">
+    <link rel="stylesheet" href="/css/styles.css?v=21">
+    <link rel="stylesheet" href="/css/mobile.css?v=1">
 
     <!-- Image Compression Library (Web Worker powered) -->
-    <script
+    <script defer
         src="https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.2/dist/browser-image-compression.js"></script>
 
     <!-- Flatpickr Date Picker - Vietnamese format -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/vn.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/vn.js"></script>
 </head>
 
 <body style="opacity:0; transition:opacity 0.2s ease;">
@@ -1995,7 +1996,7 @@
     <script src="/js/app-router.js?v=4"></script>
     <script src="/js/api.js?v=18"></script>
     <script src="/js/notifications.js?v=1"></script>
-    <script src="/js/app.js?v=25"></script>
+    <script src="/js/app.js?v=26"></script>
     <script src="/js/modules/create-order.js?v=1"></script>
     <script src="/js/modules/order-history.js?v=101"></script>
     <script src="/js/modules/suppliers.js?v=1"></script>
@@ -2011,6 +2012,22 @@
 
 
 
+
+    <!-- Service Worker Registration -->
+    <script>
+        // Register Service Worker for PWA / offline caching
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(reg => {
+                        console.log('✅ SW registered:', reg.scope);
+                        // Check for updates every 5 minutes
+                        setInterval(() => reg.update(), 5 * 60 * 1000);
+                    })
+                    .catch(err => console.warn('SW registration failed:', err));
+            });
+        }
+    </script>
 
 </body>
 
