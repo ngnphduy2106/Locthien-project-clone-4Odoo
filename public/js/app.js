@@ -1447,9 +1447,12 @@ function switchDispatchTab(tab) {
 }
 window.loadCompletedOrders = loadCompletedOrders;
 <<<<<<< HEAD
+<<<<<<< HEAD
 window.loadCompletedOrders = loadCompletedOrders;
 =======
 >>>>>>> parent of 2f27238 (Revert "perf: pagination + dashboard cache + PWA/mobile fixes")
+=======
+>>>>>>> 1efe487 (perf: pagination + dashboard cache + PWA/mobile fixes)
 
 // === ORDER TYPE (Export/Import) ===
 function switchOrderType(type) {
