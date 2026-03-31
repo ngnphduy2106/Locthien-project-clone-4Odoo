@@ -1446,6 +1446,7 @@ function switchDispatchTab(tab) {
     }
 }
 window.loadCompletedOrders = loadCompletedOrders;
+window.loadCompletedOrders = loadCompletedOrders;
 
 // === ORDER TYPE (Export/Import) ===
 function switchOrderType(type) {
