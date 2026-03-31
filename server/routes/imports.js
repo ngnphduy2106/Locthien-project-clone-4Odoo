@@ -166,7 +166,7 @@ router.post('/', async (req, res) => {
                 msg += `📅 ${fmtDate}\n`;
             }
             msg += `🏭 <b>${supplier_name}</b>\n`;
-            msg += `📦 ${(products || []).map(p => `${p.name || p.code} — ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'Kg'}`).join(', ')}\n`;
+            if (productsList) msg += `📦\n${productsList}\n`;
             if (supplier_address) msg += `📍 ${supplier_address}\n`;
             if (description || note) msg += `📝 ${description || note}\n`;
 
@@ -351,7 +351,7 @@ router.put('/:id/assign', async (req, res) => {
                 msg += `📅 ${fmtDate}\n`;
             }
             msg += `🏭 <b>${data?.supplier_name || ''}</b>\n`;
-            if (productsList) msg += `📦 ${(products || []).map(p => `${p.name || p.code || 'SP'} — ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'kg'}`).join(', ')}\n`;
+            if (productsList) msg += `📦\n${productsList}\n`;
             if (data?.supplier_address) msg += `📍 ${data.supplier_address}\n`;
             if (data?.merged_order_no) msg += `🔗 Ghép chuyến: ${data.merged_order_no}\n`;
             msg += `──────────────\n`;
