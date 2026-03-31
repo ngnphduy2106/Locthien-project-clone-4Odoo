@@ -59,19 +59,15 @@ function formatNumber(num) {
 function toggleMobileMenu() {
     const sidebar = $('.sidebar');
     const overlay = $('.sidebar-overlay');
-    if (sidebar && overlay) {
-        sidebar.classList.toggle('active');
-        overlay.classList.toggle('active');
-    }
+    if (sidebar) sidebar.classList.toggle('open');
+    if (overlay) overlay.classList.toggle('active');
 }
 
 function closeMobileMenu() {
     const sidebar = $('.sidebar');
     const overlay = $('.sidebar-overlay');
-    if (sidebar && overlay) {
-        sidebar.classList.remove('active');
-        overlay.classList.remove('active');
-    }
+    if (sidebar) sidebar.classList.remove('open');
+    if (overlay) overlay.classList.remove('active');
 }
 
 // === Export to Window ===
