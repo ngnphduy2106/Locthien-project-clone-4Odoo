@@ -856,8 +856,17 @@ const performSync = async () => {
                 console.log(`⚠️ Flood guard: skipping individual notification for ${saleOrderNo} (${newOrdersInBatch.length} new orders in batch)`);
             } else {
                 // Normal: send individual Telegram notification
+                // Format: each product on its own line with spec (packaging) if available
                 const productsList = (mappedOrder.sale_order_product_mappings || [])
-                    .map(p => `- ${p.name}: ${Number(p.qty).toLocaleString('en-US')} ${p.unit}`)
+                    .map(p => {
+                        const qty = Number(p.qty || 0);
+                        const qtyStr = qty.toLocaleString('vi-VN');
+                        const spec = p.spec || p.note || '';
+                        if (spec) {
+                            return `  - ${p.name}: ${qtyStr} ${p.unit} (${spec})`;
+                        }
+                        return `  - ${p.name}: ${qtyStr} ${p.unit}`;
+                    })
                     .join('\n');
 
                 let formattedDate = 'N/A';
@@ -875,7 +884,7 @@ const performSync = async () => {
                 msg += `👤 <b>${item.account_name || 'N/A'}</b>\n`;
 
                 if (productsList) {
-                    msg += `📦 ${(mappedOrder.sale_order_product_mappings || []).map(p => `${p.name} — ${Number(p.qty).toLocaleString('vi-VN')} ${p.unit}`).join(', ')}\n`;
+                    msg += `📦\n${productsList}\n`;
                 }
 
                 msg += `📍 ${mappedOrder.shipping_address || 'N/A'}\n`;
