@@ -90,33 +90,9 @@ router.get('/summary', async (req, res) => {
     }
 });
 
-// ===============================================
-// Dashboard cache — avoid full-table scan on every request
-// TTL: 5 minutes. Invalidated on order state changes.
-// ===============================================
-let _dashboardCache = null;
-let _dashboardCacheTime = 0;
-const DASHBOARD_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-
-// Export invalidation function for use by other routes (order create/complete/approve)
-export function invalidateDashboardCache() {
-    _dashboardCache = null;
-    _dashboardCacheTime = 0;
-    console.log('📊 Dashboard cache invalidated');
-}
-
 // GET /api/reports/dashboard
 router.get('/dashboard', async (req, res) => {
     try {
-        // Return cached result if fresh
-        const now = Date.now();
-        if (_dashboardCache && (now - _dashboardCacheTime) < DASHBOARD_CACHE_TTL) {
-            console.log('📊 Dashboard: serving from cache (' + Math.round((now - _dashboardCacheTime) / 1000) + 's old)');
-            return res.json(_dashboardCache);
-        }
-
-        console.log('📊 Dashboard: computing fresh stats...');
-        const startMs = Date.now();
         const orders = await db.getOrders();
         const inventory = await db.getInventory();
 
@@ -164,7 +140,7 @@ router.get('/dashboard', async (req, res) => {
             }
         }
 
-        const result = createResponse(false, 'OK', {
+        res.json(createResponse(false, 'OK', {
             totalOrders,
             pendingOrders,
             deliveringOrders,
@@ -173,24 +149,11 @@ router.get('/dashboard', async (req, res) => {
             completedToday,
             totalStock: Math.round(totalStock),
             lowStockAlerts
-        });
-
-        // Cache the result
-        _dashboardCache = result;
-        _dashboardCacheTime = Date.now();
-        console.log(`📊 Dashboard: computed in ${Date.now() - startMs}ms, cached for ${DASHBOARD_CACHE_TTL / 1000}s`);
-
-        res.json(result);
+        }));
 
     } catch (e) {
         res.json(createResponse(true, e.message));
     }
-});
-
-// POST /api/reports/dashboard/invalidate — manual cache bust
-router.post('/dashboard/invalidate', (req, res) => {
-    invalidateDashboardCache();
-    res.json(createResponse(false, 'Cache invalidated'));
 });
 
 // GET /api/reports/order-history - Get order history for reporting (completed/cancelled)

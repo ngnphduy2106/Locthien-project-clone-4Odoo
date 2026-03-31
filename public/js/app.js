@@ -1028,53 +1028,28 @@ async function loadDashboard() {
         const periodSelect = window.$('#dashboard-period');
         const period = periodSelect?.value || 'month';
 
-        const currentUser = (window.state?.user || state?.user) || {};
-        const isAdmin = ['admin', 'tester'].includes(String(currentUser.role || '').toLowerCase());
-
-        // === FAST PATH: Use cached dashboard stats for simple views ===
-        // For 'month' (default), 'all', or when we don't need chart data
-        const dashboardStats = await api.getDashboardStats();
-        const statsData = dashboardStats?.data || dashboardStats || {};
-
-        // Update stat cards from server-side cached stats
-        const elOrderCount = window.$('#stat-order-count');
-        const elOrderValue = window.$('#stat-order-value');
-        const elPendingCount = window.$('#stat-pending-count');
-        const elCompletedCount = window.$('#stat-completed-count');
-        const elCompletedRate = window.$('#stat-completed-rate');
-        const elUpdateTime = window.$('#dashboard-update-time');
-
-        const totalOrders = statsData.totalOrders || 0;
-        const completedTotal = statsData.completedTotal || 0;
-        const pendingOrders = statsData.pendingOrders || 0;
-        const completedRate = totalOrders > 0 ? Math.round((completedTotal / totalOrders) * 100) : 0;
-
-        if (elOrderCount) elOrderCount.textContent = totalOrders.toLocaleString('vi-VN');
-        if (elPendingCount) elPendingCount.textContent = pendingOrders;
-        if (elCompletedCount) elCompletedCount.textContent = completedTotal;
-        if (elCompletedRate) elCompletedRate.textContent = `${completedRate}% tỷ lệ hoàn thành`;
-        if (elUpdateTime) elUpdateTime.textContent = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-
-        // === CHARTS: Need order-level data — use pending+assigned from dispatch load ===
-        // Only load full orders for charts when needed
-        const includeDeleted = (period === 'all' || period === 'custom');
-        const res = await api.getOrders(includeDeleted);
-
-        // Combine all orders (pending + assigned only — completed not loaded)
-        const allOrders = [
-            ...(res.pending || []),
-            ...(res.assigned || [])
-        ];
-
         // Get custom date range if selected (from Flatpickr instances)
         const dateFromEl = document.getElementById('dashboard-date-from');
         const dateToEl = document.getElementById('dashboard-date-to');
         const dateFrom = dateFromEl?._flatpickr?.selectedDates?.[0];
         const dateTo = dateToEl?._flatpickr?.selectedDates?.[0];
 
-        // Filter orders by period for charts
+        // Get orders data - include deleted/cancelled when viewing all
+        const includeDeleted = (period === 'all' || period === 'custom');
+        const res = await api.getOrders(includeDeleted);
+
+        // Combine all orders (pending + assigned + completed + cancelled if available)
+        const allOrders = [
+            ...(res.pending || []),
+            ...(res.assigned || []),
+            ...(res.completed || []),
+            ...(res.cancelled || [])
+        ];
+
+        // Filter orders by period
         const now = new Date();
         const filteredOrders = allOrders.filter(order => {
+            // For 'all' period, include every order regardless of date
             if (period === 'all') return true;
 
             const orderDate = new Date(order.ngay || order.sale_order_date || order.created_at);
@@ -1091,9 +1066,10 @@ async function loadDashboard() {
                 case 'year':
                     return orderDate.getFullYear() === now.getFullYear();
                 case 'custom':
+                    // Filter by custom date range (dateFrom/dateTo are Date objects from Flatpickr)
                     if (dateFrom && dateTo) {
                         const toEnd = new Date(dateTo);
-                        toEnd.setHours(23, 59, 59, 999);
+                        toEnd.setHours(23, 59, 59, 999); // Include entire end day
                         return orderDate >= dateFrom && orderDate <= toEnd;
                     } else if (dateFrom) {
                         return orderDate >= dateFrom;
@@ -1108,18 +1084,46 @@ async function loadDashboard() {
             }
         });
 
-        // Calculate value from filtered active orders
+        // Calculate stats from filtered orders
+        const orderCount = filteredOrders.length;
         const orderValue = filteredOrders.reduce((sum, o) => sum + (parseFloat(o.amount || o.sale_order_amount) || 0), 0);
-        if (elOrderValue) elOrderValue.textContent = isAdmin ? formatCurrencyBillion(orderValue) : '***';
 
-        // Load charts with active orders data
+        // Calculate pending and completed from filtered orders
+        const pendingFromFiltered = filteredOrders.filter(o => !o.taiXe && o.status !== 'Đã hủy bỏ' && o.status !== 'Đã thực hiện').length;
+        const completedFromFiltered = filteredOrders.filter(o => o.status === 'Đã thực hiện').length;
+
+        // Use API counts for quick stats (not affected by period filter)
+        const pendingCount = pendingFromFiltered;
+        const completedCount = completedFromFiltered;
+        // Completion rate should be based on the filtered order count
+        const completedRate = orderCount > 0 ? Math.round((completedFromFiltered / orderCount) * 100) : 0;
+
+        // Update stat cards
+        const elOrderCount = window.$('#stat-order-count');
+        const elOrderValue = window.$('#stat-order-value');
+        const elPendingCount = window.$('#stat-pending-count');
+        const elCompletedCount = window.$('#stat-completed-count');
+        const elCompletedRate = window.$('#stat-completed-rate');
+        const elUpdateTime = window.$('#dashboard-update-time');
+
+        const currentUser = (window.state?.user || state?.user) || {};
+        const isAdmin = ['admin', 'tester'].includes(String(currentUser.role || '').toLowerCase());
+
+        if (elOrderCount) elOrderCount.textContent = orderCount.toLocaleString('vi-VN');
+        if (elOrderValue) elOrderValue.textContent = isAdmin ? formatCurrencyBillion(orderValue) : '***';
+        if (elPendingCount) elPendingCount.textContent = pendingCount;
+        if (elCompletedCount) elCompletedCount.textContent = completedCount;
+        if (elCompletedRate) elCompletedRate.textContent = `${completedRate}% tỷ lệ hoàn thành`;
+        if (elUpdateTime) elUpdateTime.textContent = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+
+        // Load charts
         loadOrdersTimeChart(filteredOrders, period);
         loadValueTimeChart(filteredOrders, period);
 
         // Load analytics
         loadTopProducts(filteredOrders);
         loadTopCustomers(filteredOrders);
-        loadTopDrivers(filteredOrders);
+        loadTopDrivers(res.completed || []);
 
     } catch (e) {
         console.error('Dashboard error:', e);
@@ -1355,20 +1359,9 @@ async function loadOrders() {
         const res = await api.getOrders();
         state.orders.pending = res.pending || [];
         state.orders.assigned = res.assigned || [];
-        state.orders.completed = []; // Lazy-loaded via pagination
-        state.orders._completedCount = res.completedCount || 0;
-        state.orders._cancelledCount = res.cancelledCount || 0;
-        state.orders._completedPage = 0; // Reset pagination
-        state.orders._completedHasMore = true;
+        state.orders.completed = res.completed || [];
         state.drivers = res.drivers || [];
         state.assistants = res.assistants || [];
-
-        // Update completed tab badge with count
-        const completedTab = window.$('#tab-completed');
-        if (completedTab) {
-            const totalDone = (res.completedCount || 0) + (res.cancelledCount || 0);
-            completedTab.textContent = `Hoàn thành (${totalDone})`;
-        }
 
         // Load unread counts for badges
         await loadUnreadCounts();
@@ -1376,55 +1369,6 @@ async function loadOrders() {
         renderDispatchOrders();
     } catch (e) {
         container.innerHTML = '<p style="text-align:center; color:var(--danger);">Lỗi tải đơn hàng</p>';
-    }
-}
-
-// Lazy-load completed orders with pagination
-async function loadCompletedOrders(page = 1) {
-    const container = window.$('#dispatch-order-list');
-    if (!container) return;
-
-    if (page === 1) {
-        container.innerHTML = '<div class="loading-spinner" style="margin: 40px auto;"></div>';
-        state.orders.completed = []; // Reset on first page
-    }
-
-    try {
-        const res = await fetch(`/api/orders?tab=completed&page=${page}&limit=50`);
-        const data = await res.json();
-
-        if (data.error) throw new Error(data.msg);
-
-        // Append orders (for infinite scroll / load more)
-        state.orders.completed = [...state.orders.completed, ...(data.completed || [])];
-        state.orders._completedPage = page;
-        state.orders._completedHasMore = data.pagination?.hasNext || false;
-        state.orders._completedTotal = data.pagination?.total || 0;
-        state.orders._completedTotalPages = data.pagination?.totalPages || 1;
-
-        renderDispatchOrders();
-
-        // Add "load more" button if there are more pages
-        if (data.pagination?.hasNext) {
-            const loadMoreDiv = document.createElement('div');
-            loadMoreDiv.style.cssText = 'text-align:center; padding:20px;';
-            loadMoreDiv.innerHTML = `
-                <button class="btn btn-outline" onclick="loadCompletedOrders(${page + 1})" 
-                    style="padding:12px 24px; border-radius:8px;">
-                    <i class="bi bi-arrow-down-circle"></i> 
-                    Tải thêm (trang ${page + 1}/${data.pagination.totalPages})
-                </button>
-                <div style="margin-top:8px; color:var(--text-muted); font-size:12px;">
-                    Đang hiện ${state.orders.completed.length} / ${data.pagination.total} đơn
-                </div>
-            `;
-            container.appendChild(loadMoreDiv);
-        }
-    } catch (e) {
-        console.error('Load completed error:', e);
-        if (page === 1) {
-            container.innerHTML = '<p style="text-align:center; color:var(--danger);">Lỗi tải đơn hoàn thành</p>';
-        }
     }
 }
 
@@ -1438,14 +1382,10 @@ function switchDispatchTab(tab) {
     // Render appropriate list based on order type
     if (state.currentOrderType === 'import') {
         renderImportList();
-    } else if (tab === 'completed' && state.orders.completed.length === 0 && state.orders._completedHasMore !== false) {
-        // Lazy-load completed orders on first click
-        loadCompletedOrders(1);
     } else {
         renderDispatchOrders();
     }
 }
-window.loadCompletedOrders = loadCompletedOrders;
 
 // === ORDER TYPE (Export/Import) ===
 function switchOrderType(type) {
@@ -4540,13 +4480,18 @@ function clearAppCache() {
         localStorage.clear();
         // Clear sessionStorage
         sessionStorage.clear();
-        // Clear Cache API entries (but keep SW registered for PWA)
+        // Unregister service workers
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(regs => {
+                regs.forEach(r => r.unregister());
+            });
+        }
+        // Clear Cache API
         if ('caches' in window) {
             caches.keys().then(names => {
                 names.forEach(name => caches.delete(name));
             });
         }
-        // NOTE: Do NOT unregister service workers — keep PWA installable
         // Reload page
         setTimeout(() => window.location.reload(true), 300);
     } catch (e) {
@@ -6779,7 +6724,7 @@ async function assignImportDriver(importId) {
         if (!ordRes.error) {
             state.orders.pending = ordRes.pending || [];
             state.orders.assigned = ordRes.assigned || [];
-            // Don't overwrite completed — it's managed by pagination (loadCompletedOrders)
+            state.orders.completed = ordRes.completed || [];
         }
     } catch (e) {
         console.warn('Failed to pre-fetch orders for merge:', e.message);
