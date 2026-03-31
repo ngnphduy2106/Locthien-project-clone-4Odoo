@@ -2015,16 +2015,22 @@
 
     <!-- Service Worker Registration -->
     <script>
-        // Register Service Worker for PWA / offline caching
+        // Register Service Worker — with safety checks for iOS
         if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js')
-                    .then(reg => {
-                        console.log('✅ SW registered:', reg.scope);
-                        // Check for updates every 5 minutes
-                        setInterval(() => reg.update(), 5 * 60 * 1000);
-                    })
-                    .catch(err => console.warn('SW registration failed:', err));
+            window.addEventListener('load', async () => {
+                try {
+                    // Verify sw.js exists before registering (prevents iOS "Not found" errors)
+                    const check = await fetch('/sw.js', { method: 'HEAD' });
+                    if (!check.ok) {
+                        console.warn('SW: /sw.js not available, skipping registration');
+                        return;
+                    }
+                    const reg = await navigator.serviceWorker.register('/sw.js');
+                    console.log('✅ SW registered:', reg.scope);
+                } catch (err) {
+                    // Suppress — don't spam error monitoring
+                    console.warn('SW registration skipped:', err.message);
+                }
             });
         }
     </script>
