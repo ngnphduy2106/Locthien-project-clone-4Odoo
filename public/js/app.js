@@ -58,7 +58,7 @@ let state = {
     assistants: [],
     currentSection: 'dashboard',
     currentDispatchTab: 'pending',
-    currentOrderType: 'export',
+    currentOrderType: localStorage.getItem('lt_orderType') || 'export',
     orderProducts: [],
     historyPage: 1,
     historyPerPage: 10,
@@ -278,7 +278,10 @@ function showSection(sectionId) {
             }
             break;
         case 'dispatch':
-            if (!isCacheValid('dispatch')) {
+            // Restore saved order type (export/import)
+            if (state.currentOrderType === 'import') {
+                switchOrderType('import');
+            } else if (!isCacheValid('dispatch')) {
                 loadOrders();
                 state._cache.dispatch = Date.now();
             } else {
@@ -1450,6 +1453,7 @@ window.loadCompletedOrders = loadCompletedOrders;
 // === ORDER TYPE (Export/Import) ===
 function switchOrderType(type) {
     state.currentOrderType = type;
+    localStorage.setItem('lt_orderType', type);
 
     // Update type buttons
     const exportBtn = window.$('#type-export');
