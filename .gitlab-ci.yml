@@ -1,10 +1,15 @@
-# The Docker image that will be used to build your app
-image: dd
-create-pages:
-  pages:
-    # The folder that contains the files to be exposed at the Page URL
-    publish: public
+image: alpine:latest
+
+pages:
+  stage: deploy
+  script:
+    - echo "Deploying Lộc Thiên web application..."
+    # Tạo thư mục public và copy toàn bộ source code vào đó để deploy
+    - mkdir -p public
+    # Dùng rsync hoặc cp để chuyển file vào public (bỏ qua chính thư mục public để tránh lặp)
+    - cp -r * public/ 2>/dev/null || true
+  artifacts:
+    paths:
+      - public
   rules:
-    # This ensures that only pushes to the default branch will trigger
-    # a pages deploy
     - if: $CI_COMMIT_REF_NAME == $CI_DEFAULT_BRANCH
