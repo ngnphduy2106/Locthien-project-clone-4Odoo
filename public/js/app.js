@@ -8692,13 +8692,13 @@ const _webpSupported = (() => {
     } catch { return false; }
 })();
 
-// Hard compression rules — OPTIMIZED FOR 3G
+// Hard compression rules — balanced: clear photos + reasonable upload size
 const IMG_COMPRESS_CONFIG = {
-    maxSizeMB: 0.15,           // Target <150KB output (was 300KB — halved for 3G)
-    maxWidthOrHeight: 800,     // Max dimension 800px (was 1200 — sufficient for proof photos)
+    maxSizeMB: 0.4,            // Target <400KB output (readable quality)
+    maxWidthOrHeight: 1200,    // Max dimension 1200px (good detail for proof photos)
     useWebWorker: true,        // Layer 2: Off main thread
     fileType: _webpSupported ? 'image/webp' : 'image/jpeg',
-    initialQuality: 0.55,     // Layer 3: Quality 0.55 (was 0.65 — more compression for 3G)
+    initialQuality: 0.75,     // Layer 3: Quality 0.75 (clear, minimal artifacts)
     alwaysKeepResolution: false,
     preserveExif: false,       // Strip metadata for smaller files
 };
