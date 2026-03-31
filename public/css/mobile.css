@@ -252,7 +252,7 @@
 }
 
 /* === Performance: Hardware acceleration for animations === */
-.sidebar,
+/* NOTE: Do NOT add .sidebar here — it uses translateX for show/hide */
 .modal,
 .loading-overlay,
 .notification-panel {
