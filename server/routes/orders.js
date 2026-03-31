@@ -28,12 +28,67 @@ function getTelegramTag(telegramUsername, telegramUserId, displayName) {
 
 const router = Router();
 
-// GET /api/orders - Get all orders for admin
+// GET /api/orders - Get orders with pagination support for completed tab
+// Default: only pending+assigned (fast). ?tab=completed&page=1&limit=50 for completed orders.
 router.get('/', async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     try {
-        // Support query param to include deleted/cancelled orders
+        const tab = req.query.tab || ''; // 'completed' for paginated completed orders
         const includeDeleted = req.query.includeDeleted === 'true';
+
+        // === COMPLETED TAB: Paginated, separate query ===
+        if (tab === 'completed') {
+            const page = parseInt(req.query.page) || 1;
+            const limit = parseInt(req.query.limit) || 50;
+            const offset = (page - 1) * limit;
+
+            const orders = await db.getOrders(true); // include all statuses
+            const completedStatuses = ['đã thực hiện'];
+            const cancelledStatuses = ['đã hủy bỏ'];
+
+            let completedOrders = [];
+            let cancelledOrders = [];
+            for (const order of orders) {
+                const s = String(order.status || '').trim().toLowerCase();
+                if (completedStatuses.includes(s)) completedOrders.push(order);
+                else if (cancelledStatuses.includes(s)) cancelledOrders.push(order);
+            }
+
+            // Combine completed + cancelled, sort by date desc
+            const allDone = [...completedOrders, ...cancelledOrders];
+            const total = allDone.length;
+            const totalPages = Math.ceil(total / limit);
+            const paginatedOrders = allDone.slice(offset, offset + limit);
+
+            // Strip heavy fields for completed list (save bandwidth)
+            const lightOrders = paginatedOrders.map(o => ({
+                id: o.id,
+                soDon: o.soDon || o.sale_order_no,
+                ngay: o.ngay || o.sale_order_date,
+                khach: o.khach || o.account_name,
+                diaChi: o.diaChi || o.shipping_address || '',
+                status: o.status,
+                taiXe: o.taiXe || o.custom_field13 || '',
+                bienSo: o.bienSo || o.custom_field14 || '',
+                amount: o.amount || o.sale_order_amount || 0,
+                description: o.description || '',
+                delivery_time: o.delivery_time || '',
+                assistant_name: o.assistant_name || '',
+                merged_order_no: o.merged_order_no || '',
+                is_pinned: o.is_pinned || false,
+                products: o.products || o.cart || [],
+                completed_at: o.completed_at || o.updated_at || ''
+            }));
+
+            return res.json({
+                error: false,
+                tab: 'completed',
+                completed: lightOrders,
+                pagination: { page, limit, total, totalPages, hasNext: page < totalPages }
+            });
+        }
+
+        // === DEFAULT: Only pending + assigned (fast dispatch load) ===
         const orders = await db.getOrders(includeDeleted);
         const users = await db.getUsers();
 
@@ -42,21 +97,19 @@ router.get('/', async (req, res) => {
 
         const pending = [];
         const assigned = [];
-        const completed = [];
-        const cancelled = [];
+        let completedCount = 0;
+        let cancelledCount = 0;
 
         for (const order of orders) {
             const s = String(order.status || '').trim();
 
-            // Check for cancelled first
+            // Count but DON'T include completed/cancelled in response (saves ~70% bandwidth)
             if (cancelledStatuses.some(cs => cs.toLowerCase() === s.toLowerCase())) {
-                cancelled.push(order);
+                cancelledCount++;
                 continue;
             }
-
-            // Check if status is completed
             if (completedStatuses.some(cs => cs.toLowerCase() === s.toLowerCase())) {
-                completed.push(order);
+                completedCount++;
                 continue;
             }
 
@@ -120,15 +173,16 @@ router.get('/', async (req, res) => {
             .filter(u => u.status === 'ACTIVE' && String(u.role).toUpperCase() === 'ASSISTANT')
             .map(u => ({ name: u.fullName }));
 
-        console.log('DEBUG: Sending response. Pending:', pending.length, 'Assigned:', assigned.length, 'Completed:', completed.length, 'Cancelled:', cancelled.length);
+        console.log('DEBUG: Sending response. Pending:', pending.length, 'Assigned:', assigned.length, 'Completed(count):', completedCount, 'Cancelled(count):', cancelledCount);
 
         res.json({
             error: false,
             pending,
             assigned,
-            completed,
-            cancelled,
-            cancelledCount: cancelled.length,
+            completed: [], // Empty — use ?tab=completed for paginated completed list
+            completedCount,
+            cancelled: [],
+            cancelledCount,
             drivers,
             assistants
         });

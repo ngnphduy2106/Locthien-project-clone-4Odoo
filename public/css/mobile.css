@@ -1,0 +1,279 @@
+/* ===============================================
+   LỘC THIÊN ERP — MOBILE & PWA ENHANCEMENTS
+   Fixes: touch targets, safe areas, scroll, performance
+   =============================================== */
+
+/* === iOS Safe Area Support === */
+@supports (padding: env(safe-area-inset-top)) {
+    .main-header {
+        padding-top: env(safe-area-inset-top);
+    }
+
+    .sidebar {
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    .page-content {
+        padding-bottom: calc(12px + env(safe-area-inset-bottom));
+    }
+}
+
+/* === iPhone-specific Touch Target Fixes === */
+@media (max-width: 767px) {
+
+    /* Minimum 44px touch targets (Apple HIG guideline) */
+    .nav-link {
+        min-height: 44px !important;
+        padding: 12px 16px !important;
+    }
+
+    .nav-submenu .nav-link {
+        min-height: 44px !important;
+        padding: 12px 16px !important;
+    }
+
+    .btn {
+        min-height: 44px !important;
+        padding: 12px 16px !important;
+    }
+
+    .btn-sm {
+        min-height: 36px !important;
+        padding: 8px 12px !important;
+    }
+
+    .tab-btn {
+        min-height: 44px !important;
+        padding: 10px 16px !important;
+        font-size: 13px !important;
+    }
+
+    /* Form inputs — bigger touch targets */
+    .form-control,
+    .form-select,
+    input[type="text"],
+    input[type="password"],
+    input[type="number"],
+    input[type="date"],
+    input[type="tel"],
+    select,
+    textarea {
+        min-height: 44px !important;
+        font-size: 16px !important; /* Prevents iOS zoom on focus */
+        padding: 10px 14px !important;
+    }
+
+    /* Prevent iOS double-tap zoom on interactive elements */
+    * {
+        touch-action: manipulation;
+    }
+
+    /* Smooth scrolling for momentum scroll on iOS */
+    .page-content,
+    .sidebar-nav,
+    .modal-body,
+    .card-body {
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* Fix iOS bounce overscroll */
+    body {
+        overscroll-behavior-y: contain;
+    }
+
+    /* Stat cards: 2x2 grid on mobile */
+    .stat-cards {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 10px !important;
+    }
+
+    .stat-card {
+        padding: 14px !important;
+    }
+
+    .stat-card-value {
+        font-size: 1.4rem !important;
+    }
+
+    .stat-card-label {
+        font-size: 11px !important;
+    }
+
+    /* Dashboard charts: full width on mobile */
+    div[style*="grid-template-columns:1fr 1fr"] {
+        grid-template-columns: 1fr !important;
+        gap: 12px !important;
+    }
+
+    /* Analytics row: stack on mobile */
+    .analytics-row,
+    div[style*="grid-template-columns:1fr 1fr 1fr"] {
+        grid-template-columns: 1fr !important;
+        gap: 12px !important;
+    }
+
+    /* Create order form: stack grid */
+    div[style*="grid-template-columns:1fr 2fr 2fr"],
+    div[style*="grid-template-columns:1fr 1fr"] {
+        grid-template-columns: 1fr !important;
+    }
+
+    /* Order cards: tighter padding */
+    .order-card {
+        padding: 14px !important;
+        margin-bottom: 10px !important;
+    }
+
+    /* Order footer buttons: Wrap properly */
+    .order-card-footer {
+        gap: 6px !important;
+    }
+
+    .order-card-footer .btn {
+        font-size: 12px !important;
+        padding: 10px 12px !important;
+        flex: 1 1 auto;
+    }
+
+    /* Header actions: tighter spacing */
+    .header-actions {
+        gap: 8px !important;
+    }
+
+    /* User avatar: smaller on mobile */
+    .user-avatar {
+        padding: 0 10px !important;
+        min-width: 36px !important;
+        height: 36px !important;
+        font-size: 12px !important;
+    }
+
+    /* Search bar: full width on mobile */
+    .search-input {
+        width: 100% !important;
+    }
+
+    /* Modal improvements */
+    .modal-content {
+        width: 95% !important;
+        max-width: 95vw !important;
+        max-height: 92vh !important;
+        margin: 4vh auto !important;
+        border-radius: 12px !important;
+    }
+
+    .modal-body {
+        max-height: 70vh !important;
+        overflow-y: auto !important;
+    }
+
+    /* Detail rows stack on mobile */
+    .detail-row {
+        flex-direction: column !important;
+        gap: 4px !important;
+    }
+
+    /* Dispatch filter area — stack vertically */
+    section[id="section-dispatch"] > div:first-child {
+        flex-direction: column !important;
+        gap: 8px !important;
+    }
+
+    /* Date range filters — stack */
+    #dashboard-date-range {
+        flex-direction: column !important;
+        width: 100% !important;
+    }
+
+    /* Support contacts — smaller padding */
+    .support-contacts {
+        padding: 10px !important;
+        font-size: 0.75rem !important;
+    }
+}
+
+/* === Small iPhone (iPhone SE, 5S) === */
+@media (max-width: 375px) {
+    .page-content {
+        padding: 8px !important;
+    }
+
+    .stat-cards {
+        gap: 8px !important;
+    }
+
+    .stat-card {
+        padding: 10px !important;
+    }
+
+    .stat-card-value {
+        font-size: 1.2rem !important;
+    }
+
+    .page-heading {
+        font-size: 16px !important;
+    }
+
+    .tab-btn {
+        padding: 8px 10px !important;
+        font-size: 11px !important;
+    }
+
+    /* Modal takes full width */
+    .modal-content {
+        width: 100% !important;
+        max-width: 100vw !important;
+        border-radius: 12px 12px 0 0 !important;
+        position: fixed !important;
+        bottom: 0 !important;
+        margin: 0 !important;
+        max-height: 90vh !important;
+    }
+}
+
+/* === PWA Standalone Mode — remove browser chrome padding === */
+@media (display-mode: standalone) {
+    body {
+        /* Prevent text selection outside inputs */
+        -webkit-user-select: none;
+        user-select: none;
+    }
+
+    input, textarea, [contenteditable] {
+        -webkit-user-select: text;
+        user-select: text;
+    }
+
+    /* Status bar area padding */
+    .main-header {
+        padding-top: env(safe-area-inset-top, 20px);
+    }
+}
+
+/* === Performance: Hardware acceleration for animations === */
+.sidebar,
+.modal,
+.loading-overlay,
+.notification-panel {
+    will-change: transform;
+    transform: translateZ(0);
+}
+
+/* === Scroll performance === */
+.page-content {
+    contain: content;
+}
+
+#dispatch-order-list {
+    contain: layout style;
+}
+
+/* === Prevent layout shift === */
+.stat-card-value {
+    min-height: 1.2em;
+}
+
+.loading-spinner {
+    contain: strict;
+}
