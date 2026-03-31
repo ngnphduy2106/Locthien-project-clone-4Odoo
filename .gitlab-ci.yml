@@ -1,17 +1,10 @@
-# GitLab CI/CD for GitLab Pages
-# This will deploy the 'public' folder to your-group.gitlab.io/your-project
-
-image: node:latest
-
-pages:
-  stage: deploy
-  script:
-    - mkdir .public
-    - cp -r public/* .public
-    - mv .public public
-    # GitLab Pages expects files in a 'public' directory at the root
-  artifacts:
-    paths:
-      - public
-  only:
-    - main
+# The Docker image that will be used to build your app
+image: dd
+create-pages:
+  pages:
+    # The folder that contains the files to be exposed at the Page URL
+    publish: public
+  rules:
+    # This ensures that only pushes to the default branch will trigger
+    # a pages deploy
+    - if: $CI_COMMIT_REF_NAME == $CI_DEFAULT_BRANCH
