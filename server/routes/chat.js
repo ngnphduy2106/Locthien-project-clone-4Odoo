@@ -3,23 +3,20 @@
 // ===============================================
 
 import { Router } from 'express';
+import { supabase } from '../db/supabase.js';
 import { createResponse } from '../config.js';
-import { createClient } from '@supabase/supabase-js';
 import { createNotification } from './notifications.js';
 
 const router = Router();
 
 // Lazy Supabase client initialization (env vars may not exist at import time)
-let _supabase = null;
 function getSupabase() {
-    if (!_supabase) {
-        const url = process.env.SUPABASE_URL;
+    if (!supabase) {
         const key = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY;
         if (url && key) {
-            _supabase = createClient(url, key);
         }
     }
-    return _supabase;
+    return supabase;
 }
 
 // GET /api/chat/:id/messages - Get chat messages for an order or import ticket

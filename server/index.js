@@ -3,6 +3,7 @@
 // ===============================================
 
 import express from 'express';
+import { supabase } from './db/supabase.js';
 import cors from 'cors';
 import compression from 'compression';
 import { fileURLToPath } from 'url';

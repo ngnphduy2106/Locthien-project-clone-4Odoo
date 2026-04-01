@@ -3,6 +3,7 @@
 // ===============================================
 
 import dotenv from 'dotenv';
+import { supabase } from './db/supabase.js';
 dotenv.config();
 
 export const CONFIG = {

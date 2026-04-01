@@ -3,8 +3,8 @@
 // ===============================================
 
 import { Router } from 'express';
+import { supabase } from '../db/supabase.js';
 import { createResponse, getTimestamp, generateOrderCode } from '../config.js';
-import { createClient } from '@supabase/supabase-js';
 
 const router = Router();
 
@@ -24,16 +24,12 @@ function getTelegramTag(telegramUsername, telegramUserId, displayName) {
 }
 
 // Lazy Supabase client initialization (env vars may not exist at import time)
-let _supabase = null;
 function getSupabase() {
-    if (!_supabase) {
-        const url = process.env.SUPABASE_URL;
-        const key = process.env.SUPABASE_KEY;
+    if (!supabase) {
         if (url && key) {
-            _supabase = createClient(url, key);
         }
     }
-    return _supabase;
+    return supabase;
 }
 
 // GET /api/imports - List all import tickets

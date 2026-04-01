@@ -3,6 +3,7 @@
 // ===============================================
 
 import { Router } from 'express';
+import { supabase } from '../db/supabase.js';
 import { createResponse, standardizeData } from '../config.js';
 import db from '../db/index.js';
 

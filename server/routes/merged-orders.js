@@ -4,24 +4,20 @@
 // ===============================================
 
 import { Router } from 'express';
+import { supabase } from '../db/supabase.js';
 import { createResponse, getTimestamp } from '../config.js';
-import { createClient } from '@supabase/supabase-js';
 import { updateMisaOrder } from '../services/misa.js';
 import db from '../db/index.js';
 
 const router = Router();
 
 // Lazy Supabase client
-let _supabase = null;
 function getSupabase() {
-    if (!_supabase) {
-        const url = process.env.SUPABASE_URL;
-        const key = process.env.SUPABASE_KEY;
+    if (!supabase) {
         if (url && key) {
-            _supabase = createClient(url, key);
         }
     }
-    return _supabase;
+    return supabase;
 }
 
 // GET /api/merged-orders - List all merged orders with source order details
