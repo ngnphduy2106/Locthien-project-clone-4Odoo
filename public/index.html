@@ -6,6 +6,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=5">
     <title>Lộc Thiên ERP - Hệ thống Quản lý Kho vận</title>
 
+    <!-- Zalo in-app browser compatibility: prevent crash from injected scripts -->
+    <script>
+        if(typeof zaloJSV2==='undefined'){window.zaloJSV2={};}
+        window.addEventListener('error',function(e){
+            if(e.filename&&e.filename.indexOf('zalo')>-1)e.preventDefault();
+        });
+    </script>
+
     <!-- PWA Manifest -->
     <link rel="manifest" href="/manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -425,7 +433,7 @@
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
                         <h2 class="page-heading" style="margin-bottom:0;">Quản lý đơn hàng</h2>
                         <button class="btn btn-outline"
-                            onclick="state._cache.dispatch=0; state._cache.imports=0; if(window.DispatchModule) window.DispatchModule.loadOrders(); if(typeof loadImports==='function') loadImports();"
+                            onclick="state._cache.dispatch=0; state._cache.imports=0; if(state.currentOrderType==='import'){loadImportTickets();}else{loadOrders();}"
                             style="padding:8px 14px;" title="Tải lại đơn hàng">
                             <i class="bi bi-arrow-clockwise"></i> Tải lại
                         </button>

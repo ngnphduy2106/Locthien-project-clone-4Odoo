@@ -265,15 +265,15 @@ if (!IS_SERVERLESS) {
         .then(() => syncMisaProducts())
         .catch(err => console.error('Startup Sync Failed:', err));
 
-    // Background interval for long-running environments
+    // Background interval for long-running environments (60s to reduce DB load)
     setInterval(() => {
         syncMisaOrders().catch(err => console.error('Sync Job Failed:', err));
-    }, 15 * 1000);
+    }, 60 * 1000);
 
-    // Retry failed syncs every 5 minutes
+    // Retry failed syncs every 10 minutes (reduce DB load)
     setInterval(() => {
         retryFailedSyncs().catch(err => console.error('Retry Job Failed:', err));
-    }, 5 * 60 * 1000);
+    }, 10 * 60 * 1000);
 
     app.listen(PORT, () => {
         console.log(`🚀 Lộc Thiên ERP running on port ${PORT}`);

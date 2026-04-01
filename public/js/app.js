@@ -1712,19 +1712,31 @@ async function updateMyOrdersNavBadge() {
 
 function searchOrders(keyword) {
     currentSearchKeyword = (keyword || '').toLowerCase().trim();
-    renderDispatchOrders();
+    if (state.currentOrderType === 'import') {
+        renderImportList();
+    } else {
+        renderDispatchOrders();
+    }
 }
 
 function filterByDate(date) {
     currentDateFilter = date || '';
-    renderDispatchOrders();
+    if (state.currentOrderType === 'import') {
+        renderImportList();
+    } else {
+        renderDispatchOrders();
+    }
 }
 
 function clearDateFilter() {
     currentDateFilter = '';
     const dateInput = window.$('#order-date-filter');
     if (dateInput) dateInput.value = '';
-    renderDispatchOrders();
+    if (state.currentOrderType === 'import') {
+        renderImportList();
+    } else {
+        renderDispatchOrders();
+    }
 }
 
 // Helper: get sibling order codes in a merge group

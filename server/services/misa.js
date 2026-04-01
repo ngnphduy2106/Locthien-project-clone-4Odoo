@@ -134,9 +134,12 @@ export const syncMisaProducts = async () => {
             return { success: true, synced: 0, saved: 0, failed: 0, errors: [] };
         }
 
-        // Phase 2: Batch upsert to Supabase (much faster than individual upserts)
-        const { createClient } = await import('@supabase/supabase-js');
-        const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+        // Phase 2: Batch upsert to Supabase (reuse existing client — avoid connection leak)
+        const { supabase } = await import('../db/supabase.js');
+        if (!supabase) {
+            console.error('❌ Supabase client not available for product sync');
+            return { success: false, error: 'Supabase not initialized', synced: allProducts.length };
+        }
 
         // Supabase upsert supports batch — process in chunks of 500 to avoid payload limits
         const CHUNK_SIZE = 500;
