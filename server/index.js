@@ -4,6 +4,7 @@
 
 import express from 'express';
 import cors from 'cors';
+import compression from 'compression';
 import { fileURLToPath } from 'url';
 import { dirname, join, resolve } from 'path';
 import dotenv from 'dotenv';
@@ -34,6 +35,7 @@ const PORT = process.env.PORT || 3001;
 const IS_NETLIFY = !!process.env.NETLIFY || !!process.env.LAMBDA_TASK_ROOT;
 
 // Middleware
+app.use(compression()); // Gzip — reduces 511KB app.js to ~120KB
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
@@ -44,7 +46,11 @@ const __dirname = dirname(__filename);
 const publicPath = resolve(__dirname, '../public');
 console.log('📁 Static files path:', publicPath);
 if (!IS_NETLIFY) {
-    app.use(express.static(publicPath));
+    app.use(express.static(publicPath, {
+        maxAge: '1h',        // Cache static files for 1 hour
+        etag: true,          // Enable ETag for revalidation
+        lastModified: true
+    }));
 }
 
 // Create an API Router
