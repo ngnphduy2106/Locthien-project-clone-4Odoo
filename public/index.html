@@ -2013,23 +2013,12 @@
 
 
 
-    <!-- Service Worker Registration -->
+    <!-- Service Worker: CLEANUP — unregister stale SWs causing errors -->
     <script>
-        // Register Service Worker — with safety checks for iOS
         if ('serviceWorker' in navigator) {
-            window.addEventListener('load', async () => {
-                try {
-                    // Verify sw.js exists before registering (prevents iOS "Not found" errors)
-                    const check = await fetch('/sw.js', { method: 'HEAD' });
-                    if (!check.ok) {
-                        console.warn('SW: /sw.js not available, skipping registration');
-                        return;
-                    }
-                    const reg = await navigator.serviceWorker.register('/sw.js');
-                    console.log('✅ SW registered:', reg.scope);
-                } catch (err) {
-                    // Suppress — don't spam error monitoring
-                    console.warn('SW registration skipped:', err.message);
+            navigator.serviceWorker.getRegistrations().then(registrations => {
+                for (const reg of registrations) {
+                    reg.unregister().then(() => console.log('🧹 SW unregistered:', reg.scope));
                 }
             });
         }
