@@ -343,11 +343,36 @@ router.get('/my/:driverName', async (req, res) => {
 
 
 
-        // Parallel fetch orders + users with fallbacks via Promise.allSettled
-        const mainResults = await Promise.allSettled([db.getOrders(), db.getUsers()]);
+        // =========================================================
+        // PHA 1: SONG SONG HOÁ TOÀN BỘ CÁC TRUY VẤN BASE
+        // (Thay vì chờ nhau, bắn 1 lúc 4 mũi tên)
+        // =========================================================
+        const queryExportAssigns = isAdmin 
+            ? supabase.from('order_driver_assignments').select('*').or(`driver_type.eq.external,driver_name.ilike.%${driverName}%,assistant_name.ilike.%${driverName}%`)
+            : supabase.from('order_driver_assignments').select('*').or(`driver_name.ilike.%${driverName}%,assistant_name.ilike.%${driverName}%`);
+
+        const queryImportAssigns = isAdmin
+            ? supabase.from('import_driver_assignments').select('*').or(`driver_type.eq.external,driver_name.ilike.%${driverName}%,driver_name.eq.${driverName}`)
+            : supabase.from('import_driver_assignments').select('*').or(`driver_name.ilike.%${driverName}%,driver_name.eq.${driverName}`);
+
+        const mainResults = await Promise.allSettled([
+            db.getOrders(),
+            db.getUsers(),
+            queryExportAssigns,
+            queryImportAssigns
+        ]);
+
         const orders = mainResults[0].status === 'fulfilled' ? (mainResults[0].value || []) : [];
         const users = mainResults[1].status === 'fulfilled' ? (mainResults[1].value || []) : [];
         
+        function dedupe(arr) {
+            const seen = new Set();
+            return arr.filter(i => { if (seen.has(i.id)) return false; seen.add(i.id); return true; });
+        }
+        
+        const assignments = dedupe(mainResults[2].status === 'fulfilled' ? (mainResults[2].value.data || []) : []);
+        const preFetchedImportAssignments = dedupe(mainResults[3].status === 'fulfilled' ? (mainResults[3].value.data || []) : []);
+
         if (mainResults.some(r => r.status === 'rejected')) {
             console.warn('⚠️ My Orders warning: Some base queries timed out, showing partial data', mainResults.map(r => r.reason));
         }
@@ -360,46 +385,6 @@ router.get('/my/:driverName', async (req, res) => {
 
         // ===== 1. QUERY MULTI-DRIVER ASSIGNMENTS =====
         try {
-            console.log(`🔍 Querying assignments for driver: "${driverName}" (isAdmin: ${isAdmin})`);
-
-            let assignments = [];
-
-            if (isAdmin) {
-                // Admin sees ALL external driver assignments
-                const { data: allAssignments, error: allErr } = await supabase
-                    .from('order_driver_assignments')
-                    .select('*')
-                    .eq('driver_type', 'external');
-
-                if (allErr) console.error('Admin assignment query error:', allErr.message);
-
-                // Also get assignments matching admin name (if admin has personal orders)
-                const { data: myAssignments } = await supabase
-                    .from('order_driver_assignments')
-                    .select('*')
-                    .or(`driver_name.ilike.%${driverName}%,assistant_name.ilike.%${driverName}%`);
-
-                // Merge and dedupe
-                const allIds = new Set();
-                assignments = [];
-                for (const a of [...(allAssignments || []), ...(myAssignments || [])]) {
-                    if (!allIds.has(a.id)) {
-                        allIds.add(a.id);
-                        assignments.push(a);
-                    }
-                }
-                console.log(`📋 Admin sees ${assignments.length} total assignments (external + personal)`);
-            } else {
-                // Regular driver or assistant - see their own assignments
-                const { data: driverAssignments, error: assignErr } = await supabase
-                    .from('order_driver_assignments')
-                    .select('*')
-                    .or(`driver_name.ilike.%${driverName}%,assistant_name.ilike.%${driverName}%`);
-
-                if (assignErr) console.error('Assignment query error:', assignErr.message);
-                assignments = driverAssignments || [];
-            }
-
             console.log(`📋 Assignment query result: ${assignments.length} rows`);
 
             if (assignments && assignments.length > 0) {
@@ -501,42 +486,7 @@ router.get('/my/:driverName', async (req, res) => {
         // ===== 3. IMPORT TICKETS - MULTI-DRIVER =====
         try {
             // First check import_driver_assignments
-            let importAssignments = [];
-
-            if (isAdmin) {
-                // Admin sees ALL external driver assignments for imports
-                const { data: allExternalImports, error: extErr } = await supabase
-                    .from('import_driver_assignments')
-                    .select('*')
-                    .eq('driver_type', 'external');
-
-                if (extErr) console.error('Admin import assignment query error:', extErr.message);
-
-                // Also get personal import assignments
-                const { data: myImportAssigns } = await supabase
-                    .from('import_driver_assignments')
-                    .select('*')
-                    .ilike('driver_name', `%${driverName}%`);
-
-                // Merge and dedupe
-                const allIds = new Set();
-                for (const a of [...(allExternalImports || []), ...(myImportAssigns || [])]) {
-                    if (!allIds.has(a.id)) {
-                        allIds.add(a.id);
-                        importAssignments.push(a);
-                    }
-                }
-                console.log(`📦 Admin sees ${importAssignments.length} import assignments (external + personal)`);
-            } else {
-                // Regular driver - only see their own import assignments
-                const { data: driverImportAssigns, error: assignErr } = await supabase
-                    .from('import_driver_assignments')
-                    .select('*')
-                    .or(`driver_name.ilike.%${driverName}%,driver_name.eq.${driverName}`);
-
-                if (assignErr) console.error('Import assignment query error:', assignErr.message);
-                importAssignments = driverImportAssigns || [];
-            }
+            let importAssignments = preFetchedImportAssignments || [];
 
             if (importAssignments && importAssignments.length > 0) {
                 console.log(`📦 Found ${importAssignments.length} import driver assignments`);
