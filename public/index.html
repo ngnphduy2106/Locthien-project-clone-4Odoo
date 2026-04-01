@@ -2013,12 +2013,22 @@
 
 
 
-    <!-- Service Worker: CLEANUP — unregister stale SWs causing errors -->
+    <!-- Service Worker: cleanup old → register fresh -->
     <script>
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.getRegistrations().then(registrations => {
-                for (const reg of registrations) {
-                    reg.unregister().then(() => console.log('🧹 SW unregistered:', reg.scope));
+            window.addEventListener('load', async () => {
+                try {
+                    // Step 1: Unregister any stale SWs (fixes "Not found" update errors)
+                    const regs = await navigator.serviceWorker.getRegistrations();
+                    for (const reg of regs) {
+                        await reg.unregister();
+                        console.log('🧹 Old SW removed:', reg.scope);
+                    }
+                    // Step 2: Register fresh SW
+                    const newReg = await navigator.serviceWorker.register('/sw.js');
+                    console.log('✅ SW registered:', newReg.scope);
+                } catch (err) {
+                    console.warn('SW setup skipped:', err.message);
                 }
             });
         }
