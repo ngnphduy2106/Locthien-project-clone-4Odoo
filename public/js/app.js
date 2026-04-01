@@ -9057,9 +9057,9 @@ async function showDriverCompletionModal(orderId, assignmentId = null) {
     const productsHtml = state.completionCart.length > 0
         ? `<div style="display:flex; padding:8px 12px; background:var(--primary); color:white; font-size:11px; font-weight:600; border-radius:8px 8px 0 0;">
                 <div style="flex:2;">Sản phẩm</div>
-                <div style="flex:1; text-align:center;">SL Đặt</div>
-                <div style="flex:1; text-align:center;">SL Thực tế <span style="color:#fbbf24;">*</span></div>
-                <div style="width:45px; text-align:right;">ĐVT</div>
+                <div style="flex:0.8; text-align:center;">SL Đặt</div>
+                <div style="flex:1.5; text-align:center;">SL Thực tế <span style="color:#fbbf24;">*</span></div>
+                <div style="width:35px; text-align:right;">ĐVT</div>
            </div>` +
         state.completionCart.map((item, idx) => `
             <div style="display:flex; align-items:center; gap:8px; padding:10px 12px; border-bottom:1px solid var(--border); background:${idx % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.02)'};">
@@ -9067,10 +9067,10 @@ async function showDriverCompletionModal(orderId, assignmentId = null) {
                     <div style="font-weight:600; color:var(--text-primary); font-size:13px;">${item.name}</div>
                     <div id="qty-warning-${idx}" style="display:none; font-size:11px; margin-top:4px; padding:4px 8px; border-radius:6px; font-weight:600;"></div>
                 </div>
-                <div style="flex:1; text-align:center;">
-                    <span style="font-size:14px; font-weight:600; color:var(--text-secondary); background:var(--body-bg); padding:6px 10px; border-radius:6px; display:inline-block;">${Number(item.planQty).toLocaleString('vi-VN')}</span>
+                <div style="flex:0.8; text-align:center;">
+                    <span style="font-size:13px; font-weight:600; color:var(--text-secondary); background:var(--body-bg); padding:4px 6px; border-radius:6px; display:inline-block;">${Number(item.planQty).toLocaleString('vi-VN')}</span>
                 </div>
-                <div style="flex:1;">
+                <div style="flex:1.5;">
                     <input type="number" class="form-control actual-qty-input" 
                         id="actual-qty-${idx}"
                         data-plan-qty="${item.planQty}"
@@ -9078,9 +9078,9 @@ async function showDriverCompletionModal(orderId, assignmentId = null) {
                         oninput="updateCompletionQty(${idx}, this.value)"
                         onchange="updateCompletionQty(${idx}, this.value)"
                         required
-                        style="padding:6px 8px; font-size:14px; font-weight:700; text-align:center; border:2px solid var(--primary); border-radius:6px;">
+                        style="padding:6px 4px; font-size:15px; font-weight:700; text-align:center; border:2px solid var(--primary); border-radius:6px; min-width:70px; width:100%;">
                 </div>
-                <div style="width:45px; text-align:right; color:var(--text-secondary); font-size:12px;">${item.unit}</div>
+                <div style="width:35px; text-align:right; color:var(--text-secondary); font-size:11px;">${item.unit}</div>
             </div>
         `).join('')
         : '<p style="color:var(--text-muted); padding:20px; text-align:center;">Không có sản phẩm</p>';
@@ -9441,7 +9441,7 @@ function showImportCompletionModal(importId, assignmentId = null) {
                         <div style="font-size:11px; color:var(--text-muted);">Thực tế</div>
                         <input type="number" id="import-actual-qty-${idx}" class="form-control" 
                             data-plan-qty="${p.qty || p.quantity || 0}"
-                            style="padding:6px 8px; font-size:13px;"
+                            style="padding:6px 4px; font-size:15px; font-weight:700; min-width:70px; width:100%;"
                             value="" 
                             oninput="updateImportCompletionQty(${idx}, this.value)"
                             onchange="updateImportCompletionQty(${idx}, this.value)">
