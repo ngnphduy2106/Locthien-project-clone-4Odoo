@@ -89,27 +89,32 @@ router.get('/', async (req, res) => {
         }
 
         // === DEFAULT: Only pending + assigned (fast dispatch load) ===
-        const orders = await db.getOrders(includeDeleted);
+        // Exclude completed/cancelled at DB level for massive speedup
+        const orders = await db.getOrders(includeDeleted, ['Đã thực hiện']);
         const users = await db.getUsers();
 
-        const completedStatuses = ['Đã thực hiện']; // Only completed, not cancelled
-        const cancelledStatuses = ['Đã hủy bỏ'];
+        // Count completed/cancelled separately (lightweight count query)
+        let completedCount = 0;
+        let cancelledCount = 0;
+        try {
+            const { createClient } = await import('@supabase/supabase-js');
+            const countDb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+            const { count: cCount } = await countDb.from('orders').select('id', { count: 'exact', head: true }).eq('status', 'Đã thực hiện');
+            const { count: xCount } = await countDb.from('orders').select('id', { count: 'exact', head: true }).eq('status', 'Đã hủy bỏ');
+            completedCount = cCount || 0;
+            cancelledCount = xCount || 0;
+        } catch (countErr) {
+            console.warn('Count query failed, using 0:', countErr.message);
+        }
 
         const pending = [];
         const assigned = [];
-        let completedCount = 0;
-        let cancelledCount = 0;
 
         for (const order of orders) {
             const s = String(order.status || '').trim();
 
-            // Count but DON'T include completed/cancelled in response (saves ~70% bandwidth)
-            if (cancelledStatuses.some(cs => cs.toLowerCase() === s.toLowerCase())) {
-                cancelledCount++;
-                continue;
-            }
-            if (completedStatuses.some(cs => cs.toLowerCase() === s.toLowerCase())) {
-                completedCount++;
+            // Skip any remaining completed/cancelled that slipped through
+            if (s.toLowerCase() === 'đã thực hiện' || s.toLowerCase() === 'đã hủy bỏ') {
                 continue;
             }
 

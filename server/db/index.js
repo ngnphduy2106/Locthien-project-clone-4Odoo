@@ -1,4 +1,4 @@
-﻿// ===============================================
+// ===============================================
 // DATABASE ABSTRACTION LAYER
 // Supports: Supabase (Primary), Firebase RTDB, Mock
 // ===============================================
@@ -145,16 +145,11 @@ export const db = {
             await firebaseDb.ref(`users/${safeId}`).update(data);
             return { id: safeId, ...data };
         }
-        return null; // mock removed
-        if (index > -1) {
-
-
-        }
         return null;
     },
 
     // === ORDERS ===
-    getOrders: async (includeDeleted = false) => {
+    getOrders: async (includeDeleted = false, excludeStatuses = []) => {
         const { useSupabase, useFirebase } = getMode();
         if (useSupabase) {
             // Sort by sale_order_date first (newest orders first), then by created_date (newest created first)
@@ -165,7 +160,12 @@ export const db = {
 
             // Filter out cancelled orders by default (soft-deleted from MISA)
             if (!includeDeleted) {
-                query = query.neq('status', 'ÄÃ£ há»§y bá»');
+                query = query.neq('status', 'Đã hủy bỏ');
+            }
+
+            // Exclude specific statuses at DB level (e.g., completed for dispatch default load)
+            for (const st of excludeStatuses) {
+                query = query.neq('status', st);
             }
 
             const { data, error } = await query;
@@ -198,8 +198,8 @@ export const db = {
                     driver: o.custom_field13 || '',
                     plate: o.custom_field14 || '',
                     // MISA Description & Creator (for driver view)
-                    misa_note: o.description || '', // Ghi chÃº tá»« MISA CRM
-                    creator_name: o.owner_name || '', // NgÆ°á»i táº¡o Ä‘Æ¡n (Ä‘á»ƒ tÃ i xáº¿ liÃªn láº¡c)
+                    misa_note: o.description || '', // Ghi chú từ MISA CRM
+                    creator_name: o.owner_name || '', // Người tạo đơn (để tài xế liên lạc)
                     // Products
                     products: products,
                     cart: products,
