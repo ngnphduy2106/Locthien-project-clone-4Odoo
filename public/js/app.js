@@ -4910,26 +4910,9 @@ async function submitDelivery() {
     const whRadio = document.querySelector('input[name="del-wh"]:checked');
     const warehouse = whRadio?.value || 'LT1';
 
-    // Get driver info - Fetch from order_driver_assignments (source of truth for dispatch)
-    let driverName = 'Chưa phân công';
-    let plate = '';
-    try {
-        const assignResp = await fetch(`/api/orders/${order.id || order.soDon || order.sale_order_no}/assignments`);
-        const assignData = await assignResp.json();
-        if (!assignData.error && assignData.data && assignData.data.length > 0) {
-            driverName = assignData.data.map(a => a.driver_name).filter(Boolean).join(' và ') || driverName;
-            plate = assignData.data.map(a => a.plate).filter(Boolean).join(' và ') || plate;
-        }
-    } catch (e) {
-        console.warn('Failed to fetch assignments for driver info:', e.message);
-    }
-    // Fallback to order fields if assignments didn't provide driver
-    if (driverName === 'Chưa phân công') {
-        driverName = order.driver_name || order.taiXe || order.driver || order.custom_field13 || 'Chưa phân công';
-    }
-    if (!plate) {
-        plate = order.plate || order.bienSo || order.custom_field14 || '';
-    }
+    // Get driver info directly from order (already loaded from my-orders)
+    let driverName = order.taiXe || order.driver_name || order.driver || order.custom_field13 || state.user?.name || 'Chưa phân công';
+    let plate = order.bienSo || order.assignment_plate || order.plate || order.custom_field14 || '';
 
     showLoading('Đang xử lý...');
 
