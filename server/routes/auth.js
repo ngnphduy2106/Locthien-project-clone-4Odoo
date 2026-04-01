@@ -221,8 +221,8 @@ router.post('/force-reload/:id', async (req, res) => {
 router.get('/check-reload/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const { createClient } = await import('@supabase/supabase-js');
-        const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+
         const { data } = await supabase.from('users').select('force_reload').eq('id', id).single();
         if (data?.force_reload) {
             // Reset the flag

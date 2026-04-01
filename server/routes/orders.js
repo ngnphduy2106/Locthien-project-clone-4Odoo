@@ -122,8 +122,8 @@ router.get('/', async (req, res) => {
 
         // Fetch all active driver assignments in one batch to show remaining qty on dispatch tab
         try {
-            const { createClient } = await import('@supabase/supabase-js');
-            const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+
             const { data: allAssignments } = await supabase
                 .from('order_driver_assignments')
                 .select('order_id, assigned_products, status, driver_type')
@@ -198,8 +198,8 @@ router.put('/:id/pin', async (req, res) => {
         const { id } = req.params;
         const { is_pinned } = req.body;
 
-        const { createClient } = await import('@supabase/supabase-js');
-        const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+
 
         const { error } = await supabase
             .from('orders')
@@ -220,8 +220,8 @@ router.put('/:id/pin', async (req, res) => {
 // GET /api/orders/export-tickets - Get recent export tickets
 router.get('/export-tickets', async (req, res) => {
     try {
-        const { createClient } = await import('@supabase/supabase-js');
-        const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+
 
         const { data, error } = await supabase
             .from('export_tickets')
@@ -246,8 +246,8 @@ router.get('/export-tickets', async (req, res) => {
 router.get('/assignment/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const { createClient } = await import('@supabase/supabase-js');
-        const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+
 
         const { data, error } = await supabase
             .from('order_driver_assignments')
@@ -269,8 +269,8 @@ router.get('/assignment/:id', async (req, res) => {
 router.get('/:orderId/assignments', async (req, res) => {
     try {
         const { orderId } = req.params;
-        const { createClient } = await import('@supabase/supabase-js');
-        const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+
 
         console.log(`📦 Fetching assignments for order: ${orderId}`);
 
@@ -339,11 +339,18 @@ router.get('/my/:driverName', async (req, res) => {
 
         console.log(`🔍 My Orders Search: driverName="${driverName}" role="${role}", isAdmin=${isAdmin}`);
 
-        const { createClient } = await import('@supabase/supabase-js');
-        const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
-        // Parallel fetch orders + users
-        const [orders, users] = await Promise.all([db.getOrders(), db.getUsers()]);
+
+
+        // Parallel fetch orders + users with fallbacks via Promise.allSettled
+        const mainResults = await Promise.allSettled([db.getOrders(), db.getUsers()]);
+        const orders = mainResults[0].status === 'fulfilled' ? (mainResults[0].value || []) : [];
+        const users = mainResults[1].status === 'fulfilled' ? (mainResults[1].value || []) : [];
+        
+        if (mainResults.some(r => r.status === 'rejected')) {
+            console.warn('⚠️ My Orders warning: Some base queries timed out, showing partial data', mainResults.map(r => r.reason));
+        }
+
         const internalDrivers = users
             .filter(u => u.role === CONFIG.ROLES.DRIVER)
             .map(u => (u.fullName || '').toUpperCase());
@@ -535,12 +542,15 @@ router.get('/my/:driverName', async (req, res) => {
 
                 // BATCH: Fetch all import tickets and all import assignments in parallel
                 const importIds = [...new Set(importAssignments.map(a => a.import_id))];
-                const [ticketsResult, batchImportAssigns] = await Promise.all([
+                const importResults = await Promise.allSettled([
                     supabase.from('import_tickets').select('*').in('id', importIds),
                     supabase.from('import_driver_assignments')
                         .select('id, status, assigned_qty, actual_qty, driver_name, plate, import_id')
                         .in('import_id', importIds)
                 ]);
+
+                const ticketsResult = importResults[0].status === 'fulfilled' ? importResults[0].value : { data: [] };
+                const batchImportAssigns = importResults[1].status === 'fulfilled' ? importResults[1].value : { data: [] };
 
                 // Index tickets by id
                 const ticketMap = {};
@@ -671,8 +681,8 @@ router.get('/my/:driverName', async (req, res) => {
 // MUST be defined BEFORE /:id to avoid Express matching 'pending-confirm' as :id
 router.get('/pending-confirm', async (req, res) => {
     try {
-        const { createClient } = await import('@supabase/supabase-js');
-        const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+
         const type = req.query.type || 'export';
 
         if (type === 'rejected') {
@@ -1262,8 +1272,8 @@ router.put('/:id/unassign', async (req, res) => {
         const orderNo = order.soDon || order.sale_order_no || id;
 
         // 1. Delete driver assignments
-        const { createClient } = await import('@supabase/supabase-js');
-        const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+
         const { data: deletedAssigns } = await supabase
             .from('order_driver_assignments')
             .delete()
@@ -1339,8 +1349,8 @@ router.put('/:id/edit-assignment', async (req, res) => {
         console.log(`\n✏️ EDIT ASSIGNMENT - Order: ${id}, Assignment: ${assignment_id}`);
         console.log(`   New driver: ${driver_name}, plate: ${plate}`);
 
-        const { createClient } = await import('@supabase/supabase-js');
-        const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+
 
         // Verify assignment exists and belongs to this order
         const { data: assignment, error: lookupErr } = await supabase
@@ -1460,8 +1470,8 @@ router.put('/:id/start', async (req, res) => {
 
         // If multi-driver order, update assignment status
         if (assignment_id) {
-            const { createClient } = await import('@supabase/supabase-js');
-            const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+
 
             const { error } = await supabase
                 .from('order_driver_assignments')
@@ -1510,8 +1520,8 @@ router.post('/:id/complete', async (req, res) => {
         console.log(`🛒 cart length: ${cart?.length || 0}, products length: ${products?.length || 0}`);
         console.log(`👤 driver_name: ${driver_name}, admin_completed: ${admin_completed}`);
 
-        const { createClient } = await import('@supabase/supabase-js');
-        const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+
 
         // PERF: Single getOrder() call — reused everywhere
         let orderInfo = null;
@@ -1967,8 +1977,8 @@ router.post('/:id/complete', async (req, res) => {
 
         // Create export ticket for Admin Complete (so images can be added later)
         try {
-            const { createClient } = await import('@supabase/supabase-js');
-            const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+
             const fullOrderForTicket = await db.getOrder(id);
 
             const ts = new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14);
@@ -2026,7 +2036,7 @@ router.post('/:id/complete', async (req, res) => {
         let adminResolvedDriver = '';
         let adminResolvedPlate = '';
         try {
-            const { createClient: createSC } = await import('@supabase/supabase-js');
+
             const sbLookup = createSC(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
             const { data: assigns } = await sbLookup
                 .from('order_driver_assignments')
@@ -2090,7 +2100,7 @@ router.post('/:id/complete', async (req, res) => {
             let proofImages = images || [];
             if (proofImages.length === 0) {
                 try {
-                    const { createClient: sc } = await import('@supabase/supabase-js');
+
                     const sbImg = sc(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
                     const ticketTable = isImport ? 'import_tickets' : 'export_tickets';
                     const { data: ticket } = await sbImg
@@ -2119,8 +2129,8 @@ router.post('/:id/complete', async (req, res) => {
         if (fullOrder?.merged_order_no && !req.body.prevent_loop) {
             console.log(`🔗 Auto-completing sister orders for merged trip: ${fullOrder.merged_order_no}`);
             try {
-                const { createClient } = await import('@supabase/supabase-js');
-                const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+
 
                 const { data: mergedLog } = await supabase
                     .from('merged_orders')
@@ -2246,8 +2256,8 @@ router.post('/:id/assign-multi', async (req, res) => {
         }
 
         // Get Supabase client
-        const { createClient } = await import('@supabase/supabase-js');
-        const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+
 
         // Check existing assignments to determine notification type and get previous driver names
         const { data: existingAssignments } = await supabase
@@ -2315,8 +2325,8 @@ router.post('/:id/assign-multi', async (req, res) => {
                 }
             }
 
-            const { createClient } = await import('@supabase/supabase-js');
-            const supabase2 = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+
 
             if (existingMergedNo) {
                 // Join existing merged order
@@ -2501,8 +2511,8 @@ router.post('/:id/assign-multi', async (req, res) => {
 router.get('/:id/proof-images', async (req, res) => {
     try {
         const { id } = req.params;
-        const { createClient } = await import('@supabase/supabase-js');
-        const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+
 
         // Resolve order UUID and soDon once
         const orderInfo = await db.getOrder(id);
@@ -2574,8 +2584,8 @@ router.post('/:id/add-proof-images', async (req, res) => {
             return res.json(createResponse(true, 'Vui lòng chọn ít nhất 1 ảnh!'));
         }
 
-        const { createClient } = await import('@supabase/supabase-js');
-        const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+
 
         // Also save to order_driver_assignments if any exist for this order
         try {
@@ -2694,8 +2704,8 @@ router.delete('/:id/proof-images/:imageIndex', async (req, res) => {
             return res.json(createResponse(true, 'Chỉ số ảnh không hợp lệ!'));
         }
 
-        const { createClient } = await import('@supabase/supabase-js');
-        const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+
 
         // Resolve order IDs (same logic as GET proof-images)
         const orderInfo = await db.getOrder(id);
@@ -2793,8 +2803,8 @@ router.delete('/:id/proof-images/:imageIndex', async (req, res) => {
 router.get('/:id/chat', async (req, res) => {
     try {
         const { id } = req.params;
-        const { createClient } = await import('@supabase/supabase-js');
-        const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+
 
         const { data, error } = await supabase
             .from('order_messages')
@@ -2815,8 +2825,8 @@ router.post('/:id/chat', async (req, res) => {
         const { id } = req.params;
         const { sender_name, sender_role, message, image } = req.body;
 
-        const { createClient } = await import('@supabase/supabase-js');
-        const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+
 
         const { error } = await supabase.from('order_messages').insert({
             order_id: id,
@@ -2849,8 +2859,8 @@ router.post('/local', async (req, res) => {
             return res.json(createResponse(true, 'Thiếu thông tin khách hàng hoặc sản phẩm'));
         }
 
-        const { createClient } = await import('@supabase/supabase-js');
-        const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+
 
         const orderNo = await generateOrderCode('E'); // E2603001 format
 
@@ -2986,8 +2996,8 @@ router.put('/:id/cancel', async (req, res) => {
 router.get('/:id/review', async (req, res) => {
     try {
         const { id } = req.params;
-        const { createClient } = await import('@supabase/supabase-js');
-        const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+
 
         // Get order
         const order = await db.getOrder(id);
@@ -3274,8 +3284,8 @@ router.post('/:id/reject', async (req, res) => {
 
         // Reset driver assignments from completed → pending
         try {
-            const { createClient } = await import('@supabase/supabase-js');
-            const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+
             const { error: assignErr } = await supabase
                 .from('order_driver_assignments')
                 .update({ status: 'pending' })

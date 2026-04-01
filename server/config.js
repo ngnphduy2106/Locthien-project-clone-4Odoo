@@ -123,8 +123,8 @@ export function getTimestamp() {
  * @returns {Promise<string>} Generated order code
  */
 export async function generateOrderCode(prefix = 'E') {
-    const { createClient } = await import('@supabase/supabase-js');
-    const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+
 
     const now = new Date();
     // Use Vietnam timezone for correct YY/MM

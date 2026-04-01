@@ -242,8 +242,8 @@ router.get('/order-history', async (req, res) => {
         // === FETCH IMPORT TICKETS from Supabase ===
         let importOrders = [];
         try {
-            const { createClient } = await import('@supabase/supabase-js');
-            const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+
 
             const { data: importTickets, error: importErr } = await supabase
                 .from('import_tickets')

@@ -160,8 +160,8 @@ app.get('/api/admin/sync-drivers', async (req, res) => {
 
         // Update DB: only orders missing driver data
         let updated = 0, skipped = 0;
-        const { createClient } = await import('@supabase/supabase-js');
-        const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+
 
         for (const item of allOrders) {
             const orderNo = item.sale_order_no;

@@ -10,8 +10,8 @@ const router = Router();
 
 // Helper to create Supabase client
 async function getSupabase() {
-    const { createClient } = await import('@supabase/supabase-js');
-    return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+    return supabase;
 }
 
 // GET /api/notifications/:userId - Get user's notifications
