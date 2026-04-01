@@ -2282,7 +2282,7 @@ router.post('/:id/assign-multi', async (req, res) => {
             if (existingMergedNo) {
                 // Join existing merged order
                 finalMergedOrderNo = existingMergedNo;
-                const { data: existingMerged } = await supabase2
+                const { data: existingMerged } = await supabase
                     .from('merged_orders')
                     .select('source_order_nos, total_amount')
                     .eq('merged_no', finalMergedOrderNo)
@@ -2292,7 +2292,7 @@ router.post('/:id/assign-multi', async (req, res) => {
                     const allNos = [...new Set([...(existingMerged.source_order_nos || []), currentSaleOrderNo, ...mergeOrderNos])];
                     let totalAmount = Number(existingMerged.total_amount || 0) + Number(currentOrder?.sale_order_amount || 0);
 
-                    await supabase2
+                    await supabase
                         .from('merged_orders')
                         .update({
                             source_order_nos: allNos,
@@ -2318,7 +2318,7 @@ router.post('/:id/assign-multi', async (req, res) => {
                         totalAmount += Number(partner.sale_order_amount || 0);
                     } else {
                         // Check import tickets
-                        const { data: impTicket } = await supabase2
+                        const { data: impTicket } = await supabase
                             .from('import_tickets')
                             .select('total_amount')
                             .eq('ticket_no', partnerNo)
@@ -2327,7 +2327,7 @@ router.post('/:id/assign-multi', async (req, res) => {
                     }
                 }
 
-                await supabase2
+                await supabase
                     .from('merged_orders')
                     .insert({
                         merged_no: finalMergedOrderNo,
@@ -2355,13 +2355,13 @@ router.post('/:id/assign-multi', async (req, res) => {
                     console.log(`✅ Export partner ${partnerNo} updated: merged=${finalMergedOrderNo}`);
                 } else {
                     // Try import ticket
-                    const { data: impTicket } = await supabase2
+                    const { data: impTicket } = await supabase
                         .from('import_tickets')
                         .select('id')
                         .eq('ticket_no', partnerNo)
                         .single();
                     if (impTicket) {
-                        await supabase2
+                        await supabase
                             .from('import_tickets')
                             .update({
                                 merged_order_no: finalMergedOrderNo,
