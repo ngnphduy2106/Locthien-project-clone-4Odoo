@@ -918,38 +918,40 @@ router.put('/:id', async (req, res) => {
         }
 
 
-        // Sync to MISA - preserve current order status
+        // Sync to MISA - preserve current order status (skip E-prefix local orders)
         const fullOrder = await db.getOrder(id);
-        try {
-            console.log(`📤 Edit Order Sync - Order: ${fullOrder?.sale_order_no}, Status: ${fullOrder?.status}`);
+        const editOrderNo = fullOrder?.sale_order_no || fullOrder?.soDon || id;
+        const isLocalEditOrder = String(editOrderNo).startsWith('E');
 
-            // Map Supabase status to MISA status text
-            let misaStatusForEdit = undefined;
-            const currentStatus = fullOrder?.status;
-            if (currentStatus === 'COMPLETED' || currentStatus === 'Hoàn thành' || currentStatus === 'Đã thực hiện' || currentStatus === 'completed') {
-                misaStatusForEdit = 'Đã thực hiện';
-            } else if (currentStatus === 'DELIVERING' || currentStatus === 'Đang thực hiện' || currentStatus === 'Đang giao' || currentStatus === 'in_transit') {
-                misaStatusForEdit = 'Đang thực hiện';
+        if (!isLocalEditOrder) {
+            try {
+                console.log(`📤 Edit Order Sync - Order: ${editOrderNo}, Status: ${fullOrder?.status}`);
+
+                // Map Supabase status to MISA status text
+                let misaStatusForEdit = undefined;
+                const currentStatus = fullOrder?.status;
+                if (currentStatus === 'COMPLETED' || currentStatus === 'Hoàn thành' || currentStatus === 'Đã thực hiện' || currentStatus === 'completed') {
+                    misaStatusForEdit = 'Đã thực hiện';
+                } else if (currentStatus === 'DELIVERING' || currentStatus === 'Đang thực hiện' || currentStatus === 'Đang giao' || currentStatus === 'in_transit') {
+                    misaStatusForEdit = 'Đang thực hiện';
+                }
+
+                await updateMisaOrder(editOrderNo, {
+                    misa_id: fullOrder?.misa_id,
+                    cart: updateData.cart || fullOrder?.cart || [],
+                    status: misaStatusForEdit
+                });
+
+            } catch (syncErr) {
+                console.error('MISA Sync Error on Edit:', syncErr.message);
             }
-
-            console.log(`📤 Mapped MISA Status: ${misaStatusForEdit}`);
-
-            await updateMisaOrder(fullOrder?.sale_order_no || id, {
-                misa_id: fullOrder?.misa_id,
-                cart: updateData.cart || fullOrder?.cart || [],
-                status: misaStatusForEdit  // Pass explicitly mapped status
-            });
-
-        } catch (syncErr) {
-            console.error('MISA Sync Error on Edit:', syncErr.message);
         }
 
-        // Send Telegram notification about the edit — ONLY for active orders
-        // (Completed/dispatched orders have qty diffs from actual delivery → skip notification)
-        const orderStatus = existingOrder?.status || '';
-        const isActiveOrder = ['Mới', 'Chưa thực hiện'].includes(orderStatus);
+        // Send Telegram notification about the edit — skip only completed/cancelled orders
+        const orderStatus = (existingOrder?.status || '').toLowerCase();
+        const isFinishedOrder = ['đã thực hiện', 'hoàn thành', 'completed', 'đã hủy bỏ', 'cancelled'].includes(orderStatus);
 
-        if (isActiveOrder) {
+        if (!isFinishedOrder) {
             try {
                 const { sendTelegramMessage } = await import('../services/telegram.js');
                 const updatedOrder = fullOrder || await db.getOrder(id);
@@ -1018,7 +1020,19 @@ router.put('/:id', async (req, res) => {
                     }
                 }
 
-                if (note || notes) msg += `\n📝 Ghi chú: ${note || notes}`;
+                // Detect and highlight description/note change
+                const oldNote = existingOrder?.description || existingOrder?.ghiChu || existingOrder?.misa_note || '';
+                const newNote = note || notes || '';
+                if (newNote && oldNote !== newNote) {
+                    msg += `\n📝 <b>Đổi mô tả:</b>\n`;
+                    if (oldNote) {
+                        msg += `<blockquote>❌ ${oldNote}\n✅ ${newNote}</blockquote>`;
+                    } else {
+                        msg += `<blockquote>✅ ${newNote}</blockquote>`;
+                    }
+                } else if (newNote) {
+                    msg += `\n📝 Ghi chú: ${newNote}`;
+                }
 
                 // Reply to original order message if available
                 const replyId = updatedOrder?.telegram_message_id || null;
