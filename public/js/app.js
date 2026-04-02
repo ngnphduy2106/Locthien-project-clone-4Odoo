@@ -10996,8 +10996,56 @@ async function openReviewPanel(orderId, isImport = false) {
                 ` : ''}
             `;
 
-            // Render editable products — prioritize cart (actual delivery) over products (original order)
-            const products = (order.cart && order.cart.length > 0) ? order.cart : (order.products || []);
+            // Render editable products — use actual delivery qty from drivers if available
+            let products = (order.cart && order.cart.length > 0) ? order.cart : (order.products || []);
+            
+            // Override qty with actual_qty from driver assignments (what the driver actually delivered)
+            if (driverAssignments && driverAssignments.length > 0) {
+                const completedAssignments = driverAssignments.filter(a => a.status === 'completed' && a.actual_qty > 0);
+                if (completedAssignments.length > 0) {
+                    // Sum actual_qty from all completed drivers
+                    const totalActualQty = completedAssignments.reduce((sum, a) => sum + Number(a.actual_qty || 0), 0);
+                    
+                    // If single product, directly replace qty
+                    if (products.length === 1) {
+                        products = products.map(p => ({ ...p, qty: totalActualQty }));
+                    } else if (products.length > 1) {
+                        // Multiple products: check if drivers have actual_products detail
+                        const hasDetailedProducts = completedAssignments.some(a => a.actual_products && a.actual_products.length > 0);
+                        if (hasDetailedProducts) {
+                            // Merge actual_products from all drivers
+                            const actualMap = {};
+                            for (const a of completedAssignments) {
+                                for (const ap of (a.actual_products || [])) {
+                                    const key = ap.code || ap.name;
+                                    if (key) {
+                                        actualMap[key] = (actualMap[key] || 0) + Number(ap.qty || 0);
+                                    }
+                                }
+                            }
+                            // Override product quantities with actual delivered
+                            if (Object.keys(actualMap).length > 0) {
+                                products = products.map(p => {
+                                    const key = p.code || p.name;
+                                    if (actualMap[key] !== undefined) {
+                                        return { ...p, qty: actualMap[key] };
+                                    }
+                                    return p;
+                                });
+                            }
+                        } else {
+                            // Fallback: distribute totalActualQty proportionally
+                            const originalTotal = products.reduce((s, p) => s + Number(p.qty || 0), 0);
+                            if (originalTotal > 0) {
+                                products = products.map(p => ({
+                                    ...p,
+                                    qty: Math.round(Number(p.qty || 0) / originalTotal * totalActualQty)
+                                }));
+                            }
+                        }
+                    }
+                }
+            }
             renderReviewProducts(products);
 
 
