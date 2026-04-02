@@ -89,31 +89,78 @@ router.get('/', async (req, res) => {
             });
         }
 
-        // === DEFAULT: Only pending + assigned (fast dispatch load) ===
-        const orders = await db.getOrders(includeDeleted);
-        const users = await db.getUsers();
-
-        const completedStatuses = ['Đã thực hiện']; // Only completed, not cancelled
+        // === DEFAULT: Only pending + assigned (OPTIMIZED: filter at DB level) ===
+        // Instead of fetching ALL 1000+ orders and filtering in memory,
+        // query Supabase directly for non-completed/non-cancelled orders
+        const completedStatuses = ['Đã thực hiện'];
         const cancelledStatuses = ['Đã hủy bỏ'];
 
+        const startTime = Date.now();
+
+        // Parallel: fetch active orders + users + counts + assignments
+        const [activeResult, usersResult, countResult, assignResult] = await Promise.allSettled([
+            // 1. Active orders only (NOT completed, NOT cancelled) — the key optimization
+            supabase.from('orders').select('*')
+                .not('status', 'in', '("Đã thực hiện","Đã hủy bỏ")')
+                .order('sale_order_date', { ascending: false, nullsFirst: false })
+                .order('created_date', { ascending: false, nullsFirst: false }),
+            // 2. Users (for driver list)
+            db.getUsers(),
+            // 3. Counts only (no data transfer) for completed/cancelled badges
+            Promise.all([
+                supabase.from('orders').select('id', { count: 'exact', head: true }).eq('status', 'Đã thực hiện'),
+                supabase.from('orders').select('id', { count: 'exact', head: true }).eq('status', 'Đã hủy bỏ')
+            ]),
+            // 4. Driver assignments
+            supabase.from('order_driver_assignments')
+                .select('order_id, assigned_products, status, driver_type')
+                .in('status', ['pending', 'completed'])
+        ]);
+
+        // Parse active orders
+        let activeOrders = [];
+        if (activeResult.status === 'fulfilled' && activeResult.value.data) {
+            // Map to frontend field names (same as db.getOrders)
+            activeOrders = activeResult.value.data.map(o => {
+                let products = [];
+                try {
+                    if (typeof o.sale_order_product_mappings === 'string') {
+                        products = JSON.parse(o.sale_order_product_mappings);
+                    } else if (Array.isArray(o.sale_order_product_mappings)) {
+                        products = o.sale_order_product_mappings;
+                    }
+                } catch (e) { }
+                return {
+                    ...o,
+                    soDon: o.sale_order_no,
+                    ngay: o.sale_order_date,
+                    khach: o.account_name,
+                    diaChi: o.shipping_address || o.billing_address || '',
+                    amount: o.sale_order_amount || 0,
+                    taiXe: o.custom_field13 || '',
+                    bienSo: o.custom_field14 || '',
+                    driver: o.custom_field13 || '',
+                    plate: o.custom_field14 || '',
+                    misa_note: o.description || '',
+                    creator_name: o.owner_name || '',
+                    products,
+                    cart: products,
+                    is_pinned: o.is_pinned || false
+                };
+            });
+        } else {
+            console.error('Active orders query failed, falling back to full fetch');
+            activeOrders = (await db.getOrders(includeDeleted)).filter(o => {
+                const s = String(o.status || '').trim();
+                return !completedStatuses.some(cs => cs.toLowerCase() === s.toLowerCase())
+                    && !cancelledStatuses.some(cs => cs.toLowerCase() === s.toLowerCase());
+            });
+        }
+
+        // Split into pending/assigned
         const pending = [];
         const assigned = [];
-        let completedCount = 0;
-        let cancelledCount = 0;
-
-        for (const order of orders) {
-            const s = String(order.status || '').trim();
-
-            // Count but DON'T include completed/cancelled in response (saves ~70% bandwidth)
-            if (cancelledStatuses.some(cs => cs.toLowerCase() === s.toLowerCase())) {
-                cancelledCount++;
-                continue;
-            }
-            if (completedStatuses.some(cs => cs.toLowerCase() === s.toLowerCase())) {
-                completedCount++;
-                continue;
-            }
-
+        for (const order of activeOrders) {
             if (!order.taiXe) {
                 pending.push(order);
             } else {
@@ -121,17 +168,19 @@ router.get('/', async (req, res) => {
             }
         }
 
-        // Fetch all active driver assignments in one batch to show remaining qty on dispatch tab
-        try {
+        // Parse counts
+        let completedCount = 0;
+        let cancelledCount = 0;
+        if (countResult.status === 'fulfilled') {
+            const [compRes, cancRes] = countResult.value;
+            completedCount = compRes.count || 0;
+            cancelledCount = cancRes.count || 0;
+        }
 
-
-            const { data: allAssignments } = await supabase
-                .from('order_driver_assignments')
-                .select('order_id, assigned_products, status, driver_type')
-                .in('status', ['pending', 'completed']);
-
-            if (allAssignments && allAssignments.length > 0) {
-                // Group assignments by order_id
+        // Attach driver assignments
+        if (assignResult.status === 'fulfilled' && assignResult.value.data) {
+            const allAssignments = assignResult.value.data;
+            if (allAssignments.length > 0) {
                 const assignmentsByOrder = {};
                 for (const a of allAssignments) {
                     if (!a.order_id) continue;
@@ -139,13 +188,11 @@ router.get('/', async (req, res) => {
                     assignmentsByOrder[a.order_id].push(a);
                 }
 
-                // Attach dispatched_products to each order (pending + assigned)
                 for (const order of [...pending, ...assigned]) {
                     const orderId = order.soDon || order.sale_order_no || order.id;
                     const assigns = assignmentsByOrder[orderId] || assignmentsByOrder[order.id] || [];
                     if (assigns.length === 0) continue;
 
-                    // Sum up assigned products across all drivers
                     const dispatchedMap = {};
                     for (const a of assigns) {
                         let prods = a.assigned_products;
@@ -162,10 +209,10 @@ router.get('/', async (req, res) => {
                     order.has_external_driver = assigns.some(a => a.driver_type === 'external');
                 }
             }
-        } catch (assignErr) {
-            console.warn('Assignment batch fetch error (non-critical):', assignErr.message);
         }
 
+        // Parse users for driver/assistant lists
+        const users = usersResult.status === 'fulfilled' ? usersResult.value : [];
         const drivers = users
             .filter(u => u.status === 'ACTIVE' && u.role === CONFIG.ROLES.DRIVER)
             .map(u => ({ name: u.fullName, plate: u.plate }));
@@ -174,13 +221,14 @@ router.get('/', async (req, res) => {
             .filter(u => u.status === 'ACTIVE' && String(u.role).toUpperCase() === 'ASSISTANT')
             .map(u => ({ name: u.fullName }));
 
-        console.log('DEBUG: Sending response. Pending:', pending.length, 'Assigned:', assigned.length, 'Completed(count):', completedCount, 'Cancelled(count):', cancelledCount);
+        const elapsed = Date.now() - startTime;
+        console.log(`📦 Orders API: ${pending.length} pending + ${assigned.length} assigned (${elapsed}ms) | Skipped ${completedCount} completed + ${cancelledCount} cancelled`);
 
         res.json({
             error: false,
             pending,
             assigned,
-            completed: [], // Empty — use ?tab=completed for paginated completed list
+            completed: [],
             completedCount,
             cancelled: [],
             cancelledCount,
