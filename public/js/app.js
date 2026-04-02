@@ -10699,7 +10699,7 @@ async function loadPendingConfirmOrders() {
 
         if (confirmCurrentTab === 'export') {
             const isAdmin = state.user?.role?.toLowerCase() === 'admin';
-            const isSales = ['sales', 'staff', 'admin', 'dispatcher'].includes(state.user?.role?.toLowerCase());
+            const isSales = ['sales', 'staff', 'admin', 'dispatcher', 'điều phối', 'dieu phoi', 'dieuphoi'].includes(state.user?.role?.toLowerCase());
             const canApprove = isSales; // Sales + Admin + Dispatcher can approve & push MISA
             container.innerHTML = orders.map(o => {
                 const orderNo = o.sale_order_no || o.id;
@@ -11005,7 +11005,7 @@ async function openReviewPanel(orderId, isImport = false) {
             // Update confirm button based on role
             const confirmBtn = panel.querySelector('#review-confirm-btn');
             const rejectBtn = panel.querySelector('#review-reject-btn');
-            const canApprove = ['admin', 'sales', 'staff', 'dispatcher', 'import_manager'].includes(state.user?.role?.toLowerCase());
+            const canApprove = ['admin', 'sales', 'staff', 'dispatcher', 'điều phối', 'dieu phoi', 'dieuphoi', 'import_manager'].includes(state.user?.role?.toLowerCase());
             if (confirmBtn) {
                 if (canApprove) {
                     confirmBtn.innerHTML = '<i class="bi bi-cloud-upload"></i> DUYỆT & ĐẨY MISA';
@@ -11019,7 +11019,7 @@ async function openReviewPanel(orderId, isImport = false) {
             }
             // Show reject button for admin/dispatcher/sales
             if (rejectBtn) {
-                rejectBtn.style.display = ['admin', 'dispatcher', 'sales', 'import_manager'].includes(state.user?.role?.toLowerCase()) ? '' : 'none';
+                rejectBtn.style.display = ['admin', 'sales', 'staff', 'dispatcher', 'điều phối', 'dieu phoi', 'dieuphoi', 'import_manager'].includes(state.user?.role?.toLowerCase()) ? '' : 'none';
             }
         }
     } catch (err) {
