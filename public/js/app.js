@@ -5241,7 +5241,7 @@ function updateImportCartNote(idx, val) {
     }
 }
 
-function handleImportImageSelect(input) {
+async function handleImportImageSelect(input) {
     const files = input.files;
     if (!files || !files.length) return;
 
@@ -5260,12 +5260,12 @@ function handleImportImageSelect(input) {
         previewArea.innerHTML = '';
     }
 
-    Array.from(files).forEach(file => {
-        if (state.importSelectedImages.length >= 10) return;
+    // Compress images before storing (same quality as export: 1200px, q0.75)
+    for (const file of Array.from(files)) {
+        if (state.importSelectedImages.length >= 10) break;
 
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const base64 = e.target.result;
+        try {
+            const base64 = await compressImage(file);
             const idx = state.importSelectedImages.length;
             state.importSelectedImages.push(base64);
 
@@ -5281,9 +5281,10 @@ function handleImportImageSelect(input) {
             if (counter) {
                 counter.textContent = `${state.importSelectedImages.length}/10 ảnh`;
             }
-        };
-        reader.readAsDataURL(file);
-    });
+        } catch (err) {
+            console.warn('Import image compression error:', err.message);
+        }
+    }
 }
 
 function removeImportDeliveryImage(idx) {
@@ -8689,13 +8690,13 @@ const _webpSupported = (() => {
     } catch { return false; }
 })();
 
-// Hard compression rules — balanced: clear photos + reasonable upload size
+// Hard compression rules — higher quality for proof photos (weight tickets need to be readable)
 const IMG_COMPRESS_CONFIG = {
-    maxSizeMB: 0.4,            // Target <400KB output (readable quality)
-    maxWidthOrHeight: 1200,    // Max dimension 1200px (good detail for proof photos)
+    maxSizeMB: 0.6,            // Target <600KB output (clear quality for weight tickets)
+    maxWidthOrHeight: 1600,    // Max dimension 1600px (high detail for proof photos)
     useWebWorker: true,        // Layer 2: Off main thread
     fileType: _webpSupported ? 'image/webp' : 'image/jpeg',
-    initialQuality: 0.75,     // Layer 3: Quality 0.75 (clear, minimal artifacts)
+    initialQuality: 0.82,     // Layer 3: Quality 0.82 (sharp text, minimal artifacts)
     alwaysKeepResolution: false,
     preserveExif: false,       // Strip metadata for smaller files
 };
