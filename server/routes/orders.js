@@ -3075,42 +3075,48 @@ router.post('/:id/confirm', async (req, res) => {
 
         await db.updateOrder(id, updateData);
 
-        // Sync to MISA CRM
-        let crmStatus = 'OK';
-        try {
-            const updatedOrder = await db.getOrder(id);
-            const syncResult = await updateMisaOrder(updatedOrder?.sale_order_no || id, {
-                misa_id: updatedOrder?.misa_id,
-                delivery_status: 'Đã giao hàng',
-                status: 'Đã thực hiện',
-                driver: updatedOrder?.taiXe || updatedOrder?.custom_field13 || '',
-                plate: updatedOrder?.bienSo || updatedOrder?.custom_field14 || '',
-                cart: updatedOrder?.products || []
-            });
-            if (!syncResult?.success) {
-                crmStatus = syncResult?.message || 'MISA sync failed';
-                console.error('MISA confirm sync failed:', crmStatus);
+        // Sync to MISA CRM — SKIP for E-prefix orders (local Supabase only)
+        const orderNo = order.soDon || order.sale_order_no || id;
+        const isLocalOrder = String(orderNo).startsWith('E');
+        let crmStatus = isLocalOrder ? 'SKIP' : 'OK';
+
+        if (!isLocalOrder) {
+            try {
+                const updatedOrder = await db.getOrder(id);
+                const syncResult = await updateMisaOrder(updatedOrder?.sale_order_no || id, {
+                    misa_id: updatedOrder?.misa_id,
+                    delivery_status: 'Đã giao hàng',
+                    status: 'Đã thực hiện',
+                    driver: updatedOrder?.taiXe || updatedOrder?.custom_field13 || '',
+                    plate: updatedOrder?.bienSo || updatedOrder?.custom_field14 || '',
+                    cart: updatedOrder?.products || []
+                });
+                if (!syncResult?.success) {
+                    crmStatus = syncResult?.message || 'MISA sync failed';
+                    console.error('MISA confirm sync failed:', crmStatus);
+                }
+            } catch (syncErr) {
+                crmStatus = syncErr.message;
+                console.error('MISA confirm sync error:', syncErr.message);
             }
-        } catch (syncErr) {
-            crmStatus = syncErr.message;
-            console.error('MISA confirm sync error:', syncErr.message);
         }
 
         // Telegram: notify sales confirmed
         try {
             const { sendTelegramMessage } = await import('../services/telegram.js');
-            const orderNo = order.soDon || order.sale_order_no || id;
             let msg = `☑️ <b>SALES XÁC NHẬN ĐƠN</b>\n`;
             msg += `📦 <b>#${orderNo}</b>\n`;
             msg += `👤 ${order.khach || order.account_name || 'N/A'}\n`;
-            msg += `👔 Bởi: ${confirmed_by || 'sales'}\n`;
-            msg += `📤 CRM: ${crmStatus === 'OK' ? '✅ Đã đồng bộ' : '⚠️ ' + crmStatus}`;
+            msg += `👔 Bởi: ${confirmed_by || 'sales'}`;
+            if (!isLocalOrder) {
+                msg += `\n📤 CRM: ${crmStatus === 'OK' ? '✅ Đã đồng bộ' : '⚠️ ' + crmStatus}`;
+            }
             await sendTelegramMessage(msg, 'NOTIFY');
         } catch (tgErr) {
             console.error('Telegram confirm error:', tgErr.message);
         }
 
-        res.json(createResponse(false, 'Đã xác nhận & đồng bộ MISA!', { crmStatus }));
+        res.json(createResponse(false, isLocalOrder ? 'Đã xác nhận!' : 'Đã xác nhận & đồng bộ MISA!', { crmStatus }));
     } catch (e) {
         console.error('confirm error:', e.message);
         res.json(createResponse(true, e.message));
@@ -3162,40 +3168,48 @@ router.post('/:id/approve', async (req, res) => {
 
         await db.updateOrder(id, updateData);
 
-        // Sync to MISA CRM (uses the UPDATED order data)
-        let crmStatus = 'OK';
-        try {
-            const updatedOrder = await db.getOrder(id);
-            const syncResult = await updateMisaOrder(updatedOrder?.sale_order_no || id, {
-                misa_id: updatedOrder?.misa_id,
-                delivery_status: 'Đã giao hàng',
-                status: 'Đã thực hiện',
-                driver: updatedOrder?.taiXe || updatedOrder?.custom_field13 || '',
-                plate: updatedOrder?.bienSo || updatedOrder?.custom_field14 || '',
-                cart: updatedOrder?.products || []
-            });
-            if (!syncResult?.success) {
-                crmStatus = syncResult?.message || 'MISA sync failed';
-                console.error('MISA approve sync failed:', crmStatus);
+        // Sync to MISA CRM — SKIP for E-prefix orders (local Supabase only, not in MISA)
+        const orderNo = order.soDon || order.sale_order_no || id;
+        const isLocalOrder = String(orderNo).startsWith('E');
+        let crmStatus = isLocalOrder ? 'SKIP' : 'OK';
+
+        if (!isLocalOrder) {
+            try {
+                const updatedOrder = await db.getOrder(id);
+                const syncResult = await updateMisaOrder(updatedOrder?.sale_order_no || id, {
+                    misa_id: updatedOrder?.misa_id,
+                    delivery_status: 'Đã giao hàng',
+                    status: 'Đã thực hiện',
+                    driver: updatedOrder?.taiXe || updatedOrder?.custom_field13 || '',
+                    plate: updatedOrder?.bienSo || updatedOrder?.custom_field14 || '',
+                    cart: updatedOrder?.products || []
+                });
+                if (!syncResult?.success) {
+                    crmStatus = syncResult?.message || 'MISA sync failed';
+                    console.error('MISA approve sync failed:', crmStatus);
+                }
+            } catch (syncErr) {
+                crmStatus = syncErr.message;
+                console.error('MISA approve sync error:', syncErr.message);
             }
-        } catch (syncErr) {
-            crmStatus = syncErr.message;
-            console.error('MISA approve sync error:', syncErr.message);
+        } else {
+            console.log(`📦 Skipping MISA sync for local order ${orderNo} (E-prefix)`);
         }
 
         // Telegram notification → SALES group
         try {
             const { sendTelegramMessage } = await import('../services/telegram.js');
-            const orderNo = order.soDon || order.sale_order_no || id;
             const products = (order.products || []).map(p => `  • ${p.name || p.code}: ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'Kg'}`).join('\n');
-            let msg = `✅ <b>DUYỆT ĐƠN & ĐẨY MISA</b>\n`;
+            let msg = `✅ <b>DUYỆT ĐƠN${isLocalOrder ? '' : ' & ĐẨY MISA'}</b>\n`;
             msg += `📦 <b>#${orderNo}</b>\n`;
             msg += `👤 ${order.khach || order.account_name || 'N/A'}\n`;
             msg += `📍 ${order.diaChi || order.shipping_address || ''}\n`;
             msg += `🚛 ${order.taiXe || order.custom_field13 || 'N/A'}\n`;
             if (products) msg += `📋 Sản phẩm:\n${products}\n`;
-            msg += `👔 Duyệt bởi: ${approved_by || 'admin'}\n`;
-            msg += `📤 CRM: ${crmStatus === 'OK' ? '✅ Đã đồng bộ' : '⚠️ ' + crmStatus}`;
+            msg += `👔 Duyệt bởi: ${approved_by || 'admin'}`;
+            if (!isLocalOrder) {
+                msg += `\n📤 CRM: ${crmStatus === 'OK' ? '✅ Đã đồng bộ' : '⚠️ ' + crmStatus}`;
+            }
             await sendTelegramMessage(msg, 'SALES');
         } catch (tgErr) {
             console.error('Telegram approve error:', tgErr.message);
