@@ -1419,7 +1419,7 @@
                                         </div>
                                     </div>
                                     <!-- Right: Order Details (Editable) -->
-                                    <div style="padding:20px; overflow-y:auto;">
+                                    <div style="padding:20px; overflow-y:auto; display:flex; flex-direction:column;">
                                         <h4 style="margin:0 0 12px; font-size:14px; color:#374151;"><i
                                                 class="bi bi-pencil-square"></i> Chi tiết đơn hàng</h4>
                                         <div id="review-order-info" style="margin-bottom:16px; font-size:13px;">
@@ -1433,19 +1433,18 @@
                                                 <i class="bi bi-plus"></i> Thêm SP
                                             </button>
                                         </div>
-                                        <div id="review-products" style="display:flex; flex-direction:column; gap:6px;">
+                                        <div id="review-products" style="display:flex; flex-direction:column; gap:6px; flex:1; overflow-y:auto; min-height:0;">
                                             <!-- Editable products -->
                                         </div>
 
                                         <div
-                                            style="margin-top:20px; padding-top:16px; border-top:1px solid #E5E7EB; display:flex; gap:10px;">
+                                            style="margin-top:20px; padding-top:16px; border-top:1px solid #E5E7EB; display:flex; gap:10px; flex-shrink:0;">
                                             <button id="review-reject-btn" class="btn" onclick="rejectOrder()"
                                                 style="flex:0 0 auto; padding:12px 20px; font-size:14px; border-radius:12px; background:linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color:white; border:none; font-weight:600; cursor:pointer;">
                                                 <i class="bi bi-x-circle"></i> Từ chối
                                             </button>
                                             <button id="review-confirm-btn" class="btn btn-primary"
-                                                onclick="confirmReviewOrder()"
-                                                style="flex:1; padding:12px; font-size:15px; border-radius:12px; background:linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
+                                                style="flex:1; padding:12px; font-size:15px; border-radius:12px; background:linear-gradient(135deg, #f59e0b 0%, #d97706 100%); cursor:pointer;">
                                                 <i class="bi bi-check"></i> XÁC NHẬN ĐƠN
                                             </button>
                                         </div>
