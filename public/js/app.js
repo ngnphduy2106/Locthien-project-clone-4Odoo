@@ -10733,7 +10733,7 @@ async function loadPendingConfirmOrders() {
                             </button>
                             ${canApprove ? `
                                 <button class="btn btn-sm" onclick="approveOrder('${o.id}')" style="font-size:12px; padding:6px 14px; border-radius:8px; width:100%; background:linear-gradient(135deg, #10b981, #059669); color:white; border:none; font-weight:600; box-shadow:0 2px 4px rgba(16,185,129,0.3);">
-                                    <i class="bi bi-cloud-upload"></i> Duyệt & MISA
+                                    <i class="bi bi-check-circle"></i> Duyệt
                                 </button>
                             ` : ''}
                         </div>
@@ -11008,7 +11008,7 @@ async function openReviewPanel(orderId, isImport = false) {
             const canApprove = ['admin', 'sales', 'staff', 'dispatcher', 'điều phối', 'dieu phoi', 'dieuphoi', 'import_manager'].includes(state.user?.role?.toLowerCase());
             if (confirmBtn) {
                 if (canApprove) {
-                    confirmBtn.innerHTML = '<i class="bi bi-cloud-upload"></i> DUYỆT & ĐẨY MISA';
+                    confirmBtn.innerHTML = '<i class="bi bi-check-circle"></i> DUYỆT';
                     confirmBtn.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
                     confirmBtn.onclick = () => approveOrder(orderId);
                 } else {
