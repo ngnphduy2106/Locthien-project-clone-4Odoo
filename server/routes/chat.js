@@ -225,37 +225,66 @@ router.post('/:id/messages', async (req, res) => {
         try {
             const senderRoleUpper = (sender_role || '').toUpperCase();
             const orderNo = safeId;
+            const msgPreview = (message || '📷 Ảnh').substring(0, 60);
 
-            if (senderRoleUpper === 'DRIVER') {
+            if (senderRoleUpper === 'DRIVER' || senderRoleUpper === 'TÀI XẾ') {
                 // Driver sent message -> notify ADMIN
                 await createNotification(
                     'ADMIN',
                     'message',
-                    '💬 Tin nhắn mới',
-                    `${sender_name} nhắn trên đơn #${orderNo}`,
+                    `💬 ${sender_name}`,
+                    `#${orderNo}: ${msgPreview}`,
                     safeId,
                     orderNo
                 );
             } else {
-                // Admin/Manager sent -> Need to find driver to notify (we don't have driver info in this context)
-                // For now, we'll create a generic notification that the driver can see when they check
-                // In a full implementation, we'd query the order to get the assigned driver
-                // Let's query the order to get driver name
-                const supabase = getSupabase();
-                if (supabase && type !== 'import') {
-                    const { data: orderData } = await supabase
-                        .from('orders')
-                        .select('taiXe')
-                        .eq('id', safeId)
-                        .single();
+                // Admin/Dispatcher sent -> find and notify the assigned driver
+                const sb = getSupabase();
+                if (sb) {
+                    let driverName = null;
 
-                    // Also try by sale_order_no if not found by id
-                    if (orderData?.taiXe) {
+                    if (type === 'import') {
+                        // Import ticket: driver in assigned_driver field
+                        const { data: imp } = await sb
+                            .from('import_tickets')
+                            .select('assigned_driver')
+                            .eq('id', safeId)
+                            .single();
+                        if (!imp) {
+                            const { data: imp2 } = await sb
+                                .from('import_tickets')
+                                .select('assigned_driver')
+                                .eq('ticket_no', safeId)
+                                .single();
+                            driverName = imp2?.assigned_driver;
+                        } else {
+                            driverName = imp?.assigned_driver;
+                        }
+                    } else {
+                        // Export order: driver in custom_field13 (taiXe)
+                        const { data: ord } = await sb
+                            .from('orders')
+                            .select('custom_field13')
+                            .eq('id', safeId)
+                            .single();
+                        if (!ord) {
+                            const { data: ord2 } = await sb
+                                .from('orders')
+                                .select('custom_field13')
+                                .eq('sale_order_no', safeId)
+                                .single();
+                            driverName = ord2?.custom_field13;
+                        } else {
+                            driverName = ord?.custom_field13;
+                        }
+                    }
+
+                    if (driverName) {
                         await createNotification(
-                            orderData.taiXe,
+                            driverName,
                             'message',
-                            '💬 Tin nhắn mới',
-                            `Bạn có tin nhắn mới ở đơn #${orderNo}`,
+                            `💬 ${sender_name}`,
+                            `#${orderNo}: ${msgPreview}`,
                             safeId,
                             orderNo
                         );

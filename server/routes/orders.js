@@ -2853,14 +2853,11 @@ router.get('/:id/chat', async (req, res) => {
     }
 });
 
-// POST /api/orders/:id/chat - Send chat message
+// POST /api/orders/:id/chat - Send chat message (legacy endpoint)
 router.post('/:id/chat', async (req, res) => {
     try {
         const { id } = req.params;
         const { sender_name, sender_role, message, image } = req.body;
-
-
-
 
         const { error } = await supabase.from('order_messages').insert({
             order_id: id,
@@ -2871,6 +2868,30 @@ router.post('/:id/chat', async (req, res) => {
         });
 
         if (error) return res.json(createResponse(true, error.message));
+
+        // In-app notification for chat
+        try {
+            const senderRoleUpper = (sender_role || '').toUpperCase();
+            const msgPreview = (message || '📷 Ảnh').substring(0, 60);
+
+            if (senderRoleUpper === 'DRIVER' || senderRoleUpper === 'TÀI XẾ') {
+                await createNotification('ADMIN', 'message', `💬 ${sender_name}`, `#${id}: ${msgPreview}`, id, id);
+            } else {
+                // Find driver to notify
+                const { data: ord } = await supabase.from('orders').select('custom_field13').eq('id', id).single();
+                let driverName = ord?.custom_field13;
+                if (!driverName) {
+                    const { data: ord2 } = await supabase.from('orders').select('custom_field13').eq('sale_order_no', id).single();
+                    driverName = ord2?.custom_field13;
+                }
+                if (driverName) {
+                    await createNotification(driverName, 'message', `💬 ${sender_name}`, `#${id}: ${msgPreview}`, id, id);
+                }
+            }
+        } catch (notifyErr) {
+            console.error('Chat notification error:', notifyErr.message);
+        }
+
         res.json(createResponse(false, 'Đã gửi!'));
     } catch (e) {
         res.json(createResponse(true, e.message));
