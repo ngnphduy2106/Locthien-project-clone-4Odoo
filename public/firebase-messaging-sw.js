@@ -9,12 +9,12 @@ importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-comp
 
 // Firebase config — must match the project
 const firebaseConfig = {
-    apiKey: "AIzaSyD-locthien-scm",
+    apiKey: "AIzaSyDLjwBvNnhEdn32VgmYqDfbRkVrzflCA8w",
     authDomain: "locthien-scm.firebaseapp.com",
     projectId: "locthien-scm",
     storageBucket: "locthien-scm.firebasestorage.app",
     messagingSenderId: "831814732608",
-    appId: "1:105188454064471829082:web:locthien"
+    appId: "1:831814732608:web:a5962decde0ecb230fc8a5"
 };
 
 firebase.initializeApp(firebaseConfig);
