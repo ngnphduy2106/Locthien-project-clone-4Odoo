@@ -493,6 +493,14 @@ async function handleLogin() {
 
         localStorage.setItem('LT_SESSION', JSON.stringify(state));
 
+        // Register for push notifications after login
+        if (typeof NotificationModule !== 'undefined' && state.user?.name) {
+            setTimeout(() => {
+                NotificationModule.registerForNotifications(state.user.name);
+                startNotificationPolling();
+            }, 1500);
+        }
+
         initApp();
     } catch (e) {
         hideLoading();
