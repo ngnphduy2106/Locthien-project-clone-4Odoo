@@ -3314,7 +3314,7 @@ router.post('/:id/reject', async (req, res) => {
         const order = await db.getOrder(id);
         if (!order) return res.json(createResponse(true, 'Không tìm thấy đơn hàng'));
 
-        // Update order with rejection - use existing columns only
+        // Update order with rejection - keep status as 'Đang thực hiện' to preserve dispatch assignment
         const rejectNote = `[TỪ CHỐI] Bởi ${rejected_by || 'admin'} lúc ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}${reason ? ' - Lý do: ' + reason : ''}`;
         const updateData = {
             admin_approved: false,
@@ -3323,7 +3323,7 @@ router.post('/:id/reject', async (req, res) => {
             sale_confirmed: false,
             sale_confirmed_at: null,
             sale_confirmed_by: null,
-            status: 'Chưa thực hiện',
+            status: 'Đang thực hiện',
             delivery_status: 'Đang giao hàng',
             description: rejectNote
         };
