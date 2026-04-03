@@ -210,7 +210,8 @@ let _lastSeenNotifIds = new Set();
 let _firstLoadDone = false;
 
 async function loadNotifications() {
-    const user = JSON.parse(localStorage.getItem('LT_USER') || '{}');
+    const session = JSON.parse(localStorage.getItem('LT_SESSION') || '{}');
+    const user = session.user || {};
     const userId = user.fullName || user.name || user.phone;
     const userRole = user.role || '';
 
@@ -395,7 +396,8 @@ async function handleNotificationClick(notificationId, orderId) {
 
 // Mark all notifications as read
 async function markAllNotificationsRead() {
-    const user = JSON.parse(localStorage.getItem('LT_USER') || '{}');
+    const session = JSON.parse(localStorage.getItem('LT_SESSION') || '{}');
+    const user = session.user || {};
     const userId = user.fullName || user.name || user.phone;
 
     if (!userId) return;
@@ -526,8 +528,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Start polling after login
     setTimeout(() => {
-        const user = localStorage.getItem('LT_USER');
-        if (user) {
+        const session = localStorage.getItem('LT_SESSION');
+        if (session) {
             startNotificationPolling();
         }
     }, 2000);
