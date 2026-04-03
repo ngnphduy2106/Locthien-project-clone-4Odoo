@@ -770,6 +770,29 @@ router.get('/pending-confirm', async (req, res) => {
             return { ...o, products };
         });
 
+        // Enrich merged orders with source_order_nos (list of all order codes in the merged trip)
+        const mergedNos = [...new Set(mapped.filter(o => o.merged_order_no).map(o => o.merged_order_no))];
+        if (mergedNos.length > 0) {
+            try {
+                const { data: mergedLogs } = await supabase
+                    .from('merged_orders')
+                    .select('merged_no, source_order_nos')
+                    .in('merged_no', mergedNos);
+
+                if (mergedLogs) {
+                    const mergedMap = {};
+                    mergedLogs.forEach(m => { mergedMap[m.merged_no] = m.source_order_nos || []; });
+                    mapped.forEach(o => {
+                        if (o.merged_order_no && mergedMap[o.merged_order_no]) {
+                            o.source_order_nos = mergedMap[o.merged_order_no];
+                        }
+                    });
+                }
+            } catch (mergedErr) {
+                console.error('Enrich merged orders error:', mergedErr.message);
+            }
+        }
+
         res.json(createResponse(false, 'OK', mapped));
     } catch (e) {
         console.error('pending-confirm error:', e.message);
@@ -3143,6 +3166,20 @@ router.get('/:id/review', async (req, res) => {
                     }
                 }
             }
+        }
+
+        // Enrich order with source_order_nos for merged display
+        if (mergedNo) {
+            try {
+                const { data: mergedLog } = await supabase
+                    .from('merged_orders')
+                    .select('source_order_nos')
+                    .eq('merged_no', mergedNo)
+                    .single();
+                if (mergedLog?.source_order_nos) {
+                    order.source_order_nos = mergedLog.source_order_nos;
+                }
+            } catch (e) { }
         }
 
         res.json(createResponse(false, 'OK', {
