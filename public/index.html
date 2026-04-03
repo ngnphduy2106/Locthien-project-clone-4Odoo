@@ -2020,20 +2020,18 @@
 
 
 
-    <!-- Service Worker: cleanup old → register fresh -->
+    <!-- Service Worker: register app SW + Firebase messaging SW -->
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', async () => {
                 try {
-                    // Step 1: Unregister any stale SWs (fixes "Not found" update errors)
-                    const regs = await navigator.serviceWorker.getRegistrations();
-                    for (const reg of regs) {
-                        await reg.unregister();
-                        console.log('🧹 Old SW removed:', reg.scope);
-                    }
-                    // Step 2: Register fresh SW
-                    const newReg = await navigator.serviceWorker.register('/sw.js');
-                    console.log('✅ SW registered:', newReg.scope);
+                    // Register app SW (caching)
+                    await navigator.serviceWorker.register('/sw.js');
+                    console.log('✅ App SW registered');
+
+                    // Register Firebase messaging SW (push notifications)
+                    await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+                    console.log('✅ Firebase SW registered');
                 } catch (err) {
                     console.warn('SW setup skipped:', err.message);
                 }
