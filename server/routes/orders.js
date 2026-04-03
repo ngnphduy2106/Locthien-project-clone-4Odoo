@@ -1146,29 +1146,20 @@ router.put('/:id/assign', async (req, res) => {
             cart: fullOrder?.cart || fullOrder?.products || []
         });
 
-        // Send push notification to driver (async, don't block response)
+        // In-app + FCM push notification to driver
         try {
-            const { notifyDriverOrderAssigned } = await import('../services/firebase.js');
-            const users = await db.getUsers();
-            const driver = users.find(u =>
-                u.fullName?.toLowerCase() === driverName?.toLowerCase() ||
-                u.username?.toLowerCase() === driverName?.toLowerCase()
+            const orderNo = fullOrder?.soDon || fullOrder?.sale_order_no || id;
+            const customer = fullOrder?.khach || fullOrder?.account_name || '';
+            await createNotification(
+                driverName,
+                'order_assigned',
+                `🚛 Đơn hàng mới`,
+                `#${orderNo} - ${customer}`,
+                id,
+                orderNo
             );
-
-            if (driver?.fcm_token) {
-                notifyDriverOrderAssigned(driver.fcm_token, {
-                    orderId: id,
-                    orderNo: fullOrder?.soDon || fullOrder?.sale_order_no || id,
-                    customerName: fullOrder?.khach || fullOrder?.account_name,
-                    address: fullOrder?.diaChi || fullOrder?.shipping_address,
-                    type: 'export'
-                });
-                console.log(`📬 Push notification sent to driver ${driverName}`);
-            } else {
-                console.log(`⚠️ No FCM token for driver ${driverName}`);
-            }
         } catch (notifyErr) {
-            console.error('Push notification error:', notifyErr.message);
+            console.error('Assign notification error:', notifyErr.message);
         }
 
         // Send Telegram notification to DRIVER group (async, don't block response)
