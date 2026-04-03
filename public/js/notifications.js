@@ -5,7 +5,7 @@
 
 const NotificationModule = {
     // VAPID key from Firebase Console > Cloud Messaging > Web Push certificates
-    vapidKey: 'BOlhHKZU6BMEorXN0tDzDXVjRQ8hHWmsPzfTZOBGLdL7l_zRpfDWFCXPb0_AXLPsPzHBhtcDO47Kj42aDLQ9kuY',
+    vapidKey: 'BOlhHKZU6BMEorXN0tDzDXVjRQ8hHWmsPzfTZOBGLdL7I_zRpfDWFCXPb0_AXLPsPzHBhtcD047Kj42aDLQ9kuY',
     initialized: false,
     messaging: null,
 
