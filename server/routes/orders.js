@@ -3116,6 +3116,23 @@ router.post('/:id/confirm', async (req, res) => {
             console.error('Telegram confirm error:', tgErr.message);
         }
 
+        // In-app notification for the assigned driver
+        try {
+            const driverName = order.taiXe || order.custom_field13 || '';
+            if (driverName) {
+                await createNotification(
+                    driverName,
+                    'order_completed',
+                    '✅ Đơn đã xác nhận',
+                    `#${orderNo} — ${order.khach || order.account_name || ''} đã được duyệt`,
+                    id,
+                    orderNo
+                );
+            }
+        } catch (notifyErr) {
+            console.error('In-app confirm notification error:', notifyErr.message);
+        }
+
         res.json(createResponse(false, isLocalOrder ? 'Đã xác nhận!' : 'Đã xác nhận & đồng bộ MISA!', { crmStatus }));
     } catch (e) {
         console.error('confirm error:', e.message);
