@@ -287,11 +287,11 @@ function showToastBanner(notif) {
     container.appendChild(toast);
     playNotificationSound();
 
-    // Auto-remove after 6 seconds
+    // Auto-remove after 15 seconds (enough time to read)
     setTimeout(() => {
         toast.classList.add('fade-out');
         setTimeout(() => toast.remove(), 300);
-    }, 6000);
+    }, 15000);
 }
 
 // Show native browser notification (works on mobile PWA)
