@@ -4,99 +4,123 @@
 // ===============================================
 
 const NotificationModule = {
-    vapidKey: null, // Will be set from Firebase Console
+    // VAPID key from Firebase Console > Project Settings > Cloud Messaging > Web Push certificates
+    // TODO: Replace with your actual VAPID key from Firebase Console
+    vapidKey: 'BKagOny0KF_2pCJQ3m....YOUR_VAPID_KEY_HERE',
     initialized: false,
+    messaging: null,
 
-    // Initialize Firebase Messaging in browser
-    async init() {
-        if (this.initialized) return true;
-
-        // Check if notifications are supported
-        if (!('Notification' in window)) {
-            console.log('❌ This browser does not support notifications');
-            return false;
-        }
-
-        // Check if service workers are supported
-        if (!('serviceWorker' in navigator)) {
-            console.log('❌ Service workers not supported');
-            return false;
-        }
+    // Load Firebase SDK dynamically (avoid heavy load on every page)
+    async loadFirebaseSDK() {
+        if (window.firebase?.messaging) return true;
 
         try {
-            // Register service worker
-            const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
-            console.log('✅ Service Worker registered:', registration.scope);
+            // Load Firebase App + Messaging
+            await this._loadScript('https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js');
+            await this._loadScript('https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js');
 
-            this.initialized = true;
+            firebase.initializeApp({
+                apiKey: "AIzaSyD-locthien-scm",
+                authDomain: "locthien-scm.firebaseapp.com",
+                projectId: "locthien-scm",
+                storageBucket: "locthien-scm.firebasestorage.app",
+                messagingSenderId: "105188454064471829082",
+                appId: "1:105188454064471829082:web:locthien"
+            });
+
+            this.messaging = firebase.messaging();
+            console.log('🔥 Firebase Messaging SDK loaded');
             return true;
         } catch (e) {
-            console.error('❌ Service Worker registration failed:', e);
+            console.error('❌ Firebase SDK load error:', e.message);
             return false;
         }
     },
 
-    // Request notification permission
+    _loadScript(src) {
+        return new Promise((resolve, reject) => {
+            if (document.querySelector(`script[src="${src}"]`)) return resolve();
+            const s = document.createElement('script');
+            s.src = src;
+            s.onload = resolve;
+            s.onerror = reject;
+            document.head.appendChild(s);
+        });
+    },
+
+    // Initialize — register service worker
+    async init() {
+        if (this.initialized) return true;
+
+        if (!('Notification' in window) || !('serviceWorker' in navigator)) {
+            console.log('❌ Push notifications not supported');
+            return false;
+        }
+
+        try {
+            const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+            console.log('✅ FCM Service Worker registered:', registration.scope);
+            this.initialized = true;
+            return true;
+        } catch (e) {
+            console.error('❌ SW registration failed:', e);
+            return false;
+        }
+    },
+
+    // Request permission
     async requestPermission() {
         const permission = await Notification.requestPermission();
         console.log('🔔 Notification permission:', permission);
         return permission === 'granted';
     },
 
-    // Get FCM token and register with backend
+    // Get REAL FCM token and register with backend
     async registerForNotifications(userId) {
-        if (!userId) {
-            console.log('⚠️ No userId provided');
-            return false;
-        }
+        if (!userId) return false;
 
         try {
-            // Make sure we're initialized
-            if (!this.initialized) {
-                await this.init();
-            }
+            if (!this.initialized) await this.init();
 
-            // Request permission
             const granted = await this.requestPermission();
             if (!granted) {
-                console.log('⚠️ Notification permission denied');
+                console.log('⚠️ Notification permission denied by user');
                 return false;
             }
 
-            // Get the service worker registration
-            const registration = await navigator.serviceWorker.ready;
+            // Load Firebase SDK
+            const sdkLoaded = await this.loadFirebaseSDK();
+            if (!sdkLoaded || !this.messaging) {
+                console.log('⚠️ Firebase SDK not available, using fallback');
+                return false;
+            }
 
-            // Subscribe to push (using web push API)
-            // Note: For FCM, we need to use Firebase SDK in frontend
-            // This is a simplified version using localStorage mock
-            const token = await this.getMockToken();
+            // Get REAL FCM token
+            const registration = await navigator.serviceWorker.getRegistration('/firebase-messaging-sw.js');
+            const token = await this.messaging.getToken({
+                vapidKey: this.vapidKey,
+                serviceWorkerRegistration: registration
+            });
 
             if (token) {
-                // Register token with backend
+                console.log('🔑 FCM Token obtained:', token.substring(0, 20) + '...');
+
+                // Register token with backend (saves to users table)
                 const res = await api.registerFcmToken(userId, token);
                 if (!res.error) {
                     localStorage.setItem('LT_FCM_TOKEN', token);
-                    console.log('✅ Push notification registered');
+                    console.log('✅ Push notifications active — lock screen notifications enabled!');
                     return true;
                 }
+            } else {
+                console.log('⚠️ No FCM token received');
             }
 
             return false;
         } catch (e) {
-            console.error('❌ Push registration error:', e);
+            console.error('❌ Push registration error:', e.message);
             return false;
         }
-    },
-
-    // Mock token for development (replace with real FCM SDK)
-    async getMockToken() {
-        // In production, use Firebase SDK: messaging.getToken({ vapidKey: this.vapidKey })
-        const existingToken = localStorage.getItem('LT_FCM_TOKEN');
-        if (existingToken) return existingToken;
-
-        // Generate mock token for development
-        const mockToken = 'mock_fcm_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-        return mockToken;
     },
 
     // Show in-app notification

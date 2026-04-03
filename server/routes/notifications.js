@@ -148,11 +148,12 @@ router.delete('/:id', async (req, res) => {
     }
 });
 
-// === HELPER: Create notification ===
+// === HELPER: Create notification + push to device ===
 export async function createNotification(userId, type, title, body, orderId = null, orderNo = null) {
     try {
         const supabase = await getSupabase();
 
+        // 1. Save to database (in-app notification)
         const { error } = await supabase
             .from('notifications')
             .insert({
@@ -170,6 +171,58 @@ export async function createNotification(userId, type, title, body, orderId = nu
         }
 
         console.log(`🔔 Notification created: ${type} for ${userId}`);
+
+        // 2. Send FCM push to device (lock screen notification)
+        try {
+            const { sendPushNotification } = await import('../services/firebase.js');
+
+            // Find user's FCM token from users table
+            let fcmToken = null;
+
+            if (userId === 'ADMIN') {
+                // For ADMIN-targeted notifications, push to all admin devices
+                const { data: admins } = await supabase
+                    .from('users')
+                    .select('fcm_token')
+                    .eq('role', 'admin')
+                    .not('fcm_token', 'is', null);
+
+                if (admins?.length) {
+                    for (const admin of admins) {
+                        if (admin.fcm_token && !admin.fcm_token.startsWith('mock_')) {
+                            await sendPushNotification(admin.fcm_token, title, body, {
+                                orderId: String(orderId || ''),
+                                orderNo: String(orderNo || ''),
+                                type: type
+                            });
+                        }
+                    }
+                }
+            } else {
+                // Find specific user by name (fullName match)
+                const { data: users } = await supabase
+                    .from('users')
+                    .select('fcm_token')
+                    .eq('fullName', userId)
+                    .not('fcm_token', 'is', null)
+                    .limit(1);
+
+                fcmToken = users?.[0]?.fcm_token;
+
+                if (fcmToken && !fcmToken.startsWith('mock_')) {
+                    await sendPushNotification(fcmToken, title, body, {
+                        orderId: String(orderId || ''),
+                        orderNo: String(orderNo || ''),
+                        type: type
+                    });
+                    console.log(`📬 FCM push sent to ${userId}`);
+                }
+            }
+        } catch (pushErr) {
+            // FCM push failure should not block in-app notification
+            console.log(`⚠️ FCM push skipped: ${pushErr.message}`);
+        }
+
         return true;
 
     } catch (e) {
