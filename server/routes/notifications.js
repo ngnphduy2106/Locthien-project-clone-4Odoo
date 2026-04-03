@@ -24,14 +24,18 @@ router.get('/:userId', async (req, res) => {
         const { limit = 50, unreadOnly = false, role = '' } = req.query;
         const supabase = await getSupabase();
 
-        // Admin sees ALL notifications; non-admin sees only their own
+        // Admin sees ALL notifications from last 7 days; non-admin sees only their own
         const isAdmin = ['admin'].includes((role || '').toLowerCase());
 
         let query = supabase
             .from('notifications')
             .select('*');
 
-        if (!isAdmin) {
+        if (isAdmin) {
+            // Admin: see all notifications but limit to recent (7 days)
+            const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+            query = query.gte('created_at', sevenDaysAgo);
+        } else {
             // Non-admin: only their own name-targeted notifications
             query = query.eq('user_id', userId);
         }
@@ -57,7 +61,10 @@ router.get('/:userId', async (req, res) => {
             .select('*', { count: 'exact', head: true })
             .eq('is_read', false);
 
-        if (!isAdmin) {
+        if (isAdmin) {
+            const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+            countQuery = countQuery.gte('created_at', sevenDaysAgo);
+        } else {
             countQuery = countQuery.eq('user_id', userId);
         }
 
