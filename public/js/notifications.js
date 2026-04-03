@@ -183,6 +183,9 @@ function toggleNotificationPanel(event) {
 }
 
 // Load notifications from API
+let _lastSeenNotifIds = new Set();
+let _firstLoadDone = false;
+
 async function loadNotifications() {
     const user = JSON.parse(localStorage.getItem('LT_USER') || '{}');
     const userId = user.fullName || user.name || user.phone;
@@ -194,11 +197,104 @@ async function loadNotifications() {
         const data = await res.json();
 
         if (!data.error) {
-            renderNotifications(data.data || []);
+            const notifications = data.data || [];
+            renderNotifications(notifications);
             updateNotificationBadge(data.unreadCount || 0);
+
+            // Show toast + native notification for NEW unread notifications
+            if (_firstLoadDone) {
+                const newNotifs = notifications.filter(n => !n.is_read && !_lastSeenNotifIds.has(n.id));
+                newNotifs.forEach(n => {
+                    showToastBanner(n);
+                    showNativeNotification(n);
+                });
+            }
+
+            // Track seen IDs
+            _lastSeenNotifIds = new Set(notifications.map(n => n.id));
+            _firstLoadDone = true;
         }
     } catch (e) {
         console.error('Load notifications error:', e);
+    }
+}
+
+// Show toast banner at top of screen
+function showToastBanner(notif) {
+    const iconMap = {
+        'order_assigned': '🚛', 'order_completed': '✅',
+        'order_edited': '⚠️', 'order_rejected': '❌',
+        'misa_new_order': '📦', 'message': '💬'
+    };
+    const colorMap = {
+        'order_rejected': '#ef4444', 'order_edited': '#f59e0b',
+        'order_assigned': '#3b82f6', 'order_completed': '#22c55e'
+    };
+    const icon = iconMap[notif.type] || '🔔';
+    const borderColor = colorMap[notif.type] || 'var(--primary)';
+
+    let container = document.getElementById('notification-toast');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'notification-toast';
+        container.className = 'notification-container';
+        document.body.appendChild(container);
+    }
+
+    const toast = document.createElement('div');
+    toast.className = 'notification-toast';
+    toast.style.borderLeftColor = borderColor;
+    toast.style.cursor = 'pointer';
+    toast.innerHTML = `
+        <div class="toast-icon">${icon}</div>
+        <div class="toast-content">
+            <div class="toast-title">${escapeHtml(notif.title)}</div>
+            <div class="toast-body">${escapeHtml(notif.body)}</div>
+        </div>
+        <button class="toast-close" onclick="event.stopPropagation(); this.parentElement.remove()">×</button>
+    `;
+
+    toast.addEventListener('click', () => {
+        handleNotificationClick(notif.id, notif.order_id || '');
+        toast.remove();
+    });
+
+    container.appendChild(toast);
+    playNotificationSound();
+
+    // Auto-remove after 6 seconds
+    setTimeout(() => {
+        toast.classList.add('fade-out');
+        setTimeout(() => toast.remove(), 300);
+    }, 6000);
+}
+
+// Show native browser notification (works on mobile PWA)
+function showNativeNotification(notif) {
+    if (!('Notification' in window)) return;
+    if (Notification.permission !== 'granted') {
+        // Request permission on first notification
+        Notification.requestPermission();
+        return;
+    }
+
+    try {
+        const nativeNotif = new Notification(notif.title || 'Thông báo', {
+            body: notif.body || '',
+            icon: '/icons/icon-192.png',
+            badge: '/icons/icon-72.png',
+            tag: notif.id, // Prevent duplicate native notifications
+            vibrate: [200, 100, 200],
+            requireInteraction: true // Stay until user dismisses
+        });
+
+        nativeNotif.onclick = () => {
+            window.focus();
+            handleNotificationClick(notif.id, notif.order_id || '');
+            nativeNotif.close();
+        };
+    } catch (e) {
+        console.log('Native notification error:', e.message);
     }
 }
 
@@ -383,10 +479,10 @@ function startNotificationPolling() {
     // Initial load
     loadNotifications();
 
-    // Poll every 30 seconds
+    // Poll every 15 seconds (faster for drivers to see rejections quickly)
     notificationPollingInterval = setInterval(() => {
         loadNotifications();
-    }, 30000);
+    }, 15000);
 }
 
 // Close panel when clicking outside
