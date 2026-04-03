@@ -10750,7 +10750,7 @@ async function loadPendingConfirmOrders() {
                     <div style="flex:1; min-width:200px;">
                         <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                             <span style="font-weight:600; color:#dc2626; font-size:13px;">#${t.ticket_no || t.id}</span>
-                            ${t.merged_order_no ? `<span style="background:#dcfce7; color:#16a34a; font-size:10px; padding:2px 6px; border-radius:4px; font-weight:600;">🔗Ghép: ${t.merged_order_no}</span>` : ''}
+                            ${t.merged_order_no ? `<span style="background:#dcfce7; color:#16a34a; font-size:10px; padding:2px 6px; border-radius:4px; font-weight:600;">🔗Ghép: ${t.source_order_nos ? t.source_order_nos.filter(n => n !== (t.ticket_no || t.id)).join(', ') : t.merged_order_no}</span>` : ''}
                             <span style="font-size:11px; color:#6B7280;">${t.created_at ? new Date(t.created_at).toLocaleDateString('vi-VN') : ''}</span>
                         </div>
                         <div style="font-size:12px; color:#374151; margin-top:2px;"><b>${t.supplier_name || t.parent_order?.account_name || 'N/A'}</b></div>
@@ -10914,7 +10914,16 @@ async function openReviewPanel(orderId, isImport = false) {
             const data = json.data;
             confirmReviewingOrder = data;
 
-            if (orderNoEl) orderNoEl.textContent = `#${data.orderNo || orderId}`;
+            if (orderNoEl) {
+                let label = `#${data.orderNo || orderId}`;
+                if (data.merged_order_no && data.source_order_nos) {
+                    const others = data.source_order_nos.filter(n => n !== (data.orderNo || orderId));
+                    if (others.length > 0) label += ` (Ghép: ${others.join(', ')})`;
+                } else if (data.merged_order_no) {
+                    label += ` (Ghép: ${data.merged_order_no})`;
+                }
+                orderNoEl.textContent = label;
+            }
 
             // Render images
             const images = data.images || [];

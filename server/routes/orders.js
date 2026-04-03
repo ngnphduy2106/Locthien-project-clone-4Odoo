@@ -709,7 +709,28 @@ router.get('/pending-confirm', async (req, res) => {
 
             if (error) return res.json(createResponse(true, error.message));
 
-            return res.json(createResponse(false, 'OK', tickets || []));
+            // Enrich merged imports with source_order_nos
+            const importList = tickets || [];
+            const mergedNos = [...new Set(importList.filter(t => t.merged_order_no).map(t => t.merged_order_no))];
+            if (mergedNos.length > 0) {
+                try {
+                    const { data: mergedLogs } = await supabase
+                        .from('merged_orders')
+                        .select('merged_no, source_order_nos')
+                        .in('merged_no', mergedNos);
+                    if (mergedLogs) {
+                        const mergedMap = {};
+                        mergedLogs.forEach(m => { mergedMap[m.merged_no] = m.source_order_nos || []; });
+                        importList.forEach(t => {
+                            if (t.merged_order_no && mergedMap[t.merged_order_no]) {
+                                t.source_order_nos = mergedMap[t.merged_order_no];
+                            }
+                        });
+                    }
+                } catch (e) { console.error('Enrich import merged error:', e.message); }
+            }
+
+            return res.json(createResponse(false, 'OK', importList));
         }
 
         if (type === 'approved') {

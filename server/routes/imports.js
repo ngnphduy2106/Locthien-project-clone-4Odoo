@@ -1325,6 +1325,19 @@ router.get('/:id/review', async (req, res) => {
         // Get proof images from ticket itself
         const proofImages = ticket.images || [];
 
+        // Enrich with source_order_nos for merged orders
+        let source_order_nos = null;
+        if (ticket.merged_order_no) {
+            try {
+                const { data: mergedLog } = await supabase
+                    .from('merged_orders')
+                    .select('source_order_nos')
+                    .eq('merged_no', ticket.merged_order_no)
+                    .single();
+                source_order_nos = mergedLog?.source_order_nos || null;
+            } catch (e) { }
+        }
+
         res.json({
             error: false,
             data: {
@@ -1340,7 +1353,9 @@ router.get('/:id/review', async (req, res) => {
                 products: ticket.products || [],
                 note: ticket.note || '',
                 images: proofImages,
-                admin_approved: ticket.admin_approved || false
+                admin_approved: ticket.admin_approved || false,
+                merged_order_no: ticket.merged_order_no || null,
+                source_order_nos: source_order_nos
             }
         });
 
