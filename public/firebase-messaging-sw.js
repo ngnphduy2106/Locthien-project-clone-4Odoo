@@ -13,7 +13,7 @@ const firebaseConfig = {
     authDomain: "locthien-scm.firebaseapp.com",
     projectId: "locthien-scm",
     storageBucket: "locthien-scm.firebasestorage.app",
-    messagingSenderId: "105188454064471829082",
+    messagingSenderId: "831814732608",
     appId: "1:105188454064471829082:web:locthien"
 };
 
