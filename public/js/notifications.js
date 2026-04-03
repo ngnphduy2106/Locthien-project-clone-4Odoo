@@ -221,6 +221,8 @@ function renderNotifications(notifications) {
         'message': '💬',
         'order_assigned': '🚛',
         'order_completed': '✅',
+        'order_edited': '⚠️',
+        'order_rejected': '❌',
         'misa_new_order': '📦'
     };
 
@@ -228,6 +230,8 @@ function renderNotifications(notifications) {
         'message': 'message',
         'order_assigned': 'order',
         'order_completed': 'complete',
+        'order_edited': 'warning',
+        'order_rejected': 'danger',
         'misa_new_order': 'misa'
     };
 

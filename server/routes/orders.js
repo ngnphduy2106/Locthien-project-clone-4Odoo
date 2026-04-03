@@ -1042,6 +1042,27 @@ router.put('/:id', async (req, res) => {
             }
         }
 
+        // In-app notification for assigned driver (so they see changes in their app)
+        if (!isFinishedOrder) {
+            try {
+                const driverName = fullOrder?.custom_field13 || fullOrder?.taiXe || '';
+                if (driverName) {
+                    const orderNo = fullOrder?.sale_order_no || fullOrder?.soDon || id;
+                    const changeDesc = (note || notes) ? `Mô tả: ${note || notes}` : 'Sản phẩm/địa chỉ đã thay đổi';
+                    await createNotification(
+                        driverName,
+                        'order_edited',
+                        '⚠️ Đơn đã chỉnh sửa',
+                        `#${orderNo} — ${changeDesc}`,
+                        id,
+                        orderNo
+                    );
+                }
+            } catch (notifyErr) {
+                console.error('In-app edit notification error:', notifyErr.message);
+            }
+        }
+
         res.json(createResponse(false, 'Đã cập nhật đơn hàng!'));
 
     } catch (e) {
@@ -3339,6 +3360,24 @@ router.post('/:id/reject', async (req, res) => {
             await sendTelegramMessage(msg, 'SALES');
         } catch (tgErr) {
             console.error('Telegram reject error:', tgErr.message);
+        }
+
+        // In-app notification for the assigned driver
+        try {
+            const driverName = order.taiXe || order.custom_field13 || '';
+            if (driverName) {
+                const orderNo = order.soDon || order.sale_order_no || id;
+                await createNotification(
+                    driverName,
+                    'order_rejected',
+                    '❌ Đơn bị từ chối',
+                    `#${orderNo} — ${reason || 'Vui lòng kiểm tra lại'}`,
+                    id,
+                    orderNo
+                );
+            }
+        } catch (notifyErr) {
+            console.error('In-app reject notification error:', notifyErr.message);
         }
 
         res.json(createResponse(false, 'Đã từ chối đơn hàng!'));

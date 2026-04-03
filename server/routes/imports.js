@@ -5,6 +5,7 @@
 import { Router } from 'express';
 import { supabase } from '../db/supabase.js';
 import { createResponse, getTimestamp, generateOrderCode } from '../config.js';
+import { createNotification } from './notifications.js';
 
 const router = Router();
 
@@ -1507,6 +1508,23 @@ router.post('/:id/reject', async (req, res) => {
             await sendTelegramMessage(msg, 'SALES');
         } catch (tgErr) {
             console.error('Telegram import reject error:', tgErr.message);
+        }
+
+                // In-app notification for the assigned driver
+        try {
+            const driverName = ticket.assigned_driver || '';
+            if (driverName) {
+                await createNotification(
+                    driverName,
+                    'order_rejected',
+                    '❌ Phiếu nhập bị từ chối',
+                    `#${ticket.ticket_no} — ${reason || 'Vui lòng kiểm tra lại'}`,
+                    ticket.id,
+                    ticket.ticket_no
+                );
+            }
+        } catch (notifyErr) {
+            console.error('In-app import reject notification error:', notifyErr.message);
         }
 
         console.log(`❌ Import ${ticket.ticket_no} rejected by ${rejected_by}`);
