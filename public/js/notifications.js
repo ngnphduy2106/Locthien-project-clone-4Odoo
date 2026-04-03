@@ -189,11 +189,12 @@ let _firstLoadDone = false;
 async function loadNotifications() {
     const user = JSON.parse(localStorage.getItem('LT_USER') || '{}');
     const userId = user.fullName || user.name || user.phone;
+    const userRole = user.role || '';
 
     if (!userId) return;
 
     try {
-        const res = await fetch(`/api/notifications/${encodeURIComponent(userId)}`);
+        const res = await fetch(`/api/notifications/${encodeURIComponent(userId)}?role=${encodeURIComponent(userRole)}`);
         const data = await res.json();
 
         if (!data.error) {
@@ -376,8 +377,9 @@ async function markAllNotificationsRead() {
 
     if (!userId) return;
 
+    const userRole = user.role || '';
     try {
-        await fetch(`/api/notifications/mark-all-read/${encodeURIComponent(userId)}`, { method: 'PUT' });
+        await fetch(`/api/notifications/mark-all-read/${encodeURIComponent(userId)}?role=${encodeURIComponent(userRole)}`, { method: 'PUT' });
         loadNotifications();
     } catch (e) {
         console.error('Mark all read error:', e);

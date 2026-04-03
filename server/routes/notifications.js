@@ -16,16 +16,27 @@ async function getSupabase() {
 }
 
 // GET /api/notifications/:userId - Get user's notifications
+// Admin (role=admin) sees ALL notifications to monitor errors
+// Others see only notifications targeted to their name
 router.get('/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
-        const { limit = 50, unreadOnly = false } = req.query;
+        const { limit = 50, unreadOnly = false, role = '' } = req.query;
         const supabase = await getSupabase();
+
+        // Admin sees ALL notifications; non-admin sees only their own
+        const isAdmin = ['admin'].includes((role || '').toLowerCase());
 
         let query = supabase
             .from('notifications')
-            .select('*')
-            .or(`user_id.eq.${userId},user_id.eq.ADMIN`)
+            .select('*');
+
+        if (!isAdmin) {
+            // Non-admin: only their own name-targeted notifications
+            query = query.eq('user_id', userId);
+        }
+
+        query = query
             .order('created_at', { ascending: false })
             .limit(parseInt(limit));
 
@@ -40,12 +51,17 @@ router.get('/:userId', async (req, res) => {
             return res.json(createResponse(true, error.message));
         }
 
-        // Get unread count
-        const { count } = await supabase
+        // Get unread count with same filter
+        let countQuery = supabase
             .from('notifications')
             .select('*', { count: 'exact', head: true })
-            .or(`user_id.eq.${userId},user_id.eq.ADMIN`)
             .eq('is_read', false);
+
+        if (!isAdmin) {
+            countQuery = countQuery.eq('user_id', userId);
+        }
+
+        const { count } = await countQuery;
 
         res.json({
             error: false,
@@ -84,13 +100,20 @@ router.put('/:id/read', async (req, res) => {
 router.put('/mark-all-read/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
+        const { role = '' } = req.query;
         const supabase = await getSupabase();
+        const isAdmin = ['admin'].includes((role || '').toLowerCase());
 
-        const { error } = await supabase
+        let markQuery = supabase
             .from('notifications')
             .update({ is_read: true })
-            .or(`user_id.eq.${userId},user_id.eq.ADMIN`)
             .eq('is_read', false);
+
+        if (!isAdmin) {
+            markQuery = markQuery.eq('user_id', userId);
+        }
+
+        const { error } = await markQuery;
 
         if (error) {
             return res.json(createResponse(true, error.message));
