@@ -138,7 +138,35 @@
 
     /* Header actions: tighter spacing */
     .header-actions {
-        gap: 8px !important;
+        gap: 12px !important;
+    }
+
+    /* Hide page title on mobile to make room for actions */
+    .page-title {
+        display: none !important;
+    }
+
+    /* Header: left-align menu, right-align actions */
+    .main-header {
+        padding: 0 12px !important;
+        gap: 8px;
+    }
+
+    /* Notification bell: bigger touch target + more visible */
+    .notification-bell {
+        width: 44px !important;
+        height: 44px !important;
+        font-size: 22px !important;
+        background: rgba(124, 92, 255, 0.08) !important;
+        border-radius: 12px !important;
+    }
+
+    .notification-count {
+        top: -2px !important;
+        right: -2px !important;
+        min-width: 20px !important;
+        height: 20px !important;
+        font-size: 11px !important;
     }
 
     /* User avatar: smaller on mobile */
@@ -147,6 +175,26 @@
         min-width: 36px !important;
         height: 36px !important;
         font-size: 12px !important;
+    }
+
+    /* Notification panel: full width on mobile */
+    .notification-panel {
+        position: fixed !important;
+        top: auto !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        width: 100% !important;
+        max-height: 70vh !important;
+        border-radius: 16px 16px 0 0 !important;
+        z-index: 2000 !important;
+    }
+
+    /* User menu dropdown: position properly on mobile */
+    .user-menu-dropdown {
+        right: 0 !important;
+        left: auto !important;
+        min-width: 160px;
     }
 
     /* Search bar: full width on mobile */
