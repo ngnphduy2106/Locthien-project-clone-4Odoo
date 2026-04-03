@@ -191,7 +191,7 @@ export async function createNotification(userId, type, title, body, orderId = nu
                 const { data: admins } = await supabase
                     .from('users')
                     .select('fcm_token')
-                    .eq('role', 'admin')
+                    .in('role', ['admin', 'ADMIN'])
                     .not('fcm_token', 'is', null);
 
                 if (admins?.length) {
@@ -210,7 +210,7 @@ export async function createNotification(userId, type, title, body, orderId = nu
                 const { data: users } = await supabase
                     .from('users')
                     .select('fcm_token')
-                    .eq('fullName', userId)
+                    .eq('fullname', userId)
                     .not('fcm_token', 'is', null)
                     .limit(1);
 

@@ -531,6 +531,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const session = localStorage.getItem('LT_SESSION');
         if (session) {
             startNotificationPolling();
+
+            // Register for push notifications (FCM)
+            try {
+                const parsed = JSON.parse(session);
+                const userName = parsed?.user?.name || parsed?.user?.fullName;
+                if (userName) {
+                    NotificationModule.registerForNotifications(userName);
+                }
+            } catch (e) { /* ignore parse errors */ }
         }
     }, 2000);
 });
