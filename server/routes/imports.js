@@ -183,6 +183,60 @@ router.post('/', async (req, res) => {
     }
 });
 
+// POST /api/imports/resend-notification/:ticketNo - Resend Telegram notification for a completed import
+router.post('/resend-notification/:ticketNo', async (req, res) => {
+    try {
+        const { ticketNo } = req.params;
+        const { data: ticket } = await getSupabase()
+            .from('import_tickets')
+            .select('*')
+            .eq('ticket_no', ticketNo)
+            .single();
+
+        if (!ticket) {
+            return res.json(createResponse(true, 'Không tìm thấy phiếu nhập: ' + ticketNo));
+        }
+
+        const { sendTelegramMessage, sendTelegramPhotos } = await import('../services/telegram.js');
+        const products = ticket.products || [];
+        let msg = `✅ <b>PHIẾU NHẬP ĐÃ HOÀN THÀNH</b>\n`;
+        msg += `📦 <b>#${ticket.ticket_no}</b>\n`;
+        msg += `🏭 ${ticket.supplier_name}\n`;
+        if (ticket.assigned_driver) {
+            msg += `🚗 TX: <b>${ticket.assigned_driver}</b>${ticket.assigned_plate ? ` (${ticket.assigned_plate})` : ''}\n`;
+        }
+        msg += `📦 ${products.map(p => `${p.name} — ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'Kg'}`).join(', ')}\n`;
+        if (ticket.note) msg += `📝 ${ticket.note}\n`;
+
+        // Try to send with proof images
+        let proofImages = ticket.images || [];
+        if (proofImages.length === 0) {
+            const supabase = getSupabase();
+            const { data: assigns } = await supabase
+                .from('import_driver_assignments')
+                .select('proof_images')
+                .eq('import_id', ticket.id);
+            if (assigns) {
+                for (const a of assigns) {
+                    if (a.proof_images?.length > 0) proofImages = [...proofImages, ...a.proof_images];
+                }
+            }
+        }
+
+        if (proofImages.length > 0) {
+            await sendTelegramPhotos(proofImages, msg, 'NHAP');
+        } else {
+            await sendTelegramMessage(msg, 'NHAP');
+        }
+
+        console.log(`📨 Resent Telegram notification for import ${ticketNo}`);
+        res.json(createResponse(false, `Đã gửi lại thông báo cho ${ticketNo}`));
+    } catch (e) {
+        console.error('Resend import notification error:', e.message);
+        res.json(createResponse(true, e.message));
+    }
+});
+
 // PUT /api/imports/:id - Update import ticket basic info
 router.put('/:id', async (req, res) => {
     try {
