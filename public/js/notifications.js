@@ -200,8 +200,26 @@ function toggleNotificationPanel(event) {
     if (isHidden) {
         panel.classList.remove('hidden');
         loadNotifications();
+
+        // Add backdrop on mobile
+        if (window.innerWidth <= 767) {
+            let backdrop = document.getElementById('notif-backdrop');
+            if (!backdrop) {
+                backdrop = document.createElement('div');
+                backdrop.id = 'notif-backdrop';
+                backdrop.className = 'notification-backdrop';
+                backdrop.addEventListener('click', () => {
+                    panel.classList.add('hidden');
+                    backdrop.remove();
+                });
+                document.body.appendChild(backdrop);
+            }
+        }
     } else {
         panel.classList.add('hidden');
+        // Remove backdrop
+        const backdrop = document.getElementById('notif-backdrop');
+        if (backdrop) backdrop.remove();
     }
 }
 

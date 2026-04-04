@@ -1105,17 +1105,7 @@ button, a, [onclick], [role="button"], input[type="submit"] {
     opacity: 0.5;
 }
 
-/* Mobile notification panel */
-@media (max-width: 767px) {
-    .notification-panel {
-        position: fixed;
-        top: 60px;
-        left: 10px;
-        right: 10px;
-        width: auto;
-        max-height: calc(100vh - 80px);
-    }
-}
+/* Mobile notification panel — handled by mobile.css */
 
 /* ===== TOAST NOTIFICATIONS ===== */
 .notification-container {

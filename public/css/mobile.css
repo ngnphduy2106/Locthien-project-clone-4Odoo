@@ -177,17 +177,127 @@
         font-size: 12px !important;
     }
 
-    /* Notification panel: full width on mobile */
+    /* Notification panel: slide-up sheet starting at 50% screen */
     .notification-panel {
         position: fixed !important;
-        top: auto !important;
+        top: 40% !important;
         bottom: 0 !important;
         left: 0 !important;
         right: 0 !important;
         width: 100% !important;
-        max-height: 70vh !important;
-        border-radius: 16px 16px 0 0 !important;
+        max-height: 60vh !important;
+        border-radius: 20px 20px 0 0 !important;
         z-index: 2000 !important;
+        box-shadow: 0 -4px 30px rgba(0,0,0,0.25) !important;
+        animation: slideUpPanel 0.3s ease-out !important;
+    }
+
+    .notification-panel.hidden {
+        animation: none !important;
+    }
+
+    /* Handle bar (drag indicator) */
+    .notification-header::before {
+        content: '' !important;
+        display: block !important;
+        width: 40px;
+        height: 4px;
+        background: #ccc;
+        border-radius: 2px;
+        margin: 0 auto 8px;
+    }
+
+    .notification-header {
+        flex-wrap: wrap !important;
+        padding: 10px 16px 8px !important;
+        position: sticky;
+        top: 0;
+        background: white;
+        z-index: 1;
+    }
+
+    .notification-header span {
+        font-size: 16px !important;
+        font-weight: 700 !important;
+    }
+
+    /* Bigger notification items on mobile */
+    .notification-item {
+        padding: 14px 16px !important;
+        gap: 12px !important;
+        min-height: 56px !important;
+        position: relative !important;
+    }
+
+    .notification-icon {
+        width: 40px !important;
+        height: 40px !important;
+        font-size: 18px !important;
+    }
+
+    .notification-title {
+        font-size: 14px !important;
+        font-weight: 600 !important;
+    }
+
+    .notification-body {
+        font-size: 13px !important;
+        white-space: normal !important;
+        overflow: visible !important;
+        text-overflow: unset !important;
+        line-height: 1.4 !important;
+    }
+
+    .notification-time {
+        font-size: 11px !important;
+        margin-top: 4px !important;
+    }
+
+    .notification-list {
+        max-height: calc(60vh - 50px) !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* Backdrop overlay for notification panel */
+    .notification-backdrop {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.4);
+        z-index: 1999;
+        animation: fadeInBackdrop 0.2s ease-out;
+    }
+
+    /* Toast: below header bar, not at very top */
+    .notification-container {
+        top: calc(var(--header-height, 60px) + env(safe-area-inset-top, 0px) + 4px) !important;
+    }
+
+    .notification-toast {
+        margin: 4px 10px !important;
+        border-radius: 14px !important;
+        padding: 12px 14px !important;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.2) !important;
+    }
+
+    .toast-title {
+        font-size: 14px !important;
+    }
+
+    .toast-body {
+        font-size: 13px !important;
+        white-space: normal !important;
+        overflow: visible !important;
+        text-overflow: unset !important;
+        line-height: 1.4 !important;
+    }
+
+    .toast-close {
+        font-size: 22px !important;
+        padding: 2px 4px !important;
     }
 
     /* User menu dropdown: position properly on mobile */
@@ -324,4 +434,15 @@
 
 .loading-spinner {
     contain: strict;
+}
+
+/* === Mobile Notification Animations === */
+@keyframes slideUpPanel {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+}
+
+@keyframes fadeInBackdrop {
+    from { opacity: 0; }
+    to { opacity: 1; }
 }
