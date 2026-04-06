@@ -257,6 +257,7 @@ app.use((err, req, res, next) => {
     });
 });
 
+
 // Start server (Render/Local)
 const IS_SERVERLESS = !!process.env.LAMBDA_TASK_ROOT || !!process.env.NETLIFY;
 
@@ -266,10 +267,15 @@ if (!IS_SERVERLESS) {
         .then(() => syncMisaProducts())
         .catch(err => console.error('Startup Sync Failed:', err));
 
-    // Background interval for long-running environments (5min to prevent server overload on Render)
-    setInterval(() => {
-        syncMisaOrders().catch(err => console.error('Sync Job Failed:', err));
-    }, 5 * 60 * 1000);
+    // Background sync: 30s for near-real-time CRM updates (with lock to prevent overlap)
+    let isSyncing = false;
+    setInterval(async () => {
+        if (isSyncing) return;
+        isSyncing = true;
+        try { await syncMisaOrders(); }
+        catch (err) { console.error('Sync Job Failed:', err); }
+        finally { isSyncing = false; }
+    }, 30 * 1000);
 
     // Retry failed syncs every 30 minutes (low priority background task)
     setInterval(() => {
@@ -277,8 +283,8 @@ if (!IS_SERVERLESS) {
     }, 30 * 60 * 1000);
 
     app.listen(PORT, () => {
-        console.log(`🚀 Lộc Thiên ERP running on port ${PORT}`);
-        console.log(`📍 Client folder: ${publicPath}`);
+        console.log('?? L?c Thi�n ERP running on port ' + PORT);
+        console.log('?? Client folder: ' + publicPath);
     });
 }
 
