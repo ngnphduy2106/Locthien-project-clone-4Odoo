@@ -11,18 +11,7 @@
         margin-top: 0;
     }
 
-    /* Add a safe-area background strip behind the status bar */
-    body::before {
-        content: '';
-        display: block;
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        height: env(safe-area-inset-top, 0px);
-        background: var(--bg-primary, #fff);
-        z-index: 10000;
-    }
+    /* Safe-area background color is handled by the header itself */
 
     .sidebar {
         padding-top: env(safe-area-inset-top) !important;
@@ -163,7 +152,8 @@
 
     /* Header: left-align menu, right-align actions */
     .main-header {
-        padding: env(safe-area-inset-top, 0px) 12px 0 12px !important;
+        padding: 20px 12px 0 12px !important;
+        padding-top: calc(20px + env(safe-area-inset-top, 0px)) !important;
         gap: 8px;
     }
 
