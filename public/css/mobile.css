@@ -6,11 +6,26 @@
 /* === iOS Safe Area Support === */
 @supports (padding: env(safe-area-inset-top)) {
     .main-header {
-        padding-top: env(safe-area-inset-top);
+        padding-top: env(safe-area-inset-top) !important;
+        /* Extend header background into safe area */
+        margin-top: 0;
+    }
+
+    /* Add a safe-area background strip behind the status bar */
+    body::before {
+        content: '';
+        display: block;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: env(safe-area-inset-top, 0px);
+        background: var(--bg-primary, #fff);
+        z-index: 10000;
     }
 
     .sidebar {
-        padding-top: env(safe-area-inset-top);
+        padding-top: env(safe-area-inset-top) !important;
         padding-bottom: env(safe-area-inset-bottom);
     }
 
@@ -148,7 +163,7 @@
 
     /* Header: left-align menu, right-align actions */
     .main-header {
-        padding: 0 12px !important;
+        padding: env(safe-area-inset-top, 0px) 12px 0 12px !important;
         gap: 8px;
     }
 
