@@ -1456,6 +1456,45 @@ router.get('/:id/review', async (req, res) => {
             } catch (e) { }
         }
 
+        // Fetch driver assignments to get actual quantities entered by driver
+        let assignments = [];
+        try {
+            const { data: assigns } = await supabase
+                .from('import_driver_assignments')
+                .select('driver_name, plate, assigned_qty, actual_qty, status, proof_images')
+                .eq('import_id', ticket.id)
+                .order('created_at', { ascending: true });
+            assignments = assigns || [];
+        } catch (e) { }
+
+        // Overlay actual_qty onto products if driver has entered them
+        let reviewProducts = ticket.products || [];
+        const totalActualQty = assignments.reduce((sum, a) => sum + Number(a.actual_qty || 0), 0);
+        if (totalActualQty > 0 && reviewProducts.length > 0) {
+            // If only 1 product, use total actual_qty directly
+            if (reviewProducts.length === 1) {
+                reviewProducts = [{ ...reviewProducts[0], qty: totalActualQty }];
+            } else {
+                // Multiple products: scale proportionally based on actual vs assigned total
+                const totalAssigned = assignments.reduce((sum, a) => sum + Number(a.assigned_qty || 0), 0);
+                if (totalAssigned > 0) {
+                    const ratio = totalActualQty / totalAssigned;
+                    reviewProducts = reviewProducts.map(p => ({
+                        ...p,
+                        qty: Math.round(Number(p.qty || 0) * ratio)
+                    }));
+                }
+            }
+        }
+
+        // Collect proof images from assignments too
+        let allImages = ticket.images || [];
+        for (const a of assignments) {
+            if (a.proof_images && Array.isArray(a.proof_images)) {
+                allImages = [...allImages, ...a.proof_images];
+            }
+        }
+
         res.json({
             error: false,
             data: {
@@ -1468,12 +1507,13 @@ router.get('/:id/review', async (req, res) => {
                 status: ticket.status,
                 driverName: ticket.assigned_driver || '',
                 plate: ticket.assigned_plate || '',
-                products: ticket.products || [],
+                products: reviewProducts,
                 note: ticket.note || '',
-                images: proofImages,
+                images: allImages,
                 admin_approved: ticket.admin_approved || false,
                 merged_order_no: ticket.merged_order_no || null,
-                source_order_nos: source_order_nos
+                source_order_nos: source_order_nos,
+                assignments: assignments
             }
         });
 
@@ -1487,7 +1527,7 @@ router.get('/:id/review', async (req, res) => {
 router.post('/:id/admin-confirm', async (req, res) => {
     try {
         const { id } = req.params;
-        const { confirmed_by } = req.body;
+        const { confirmed_by, products: editedProducts } = req.body;
         const supabase = getSupabase();
 
         // Find ticket by ticket_no first, then by id
@@ -1517,12 +1557,19 @@ router.post('/:id/admin-confirm', async (req, res) => {
         // Update: mark as completed with confirmation note
         // Note: 'confirmed' is not a valid status in import_tickets check constraint
         // Valid statuses: pending, completed, assigned, in_transit
+        const updatePayload = {
+            status: 'completed',
+            note: `[XÁC NHẬN] bởi ${confirmed_by || 'Admin'} lúc ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}`
+        };
+        // Save edited products if reviewer modified quantities
+        if (editedProducts && Array.isArray(editedProducts) && editedProducts.length > 0) {
+            updatePayload.products = editedProducts;
+            updatePayload.total_qty = editedProducts.reduce((sum, p) => sum + Number(p.qty || 0), 0);
+            console.log(`📝 Admin confirm: saving ${editedProducts.length} edited products`);
+        }
         const { data, error } = await supabase
             .from('import_tickets')
-            .update({
-                status: 'completed',
-                note: `[XÁC NHẬN] bởi ${confirmed_by || 'Admin'} lúc ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}`
-            })
+            .update(updatePayload)
             .eq('id', ticket.id)
             .select()
             .single();
@@ -1599,11 +1646,11 @@ router.post('/:id/reject', async (req, res) => {
 
         const rejectNote = `[TỪ CHỐI] Bởi ${rejected_by || 'admin'} lúc ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}${reason ? ' - Lý do: ' + reason : ''}`;
 
-        // Reset status to pending and store rejection note
+        // Reset status to assigned so driver still sees the order and can re-deliver
         const { data, error } = await supabase
             .from('import_tickets')
             .update({
-                status: 'pending',
+                status: 'assigned',
                 note: rejectNote
             })
             .eq('id', ticket.id)
@@ -1614,11 +1661,11 @@ router.post('/:id/reject', async (req, res) => {
             return res.json(createResponse(true, 'Lỗi từ chối: ' + error.message));
         }
 
-        // Reset driver assignments
+        // Reset driver assignments to delivering so driver sees the order again
         try {
             await supabase
                 .from('import_driver_assignments')
-                .update({ status: 'pending' })
+                .update({ status: 'delivering' })
                 .eq('import_id', ticket.id)
                 .eq('status', 'completed');
             console.log(`🔄 Reset import driver assignments for ${ticket.ticket_no}`);

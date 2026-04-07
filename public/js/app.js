@@ -11405,17 +11405,19 @@ function closeReviewPanel() {
     confirmReviewingOrder = null;
 }
 
-// Confirm import order (no MISA sync, just mark confirmed)
+// Confirm import order (no MISA sync, just mark confirmed + save edited products)
 async function confirmImportOrder(ticketNo) {
     if (!confirm(`Xác nhận đơn nhập #${ticketNo}?`)) return;
 
     const userName = state.user?.name || state.user?.fullName || state.user?.username || 'admin';
+    // Collect edited products from the review panel (reviewer may have corrected quantities)
+    const products = typeof getReviewProducts === 'function' ? getReviewProducts() : [];
     try {
         showLoading && showLoading('Đang xác nhận...');
         const res = await fetch(`/api/imports/${ticketNo}/admin-confirm`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ confirmed_by: userName })
+            body: JSON.stringify({ confirmed_by: userName, products: products })
         });
         const json = await res.json();
         hideLoading && hideLoading();
