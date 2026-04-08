@@ -2020,18 +2020,14 @@
 
 
 
-    <!-- Service Worker: register app SW + Firebase messaging SW -->
+    <!-- Service Worker: unified SW with caching + Firebase push -->
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', async () => {
                 try {
-                    // Register app SW (caching)
-                    await navigator.serviceWorker.register('/sw.js');
-                    console.log('✅ App SW registered');
-
-                    // Register Firebase messaging SW (push notifications)
-                    await navigator.serviceWorker.register('/firebase-messaging-sw.js');
-                    console.log('✅ Firebase SW registered');
+                    // Single unified SW handles both caching AND FCM push
+                    const reg = await navigator.serviceWorker.register('/sw.js');
+                    console.log('✅ Unified SW registered (cache + FCM push)');
                 } catch (err) {
                     console.warn('SW setup skipped:', err.message);
                 }

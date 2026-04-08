@@ -57,7 +57,7 @@ const NotificationModule = {
         }
 
         try {
-            const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+            const registration = await navigator.serviceWorker.register('/sw.js');
             console.log('✅ FCM Service Worker registered:', registration.scope);
             this.initialized = true;
             return true;
@@ -95,7 +95,7 @@ const NotificationModule = {
             }
 
             // Get REAL FCM token
-            const registration = await navigator.serviceWorker.getRegistration('/firebase-messaging-sw.js');
+            const registration = await navigator.serviceWorker.getRegistration('/sw.js');
             const token = await this.messaging.getToken({
                 vapidKey: this.vapidKey,
                 serviceWorkerRegistration: registration

@@ -1,9 +1,51 @@
 // ===============================================
-// LỘC THIÊN ERP — Service Worker
-// Caching strategy: Network-first for API, Cache-first for static assets
+// LỘC THIÊN ERP — Service Worker v3
+// Handles: Caching + Firebase Cloud Messaging (background push)
 // ===============================================
 
-const CACHE_NAME = 'lt-erp-v2';
+// === FIREBASE MESSAGING (must be FIRST — before any other code) ===
+importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js');
+
+firebase.initializeApp({
+    apiKey: "AIzaSyDLjwBvNnhEdn32VgmYqDfbRkVrzflCA8w",
+    authDomain: "locthien-scm.firebaseapp.com",
+    projectId: "locthien-scm",
+    storageBucket: "locthien-scm.firebasestorage.app",
+    messagingSenderId: "831814732608",
+    appId: "1:831814732608:web:a5962decde0ecb230fc8a5"
+});
+
+const messaging = firebase.messaging();
+
+// Handle background push messages (when app is NOT in focus / Chrome minimized)
+messaging.onBackgroundMessage((payload) => {
+    console.log('📬 BG push received:', payload);
+
+    const title = payload.notification?.title || payload.data?.title || 'Lộc Thiên ERP';
+    const body = payload.notification?.body || payload.data?.body || 'Bạn có thông báo mới';
+    const orderId = payload.data?.orderId || '';
+    const type = payload.data?.type || 'general';
+
+    const options = {
+        body: body,
+        icon: '/logo.png',
+        badge: '/logo.png',
+        vibrate: [200, 100, 200, 100, 200],
+        tag: orderId || type,
+        data: { orderId, type, ...payload.data },
+        requireInteraction: true,
+        actions: [
+            { action: 'view', title: '📋 Xem đơn' },
+            { action: 'dismiss', title: 'Bỏ qua' }
+        ]
+    };
+
+    return self.registration.showNotification(title, options);
+});
+
+// === CACHING ===
+const CACHE_NAME = 'lt-erp-v3';
 const STATIC_ASSETS = [
     '/',
     '/index.html',
@@ -14,32 +56,23 @@ const STATIC_ASSETS = [
     '/manifest.json'
 ];
 
-// External CDN resources to cache
-const CDN_ASSETS = [
-    'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap',
-    'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css',
-    'https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css'
-];
-
 // Install — pre-cache critical assets
 self.addEventListener('install', (event) => {
-    console.log('[SW] Installing Service Worker v2...');
+    console.log('[SW] Installing Service Worker v3 (with FCM)...');
     event.waitUntil(
         caches.open(CACHE_NAME).then((cache) => {
             console.log('[SW] Pre-caching static assets');
-            // Cache local assets (ignore failures for CDN)
             return cache.addAll(STATIC_ASSETS).catch(err => {
                 console.warn('[SW] Pre-cache partial failure:', err.message);
             });
         })
     );
-    // Activate immediately (skip waiting)
     self.skipWaiting();
 });
 
 // Activate — clean old caches
 self.addEventListener('activate', (event) => {
-    console.log('[SW] Activating Service Worker v2...');
+    console.log('[SW] Activating Service Worker v3...');
     event.waitUntil(
         caches.keys().then((names) => {
             return Promise.all(
@@ -51,7 +84,6 @@ self.addEventListener('activate', (event) => {
             );
         })
     );
-    // Take control of all pages immediately
     self.clients.claim();
 });
 
@@ -60,24 +92,18 @@ self.addEventListener('fetch', (event) => {
     const { request } = event;
     const url = new URL(request.url);
 
-    // Skip non-GET requests (POST, PUT, DELETE)
     if (request.method !== 'GET') return;
 
-    // === API requests: Network-first, fallback to cache ===
     if (url.pathname.startsWith('/api/')) {
-        // Dashboard stats: cache for 2 minutes
         if (url.pathname === '/api/reports/dashboard') {
             event.respondWith(networkFirstWithTimeout(request, 3000));
             return;
         }
-        // Other API calls: always network (no cache)
         return;
     }
 
-    // === Static assets: Stale-while-revalidate ===
     event.respondWith(
         caches.match(request).then((cached) => {
-            // Return cached immediately, fetch fresh in background
             const fetchPromise = fetch(request).then((response) => {
                 if (response && response.status === 200) {
                     const clone = response.clone();
@@ -85,7 +111,6 @@ self.addEventListener('fetch', (event) => {
                 }
                 return response;
             }).catch(() => {
-                // Network failed — cached version is all we have
                 return cached;
             });
 
@@ -110,28 +135,75 @@ async function networkFirstWithTimeout(request, timeoutMs) {
         }
         return response;
     } catch (err) {
-        // Network failed or timed out — use cache
         const cached = await caches.match(request);
         if (cached) {
             console.log('[SW] Serving from cache (network failed):', request.url);
             return cached;
         }
-        // No cache either — return error response
         return new Response(JSON.stringify({ error: true, msg: 'Offline' }), {
             headers: { 'Content-Type': 'application/json' }
         });
     }
 }
 
+// Handle notification click
+self.addEventListener('notificationclick', (event) => {
+    event.notification.close();
+    if (event.action === 'dismiss') return;
+
+    const orderId = event.notification.data?.orderId;
+    const url = orderId ? `/?order=${orderId}` : '/';
+
+    event.waitUntil(
+        clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+            for (const client of windowClients) {
+                if (client.url.includes(self.location.origin) && 'focus' in client) {
+                    client.focus();
+                    client.postMessage({
+                        type: 'NOTIFICATION_CLICK',
+                        data: event.notification.data
+                    });
+                    return;
+                }
+            }
+            return clients.openWindow(url);
+        })
+    );
+});
+
+// Handle direct push events (fallback for non-FCM push)
+self.addEventListener('push', (event) => {
+    if (!event.data) return;
+    try {
+        const payload = event.data.json();
+        const title = payload.notification?.title || payload.data?.title || 'Lộc Thiên ERP';
+        const body = payload.notification?.body || payload.data?.body || 'Thông báo mới';
+
+        event.waitUntil(
+            self.registration.showNotification(title, {
+                body,
+                icon: '/logo.png',
+                badge: '/logo.png',
+                vibrate: [200, 100, 200],
+                data: payload.data || {},
+                requireInteraction: true
+            })
+        );
+    } catch (e) {
+        console.error('Push parse error:', e);
+    }
+});
+
 // Listen for messages from main thread
 self.addEventListener('message', (event) => {
     if (event.data === 'skipWaiting') {
         self.skipWaiting();
     }
-    // Invalidate specific cache entries
     if (event.data?.type === 'INVALIDATE_CACHE') {
         caches.open(CACHE_NAME).then(cache => {
             cache.delete(event.data.url);
         });
     }
 });
+
+console.log('🔔 SW v3 loaded (Caching + FCM Push)');
