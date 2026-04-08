@@ -1930,8 +1930,10 @@ router.post('/:id/complete', async (req, res) => {
                     }
                     // 1. Admin notification
                     try {
+                        // Priority: multi-driver names > DB assigned driver > resolved driver > body driver
+                        const notifyDriverName = firstDriverName || orderInfo?.taiXe || orderInfo?.custom_field13 || resolvedDriverName || driver_name;
                         await createNotification('ADMIN', 'order_completed', '✅ Đơn hoàn thành',
-                            `Đơn #${orderNo} đã được giao bởi ${firstDriverName || resolvedDriverName || orderInfo?.taiXe || driver_name}`, id, orderNo);
+                            `Đơn #${orderNo} đã được giao bởi ${notifyDriverName}`, id, orderNo);
                     } catch (e) { console.error('Admin notification error:', e.message); }
 
                     // 2. Telegram notification
