@@ -11036,28 +11036,88 @@ async function openReviewPanel(orderId, isImport = false) {
                 orderNoEl.textContent = label;
             }
 
-            // Render images
+            // Render images — group by driver for merged orders
             if (proofImages.length > 0) {
-                imgContainer.innerHTML = proofImages.map((img, i) => `
-                    <div style="position:relative;">
-                        <img src="${img.url}" style="width:100%; border-radius:8px; cursor:zoom-in; border:1px solid #E5E7EB;" onclick="showImageLightbox(this.src)" alt="Proof ${i + 1}">
-                        <span style="position:absolute; top:4px; left:4px; background:rgba(0,0,0,0.6); color:white; padding:2px 6px; border-radius:4px; font-size:10px;">
-                            ${img.driver ? '🚛 ' + img.driver : img.ticket ? '📋 ' + img.ticket : 'Ảnh ' + (i + 1)}
-                        </span>
-                    </div>
-                `).join('');
+                // Group images by driver
+                const imagesByDriver = {};
+                const untagged = [];
+                for (const img of proofImages) {
+                    const label = img.driver || img.ticket || null;
+                    if (label) {
+                        if (!imagesByDriver[label]) imagesByDriver[label] = [];
+                        imagesByDriver[label].push(img);
+                    } else {
+                        untagged.push(img);
+                    }
+                }
+
+                const driverKeys = Object.keys(imagesByDriver);
+                const isMerged = driverKeys.length > 1 || (order.merged_order_no && driverKeys.length >= 1);
+
+                if (isMerged && driverKeys.length > 0) {
+                    // Merged: show grouped by driver/ticket with headers
+                    let html = '';
+                    driverKeys.forEach((label, gi) => {
+                        const isDriver = proofImages.some(img => img.driver === label);
+                        html += `<div style="margin-bottom:12px;">
+                            <div style="background:${isDriver ? 'linear-gradient(135deg,#3b82f6,#2563eb)' : 'linear-gradient(135deg,#6366f1,#4f46e5)'}; color:white; padding:6px 12px; border-radius:8px 8px 0 0; font-size:12px; font-weight:600;">
+                                ${isDriver ? '🚛' : '📋'} ${label}
+                            </div>
+                            <div style="background:#f9fafb; padding:8px; border-radius:0 0 8px 8px; border:1px solid #e5e7eb; border-top:none;">
+                                ${imagesByDriver[label].map((img, i) => `
+                                    <div style="position:relative; margin-bottom:6px;">
+                                        <img src="${img.url}" style="width:100%; border-radius:6px; cursor:zoom-in; border:1px solid #E5E7EB;" onclick="showImageLightbox(this.src)" alt="Proof">
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>`;
+                    });
+                    // Untagged images
+                    if (untagged.length > 0) {
+                        html += untagged.map((img, i) => `
+                            <div style="position:relative; margin-bottom:6px;">
+                                <img src="${img.url}" style="width:100%; border-radius:8px; cursor:zoom-in; border:1px solid #E5E7EB;" onclick="showImageLightbox(this.src)" alt="Proof">
+                            </div>
+                        `).join('');
+                    }
+                    imgContainer.innerHTML = html;
+                } else {
+                    // Single driver: flat list
+                    imgContainer.innerHTML = proofImages.map((img, i) => `
+                        <div style="position:relative;">
+                            <img src="${img.url}" style="width:100%; border-radius:8px; cursor:zoom-in; border:1px solid #E5E7EB;" onclick="showImageLightbox(this.src)" alt="Proof ${i + 1}">
+                            <span style="position:absolute; top:4px; left:4px; background:rgba(0,0,0,0.6); color:white; padding:2px 6px; border-radius:4px; font-size:10px;">
+                                ${img.driver ? '🚛 ' + img.driver : img.ticket ? '📋 ' + img.ticket : 'Ảnh ' + (i + 1)}
+                            </span>
+                        </div>
+                    `).join('');
+                }
             } else {
                 imgContainer.innerHTML = '<div style="text-align:center; padding:40px; color:#9CA3AF;"><i class="bi bi-image" style="font-size:48px;"></i><p>Không có ảnh</p></div>';
             }
 
-            // Render order info
+            // Render order info — show all drivers for merged orders
             const fmtDate = order.ngay || order.sale_order_date ? new Date(order.ngay || order.sale_order_date).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : 'N/A';
+            
+            // Build driver display: show all unique drivers from assignments
+            let driverDisplay = order.taiXe || order.custom_field13 || 'N/A';
+            if (driverAssignments && driverAssignments.length > 0) {
+                const uniqueDrivers = [...new Set(driverAssignments.map(a => a.driver_name).filter(Boolean))];
+                if (uniqueDrivers.length > 0) {
+                    driverDisplay = uniqueDrivers.map(d => {
+                        const a = driverAssignments.find(x => x.driver_name === d);
+                        const statusIcon = a?.status === 'completed' ? '✅' : '🚛';
+                        return `${statusIcon} ${d}`;
+                    }).join('<br>');
+                }
+            }
+
             infoContainer.innerHTML = `
                 <div style="display:grid; grid-template-columns:auto 1fr; gap:4px 12px; font-size:13px;">
                     <span style="color:#6B7280;">Khách hàng:</span><b>${order.khach || order.account_name || 'N/A'}</b>
                     <span style="color:#6B7280;">Ngày:</span><span>${fmtDate}</span>
                     <span style="color:#6B7280;">Địa chỉ:</span><span>${order.diaChi || order.shipping_address || 'N/A'}</span>
-                    <span style="color:#6B7280;">Tài xế:</span><span>${order.taiXe || order.custom_field13 || 'N/A'}</span>
+                    <span style="color:#6B7280;">Tài xế:</span><span>${driverDisplay}</span>
                     <span style="color:#6B7280;">Trạng thái:</span><span>${order.status || 'N/A'}</span>
                     ${order.delivery_note ? `<span style="color:#6B7280;">Ghi chú giao:</span><span>${order.delivery_note}</span>` : ''}
                 </div>
@@ -11065,7 +11125,11 @@ async function openReviewPanel(orderId, isImport = false) {
                     <div style="margin-top:8px; padding:8px; background:#F9FAFB; border-radius:8px; font-size:12px;">
                         <b>Chi tiết giao hàng:</b>
                         ${driverAssignments.map(a => `
-                            <div style="margin-top:4px;">🚛 ${a.driver_name}: ${Number(a.actual_qty || 0).toLocaleString('vi-VN')} Kg ${a.delivery_note ? '· ' + a.delivery_note : ''}</div>
+                            <div style="margin-top:4px; padding:4px 0; border-bottom:1px solid #f0f0f0;">
+                                🚛 <b>${a.driver_name}</b>: ${Number(a.actual_qty || 0).toLocaleString('vi-VN')} Kg
+                                ${a.assistant_name ? `<span style="color:#6b7280;"> · 👷 PX: ${a.assistant_name}</span>` : ''}
+                                ${a.delivery_note ? '<br><span style="color:#6b7280; font-size:11px;">📝 ' + a.delivery_note + '</span>' : ''}
+                            </div>
                         `).join('')}
                     </div>
                 ` : ''}
