@@ -10771,7 +10771,7 @@ async function loadPendingConfirmOrders() {
                 }
             }
 
-            const renderOrderCard = (o, isMergedChild) => {
+            const renderOrderCard = (o, mergedSiblingNos) => {
                 const orderNo = o.sale_order_no || o.id;
                 const fmtDate = o.sale_order_date ? new Date(o.sale_order_date).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : '';
                 const products = (o.products || []).map(p => `${p.name || p.code}: ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'Kg'}`).join(', ');
@@ -10779,12 +10779,13 @@ async function loadPendingConfirmOrders() {
                 const driver = o.custom_field13 || o.taiXe || '';
 
                 return `
-                <div style="background:white; border:1px solid ${isConfirmed ? '#10b981' : '#E5E7EB'}; border-radius:${isMergedChild ? '8px' : '12px'}; padding:${isMergedChild ? '12px' : '16px'}; ${isConfirmed ? 'border-left:4px solid #10b981;' : ''}" id="confirm-card-${o.id}">
+                <div style="background:white; border:1px solid ${isConfirmed ? '#10b981' : '#E5E7EB'}; border-radius:12px; padding:16px; ${isConfirmed ? 'border-left:4px solid #10b981;' : ''}" id="confirm-card-${o.id}">
                     <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap;">
                         <div style="flex:1; min-width:250px;">
                             <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:6px;">
                                 ${isConfirmed ? '<span style="color:#10b981; font-size:18px;" title="Sales đã xác nhận">☑️</span>' : '<span style="color:#d1d5db; font-size:18px;">☐</span>'}
                                 <span style="font-weight:700; color:var(--primary); font-size:14px;">#${orderNo}</span>
+                                ${mergedSiblingNos ? `<span style="background:#4c6ef5; color:#fff; font-size:9px; padding:2px 6px; border-radius:8px; font-weight:600; white-space:nowrap;"><i class="bi bi-link-45deg"></i> Ghép: ${mergedSiblingNos}</span>` : ''}
                                 <span style="font-size:11px; color:#6B7280; background:#F3F4F6; padding:2px 8px; border-radius:4px;">${fmtDate}</span>
                                 <span style="font-size:10px; color:white; background:${o.status === 'Hoàn thành' ? '#10b981' : '#6366f1'}; padding:2px 8px; border-radius:10px;">${o.status}</span>
                                 ${isConfirmed ? '<span style="font-size:10px; color:#10b981; background:#ECFDF5; padding:2px 8px; border-radius:10px;">✓ ' + (o.sale_confirmed_by || 'Sales') + '</span>' : ''}
@@ -10810,29 +10811,26 @@ async function loadPendingConfirmOrders() {
                 </div>`;
             };
 
-            let html = '';
-
-            // Render merged groups first
-            for (const [mergedNo, groupOrders] of Object.entries(mergedGroups)) {
-                const sourceNos = groupOrders[0].source_order_nos || groupOrders.map(o => o.sale_order_no || o.id);
-                html += `
-                <div style="border:2px solid #4c6ef5; border-radius:14px; margin-bottom:12px; overflow:hidden;">
-                    <div style="background:linear-gradient(135deg, #4c6ef5, #3b5bdb); color:white; padding:10px 16px; display:flex; align-items:center; gap:8px; font-size:13px;">
-                        <i class="bi bi-link-45deg" style="font-size:16px;"></i>
-                        <b>Đơn ghép</b>
-                        <span style="background:rgba(255,255,255,0.2); padding:2px 10px; border-radius:8px; font-size:11px;">${sourceNos.join(' + ')}</span>
-                        <span style="margin-left:auto; font-size:11px; opacity:0.8;">${groupOrders.length} đơn</span>
-                    </div>
-                    <div style="padding:10px; display:flex; flex-direction:column; gap:8px; background:#f8f9ff;">
-                        ${groupOrders.map(o => renderOrderCard(o, true)).join('')}
-                    </div>
-                </div>`;
+            // Deduplicate merged orders: show only 1 card per merged group
+            const seenMergedNos = new Set();
+            const deduped = [];
+            for (const o of orders) {
+                if (o.merged_order_no) {
+                    if (seenMergedNos.has(o.merged_order_no)) continue; // skip duplicate
+                    seenMergedNos.add(o.merged_order_no);
+                }
+                deduped.push(o);
             }
 
-            // Render standalone orders
-            html += standaloneOrders.map(o => renderOrderCard(o, false)).join('');
-
-            container.innerHTML = html;
+            container.innerHTML = deduped.map(o => {
+                if (o.merged_order_no) {
+                    // Show sibling order codes
+                    const orderNo = o.sale_order_no || o.id;
+                    const siblings = (o.source_order_nos || []).filter(n => n !== orderNo);
+                    return renderOrderCard(o, siblings.join(', '));
+                }
+                return renderOrderCard(o, null);
+            }).join('');
         } else if (confirmCurrentTab === 'import') {
             // Import tab
             container.innerHTML = orders.map(t => {
