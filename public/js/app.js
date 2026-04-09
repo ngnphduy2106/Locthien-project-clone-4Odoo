@@ -952,20 +952,20 @@ async function loadDrivers() {
     try {
         const res = await api.getEmployees();
         if (!res.error && res.data) {
-            // Filter drivers (role contains 'tài xế' or 'driver') — exclude test accounts
+            // Filter drivers (role contains 'tài xế' or 'driver') — exclude TESTER role
             state.drivers = res.data.filter(e => {
                 const role = (e.role || e.chucVu || '').toLowerCase();
-                if (role.includes('test') || role.includes('tester')) return false;
+                if (role === 'tester') return false;
                 return role.includes('tài xế') || role.includes('tai xe') || role.includes('driver') || role.includes('lái xe');
             }).map(e => ({
                 name: e.fullName || e.hoTen || e.name,
                 plate: e.bienSo || e.plate || ''
             }));
 
-            // Filter assistants — exclude test accounts
+            // Filter assistants — exclude TESTER role
             state.assistants = res.data.filter(e => {
                 const role = (e.role || e.chucVu || '').toLowerCase();
-                if (role.includes('test') || role.includes('tester')) return false;
+                if (role === 'tester') return false;
                 return role.includes('phụ xe') || role.includes('phu xe') || role.includes('trợ lý') || role.includes('assistant');
             }).map(e => ({
                 name: e.fullName || e.hoTen || e.name
