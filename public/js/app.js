@@ -15,7 +15,7 @@
     function reportError(msg, source, line, col, stack) {
         if (_errCount >= _MAX) return; // Rate limit
         // Skip ServiceWorker errors — browser-level, not app bugs
-        if (String(msg).includes('ServiceWorker')) return;
+        if (String(msg).includes('ServiceWorker') || String(msg).includes('service worker')) return;
         _errCount++;
         try {
             const user = window.state?.user;

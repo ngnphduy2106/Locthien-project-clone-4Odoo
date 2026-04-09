@@ -2025,6 +2025,15 @@
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', async () => {
                 try {
+                    // Clean up OLD firebase-messaging-sw.js (was separate, now merged into sw.js)
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    for (const reg of registrations) {
+                        if (reg.active?.scriptURL?.includes('firebase-messaging-sw.js')) {
+                            await reg.unregister();
+                            console.log('🗑️ Old Firebase SW unregistered');
+                        }
+                    }
+
                     // Single unified SW handles both caching AND FCM push
                     const reg = await navigator.serviceWorker.register('/sw.js');
                     console.log('✅ Unified SW registered (cache + FCM push)');
