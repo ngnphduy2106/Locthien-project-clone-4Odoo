@@ -217,9 +217,8 @@ router.get('/', async (req, res) => {
             .filter(u => u.status === 'ACTIVE' && u.role === CONFIG.ROLES.DRIVER)
             .map(u => ({ name: u.fullName, plate: u.plate }));
 
-        // Assistants: include both ASSISTANT-role AND DRIVER-role users (drivers can serve as assistants)
         const assistants = users
-            .filter(u => u.status === 'ACTIVE' && ['ASSISTANT', 'DRIVER'].includes(String(u.role).toUpperCase()))
+            .filter(u => u.status === 'ACTIVE' && String(u.role).toUpperCase() === 'ASSISTANT')
             .map(u => ({ name: u.fullName }));
 
         const elapsed = Date.now() - startTime;

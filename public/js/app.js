@@ -4127,25 +4127,51 @@ async function assignDriver(orderId) {
 function onNewDriverChange(selectEl) {
     const externalFields = window.$('#external-driver-fields');
     const plateSelect = window.$('#new-driver-plate-select');
+    const assistantSelect1 = window.$('#new-assistant-select');
+    const assistantSelect2 = window.$('#new-assistant-select-2');
 
     if (selectEl.value === '__EXTERNAL__') {
         externalFields?.classList.remove('hidden');
         externalFields.style.display = 'flex';
-        if (plateSelect) plateSelect.parentElement.style.display = 'none'; // Hide internal plate select
+        if (plateSelect) plateSelect.parentElement.style.display = 'none';
+
+        // External driver: show both assistants + drivers as phụ xe options
+        _populateAssistantDropdowns(assistantSelect1, assistantSelect2, true);
     } else {
         externalFields?.classList.add('hidden');
         externalFields.style.display = 'none';
-        if (plateSelect) plateSelect.parentElement.style.display = 'block'; // Show internal plate select
+        if (plateSelect) plateSelect.parentElement.style.display = 'block';
+
+        // Internal driver: only show ASSISTANT-role users
+        _populateAssistantDropdowns(assistantSelect1, assistantSelect2, false);
 
         // Auto-fill plate
         const selectedOption = selectEl.options[selectEl.selectedIndex];
         const plate = selectedOption?.getAttribute('data-plate') || '';
-
-        // Auto-select in the new plate dropdown if exists
         if (plateSelect && plate) {
             plateSelect.value = plate;
         }
     }
+}
+
+// Populate assistant dropdowns based on whether external driver is selected
+function _populateAssistantDropdowns(select1, select2, includeDrivers) {
+    const assistantNames = (state.assistants || []).map(a => a.name);
+    let allNames = [...assistantNames];
+
+    if (includeDrivers) {
+        // Add internal drivers as potential assistants (they can ride along on external trucks)
+        const driverNames = (state.drivers || []).map(d => d.name);
+        allNames = [...new Set([...assistantNames, ...driverNames])]; // Deduplicate
+    }
+
+    allNames.sort((a, b) => a.localeCompare(b, 'vi'));
+
+    const optionsHtml = '<option value="">-- Không có --</option>' +
+        allNames.map(n => `<option value="${n}">${n}</option>`).join('');
+
+    if (select1) { const prev1 = select1.value; select1.innerHTML = optionsHtml; select1.value = prev1; }
+    if (select2) { const prev2 = select2.value; select2.innerHTML = optionsHtml; select2.value = prev2; }
 }
 
 // Add driver to assignment list
@@ -6988,20 +7014,29 @@ async function assignImportDriver(importId) {
 function onImportDriverChange(selectEl) {
     const externalFields = window.$('#import-external-driver-fields');
     const plateContainer = window.$('#import-internal-plate-container');
+    const assistantSelect1 = window.$('#import-new-assistant-select');
+    const assistantSelect2 = window.$('#import-new-assistant-select-2');
+
     if (selectEl.value === '__EXTERNAL__') {
         externalFields?.classList.remove('hidden');
         externalFields.style.display = 'flex';
         if (plateContainer) plateContainer.style.display = 'none';
+
+        // External driver: show drivers as phụ xe options
+        _populateAssistantDropdowns(assistantSelect1, assistantSelect2, true);
     } else {
         externalFields?.classList.add('hidden');
         externalFields.style.display = 'none';
         if (plateContainer) plateContainer.style.display = 'block';
+
+        // Internal driver: only ASSISTANT-role
+        _populateAssistantDropdowns(assistantSelect1, assistantSelect2, false);
+
         // Auto-fill plate from selected driver
         const selectedOption = selectEl.options[selectEl.selectedIndex];
         const plate = selectedOption?.getAttribute('data-plate') || '';
         const plateSelect = window.$('#import-new-driver-plate-select');
         if (plateSelect && plate) {
-            // Try to select matching plate option
             for (let i = 0; i < plateSelect.options.length; i++) {
                 if (plateSelect.options[i].value === plate) {
                     plateSelect.selectedIndex = i;
