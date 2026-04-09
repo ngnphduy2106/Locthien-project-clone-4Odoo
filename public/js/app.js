@@ -4156,19 +4156,30 @@ function onNewDriverChange(selectEl) {
 
 // Populate assistant dropdowns based on whether external driver is selected
 function _populateAssistantDropdowns(select1, select2, includeDrivers) {
-    const assistantNames = (state.assistants || []).map(a => a.name);
-    let allNames = [...assistantNames];
+    const assistantNames = (state.assistants || []).map(a => a.name).filter(Boolean);
+    let optionsHtml = '<option value="">-- Không có --</option>';
 
-    if (includeDrivers) {
-        // Add internal drivers as potential assistants (they can ride along on external trucks)
-        const driverNames = (state.drivers || []).map(d => d.name);
-        allNames = [...new Set([...assistantNames, ...driverNames])]; // Deduplicate
+    // Phụ xe (ASSISTANT) first
+    if (assistantNames.length > 0) {
+        optionsHtml += '<optgroup label="👷 Phụ xe">';
+        assistantNames.sort((a, b) => a.localeCompare(b, 'vi'));
+        assistantNames.forEach(n => { optionsHtml += `<option value="${n}">${n}</option>`; });
+        optionsHtml += '</optgroup>';
     }
 
-    allNames.sort((a, b) => a.localeCompare(b, 'vi'));
+    // Tài xế (DRIVER) — only when external driver selected
+    if (includeDrivers) {
+        const driverNames = (state.drivers || []).map(d => d.name).filter(Boolean);
+        // Remove duplicates (if someone is both assistant and driver)
+        const uniqueDrivers = driverNames.filter(n => !assistantNames.includes(n));
+        uniqueDrivers.sort((a, b) => a.localeCompare(b, 'vi'));
 
-    const optionsHtml = '<option value="">-- Không có --</option>' +
-        allNames.map(n => `<option value="${n}">${n}</option>`).join('');
+        if (uniqueDrivers.length > 0) {
+            optionsHtml += '<optgroup label="🚛 Tài xế">';
+            uniqueDrivers.forEach(n => { optionsHtml += `<option value="${n}">${n}</option>`; });
+            optionsHtml += '</optgroup>';
+        }
+    }
 
     if (select1) { const prev1 = select1.value; select1.innerHTML = optionsHtml; select1.value = prev1; }
     if (select2) { const prev2 = select2.value; select2.innerHTML = optionsHtml; select2.value = prev2; }
