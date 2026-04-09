@@ -716,7 +716,7 @@ const CreateOrderModule = {
         `;
     },
 
-    // Submit đơn hàng
+    // Submit đơn hàng — show confirmation modal first
     async submitOrder() {
         if (this.orderProducts.length === 0) {
             alert('Vui lòng thêm ít nhất 1 sản phẩm!');
@@ -726,32 +726,244 @@ const CreateOrderModule = {
         const date = document.getElementById('order-date').value;
         const customer = document.getElementById('order-customer').value.trim();
         const address = document.getElementById('order-address').value.trim();
-        const note = document.getElementById('order-note')?.value?.trim() || '';  // Get note from textarea
+        const note = document.getElementById('order-note')?.value?.trim() || '';
 
         if (!customer) {
             alert('Vui lòng nhập tên nhà cung cấp/khách hàng!');
             return;
         }
 
-        // Show loading
-        const submitBtn = event.target;
-        const originalHTML = submitBtn.innerHTML;
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Đang xử lý...';
+        // Show confirmation modal instead of submitting directly
+        this.showConfirmModal({ date, customer, address, note });
+    },
+
+    // Show confirmation modal with order summary
+    showConfirmModal({ date, customer, address, note }) {
+        // Remove existing modal if any
+        let modal = document.getElementById('order-confirm-modal');
+        if (modal) modal.remove();
+
+        const formattedDate = date ? new Date(date + 'T00:00:00').toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' }) : 'N/A';
+        const totalQty = this.orderProducts.reduce((sum, p) => sum + p.qty, 0);
+
+        modal = document.createElement('div');
+        modal.id = 'order-confirm-modal';
+        modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:2000;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px);animation:fadeIn 0.2s ease;';
+        modal.innerHTML = `
+            <style>
+                @keyframes slideUp { from { opacity:0; transform:translateY(40px); } to { opacity:1; transform:translateY(0); } }
+                @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+                .confirm-modal-card {
+                    background:white; border-radius:20px; width:100%; max-width:600px; max-height:90vh;
+                    display:flex; flex-direction:column; box-shadow:0 25px 60px rgba(0,0,0,0.3);
+                    animation:slideUp 0.3s ease;
+                }
+                .confirm-header {
+                    background:linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+                    color:white; padding:20px 24px; border-radius:20px 20px 0 0;
+                    display:flex; justify-content:space-between; align-items:center;
+                }
+                .confirm-body { padding:24px; overflow-y:auto; flex:1; }
+                .confirm-info-row {
+                    display:flex; justify-content:space-between; padding:10px 0;
+                    border-bottom:1px solid #f0f0f0; font-size:14px;
+                }
+                .confirm-info-label { color:#6B7280; font-weight:500; display:flex; align-items:center; gap:6px; }
+                .confirm-info-value { color:#1f2937; font-weight:600; text-align:right; max-width:60%; }
+                .confirm-product-item {
+                    display:flex; align-items:center; gap:10px; padding:12px 14px;
+                    background:#f9fafb; border-radius:10px; margin-bottom:8px;
+                    border:1px solid #e5e7eb; transition:all 0.2s;
+                }
+                .confirm-product-item:hover { border-color:#11998e; background:#f0fdf4; }
+                .confirm-product-num {
+                    width:28px; height:28px; border-radius:8px;
+                    background:linear-gradient(135deg, #667eea, #764ba2);
+                    color:white; display:flex; align-items:center; justify-content:center;
+                    font-size:12px; font-weight:700; flex-shrink:0;
+                }
+                .confirm-product-name { flex:1; font-weight:600; font-size:13px; color:#1e293b; }
+                .confirm-product-qty-input {
+                    width:80px; border:1px solid #d1d5db; border-radius:6px; padding:4px 8px;
+                    font-size:13px; text-align:right; font-weight:600; background:white;
+                }
+                .confirm-product-qty-input:focus { border-color:#11998e; outline:none; box-shadow:0 0 0 2px rgba(17,153,142,0.15); }
+                .confirm-product-unit { color:#6b7280; font-size:12px; font-weight:500; width:30px; }
+                .confirm-product-del {
+                    width:28px; height:28px; border-radius:6px; border:none;
+                    background:#fee2e2; color:#ef4444; cursor:pointer; font-size:14px;
+                    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+                    transition:all 0.2s;
+                }
+                .confirm-product-del:hover { background:#ef4444; color:white; }
+                .confirm-footer {
+                    padding:16px 24px; border-top:1px solid #e5e7eb;
+                    display:flex; gap:12px; border-radius:0 0 20px 20px; background:#fafafa;
+                }
+                .confirm-total-bar {
+                    display:flex; justify-content:space-between; align-items:center;
+                    padding:12px 16px; background:linear-gradient(135deg, #11998e15, #38ef7d15);
+                    border-radius:10px; margin-top:8px; border:1px solid #11998e30;
+                }
+            </style>
+            <div class="confirm-modal-card" onclick="event.stopPropagation()">
+                <div class="confirm-header">
+                    <div>
+                        <div style="font-size:17px;font-weight:700;">📋 Xác nhận đơn hàng</div>
+                        <div style="font-size:12px;opacity:0.9;">Kiểm tra thông tin trước khi tạo</div>
+                    </div>
+                    <button onclick="document.getElementById('order-confirm-modal').remove()"
+                        style="background:rgba(255,255,255,0.2);border:none;color:white;border-radius:50%;width:36px;height:36px;cursor:pointer;font-size:18px;font-weight:bold;transition:background 0.2s;"
+                        onmouseover="this.style.background='rgba(255,0,0,0.4)'"
+                        onmouseout="this.style.background='rgba(255,255,255,0.2)'">✕</button>
+                </div>
+                <div class="confirm-body">
+                    <!-- Order Info -->
+                    <div style="margin-bottom:20px;">
+                        <div class="confirm-info-row">
+                            <span class="confirm-info-label"><i class="bi bi-calendar3"></i> Ngày</span>
+                            <span class="confirm-info-value">${formattedDate}</span>
+                        </div>
+                        <div class="confirm-info-row">
+                            <span class="confirm-info-label"><i class="bi bi-building"></i> NCC/Khách hàng</span>
+                            <span class="confirm-info-value">${this._escHtml(customer)}</span>
+                        </div>
+                        ${address ? `<div class="confirm-info-row">
+                            <span class="confirm-info-label"><i class="bi bi-geo-alt"></i> Địa chỉ</span>
+                            <span class="confirm-info-value">${this._escHtml(address)}</span>
+                        </div>` : ''}
+                        ${note ? `<div class="confirm-info-row" style="border-bottom:none;">
+                            <span class="confirm-info-label"><i class="bi bi-sticky"></i> Ghi chú</span>
+                            <span class="confirm-info-value">${this._escHtml(note)}</span>
+                        </div>` : ''}
+                    </div>
+
+                    <!-- Products -->
+                    <div style="font-size:14px;font-weight:700;color:#374151;margin-bottom:10px;display:flex;align-items:center;gap:6px;">
+                        <i class="bi bi-box-seam" style="color:#11998e;"></i> Sản phẩm
+                        <span style="background:#e0e7ff;color:#4338ca;padding:1px 8px;border-radius:8px;font-size:11px;font-weight:600;">${this.orderProducts.length}</span>
+                    </div>
+                    <div id="confirm-products-list">
+                        ${this._renderConfirmProducts()}
+                    </div>
+                    <div class="confirm-total-bar" id="confirm-total-bar">
+                        <span style="font-size:13px;color:#374151;font-weight:600;">Tổng cộng</span>
+                        <span style="font-size:16px;font-weight:700;color:#11998e;" id="confirm-total-qty">${Number(totalQty).toLocaleString('vi-VN')} Kg</span>
+                    </div>
+                </div>
+                <div class="confirm-footer">
+                    <button onclick="document.getElementById('order-confirm-modal').remove()"
+                        style="flex:1;padding:14px;border:2px solid #e5e7eb;border-radius:12px;background:white;color:#374151;font-weight:600;font-size:14px;cursor:pointer;transition:all 0.2s;"
+                        onmouseover="this.style.borderColor='#9ca3af';this.style.background='#f9fafb'"
+                        onmouseout="this.style.borderColor='#e5e7eb';this.style.background='white'">
+                        <i class="bi bi-pencil-square"></i> Quay lại sửa
+                    </button>
+                    <button id="btn-confirm-submit" onclick="CreateOrderModule.confirmAndSubmit()"
+                        style="flex:2;padding:14px;border:none;border-radius:12px;background:linear-gradient(135deg,#11998e,#38ef7d);color:white;font-weight:700;font-size:15px;cursor:pointer;box-shadow:0 4px 16px rgba(17,153,142,0.3);transition:all 0.2s;text-transform:uppercase;letter-spacing:0.5px;"
+                        onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 6px 20px rgba(17,153,142,0.4)'"
+                        onmouseout="this.style.transform='';this.style.boxShadow='0 4px 16px rgba(17,153,142,0.3)'">
+                        <i class="bi bi-check-circle"></i> Xác nhận tạo đơn
+                    </button>
+                </div>
+            </div>
+        `;
+
+        // Close on backdrop click
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) modal.remove();
+        });
+        // Close on Escape
+        const escHandler = (e) => { if (e.key === 'Escape') { modal.remove(); document.removeEventListener('keydown', escHandler); } };
+        document.addEventListener('keydown', escHandler);
+
+        document.body.appendChild(modal);
+    },
+
+    // Render products in confirmation modal
+    _renderConfirmProducts() {
+        return this.orderProducts.map((p, i) => `
+            <div class="confirm-product-item" data-idx="${i}">
+                <div class="confirm-product-num">${i + 1}</div>
+                <div class="confirm-product-name">
+                    ${this._escHtml(p.name)}
+                    ${p.code ? `<div style="font-size:11px;color:#6b7280;font-weight:400;margin-top:1px;">${this._escHtml(p.code)}</div>` : ''}
+                </div>
+                <input type="number" class="confirm-product-qty-input" value="${p.qty}" step="0.01" min="0.01"
+                    onchange="CreateOrderModule.editConfirmProduct(${i}, this.value)">
+                <span class="confirm-product-unit">${p.unit}</span>
+                <button class="confirm-product-del" title="Xóa" onclick="CreateOrderModule.removeConfirmProduct(${i})">
+                    <i class="bi bi-trash3"></i>
+                </button>
+            </div>
+        `).join('');
+    },
+
+    // Edit product qty in confirm modal
+    editConfirmProduct(index, newQty) {
+        const qty = parseFloat(newQty);
+        if (isNaN(qty) || qty <= 0) return;
+        this.orderProducts[index].qty = qty;
+        this._updateConfirmTotal();
+        this.renderProductList(); // sync main form too
+    },
+
+    // Remove product from confirm modal
+    removeConfirmProduct(index) {
+        this.orderProducts.splice(index, 1);
+        // If no products left, close modal
+        if (this.orderProducts.length === 0) {
+            document.getElementById('order-confirm-modal')?.remove();
+            alert('Đã xóa hết sản phẩm. Vui lòng thêm lại.');
+            this.renderProductList();
+            return;
+        }
+        // Re-render products in modal
+        const list = document.getElementById('confirm-products-list');
+        if (list) list.innerHTML = this._renderConfirmProducts();
+        this._updateConfirmTotal();
+        this.renderProductList(); // sync main form
+    },
+
+    // Update total in confirm modal
+    _updateConfirmTotal() {
+        const totalEl = document.getElementById('confirm-total-qty');
+        if (totalEl) {
+            const total = this.orderProducts.reduce((sum, p) => sum + p.qty, 0);
+            totalEl.textContent = Number(total).toLocaleString('vi-VN') + ' Kg';
+        }
+    },
+
+    // Escape HTML helper
+    _escHtml(text) {
+        if (!text) return '';
+        return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    },
+
+    // Final submit after confirmation
+    async confirmAndSubmit() {
+        const date = document.getElementById('order-date').value;
+        const customer = document.getElementById('order-customer').value.trim();
+        const address = document.getElementById('order-address').value.trim();
+        const note = document.getElementById('order-note')?.value?.trim() || '';
+
+        // Show loading on confirm button
+        const submitBtn = document.getElementById('btn-confirm-submit');
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Đang xử lý...';
+        }
 
         try {
             const response = await fetch('/api/orders/create', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     date: date,
                     customer: customer,
                     address: address,
                     products: this.orderProducts,
                     type: 'IMPORT',
-                    note: note  // Include note in API call
+                    note: note
                 })
             });
 
@@ -760,6 +972,9 @@ const CreateOrderModule = {
             if (data.error) {
                 throw new Error(data.msg || 'Có lỗi xảy ra khi tạo đơn');
             }
+
+            // Close modal
+            document.getElementById('order-confirm-modal')?.remove();
 
             alert('✅ Tạo đơn nhập thành công!');
 
@@ -772,9 +987,10 @@ const CreateOrderModule = {
         } catch (error) {
             console.error('Error creating order:', error);
             alert('❌ Lỗi: ' + error.message);
-        } finally {
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = originalHTML;
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="bi bi-check-circle"></i> Xác nhận tạo đơn';
+            }
         }
     }
 };
