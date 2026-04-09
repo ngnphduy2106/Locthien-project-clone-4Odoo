@@ -214,7 +214,7 @@ router.get('/', async (req, res) => {
         // Parse users for driver/assistant lists
         const users = usersResult.status === 'fulfilled' ? usersResult.value : [];
         const drivers = users
-            .filter(u => u.status === 'ACTIVE' && u.role === CONFIG.ROLES.DRIVER)
+            .filter(u => u.status === 'ACTIVE' && u.role === CONFIG.ROLES.DRIVER && String(u.role).toUpperCase() !== 'TESTER')
             .map(u => ({ name: u.fullName, plate: u.plate }));
 
         const assistants = users
