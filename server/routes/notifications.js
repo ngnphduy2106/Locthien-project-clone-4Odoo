@@ -177,7 +177,7 @@ export async function createNotification(userId, type, title, body, orderId = nu
             return false;
         }
 
-        console.log(`🔔 Notification created: ${type} for ${userId}`);
+        console.log(`🔔 Notification created: ${type} for "${userId}"`);
 
         // 2. Send FCM push to device (lock screen notification)
         try {
@@ -190,39 +190,52 @@ export async function createNotification(userId, type, title, body, orderId = nu
                 // For ADMIN-targeted notifications, push to all admin devices
                 const { data: admins } = await supabase
                     .from('users')
-                    .select('fcm_token')
+                    .select('fcm_token, fullname')
                     .in('role', ['admin', 'ADMIN'])
                     .not('fcm_token', 'is', null);
+
+                console.log(`📬 ADMIN push: found ${admins?.length || 0} admin(s) with tokens`);
 
                 if (admins?.length) {
                     for (const admin of admins) {
                         if (admin.fcm_token && !admin.fcm_token.startsWith('mock_')) {
-                            await sendPushNotification(admin.fcm_token, title, body, {
+                            const result = await sendPushNotification(admin.fcm_token, title, body, {
                                 orderId: String(orderId || ''),
                                 orderNo: String(orderNo || ''),
                                 type: type
                             });
+                            console.log(`📬 FCM push to admin "${admin.fullname}": ${result ? '✅' : '❌'}`);
                         }
                     }
                 }
             } else {
                 // Find specific user by name (fullName match)
-                const { data: users } = await supabase
+                // Use ilike for case-insensitive match to handle name variations
+                const { data: users, error: userErr } = await supabase
                     .from('users')
-                    .select('fcm_token')
-                    .eq('fullname', userId)
-                    .not('fcm_token', 'is', null)
-                    .limit(1);
+                    .select('fcm_token, fullname, role')
+                    .ilike('fullname', userId)
+                    .limit(5);
 
-                fcmToken = users?.[0]?.fcm_token;
+                console.log(`🔍 FCM lookup for "${userId}": found ${users?.length || 0} user(s)${userErr ? ' (error: ' + userErr.message + ')' : ''}`);
+                
+                if (users?.length) {
+                    users.forEach(u => console.log(`   → "${u.fullname}" [${u.role}] token: ${u.fcm_token ? u.fcm_token.substring(0, 15) + '...' : 'NULL'}`));
+                }
 
-                if (fcmToken && !fcmToken.startsWith('mock_')) {
-                    await sendPushNotification(fcmToken, title, body, {
+                // Use first user with valid token
+                const validUser = (users || []).find(u => u.fcm_token && !u.fcm_token.startsWith('mock_'));
+                fcmToken = validUser?.fcm_token;
+
+                if (fcmToken) {
+                    const result = await sendPushNotification(fcmToken, title, body, {
                         orderId: String(orderId || ''),
                         orderNo: String(orderNo || ''),
                         type: type
                     });
-                    console.log(`📬 FCM push sent to ${userId}`);
+                    console.log(`📬 FCM push sent to "${userId}": ${result ? '✅ OK' : '❌ FAILED'}`);
+                } else {
+                    console.log(`⚠️ No valid FCM token for "${userId}" — push notification skipped`);
                 }
             }
         } catch (pushErr) {
