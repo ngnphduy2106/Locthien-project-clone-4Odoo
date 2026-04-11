@@ -1509,6 +1509,24 @@ router.post('/:id/admin-confirm', async (req, res) => {
             console.error('Telegram import confirm error:', tgErr.message);
         }
 
+        // In-app + FCM push notification to the assigned driver
+        try {
+            const driverName = data.assigned_driver || '';
+            if (driverName) {
+                await createNotification(
+                    driverName,
+                    'order_completed',
+                    '✅ Phiếu nhập đã được xác nhận',
+                    `#${data.ticket_no} — Xác nhận bởi ${confirmed_by || 'Admin'}`,
+                    ticket.id,
+                    data.ticket_no
+                );
+                console.log(`📬 Import confirm notification sent to driver: ${driverName}`);
+            }
+        } catch (notifyErr) {
+            console.error('In-app import confirm notification error:', notifyErr.message);
+        }
+
         res.json({
             error: false,
             msg: `Đã xác nhận phiếu nhập #${data.ticket_no}!`,

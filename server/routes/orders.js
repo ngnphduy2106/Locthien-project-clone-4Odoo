@@ -3234,6 +3234,24 @@ router.post('/:id/approve', async (req, res) => {
             console.error('Telegram approve error:', tgErr.message);
         }
 
+        // In-app + FCM push notification to the assigned driver
+        try {
+            const driverName = order.taiXe || order.custom_field13 || '';
+            if (driverName) {
+                await createNotification(
+                    driverName,
+                    'order_completed',
+                    '✅ Đơn đã được duyệt',
+                    `#${orderNo} — Đã duyệt bởi ${approved_by || 'admin'}`,
+                    id,
+                    orderNo
+                );
+                console.log(`📬 Approve notification sent to driver: ${driverName}`);
+            }
+        } catch (notifyErr) {
+            console.error('In-app approve notification error:', notifyErr.message);
+        }
+
         res.json(createResponse(false, 'Duyệt thành công!', { crmStatus }));
     } catch (e) {
         console.error('approve error:', e.message);
