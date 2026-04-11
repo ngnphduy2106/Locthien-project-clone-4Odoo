@@ -27,6 +27,7 @@ import supplierRoutes from './routes/suppliers.js';
 import customerRoutes from './routes/customers.js';
 import notificationRoutes from './routes/notifications.js';
 import mergedOrderRoutes from './routes/merged-orders.js';
+import systemRoutes from './routes/system.js';
 
 import { syncMisaOrders, syncMisaProducts, getSyncStatus, updateMisaOrder } from './services/misa.js';
 import db from './db/index.js';
@@ -69,6 +70,7 @@ apiRouter.use('/suppliers', supplierRoutes);
 apiRouter.use('/customers', customerRoutes);
 apiRouter.use('/notifications', notificationRoutes);
 apiRouter.use('/merged-orders', mergedOrderRoutes);
+apiRouter.use('/system', systemRoutes);
 
 // Manual Sync Endpoint (Two-way: Pull New & Push Pending)
 apiRouter.post('/sync', async (req, res) => {
@@ -283,7 +285,7 @@ if (!IS_SERVERLESS) {
     }, 30 * 60 * 1000);
 
     app.listen(PORT, () => {
-        console.log('?? L?c Thiên ERP running on port ' + PORT);
+        console.log('?? L?c Thiï¿½n ERP running on port ' + PORT);
         console.log('?? Client folder: ' + publicPath);
     });
 }
