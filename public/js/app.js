@@ -71,7 +71,9 @@ let state = {
         myOrders: 0,      // Last load timestamp for my-orders
         dashboard: 0,     // Last load timestamp for dashboard
         cacheTTL: 30000   // 30 seconds cache validity
-    }
+    },
+    // Race condition guard: increments on each load call, stale responses are discarded
+    _loadRequestId: 0
 };
 
 window.state = state;
@@ -1364,10 +1366,20 @@ async function loadOrders() {
     const container = window.$('#dispatch-order-list');
     if (!container) return;
 
+    // Race condition guard: track this request
+    const requestId = ++state._loadRequestId;
+
     container.innerHTML = '<div class="loading-spinner" style="margin: 40px auto;"></div>';
 
     try {
         const res = await api.getOrders();
+
+        // Discard stale response if user already switched tabs
+        if (requestId !== state._loadRequestId || state.currentOrderType !== 'export') {
+            console.log('⏭️ Discarding stale export response (user switched tabs)');
+            return;
+        }
+
         state.orders.pending = res.pending || [];
         state.orders.assigned = res.assigned || [];
         state.orders.completed = []; // Lazy-loaded via pagination
@@ -1390,7 +1402,10 @@ async function loadOrders() {
 
         renderDispatchOrders();
     } catch (e) {
-        container.innerHTML = '<p style="text-align:center; color:var(--danger);">Lỗi tải đơn hàng</p>';
+        // Only show error if this is still the active request
+        if (requestId === state._loadRequestId) {
+            container.innerHTML = '<p style="text-align:center; color:var(--danger);">Lỗi tải đơn hàng</p>';
+        }
     }
 }
 
@@ -1398,6 +1413,9 @@ async function loadOrders() {
 async function loadCompletedOrders(page = 1) {
     const container = window.$('#dispatch-order-list');
     if (!container) return;
+
+    // Race condition guard: track this request
+    const requestId = ++state._loadRequestId;
 
     if (page === 1) {
         container.innerHTML = '<div class="loading-spinner" style="margin: 40px auto;"></div>';
@@ -1407,6 +1425,12 @@ async function loadCompletedOrders(page = 1) {
     try {
         const res = await fetch(`/api/orders?tab=completed&page=${page}&limit=50`);
         const data = await res.json();
+
+        // Discard stale response if user already switched tabs
+        if (requestId !== state._loadRequestId || state.currentOrderType !== 'export') {
+            console.log('⏭️ Discarding stale completed response (user switched tabs)');
+            return;
+        }
 
         if (data.error) throw new Error(data.msg);
 
@@ -1437,7 +1461,7 @@ async function loadCompletedOrders(page = 1) {
         }
     } catch (e) {
         console.error('Load completed error:', e);
-        if (page === 1) {
+        if (requestId === state._loadRequestId && page === 1) {
             container.innerHTML = '<p style="text-align:center; color:var(--danger);">Lỗi tải đơn hoàn thành</p>';
         }
     }
@@ -1492,10 +1516,20 @@ async function loadImportTickets() {
     const container = window.$('#dispatch-order-list');
     if (!container) return;
 
+    // Race condition guard: track this request
+    const requestId = ++state._loadRequestId;
+
     container.innerHTML = '<div style="text-align:center; padding:40px;"><i class="bi bi-arrow-repeat spin"></i> Đang tải phiếu nhập...</div>';
 
     try {
         const res = await api.getImports();
+
+        // Discard stale response if user already switched tabs
+        if (requestId !== state._loadRequestId || state.currentOrderType !== 'import') {
+            console.log('⏭️ Discarding stale import response (user switched tabs)');
+            return;
+        }
+
         const imports = res?.data || [];
 
         // Group by status
@@ -1510,7 +1544,10 @@ async function loadImportTickets() {
 
         renderImportList();
     } catch (e) {
-        container.innerHTML = '<p style="text-align:center; color:var(--danger);">Lỗi tải phiếu nhập</p>';
+        // Only show error if this is still the active request
+        if (requestId === state._loadRequestId) {
+            container.innerHTML = '<p style="text-align:center; color:var(--danger);">Lỗi tải phiếu nhập</p>';
+        }
     }
 }
 
