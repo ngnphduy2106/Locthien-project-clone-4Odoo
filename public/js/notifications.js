@@ -94,23 +94,42 @@ const NotificationModule = {
                 return false;
             }
 
-            // Get REAL FCM token
-            const registration = await navigator.serviceWorker.getRegistration('/sw.js');
+            // CRITICAL: Use firebase-messaging-sw.js for FCM token binding
+            // This SW handles onBackgroundMessage — tokens MUST be bound to it
+            let registration = await navigator.serviceWorker.getRegistration('/firebase-messaging-sw.js');
+            if (!registration) {
+                console.log('📝 Registering firebase-messaging-sw.js...');
+                registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+                // Wait for it to activate
+                await navigator.serviceWorker.ready;
+            }
+
+            // Get REAL FCM token (bound to firebase-messaging-sw.js)
             const token = await this.messaging.getToken({
                 vapidKey: this.vapidKey,
                 serviceWorkerRegistration: registration
             });
 
             if (token) {
-                console.log('🔑 FCM Token obtained:', token.substring(0, 20) + '...');
+                const oldToken = localStorage.getItem('LT_FCM_TOKEN');
+                const tokenChanged = oldToken !== token;
 
-                // Register token with backend (saves to users table)
-                const res = await api.registerFcmToken(userId, token);
-                if (!res.error) {
-                    localStorage.setItem('LT_FCM_TOKEN', token);
-                    console.log('✅ Push notifications active — lock screen notifications enabled!');
-                    return true;
+                console.log(`🔑 FCM Token obtained: ${token.substring(0, 20)}... ${tokenChanged ? '(NEW/CHANGED)' : '(unchanged)'}`);
+
+                // Always re-register if token changed or first time
+                if (tokenChanged || !oldToken) {
+                    const res = await api.registerFcmToken(userId, token);
+                    if (!res.error) {
+                        localStorage.setItem('LT_FCM_TOKEN', token);
+                        console.log('✅ Push notifications active — lock screen notifications enabled!');
+                    } else {
+                        console.error('❌ Failed to register token with backend:', res.msg);
+                    }
+                } else {
+                    console.log('✅ FCM token unchanged — push already active');
                 }
+
+                return true;
             } else {
                 console.log('⚠️ No FCM token received');
             }

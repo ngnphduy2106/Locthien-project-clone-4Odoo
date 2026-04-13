@@ -1,48 +1,10 @@
 // ===============================================
-// LỘC THIÊN ERP — Service Worker v3
-// Handles: Caching + Firebase Cloud Messaging (background push)
+// LỘC THIÊN ERP — Service Worker v4
+// Handles: Caching ONLY (FCM handled by firebase-messaging-sw.js)
 // ===============================================
 
-// === FIREBASE MESSAGING (must be FIRST — before any other code) ===
-importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js');
-
-firebase.initializeApp({
-    apiKey: "AIzaSyDLjwBvNnhEdn32VgmYqDfbRkVrzflCA8w",
-    authDomain: "locthien-scm.firebaseapp.com",
-    projectId: "locthien-scm",
-    storageBucket: "locthien-scm.firebasestorage.app",
-    messagingSenderId: "831814732608",
-    appId: "1:831814732608:web:a5962decde0ecb230fc8a5"
-});
-
-const messaging = firebase.messaging();
-
-// Handle background push messages (when app is NOT in focus / Chrome minimized)
-messaging.onBackgroundMessage((payload) => {
-    console.log('📬 BG push received:', payload);
-
-    const title = payload.notification?.title || payload.data?.title || 'Lộc Thiên ERP';
-    const body = payload.notification?.body || payload.data?.body || 'Bạn có thông báo mới';
-    const orderId = payload.data?.orderId || '';
-    const type = payload.data?.type || 'general';
-
-    const options = {
-        body: body,
-        icon: '/logo.png',
-        badge: '/logo.png',
-        vibrate: [200, 100, 200, 100, 200],
-        tag: orderId || type,
-        data: { orderId, type, ...payload.data },
-        requireInteraction: true,
-        actions: [
-            { action: 'view', title: '📋 Xem đơn' },
-            { action: 'dismiss', title: 'Bỏ qua' }
-        ]
-    };
-
-    return self.registration.showNotification(title, options);
-});
+// NOTE: Firebase Cloud Messaging is handled by firebase-messaging-sw.js
+// DO NOT import firebase here — it causes conflicts with the FCM service worker
 
 // === CACHING ===
 const CACHE_NAME = 'lt-erp-v3';
@@ -206,4 +168,4 @@ self.addEventListener('message', (event) => {
     }
 });
 
-console.log('🔔 SW v3 loaded (Caching + FCM Push)');
+console.log('🔔 SW v4 loaded (Caching only — FCM in firebase-messaging-sw.js)');

@@ -193,17 +193,24 @@ router.post('/register-fcm-token', async (req, res) => {
         }
 
         // Save FCM token directly to Supabase users table (match by fullname)
-        const { error } = await supabase
+        // Use ilike for case-insensitive matching (consistent with notifications.js lookup)
+        const { data, error } = await supabase
             .from('users')
             .update({ fcm_token: fcmToken })
-            .eq('fullname', userId);
+            .ilike('fullname', userId)
+            .select('fullname, role');
 
         if (error) {
             console.error('FCM token save error:', error);
             return res.json(createResponse(true, 'Lỗi lưu token: ' + error.message));
         }
 
-        console.log(`📱 FCM token registered for ${userId}: ${fcmToken.substring(0, 20)}...`);
+        if (!data || data.length === 0) {
+            console.warn(`⚠️ FCM token registration: No user found matching "${userId}"`);
+            return res.json(createResponse(true, `Không tìm thấy user "${userId}"`));
+        }
+
+        console.log(`📱 FCM token registered for "${data[0].fullname}" [${data[0].role}]: ${fcmToken.substring(0, 20)}...`);
         res.json(createResponse(false, 'Đã đăng ký token thông báo!'));
     } catch (e) {
         console.error('FCM token registration error:', e);
