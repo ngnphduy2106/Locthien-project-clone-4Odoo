@@ -693,6 +693,31 @@ router.post('/:id/assign-multi', async (req, res) => {
             }
         }
 
+        // In-app + FCM push notification to each assigned driver
+        try {
+            const { data: ticketInfo } = await supabase.from('import_tickets').select('ticket_no, supplier_name').eq('id', id).single();
+            const ticketNo = ticketInfo?.ticket_no || id;
+            const supplier = ticketInfo?.supplier_name || '';
+
+            const notifiedDrivers = new Set();
+            for (const a of assignments) {
+                if (a.driver_name && !notifiedDrivers.has(a.driver_name)) {
+                    notifiedDrivers.add(a.driver_name);
+                    await createNotification(
+                        a.driver_name,
+                        'order_assigned',
+                        '🚛 Phiếu nhập mới',
+                        `#${ticketNo} - ${supplier}`,
+                        id,
+                        ticketNo
+                    );
+                    console.log(`📬 Import dispatch FCM sent to driver: ${a.driver_name}`);
+                }
+            }
+        } catch (notifyErr) {
+            console.error('Import dispatch FCM notification error:', notifyErr.message);
+        }
+
         res.json(createResponse(false, `Đã phân công ${assignments.length} tài xế!`));
 
     } catch (e) {

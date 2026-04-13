@@ -1146,22 +1146,6 @@ router.put('/:id/assign', async (req, res) => {
             cart: fullOrder?.cart || fullOrder?.products || []
         });
 
-        // In-app + FCM push notification to driver
-        try {
-            const orderNo = fullOrder?.soDon || fullOrder?.sale_order_no || id;
-            const customer = fullOrder?.khach || fullOrder?.account_name || '';
-            await createNotification(
-                driverName,
-                'order_assigned',
-                `🚛 Đơn hàng mới`,
-                `#${orderNo} - ${customer}`,
-                id,
-                orderNo
-            );
-        } catch (notifyErr) {
-            console.error('Assign notification error:', notifyErr.message);
-        }
-
         // Send Telegram notification to DRIVER group (async, don't block response)
         try {
             // === DISPATCH FORMAT: Clean multi-line with full product details ===
@@ -2415,6 +2399,32 @@ router.post('/:id/assign-multi', async (req, res) => {
             console.log(`✅ Telegram DRIVER notification sent for order ${id}`);
         } catch (tgErr) {
             console.error('❌ Telegram Error in driver assign:', tgErr.message);
+        }
+
+        // In-app + FCM push notification to each assigned driver
+        try {
+            const orderInfo2 = await db.getOrder(id);
+            const poNo2 = orderInfo2?.soDon || orderInfo2?.sale_order_no || id;
+            const customer2 = orderInfo2?.khach || orderInfo2?.account_name || '';
+            
+            // Notify each unique driver
+            const notifiedDrivers = new Set();
+            for (const a of assignments) {
+                if (a.driver_name && !notifiedDrivers.has(a.driver_name)) {
+                    notifiedDrivers.add(a.driver_name);
+                    await createNotification(
+                        a.driver_name,
+                        'order_assigned',
+                        '🚛 Đơn hàng mới',
+                        `#${poNo2} - ${customer2}`,
+                        id,
+                        poNo2
+                    );
+                    console.log(`📬 Dispatch FCM sent to driver: ${a.driver_name}`);
+                }
+            }
+        } catch (notifyErr) {
+            console.error('Dispatch FCM notification error:', notifyErr.message);
         }
 
         res.json(createResponse(false, `Đã phân công ${assignments.length} tài xế!`));
