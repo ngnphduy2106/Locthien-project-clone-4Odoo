@@ -7,7 +7,7 @@
 // DO NOT import firebase here — it causes conflicts with the FCM service worker
 
 // === CACHING ===
-const CACHE_NAME = 'lt-erp-v3';
+const CACHE_NAME = 'lt-erp-v4';
 const STATIC_ASSETS = [
     '/',
     '/index.html',
@@ -20,7 +20,7 @@ const STATIC_ASSETS = [
 
 // Install — pre-cache critical assets
 self.addEventListener('install', (event) => {
-    console.log('[SW] Installing Service Worker v3 (with FCM)...');
+    console.log('[SW] Installing Service Worker v4...');
     event.waitUntil(
         caches.open(CACHE_NAME).then((cache) => {
             console.log('[SW] Pre-caching static assets');
@@ -34,7 +34,7 @@ self.addEventListener('install', (event) => {
 
 // Activate — clean old caches
 self.addEventListener('activate', (event) => {
-    console.log('[SW] Activating Service Worker v3...');
+    console.log('[SW] Activating Service Worker v4...');
     event.waitUntil(
         caches.keys().then((names) => {
             return Promise.all(
@@ -49,13 +49,15 @@ self.addEventListener('activate', (event) => {
     self.clients.claim();
 });
 
-// Fetch — Network-first for API, Stale-while-revalidate for static
+// Fetch — Network-first for EVERYTHING (ensures fresh JS/HTML after deploy)
+// Fallback to cache only when offline
 self.addEventListener('fetch', (event) => {
     const { request } = event;
     const url = new URL(request.url);
 
     if (request.method !== 'GET') return;
 
+    // Skip API calls (except dashboard) — let browser handle them directly
     if (url.pathname.startsWith('/api/')) {
         if (url.pathname === '/api/reports/dashboard') {
             event.respondWith(networkFirstWithTimeout(request, 3000));
@@ -64,19 +66,20 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
+    // Network-first for static assets (HTML, JS, CSS)
+    // Always try network first → update cache → fallback to cache if offline
     event.respondWith(
-        caches.match(request).then((cached) => {
-            const fetchPromise = fetch(request).then((response) => {
-                if (response && response.status === 200) {
-                    const clone = response.clone();
-                    caches.open(CACHE_NAME).then(cache => cache.put(request, clone));
-                }
-                return response;
-            }).catch(() => {
-                return cached;
+        fetch(request).then((response) => {
+            if (response && response.status === 200) {
+                const clone = response.clone();
+                caches.open(CACHE_NAME).then(cache => cache.put(request, clone));
+            }
+            return response;
+        }).catch(() => {
+            // Network failed → serve from cache (offline support)
+            return caches.match(request).then(cached => {
+                return cached || new Response('Offline', { status: 503 });
             });
-
-            return cached || fetchPromise;
         })
     );
 });
