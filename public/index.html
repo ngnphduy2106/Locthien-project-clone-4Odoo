@@ -1574,9 +1574,27 @@
                     <div
                         style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
                         <h2 class="page-heading" style="margin-bottom:0;">Quản lý Tài khoản</h2>
-                        <button class="btn btn-primary" onclick="showCreateUserModal()">
-                            <i class="bi bi-person-plus"></i> Tạo tài khoản
-                        </button>
+                        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                            <div style="position:relative; display:inline-block;">
+                                <button class="btn" style="background:var(--warning); color:#000; font-weight:600;" onclick="this.nextElementSibling.classList.toggle('hidden')">
+                                    <i class="bi bi-arrow-clockwise"></i> Reset cache
+                                </button>
+                                <div class="hidden" style="position:absolute; right:0; top:100%; margin-top:4px; background:var(--card-bg); border:1px solid var(--border); border-radius:8px; padding:6px; z-index:100; min-width:180px; box-shadow:0 4px 12px rgba(0,0,0,0.3);">
+                                    <button class="btn btn-outline btn-sm" style="width:100%; text-align:left; margin-bottom:4px;" onclick="forceReloadAll('DRIVER'); this.parentElement.classList.add('hidden')">
+                                        🚛 Tất cả Tài xế
+                                    </button>
+                                    <button class="btn btn-outline btn-sm" style="width:100%; text-align:left; margin-bottom:4px;" onclick="forceReloadAll('ADMIN'); this.parentElement.classList.add('hidden')">
+                                        👤 Tất cả Admin
+                                    </button>
+                                    <button class="btn btn-outline btn-sm" style="width:100%; text-align:left; color:var(--danger);" onclick="forceReloadAll(); this.parentElement.classList.add('hidden')">
+                                        ⚠️ TẤT CẢ người dùng
+                                    </button>
+                                </div>
+                            </div>
+                            <button class="btn btn-primary" onclick="showCreateUserModal()">
+                                <i class="bi bi-person-plus"></i> Tạo tài khoản
+                            </button>
+                        </div>
                     </div>
 
                     <!-- User Stats Cards - Responsive 2x2 on mobile -->

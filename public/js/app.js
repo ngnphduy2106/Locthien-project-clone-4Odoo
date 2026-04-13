@@ -8492,6 +8492,31 @@ window.updateUserStatus = updateUserStatus;
 window.closeEditUserModal = closeEditUserModal;
 window.submitEditUser = submitEditUser;
 
+// Force reload ALL users (or by role)
+async function forceReloadAll(role = '') {
+    const label = role ? `tất cả ${role}` : 'TẤT CẢ người dùng';
+    if (!confirm(`Reset cache cho ${label}?\n\nApp sẽ tự động tải lại trong vòng 60 giây.`)) return;
+    try {
+        showLoading('Đang gửi lệnh reset...');
+        const res = await fetch('/api/auth/force-reload-all', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ role: role || undefined })
+        });
+        const data = await res.json();
+        hideLoading();
+        if (data.error) {
+            toastError(data.msg || 'Lỗi');
+        } else {
+            toastSuccess(data.msg || 'Đã gửi lệnh reset!');
+        }
+    } catch (e) {
+        hideLoading();
+        toastError('Lỗi: ' + e.message);
+    }
+}
+window.forceReloadAll = forceReloadAll;
+
 // ===============================================
 // WAREHOUSE MANAGEMENT
 // ===============================================

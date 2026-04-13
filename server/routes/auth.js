@@ -230,6 +230,35 @@ router.post('/force-reload/:id', async (req, res) => {
     }
 });
 
+// POST /api/auth/force-reload-all - Reset cache for ALL users (or by role)
+router.post('/force-reload-all', async (req, res) => {
+    try {
+        const { role } = req.body; // Optional: only reset specific role
+
+        let query = supabase
+            .from('users')
+            .update({ force_reload: true })
+            .eq('status', 'ACTIVE');
+
+        if (role) {
+            query = query.ilike('role', role);
+        }
+
+        const { data, error } = await query.select('fullname, role');
+
+        if (error) {
+            return res.json(createResponse(true, 'Lỗi: ' + error.message));
+        }
+
+        const count = data?.length || 0;
+        const names = (data || []).map(u => u.fullname).join(', ');
+        console.log(`🔄 Force reload set for ${count} users: ${names}`);
+        res.json(createResponse(false, `Đã yêu cầu reset cache cho ${count} người dùng!`));
+    } catch (e) {
+        res.json(createResponse(true, 'Lỗi: ' + e.message));
+    }
+});
+
 // GET /api/auth/check-reload/:id - Frontend checks if force reload is needed
 router.get('/check-reload/:id', async (req, res) => {
     try {
