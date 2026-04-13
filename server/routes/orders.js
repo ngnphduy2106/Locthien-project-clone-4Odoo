@@ -376,24 +376,20 @@ router.get('/:orderId/assignments', async (req, res) => {
 });
 
 // GET /api/orders/my/:driverName - Get orders for driver (both export and import)
-// Supports multi-driver splitting via order_driver_assignments table
+// OPTIMIZED: No full table scans — only fetches driver's assigned orders
 router.get('/my/:driverName', async (req, res) => {
     try {
         const { driverName } = req.params;
         const { role } = req.query;
         const myName = String(driverName).trim().toUpperCase();
         const normalizedRole = (role || '').toUpperCase();
-        // Allow SALES to see external drivers in "My Orders" tab just like ADMIN
         const isAdmin = ['ADMIN', 'TESTER', 'SALES'].includes(normalizedRole);
 
-        console.log(`🔍 My Orders Search: driverName="${driverName}" role="${role}", isAdmin=${isAdmin}`);
-
-
-
+        console.log(`🔍 My Orders: driver="${driverName}" role="${role}"`);
+        console.time('⏱️ my-orders');
 
         // =========================================================
-        // PHA 1: SONG SONG HOÁ TOÀN BỘ CÁC TRUY VẤN BASE
-        // (Thay vì chờ nhau, bắn 1 lúc 4 mũi tên)
+        // PHASE 1: All queries in PARALLEL (no sequential waits)
         // =========================================================
         const queryExportAssigns = isAdmin 
             ? supabase.from('order_driver_assignments').select('*').or(`driver_type.eq.external,driver_name.ilike.%${driverName}%,assistant_name.ilike.%${driverName}%`)
@@ -403,271 +399,211 @@ router.get('/my/:driverName', async (req, res) => {
             ? supabase.from('import_driver_assignments').select('*').or(`driver_type.eq.external,driver_name.ilike.%${driverName}%,driver_name.eq.${driverName}`)
             : supabase.from('import_driver_assignments').select('*').or(`driver_name.ilike.%${driverName}%,driver_name.eq.${driverName}`);
 
-        const mainResults = await Promise.allSettled([
-            db.getOrders(),
-            db.getUsers(),
-            queryExportAssigns,
-            queryImportAssigns
+        // Only fetch driver fullnames (not ALL users)
+        const queryDriverNames = supabase.from('users').select('fullname').eq('role', CONFIG.ROLES.DRIVER);
+
+        // Legacy export: orders with custom_field13 (not in assignments table)
+        const queryLegacyExport = isAdmin
+            ? supabase.from('orders').select('*').not('custom_field13', 'is', null).neq('custom_field13', '').neq('status', 'Đã hủy bỏ').order('sale_order_date', { ascending: false }).limit(200)
+            : supabase.from('orders').select('*').or(`custom_field13.ilike.%${driverName}%,custom_field13.eq.${driverName}`).neq('status', 'Đã hủy bỏ').order('sale_order_date', { ascending: false }).limit(100);
+
+        // Legacy import: tickets with assigned_driver (not in assignments table)
+        const queryLegacyImport = isAdmin
+            ? supabase.from('import_tickets').select('*').not('assigned_driver', 'is', null).neq('status', 'cancelled').order('created_at', { ascending: false }).limit(200)
+            : supabase.from('import_tickets').select('*').or(`assigned_driver.ilike.%${driverName}%,assigned_driver.eq.${driverName}`).neq('status', 'cancelled').order('created_at', { ascending: false }).limit(100);
+
+        const phase1 = await Promise.allSettled([
+            queryExportAssigns,     // [0]
+            queryImportAssigns,     // [1]
+            queryDriverNames,       // [2]
+            queryLegacyExport,      // [3]
+            queryLegacyImport       // [4]
         ]);
 
-        const orders = mainResults[0].status === 'fulfilled' ? (mainResults[0].value || []) : [];
-        const users = mainResults[1].status === 'fulfilled' ? (mainResults[1].value || []) : [];
-        
         function dedupe(arr) {
             const seen = new Set();
             return arr.filter(i => { if (seen.has(i.id)) return false; seen.add(i.id); return true; });
         }
-        
-        const assignments = dedupe(mainResults[2].status === 'fulfilled' ? (mainResults[2].value.data || []) : []);
-        const preFetchedImportAssignments = dedupe(mainResults[3].status === 'fulfilled' ? (mainResults[3].value.data || []) : []);
 
-        if (mainResults.some(r => r.status === 'rejected')) {
-            console.warn('⚠️ My Orders warning: Some base queries timed out, showing partial data', mainResults.map(r => r.reason));
-        }
+        const assignments = dedupe(phase1[0].status === 'fulfilled' ? (phase1[0].value.data || []) : []);
+        const importAssignments = dedupe(phase1[1].status === 'fulfilled' ? (phase1[1].value.data || []) : []);
+        const internalDrivers = (phase1[2].status === 'fulfilled' ? (phase1[2].value.data || []) : [])
+            .map(u => (u.fullname || '').toUpperCase());
+        const legacyOrders = phase1[3].status === 'fulfilled' ? (phase1[3].value.data || []) : [];
+        const legacyImports = phase1[4].status === 'fulfilled' ? (phase1[4].value.data || []) : [];
 
-        const internalDrivers = users
-            .filter(u => u.role === CONFIG.ROLES.DRIVER)
-            .map(u => (u.fullName || '').toUpperCase());
+        // =========================================================
+        // PHASE 2: Batch-fetch ONLY the orders/tickets from assignments
+        // (targeted queries instead of full table scan)
+        // =========================================================
+        const exportOrderIds = [...new Set(assignments.map(a => a.order_id))];
+        const importTicketIds = [...new Set(importAssignments.map(a => a.import_id))];
+
+        const phase2 = await Promise.allSettled([
+            exportOrderIds.length > 0
+                ? supabase.from('orders').select('*').in('id', exportOrderIds)
+                : Promise.resolve({ data: [] }),
+            exportOrderIds.length > 0
+                ? supabase.from('order_driver_assignments').select('id, status, assigned_qty, actual_qty, driver_name, order_id').in('order_id', exportOrderIds)
+                : Promise.resolve({ data: [] }),
+            importTicketIds.length > 0
+                ? supabase.from('import_tickets').select('*').in('id', importTicketIds)
+                : Promise.resolve({ data: [] }),
+            importTicketIds.length > 0
+                ? supabase.from('import_driver_assignments').select('id, status, assigned_qty, actual_qty, driver_name, plate, import_id').in('import_id', importTicketIds)
+                : Promise.resolve({ data: [] })
+        ]);
+
+        // Index for fast lookup
+        const orderMap = {};
+        (phase2[0].status === 'fulfilled' ? (phase2[0].value.data || []) : []).forEach(o => { orderMap[o.id] = o; });
+
+        const assignsByOrder = {};
+        (phase2[1].status === 'fulfilled' ? (phase2[1].value.data || []) : []).forEach(a => {
+            if (!assignsByOrder[a.order_id]) assignsByOrder[a.order_id] = [];
+            assignsByOrder[a.order_id].push(a);
+        });
+
+        const ticketMap = {};
+        (phase2[2].status === 'fulfilled' ? (phase2[2].value.data || []) : []).forEach(t => { ticketMap[t.id] = t; });
+
+        const importAssignsByTicket = {};
+        (phase2[3].status === 'fulfilled' ? (phase2[3].value.data || []) : []).forEach(a => {
+            if (!importAssignsByTicket[a.import_id]) importAssignsByTicket[a.import_id] = [];
+            importAssignsByTicket[a.import_id].push(a);
+        });
+
+        // Helper: map raw order to frontend fields
+        const mapOrder = (rawOrder) => {
+            let products = [];
+            try {
+                if (typeof rawOrder.sale_order_product_mappings === 'string') products = JSON.parse(rawOrder.sale_order_product_mappings);
+                else if (Array.isArray(rawOrder.sale_order_product_mappings)) products = rawOrder.sale_order_product_mappings;
+            } catch (e) { }
+            return {
+                ...rawOrder,
+                soDon: rawOrder.sale_order_no, ngay: rawOrder.sale_order_date,
+                khach: rawOrder.account_name, diaChi: rawOrder.shipping_address || rawOrder.billing_address || '',
+                amount: rawOrder.sale_order_amount || 0,
+                taiXe: rawOrder.custom_field13 || '', bienSo: rawOrder.custom_field14 || '',
+                misa_note: rawOrder.description || '', creator_name: rawOrder.owner_name || '',
+                products, cart: products, is_pinned: rawOrder.is_pinned || false
+            };
+        };
+
+        // Helper: format import date
+        const fmtImportDate = (imp) => {
+            const raw = String(imp.expected_date || imp.created_at || '');
+            const parts = raw.split('T')[0].split('-');
+            return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : raw;
+        };
 
         let myOrders = [];
 
-        // ===== 1. QUERY MULTI-DRIVER ASSIGNMENTS =====
-        try {
-            console.log(`📋 Assignment query result: ${assignments.length} rows`);
+        // =========================================================
+        // BUILD RESULTS
+        // =========================================================
 
-            if (assignments && assignments.length > 0) {
-                console.log(`📦 Found ${assignments.length} driver assignments`);
+        // === 1. Export: Assignment-based ===
+        for (const assign of assignments) {
+            const rawOrder = orderMap[assign.order_id];
+            if (!rawOrder) continue;
 
-                // BATCH: Fetch all assignments for the relevant order_ids in ONE query
-                const orderIds = [...new Set(assignments.map(a => a.order_id))];
-                const { data: batchAllAssigns } = await supabase
-                    .from('order_driver_assignments')
-                    .select('id, status, assigned_qty, actual_qty, driver_name, order_id')
-                    .in('order_id', orderIds);
+            const order = mapOrder(rawOrder);
+            let statusCode = 'CHO_NHAN';
+            if (assign.status === 'delivering') statusCode = 'DANG_GIAO';
+            else if (assign.status === 'completed') statusCode = 'HOAN_THANH';
 
-                // Group by order_id for fast lookup
-                const assignsByOrder = {};
-                (batchAllAssigns || []).forEach(a => {
-                    if (!assignsByOrder[a.order_id]) assignsByOrder[a.order_id] = [];
-                    assignsByOrder[a.order_id].push(a);
-                });
-
-                for (const assign of assignments) {
-                    const order = orders.find(o =>
-                        o.id === assign.order_id ||
-                        o.soDon === assign.order_id ||
-                        String(o.id) === String(assign.order_id)
-                    );
-
-                    if (!order) continue;
-
-                    let statusCode = 'CHO_NHAN';
-                    if (assign.status === 'delivering') statusCode = 'DANG_GIAO';
-                    else if (assign.status === 'completed') statusCode = 'HOAN_THANH';
-
-                    // Use pre-fetched assignments (no extra query per iteration)
-                    const allAssignments = assignsByOrder[assign.order_id] || [];
-                    const isSplitOrder = allAssignments.length > 1;
-                    const completedCount = allAssignments.filter(a => a.status === 'completed').length;
-                    const totalCount = allAssignments.length || 1;
-
-                    myOrders.push({
-                        ...order,
-                        assignment_id: assign.id,
-                        assigned_qty: assign.assigned_qty,
-                        assigned_products: assign.assigned_products,
-                        actual_qty: assign.actual_qty || 0,
-                        assignment_status: assign.status,
-                        assignment_plate: assign.plate,
-                        is_split_order: isSplitOrder,
-                        split_progress: isSplitOrder ? `${completedCount}/${totalCount}` : null,
-                        all_assignments: allAssignments,
-                        statusCode,
-                        type: 'export',
-                        taiXe: assign.driver_name,
-                        bienSo: assign.plate || order.bienSo
-                    });
-                }
-            }
-        } catch (assignErr) {
-            console.error('Assignment query error:', assignErr.message);
-        }
-
-        // ===== 2. FALLBACK: ORDERS WITHOUT ASSIGNMENTS (legacy/single driver) =====
-        const assignedOrderIds = myOrders.map(o => o.id);
-        const legacyOrders = orders.filter(o => {
-            if (assignedOrderIds.includes(o.id)) return false; // Already have from assignments
-            if (!o.taiXe) return false;
-
-            const tName = String(o.taiXe).trim().toUpperCase();
-            const match = (tName === myName) || tName.includes(myName) || myName.includes(tName);
-
-            if (isAdmin) {
-                const isExternal = tName && !internalDrivers.includes(tName);
-                return match || isExternal;
-            }
-            return match;
-        });
-
-        for (const order of legacyOrders) {
-            const s = String(order.status || '').toLowerCase();
-            let statusCode = 'CHO_GIAO';
-
-            const deliveringStatuses = ['in_transit', 'delivering', 'đang thực hiện', 'đang giao'];
-            const pendingStatuses = ['assigned', 'chưa thực hiện'];
-            const completedStatuses = ['đã thực hiện', 'completed'];
-
-            if (pendingStatuses.some(ps => s.includes(ps))) statusCode = 'CHO_NHAN';
-            else if (deliveringStatuses.some(ds => s.includes(ds))) statusCode = 'DANG_GIAO';
-            else if (completedStatuses.some(cs => s.includes(cs))) statusCode = 'HOAN_THANH';
+            const allAssigns = assignsByOrder[assign.order_id] || [];
+            const isSplitOrder = allAssigns.length > 1;
+            const completedCount = allAssigns.filter(a => a.status === 'completed').length;
 
             myOrders.push({
                 ...order,
-                statusCode,
-                type: 'export',
-                is_split_order: false
+                assignment_id: assign.id, assigned_qty: assign.assigned_qty,
+                assigned_products: assign.assigned_products,
+                actual_qty: assign.actual_qty || 0, assignment_status: assign.status,
+                assignment_plate: assign.plate,
+                is_split_order: isSplitOrder,
+                split_progress: isSplitOrder ? `${completedCount}/${allAssigns.length}` : null,
+                all_assignments: allAssigns, statusCode, type: 'export',
+                taiXe: assign.driver_name, bienSo: assign.plate || order.bienSo
             });
         }
 
-        console.log(`📋 Export orders for ${driverName}: ${myOrders.length}`);
+        // === 2. Export: Legacy (custom_field13, no assignments table) ===
+        const assignedIds = new Set(myOrders.map(o => o.id));
+        for (const rawOrder of legacyOrders) {
+            if (assignedIds.has(rawOrder.id)) continue;
+            if (!rawOrder.custom_field13) continue;
 
-        // ===== 3. IMPORT TICKETS - MULTI-DRIVER =====
-        try {
-            // First check import_driver_assignments
-            let importAssignments = preFetchedImportAssignments || [];
-
-            if (importAssignments && importAssignments.length > 0) {
-                console.log(`📦 Found ${importAssignments.length} import driver assignments`);
-
-                // BATCH: Fetch all import tickets and all import assignments in parallel
-                const importIds = [...new Set(importAssignments.map(a => a.import_id))];
-                const importResults = await Promise.allSettled([
-                    supabase.from('import_tickets').select('*').in('id', importIds),
-                    supabase.from('import_driver_assignments')
-                        .select('id, status, assigned_qty, actual_qty, driver_name, plate, import_id')
-                        .in('import_id', importIds)
-                ]);
-
-                const ticketsResult = importResults[0].status === 'fulfilled' ? importResults[0].value : { data: [] };
-                const batchImportAssigns = importResults[1].status === 'fulfilled' ? importResults[1].value : { data: [] };
-
-                // Index tickets by id
-                const ticketMap = {};
-                (ticketsResult.data || []).forEach(t => { ticketMap[t.id] = t; });
-
-                // Group assignments by import_id
-                const importAssignsByTicket = {};
-                (batchImportAssigns.data || []).forEach(a => {
-                    if (!importAssignsByTicket[a.import_id]) importAssignsByTicket[a.import_id] = [];
-                    importAssignsByTicket[a.import_id].push(a);
-                });
-
-                for (const assign of importAssignments) {
-                    const imp = ticketMap[assign.import_id];
-                    if (!imp) continue;
-
-                    let statusCode = 'CHO_NHAN';
-                    if (assign.status === 'delivering') statusCode = 'DANG_GIAO';
-                    else if (assign.status === 'completed') statusCode = 'HOAN_THANH';
-
-                    const allImportAssigns = importAssignsByTicket[assign.import_id] || [];
-                    const isSplitOrder = allImportAssigns.length > 1;
-                    const completedCount = allImportAssigns.filter(a => a.status === 'completed').length;
-                    const totalCount = allImportAssigns.length || 1;
-
-                    myOrders.push({
-                        id: imp.id,
-                        order_id: imp.id,
-                        soDon: imp.ticket_no,
-                        khach: imp.supplier_name,
-                        diaChi: imp.supplier_address,
-                        taiXe: assign.driver_name,
-                        bienSo: assign.plate,
-                        status: imp.status,
-                        products: imp.products,
-                        assignment_id: assign.id,
-                        assigned_qty: assign.assigned_qty,
-                        actual_qty: assign.actual_qty || 0,
-                        is_split_order: isSplitOrder,
-                        split_progress: isSplitOrder ? `${completedCount}/${totalCount}` : null,
-                        all_assignments: allImportAssigns,
-                        type: 'import',
-                        statusCode,
-                        ngay: (() => {
-                            const raw = String(imp.expected_date || imp.created_at || '');
-                            const parts = raw.split('T')[0].split('-');
-                            if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
-                            return raw;
-                        })(),
-                        expected_date: imp.expected_date,
-                        created_at: imp.created_at
-                    });
-                }
-            }
-
-            // Fallback: imports without assignments (legacy)
-            const assignedImportIds = myOrders.filter(o => o.type === 'import').map(o => o.id);
-
-            let query = supabase
-                .from('import_tickets')
-                .select('*')
-                .neq('status', 'cancelled');
-
-            if (!isAdmin) {
-                query = query.or(`assigned_driver.ilike.%${driverName}%,assigned_driver.eq.${driverName}`);
+            const tName = String(rawOrder.custom_field13).trim().toUpperCase();
+            const match = (tName === myName) || tName.includes(myName) || myName.includes(tName);
+            if (isAdmin) {
+                if (!match && !(tName && !internalDrivers.includes(tName))) continue;
             } else {
-                query = query.not('assigned_driver', 'is', null);
+                if (!match) continue;
             }
 
-            const { data: importTickets } = await query;
+            const s = String(rawOrder.status || '').toLowerCase();
+            let statusCode = 'CHO_GIAO';
+            if (['assigned', 'chưa thực hiện'].some(ps => s.includes(ps))) statusCode = 'CHO_NHAN';
+            else if (['in_transit', 'delivering', 'đang thực hiện', 'đang giao'].some(ds => s.includes(ds))) statusCode = 'DANG_GIAO';
+            else if (['đã thực hiện', 'completed'].some(cs => s.includes(cs))) statusCode = 'HOAN_THANH';
 
-            if (importTickets) {
-                let filteredImports = importTickets.filter(imp => !assignedImportIds.includes(imp.id));
-
-                if (isAdmin) {
-                    filteredImports = filteredImports.filter(imp => {
-                        const assignedUpper = (imp.assigned_driver || '').toUpperCase();
-                        const isMyImport = assignedUpper.includes(myName) || myName.includes(assignedUpper);
-                        const isExternalDriver = assignedUpper && !internalDrivers.includes(assignedUpper);
-                        return isMyImport || isExternalDriver;
-                    });
-                }
-
-                for (const imp of filteredImports) {
-                    myOrders.push({
-                        id: imp.id,
-                        order_id: imp.id,
-                        soDon: imp.ticket_no,
-                        khach: imp.supplier_name,
-                        diaChi: imp.supplier_address,
-                        taiXe: imp.assigned_driver,
-                        bienSo: imp.assigned_plate,
-                        status: imp.status,
-                        products: imp.products,
-                        type: 'import',
-                        is_split_order: false,
-                        statusCode: imp.status === 'assigned' ? 'CHO_NHAN' :
-                            imp.status === 'in_transit' ? 'DANG_GIAO' :
-                                imp.status === 'completed' ? 'HOAN_THANH' : 'CHO_NHAN',
-                        // Date fields - extract directly from ISO string (no parsing)
-                        ngay: (() => {
-                            const raw = String(imp.expected_date || imp.created_at || '');
-                            const parts = raw.split('T')[0].split('-');
-                            if (parts.length === 3) {
-                                return `${parts[2]}/${parts[1]}/${parts[0]}`; // DD/MM/YYYY
-                            }
-                            return raw;
-                        })(),
-                        expected_date: imp.expected_date,
-                        created_at: imp.created_at
-                    });
-                }
-            }
-        } catch (importErr) {
-            console.error('Import tickets fetch error:', importErr.message);
+            myOrders.push({ ...mapOrder(rawOrder), statusCode, type: 'export', is_split_order: false });
         }
 
-        console.log(`📦 Total orders for ${driverName}: ${myOrders.length}`);
+        // === 3. Import: Assignment-based ===
+        for (const assign of importAssignments) {
+            const imp = ticketMap[assign.import_id];
+            if (!imp) continue;
+
+            let statusCode = 'CHO_NHAN';
+            if (assign.status === 'delivering') statusCode = 'DANG_GIAO';
+            else if (assign.status === 'completed') statusCode = 'HOAN_THANH';
+
+            const allImportAssigns = importAssignsByTicket[assign.import_id] || [];
+            const isSplitOrder = allImportAssigns.length > 1;
+            const completedCount = allImportAssigns.filter(a => a.status === 'completed').length;
+
+            myOrders.push({
+                id: imp.id, order_id: imp.id, soDon: imp.ticket_no,
+                khach: imp.supplier_name, diaChi: imp.supplier_address,
+                taiXe: assign.driver_name, bienSo: assign.plate,
+                status: imp.status, products: imp.products,
+                assignment_id: assign.id, assigned_qty: assign.assigned_qty,
+                actual_qty: assign.actual_qty || 0,
+                is_split_order: isSplitOrder,
+                split_progress: isSplitOrder ? `${completedCount}/${allImportAssigns.length}` : null,
+                all_assignments: allImportAssigns,
+                type: 'import', statusCode,
+                ngay: fmtImportDate(imp), expected_date: imp.expected_date, created_at: imp.created_at
+            });
+        }
+
+        // === 4. Import: Legacy (assigned_driver, no assignments table) ===
+        const assignedImportIds = new Set(myOrders.filter(o => o.type === 'import').map(o => o.id));
+        for (const imp of legacyImports) {
+            if (assignedImportIds.has(imp.id)) continue;
+            if (isAdmin) {
+                const au = (imp.assigned_driver || '').toUpperCase();
+                if (!(au.includes(myName) || myName.includes(au)) && !(au && !internalDrivers.includes(au))) continue;
+            }
+
+            myOrders.push({
+                id: imp.id, order_id: imp.id, soDon: imp.ticket_no,
+                khach: imp.supplier_name, diaChi: imp.supplier_address,
+                taiXe: imp.assigned_driver, bienSo: imp.assigned_plate,
+                status: imp.status, products: imp.products,
+                type: 'import', is_split_order: false,
+                statusCode: imp.status === 'assigned' ? 'CHO_NHAN' : imp.status === 'in_transit' ? 'DANG_GIAO' : imp.status === 'completed' ? 'HOAN_THANH' : 'CHO_NHAN',
+                ngay: fmtImportDate(imp), expected_date: imp.expected_date, created_at: imp.created_at
+            });
+        }
+
+        console.timeEnd('⏱️ my-orders');
+        console.log(`📦 Total: ${myOrders.length} (export: ${myOrders.filter(o=>o.type==='export').length}, import: ${myOrders.filter(o=>o.type==='import').length})`);
         res.json({ error: false, data: myOrders });
 
     } catch (e) {
