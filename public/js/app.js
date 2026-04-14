@@ -4907,9 +4907,9 @@ function removeCartItem(idx) {
 }
 
 
-function handleImageSelect(input) {
-    const files = input.files;
-    if (!files || !files.length) return;
+async function handleImageSelect(input) {
+    const files = Array.from(input.files || []);
+    if (!files.length) return;
 
     const previewArea = window.$('#img-preview-area');
     const counter = window.$('#delivery-images-count');
@@ -4928,31 +4928,72 @@ function handleImageSelect(input) {
         previewArea.innerHTML = '';
     }
 
-    for (const file of files) {
-        if (state.selectedImages.length >= 10) break;
+    const remaining = 10 - state.selectedImages.length;
+    const toProcess = files.slice(0, remaining);
 
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const imgIndex = state.selectedImages.length;
-            state.selectedImages.push(e.target.result);
+    // Show instant preview with ObjectURL (no waiting for compression)
+    // then replace with compressed version in background
+    for (const file of toProcess) {
+        const imgIndex = state.selectedImages.length;
+        // Placeholder until compressed
+        state.selectedImages.push('__compressing__');
 
-            const imgWrapper = document.createElement('div');
-            imgWrapper.style.cssText = 'position:relative; width:80px; height:80px;';
-            imgWrapper.setAttribute('data-img-idx', imgIndex);
-            imgWrapper.innerHTML = `
-                <img src="${e.target.result}" style="width:100%; height:100%; object-fit:cover; border-radius:8px; border:2px solid var(--border);">
-                <button type="button" onclick="removeDeliveryImage(this.parentElement, ${imgIndex})" 
-                    style="position:absolute; top:-6px; right:-6px; width:20px; height:20px; border-radius:50%; background:var(--danger); color:white; border:none; cursor:pointer; font-size:12px; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.2);">×</button>
-            `;
-            previewArea.appendChild(imgWrapper);
+        // Instant preview using ObjectURL (no FileReader delay)
+        const objectUrl = URL.createObjectURL(file);
+        const imgWrapper = document.createElement('div');
+        imgWrapper.style.cssText = 'position:relative; width:80px; height:80px;';
+        imgWrapper.setAttribute('data-img-idx', imgIndex);
+        imgWrapper.innerHTML = `
+            <img src="${objectUrl}" style="width:100%; height:100%; object-fit:cover; border-radius:8px; border:2px solid var(--border); opacity:0.6;" id="preview-img-${imgIndex}">
+            <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center;" id="compress-spinner-${imgIndex}">
+                <i class="bi bi-arrow-repeat spin" style="font-size:18px; color:white; text-shadow:0 1px 3px rgba(0,0,0,0.5);"></i>
+            </div>
+            <button type="button" onclick="removeDeliveryImage(this.parentElement, ${imgIndex})" 
+                style="position:absolute; top:-6px; right:-6px; width:20px; height:20px; border-radius:50%; background:var(--danger); color:white; border:none; cursor:pointer; font-size:12px; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.2);">×</button>
+        `;
+        previewArea.appendChild(imgWrapper);
 
-            // Update counter
-            if (counter) {
-                counter.textContent = `${state.selectedImages.length}/10 ảnh`;
-            }
-        };
-        reader.readAsDataURL(file);
+        // Update counter
+        if (counter) {
+            counter.textContent = `${state.selectedImages.filter(i => i !== null).length}/10 ảnh`;
+        }
     }
+
+    // Compress all images in parallel (Web Worker, non-blocking)
+    const compressionResults = await Promise.allSettled(
+        toProcess.map(file => compressImage(file))
+    );
+
+    // Replace placeholders with compressed data
+    const startIdx = state.selectedImages.length - toProcess.length;
+    for (let i = 0; i < compressionResults.length; i++) {
+        const idx = startIdx + i;
+        const spinner = window.$(`#compress-spinner-${idx}`);
+        const previewImg = window.$(`#preview-img-${idx}`);
+
+        if (compressionResults[i].status === 'fulfilled') {
+            state.selectedImages[idx] = compressionResults[i].value;
+            if (previewImg) {
+                previewImg.style.opacity = '1';
+                previewImg.src = compressionResults[i].value;
+            }
+        } else {
+            // Fallback: use ObjectURL as-is (uncompressed)
+            console.warn(`⚠️ Image ${i} compression failed, using original`);
+            const objectUrl = URL.createObjectURL(toProcess[i]);
+            state.selectedImages[idx] = objectUrl;
+            if (previewImg) previewImg.style.opacity = '1';
+        }
+        if (spinner) spinner.remove();
+    }
+
+    // Update final counter
+    if (counter) {
+        const validCount = state.selectedImages.filter(i => i !== null && i !== '__compressing__').length;
+        counter.textContent = `${validCount}/10 ảnh`;
+    }
+
+    input.value = '';
 }
 
 // Remove delivery image from preview
@@ -8909,41 +8950,48 @@ async function handleCompletionImagesSelect(input) {
         return;
     }
 
-    // Upload images SEQUENTIALLY (one-by-one) for 3G reliability
-    // If connection drops mid-batch, already-uploaded images are preserved
+    // Upload images in PARALLEL BATCHES of 2 (balance speed vs 3G reliability)
+    // Already-uploaded images are preserved if connection drops
     if (orderId) {
         const uploadUrl = isImport
             ? `/api/imports/${orderId}/proof-images`
             : `/api/orders/${orderId}/add-proof-images`;
         let uploadedCount = 0;
         let failedCount = 0;
+        const BATCH_SIZE = 2; // 2 concurrent uploads — fast but 3G-safe
 
-        for (let i = 0; i < compressed.length; i++) {
-            showLoading(`Đang tải ảnh ${i + 1}/${compressed.length}...`);
-            
-            // Retry logic: try up to 2 times per image
-            let success = false;
-            for (let attempt = 0; attempt < 2 && !success; attempt++) {
-                try {
-                    const uploadRes = await fetch(uploadUrl, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ images: [compressed[i]] })
-                    });
-                    const uploadData = await uploadRes.json();
-                    if (!uploadData.error) {
-                        uploadedCount++;
-                        success = true;
-                        console.log(`📸 Uploaded image ${i + 1}/${compressed.length}`);
-                    } else {
-                        console.warn(`⚠️ Image ${i + 1} error:`, uploadData.msg);
+        for (let batchStart = 0; batchStart < compressed.length; batchStart += BATCH_SIZE) {
+            const batch = compressed.slice(batchStart, batchStart + BATCH_SIZE);
+            const batchNum = Math.floor(batchStart / BATCH_SIZE) + 1;
+            const totalBatches = Math.ceil(compressed.length / BATCH_SIZE);
+            showLoading(`Đang tải ảnh ${batchStart + 1}-${Math.min(batchStart + BATCH_SIZE, compressed.length)}/${compressed.length}...`);
+
+            const batchResults = await Promise.allSettled(
+                batch.map(async (imgData, i) => {
+                    for (let attempt = 0; attempt < 2; attempt++) {
+                        try {
+                            const uploadRes = await fetch(uploadUrl, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ images: [imgData] })
+                            });
+                            const uploadData = await uploadRes.json();
+                            if (!uploadData.error) {
+                                console.log(`📸 Uploaded image ${batchStart + i + 1}/${compressed.length}`);
+                                return true;
+                            }
+                        } catch (err) {
+                            if (attempt === 0) await new Promise(r => setTimeout(r, 1000));
+                        }
                     }
-                } catch (uploadErr) {
-                    console.warn(`⚠️ Image ${i + 1} attempt ${attempt + 1} failed:`, uploadErr.message);
-                    if (attempt === 0) await new Promise(r => setTimeout(r, 1000)); // Wait 1s before retry
-                }
+                    return false;
+                })
+            );
+
+            for (const r of batchResults) {
+                if (r.status === 'fulfilled' && r.value) uploadedCount++;
+                else failedCount++;
             }
-            if (!success) failedCount++;
         }
 
         if (failedCount > 0) {
