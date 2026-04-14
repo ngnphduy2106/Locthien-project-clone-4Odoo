@@ -8851,11 +8851,11 @@ const _webpSupported = (() => {
 
 // Hard compression rules — higher quality for proof photos (weight tickets need to be readable)
 const IMG_COMPRESS_CONFIG = {
-    maxSizeMB: 0.6,            // Target <600KB output (clear quality for weight tickets)
-    maxWidthOrHeight: 1600,    // Max dimension 1600px (high detail for proof photos)
+    maxSizeMB: 1.0,            // Target <1MB output (sharp quality for weight tickets)
+    maxWidthOrHeight: 2000,    // Max dimension 2000px (high detail for proof photos)
     useWebWorker: true,        // Layer 2: Off main thread
     fileType: _webpSupported ? 'image/webp' : 'image/jpeg',
-    initialQuality: 0.82,     // Layer 3: Quality 0.82 (sharp text, minimal artifacts)
+    initialQuality: 0.88,     // Layer 3: Quality 0.88 (very sharp text, minimal artifacts)
     alwaysKeepResolution: false,
     preserveExif: false,       // Strip metadata for smaller files
 };
