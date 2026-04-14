@@ -199,18 +199,46 @@ router.post('/resend-notification/:ticketNo', async (req, res) => {
 
         const { sendTelegramMessage, sendTelegramPhotos } = await import('../services/telegram.js');
         const products = ticket.products || [];
-        let msg = `✅ <b>PHIẾU NHẬP ĐÃ HOÀN THÀNH</b>\n`;
-        msg += `📦 <b>#${ticket.ticket_no}</b>\n`;
-        msg += `🏭 ${ticket.supplier_name}\n`;
-        if (ticket.assigned_driver) {
-            msg += `🚗 TX: <b>${ticket.assigned_driver}</b>${ticket.assigned_plate ? ` (${ticket.assigned_plate})` : ''}\n`;
-        }
-        msg += `📦 ${products.map(p => `${p.name} — ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'Kg'}`).join(', ')}\n`;
-        if (ticket.note) msg += `📝 ${ticket.note}\n`;
+        const productsList = products
+            .map(p => `- ${p.name || p.code}: ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'Kg'}`)
+            .join('\n');
 
-        // Try to send with proof images
+        const isPending = ['pending', 'assigned'].includes(ticket.status);
+
+        let msg, targetGroup;
+
+        if (isPending) {
+            // Đơn mới / chờ xử lý → gửi vào NOTIFY_NHAP (giống lúc tạo đơn)
+            msg = `🟥 <b>NHẬP HÀNG</b>\n`;
+            msg += `📦 <b>#${ticket.ticket_no}</b>\n`;
+            if (ticket.expected_date) {
+                const fmtDate = new Date(ticket.expected_date).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+                msg += `📅 ${fmtDate}\n`;
+            }
+            msg += `🏭 <b>${ticket.supplier_name}</b>\n`;
+            if (productsList) msg += `📦\n${productsList}\n`;
+            if (ticket.supplier_address) msg += `📍 ${ticket.supplier_address}\n`;
+            if (ticket.description || ticket.note) msg += `📝 ${ticket.description || ticket.note}\n`;
+            if (ticket.assigned_driver) {
+                msg += `🚗 TX: <b>${ticket.assigned_driver}</b>${ticket.assigned_plate ? ` (${ticket.assigned_plate})` : ''}\n`;
+            }
+            targetGroup = 'NOTIFY_NHAP';
+        } else {
+            // Đơn hoàn thành → gửi vào NHAP
+            msg = `✅ <b>PHIẾU NHẬP ĐÃ HOÀN THÀNH</b>\n`;
+            msg += `📦 <b>#${ticket.ticket_no}</b>\n`;
+            msg += `🏭 ${ticket.supplier_name}\n`;
+            if (ticket.assigned_driver) {
+                msg += `🚗 TX: <b>${ticket.assigned_driver}</b>${ticket.assigned_plate ? ` (${ticket.assigned_plate})` : ''}\n`;
+            }
+            msg += `📦 ${products.map(p => `${p.name} — ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'Kg'}`).join(', ')}\n`;
+            if (ticket.note) msg += `📝 ${ticket.note}\n`;
+            targetGroup = 'NHAP';
+        }
+
+        // Try to send with proof images (for completed orders)
         let proofImages = ticket.images || [];
-        if (proofImages.length === 0) {
+        if (!isPending && proofImages.length === 0) {
             const supabase = getSupabase();
             const { data: assigns } = await supabase
                 .from('import_driver_assignments')
@@ -224,13 +252,13 @@ router.post('/resend-notification/:ticketNo', async (req, res) => {
         }
 
         if (proofImages.length > 0) {
-            await sendTelegramPhotos(proofImages, msg, 'NHAP');
+            await sendTelegramPhotos(proofImages, msg, targetGroup);
         } else {
-            await sendTelegramMessage(msg, 'NHAP');
+            await sendTelegramMessage(msg, targetGroup);
         }
 
-        console.log(`📨 Resent Telegram notification for import ${ticketNo}`);
-        res.json(createResponse(false, `Đã gửi lại thông báo cho ${ticketNo}`));
+        console.log(`📨 Resent Telegram (${targetGroup}) for import ${ticketNo}`);
+        res.json(createResponse(false, `Đã gửi lại thông báo cho ${ticketNo} vào group ${isPending ? 'Thông báo nhập' : 'Nhập hàng'}`));
     } catch (e) {
         console.error('Resend import notification error:', e.message);
         res.json(createResponse(true, e.message));
