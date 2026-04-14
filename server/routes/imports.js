@@ -167,9 +167,11 @@ router.post('/', async (req, res) => {
             if (supplier_address) msg += `📍 ${supplier_address}\n`;
             if (description || note) msg += `📝 ${description || note}\n`;
 
-            await sendTelegramMessage(msg, 'NOTIFY_NHAP');
+            console.log(`📨 Sending import notification for ${ticketNo} to NOTIFY_NHAP (chatId: ${process.env.TELEGRAM_CHAT_NOTIFY_NHAP})`);
+            const result = await sendTelegramMessage(msg, 'NOTIFY_NHAP');
+            console.log(`📨 Import notification result for ${ticketNo}:`, result ? 'OK (msgId: ' + result + ')' : 'FAILED/SKIPPED');
         } catch (tgErr) {
-            console.error('Telegram Error:', tgErr.message);
+            console.error(`❌ Telegram Error for ${ticketNo}:`, tgErr.message, tgErr.stack);
         }
 
         res.json({

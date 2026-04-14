@@ -30,7 +30,7 @@ export const sendTelegramMessage = async (text, type = 'NOTIFY', replyToMessageI
     if (type === 'ERROR') chatId = process.env.TELEGRAM_CHAT_ERROR;
 
     if (!token || !chatId || token.includes('YOUR_')) {
-        console.warn(`⚠️ Telegram not configured for ${type}. Skipping notification.`);
+        console.warn(`⚠️ Telegram not configured for ${type}. token=${token ? 'SET' : 'MISSING'}, chatId=${chatId || 'MISSING'}. Skipping.`);
         return null;
     }
 
