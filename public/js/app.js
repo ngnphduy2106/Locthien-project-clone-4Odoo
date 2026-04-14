@@ -4931,14 +4931,12 @@ async function handleImageSelect(input) {
     const remaining = 10 - state.selectedImages.length;
     const toProcess = files.slice(0, remaining);
 
-    // Show instant preview with ObjectURL (no waiting for compression)
-    // then replace with compressed version in background
+    // INSTANT: Show previews immediately using ObjectURL (zero delay)
+    // Compression runs in background per-image, NO blocking the UI
     for (const file of toProcess) {
         const imgIndex = state.selectedImages.length;
-        // Placeholder until compressed
         state.selectedImages.push('__compressing__');
 
-        // Instant preview using ObjectURL (no FileReader delay)
         const objectUrl = URL.createObjectURL(file);
         const imgWrapper = document.createElement('div');
         imgWrapper.style.cssText = 'position:relative; width:80px; height:80px;';
@@ -4953,44 +4951,33 @@ async function handleImageSelect(input) {
         `;
         previewArea.appendChild(imgWrapper);
 
-        // Update counter
-        if (counter) {
-            counter.textContent = `${state.selectedImages.filter(i => i !== null).length}/10 ảnh`;
-        }
-    }
-
-    // Compress all images in parallel (Web Worker, non-blocking)
-    const compressionResults = await Promise.allSettled(
-        toProcess.map(file => compressImage(file))
-    );
-
-    // Replace placeholders with compressed data
-    const startIdx = state.selectedImages.length - toProcess.length;
-    for (let i = 0; i < compressionResults.length; i++) {
-        const idx = startIdx + i;
-        const spinner = window.$(`#compress-spinner-${idx}`);
-        const previewImg = window.$(`#preview-img-${idx}`);
-
-        if (compressionResults[i].status === 'fulfilled') {
-            state.selectedImages[idx] = compressionResults[i].value;
-            if (previewImg) {
-                previewImg.style.opacity = '1';
-                previewImg.src = compressionResults[i].value;
+        // FIRE-AND-FORGET: Compress each image independently in background
+        // No await — UI stays responsive immediately
+        compressImage(file).then(compressed => {
+            state.selectedImages[imgIndex] = compressed;
+            const img = window.$(`#preview-img-${imgIndex}`);
+            if (img) { img.style.opacity = '1'; img.src = compressed; }
+            const spin = window.$(`#compress-spinner-${imgIndex}`);
+            if (spin) spin.remove();
+            URL.revokeObjectURL(objectUrl);
+            // Update counter
+            if (counter) {
+                const ready = state.selectedImages.filter(i => i && i !== '__compressing__').length;
+                counter.textContent = `${ready}/10 ảnh`;
             }
-        } else {
-            // Fallback: use ObjectURL as-is (uncompressed)
-            console.warn(`⚠️ Image ${i} compression failed, using original`);
-            const objectUrl = URL.createObjectURL(toProcess[i]);
-            state.selectedImages[idx] = objectUrl;
-            if (previewImg) previewImg.style.opacity = '1';
-        }
-        if (spinner) spinner.remove();
+        }).catch(() => {
+            // Fallback: keep ObjectURL (uncompressed but still works)
+            state.selectedImages[imgIndex] = objectUrl;
+            const img = window.$(`#preview-img-${imgIndex}`);
+            if (img) img.style.opacity = '1';
+            const spin = window.$(`#compress-spinner-${imgIndex}`);
+            if (spin) spin.remove();
+        });
     }
 
-    // Update final counter
+    // Update counter immediately
     if (counter) {
-        const validCount = state.selectedImages.filter(i => i !== null && i !== '__compressing__').length;
-        counter.textContent = `${validCount}/10 ảnh`;
+        counter.textContent = `${state.selectedImages.filter(i => i !== null).length}/10 ảnh`;
     }
 
     input.value = '';
@@ -5027,8 +5014,19 @@ window.removeDeliveryImage = removeDeliveryImage;
 
 
 async function submitDelivery() {
-    // Validate images
-    const validImages = (state.selectedImages || []).filter(img => img !== null);
+    // Wait for any images still compressing (max 10s)
+    const hasCompressing = () => (state.selectedImages || []).some(i => i === '__compressing__');
+    if (hasCompressing()) {
+        showLoading('Đang chờ nén ảnh hoàn tất...');
+        const start = Date.now();
+        while (hasCompressing() && Date.now() - start < 10000) {
+            await new Promise(r => setTimeout(r, 300));
+        }
+        hideLoading();
+    }
+
+    // Validate images (exclude null and any remaining placeholders)
+    const validImages = (state.selectedImages || []).filter(img => img && img !== '__compressing__');
     if (!validImages.length) {
         if (!confirm('Cảnh báo: Chưa có ảnh chứng minh. Tiếp tục?')) return;
     }
