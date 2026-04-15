@@ -208,6 +208,28 @@ export async function createNotification(userId, type, title, body, orderId = nu
                         }
                     }
                 }
+            } else if (userId === 'DISPATCHER') {
+                // For DISPATCHER-targeted notifications, push to all dispatcher devices
+                const { data: dispatchers } = await supabase
+                    .from('users')
+                    .select('fcm_token, fullname')
+                    .in('role', ['DISPATCHER', 'dispatcher'])
+                    .not('fcm_token', 'is', null);
+
+                console.log(`📬 DISPATCHER push: found ${dispatchers?.length || 0} dispatcher(s) with tokens`);
+
+                if (dispatchers?.length) {
+                    for (const disp of dispatchers) {
+                        if (disp.fcm_token && !disp.fcm_token.startsWith('mock_')) {
+                            const result = await sendPushNotification(disp.fcm_token, title, body, {
+                                orderId: String(orderId || ''),
+                                orderNo: String(orderNo || ''),
+                                type: type
+                            });
+                            console.log(`📬 FCM push to dispatcher "${disp.fullname}": ${result ? '✅' : '❌'}`);
+                        }
+                    }
+                }
             } else {
                 // Find specific user by name (fullName match)
                 // Use ilike for case-insensitive match to handle name variations

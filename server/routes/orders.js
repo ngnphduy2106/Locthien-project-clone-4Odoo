@@ -1213,6 +1213,20 @@ router.put('/:id/assign', async (req, res) => {
             console.error('In-app notification error:', notifyErr.message);
         }
 
+        // Notify dispatchers about new assignment
+        try {
+            const orderNo = fullOrder?.soDon || fullOrder?.sale_order_no || id;
+            const customer = fullOrder?.khach || fullOrder?.account_name || '';
+            await createNotification(
+                'DISPATCHER',
+                'order_assigned',
+                '🚛 Đơn hàng mới',
+                `#${orderNo} — ${customer} → ${driverName}`,
+                id,
+                orderNo
+            );
+        } catch (e) { console.error('Dispatcher assign notification error:', e.message); }
+
         if (!syncResult.success) {
             console.error('MISA Sync Failed during Assign:', syncResult.message);
             // We don't block assignment, but we notify
@@ -1919,6 +1933,13 @@ router.post('/:id/complete', async (req, res) => {
                         await createNotification('ADMIN', 'order_completed', '✅ Đơn hoàn thành',
                             `Đơn #${orderNo} đã được giao bởi ${notifyDriverName}`, id, orderNo);
                     } catch (e) { console.error('Admin notification error:', e.message); }
+
+                    // 1b. Dispatcher notification
+                    try {
+                        const notifyDriverName2 = firstDriverName || orderInfo?.taiXe || orderInfo?.custom_field13 || resolvedDriverName || driver_name;
+                        await createNotification('DISPATCHER', 'order_completed', '✅ Đơn hoàn thành',
+                            `Đơn #${orderNo} — ${notifyDriverName2}`, id, orderNo);
+                    } catch (e) { console.error('Dispatcher complete notification error:', e.message); }
 
                     // 2. Telegram notification
                     if (!alreadyCompleted) {
@@ -2770,6 +2791,8 @@ router.post('/:id/chat', async (req, res) => {
 
             if (senderRoleUpper === 'DRIVER' || senderRoleUpper === 'TÀI XẾ') {
                 await createNotification('ADMIN', 'message', `💬 ${sender_name}`, `#${id}: ${msgPreview}`, id, id);
+                // Also notify dispatchers when driver sends chat
+                await createNotification('DISPATCHER', 'message', `💬 ${sender_name}`, `#${id}: ${msgPreview}`, id, id);
             } else {
                 // Find driver to notify
                 const { data: ord } = await supabase.from('orders').select('custom_field13').eq('id', id).single();
@@ -2781,6 +2804,8 @@ router.post('/:id/chat', async (req, res) => {
                 if (driverName) {
                     await createNotification(driverName, 'message', `💬 ${sender_name}`, `#${id}: ${msgPreview}`, id, id);
                 }
+                // Also notify dispatchers when admin/sales sends chat
+                await createNotification('DISPATCHER', 'message', `💬 ${sender_name}`, `#${id}: ${msgPreview}`, id, id);
             }
         } catch (notifyErr) {
             console.error('Chat notification error:', notifyErr.message);
@@ -3145,6 +3170,18 @@ router.post('/:id/confirm', async (req, res) => {
             console.error('In-app confirm notification error:', notifyErr.message);
         }
 
+        // Notify dispatchers about confirmation
+        try {
+            await createNotification(
+                'DISPATCHER',
+                'order_completed',
+                '✅ Đơn đã xác nhận',
+                `#${orderNo} — ${order.khach || order.account_name || ''}`,
+                id,
+                orderNo
+            );
+        } catch (e) { console.error('Dispatcher confirm notification error:', e.message); }
+
         res.json(createResponse(false, isLocalOrder ? 'Đã xác nhận!' : 'Đã xác nhận & đồng bộ MISA!', { crmStatus }));
     } catch (e) {
         console.error('confirm error:', e.message);
@@ -3262,6 +3299,19 @@ router.post('/:id/approve', async (req, res) => {
             console.error('In-app approve notification error:', notifyErr.message);
         }
 
+        // Notify dispatchers about approval
+        try {
+            const orderNo2 = order.soDon || order.sale_order_no || id;
+            await createNotification(
+                'DISPATCHER',
+                'order_completed',
+                '✅ Đơn đã được duyệt',
+                `#${orderNo2} — Duyệt bởi ${approved_by || 'admin'}`,
+                id,
+                orderNo2
+            );
+        } catch (e) { console.error('Dispatcher approve notification error:', e.message); }
+
         res.json(createResponse(false, 'Duyệt thành công!', { crmStatus }));
     } catch (e) {
         console.error('approve error:', e.message);
@@ -3343,6 +3393,19 @@ router.post('/:id/reject', async (req, res) => {
         } catch (notifyErr) {
             console.error('In-app reject notification error:', notifyErr.message);
         }
+
+        // Notify dispatchers about rejection
+        try {
+            const orderNo2 = order.soDon || order.sale_order_no || id;
+            await createNotification(
+                'DISPATCHER',
+                'order_rejected',
+                '❌ Đơn bị từ chối',
+                `#${orderNo2} — ${reason || 'Không có lý do'}`,
+                id,
+                orderNo2
+            );
+        } catch (e) { console.error('Dispatcher reject notification error:', e.message); }
 
         res.json(createResponse(false, 'Đã từ chối đơn hàng!'));
     } catch (e) {
