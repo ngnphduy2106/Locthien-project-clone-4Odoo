@@ -10882,14 +10882,14 @@ async function loadPendingConfirmOrders() {
             const renderOrderCard = (o, mergedSiblingNos) => {
                 const orderNo = o.sale_order_no || o.id;
                 const fmtDate = o.sale_order_date ? new Date(o.sale_order_date).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : '';
-                const products = (o.products || []).map(p => `${p.name || p.code}: ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'Kg'}`).join(', ');
+                const products = (o.products || []).map(p => `${p.name || p.code}: ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'Kg'}`).join('<br>');
                 const isConfirmed = !!o.sale_confirmed;
                 const driver = o.custom_field13 || o.taiXe || '';
 
                 return `
                 <div style="background:white; border:1px solid ${isConfirmed ? '#10b981' : '#E5E7EB'}; border-radius:12px; padding:16px; ${isConfirmed ? 'border-left:4px solid #10b981;' : ''}" id="confirm-card-${o.id}">
                     <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap;">
-                        <div style="flex:1; min-width:250px;">
+                        <div style="flex:1; min-width:0;">
                             <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:6px;">
                                 ${isConfirmed ? '<span style="color:#10b981; font-size:18px;" title="Sales đã xác nhận">☑️</span>' : '<span style="color:#d1d5db; font-size:18px;">☐</span>'}
                                 <span style="font-weight:700; color:var(--primary); font-size:14px;">#${orderNo}</span>
@@ -10942,10 +10942,10 @@ async function loadPendingConfirmOrders() {
         } else if (confirmCurrentTab === 'import') {
             // Import tab
             container.innerHTML = orders.map(t => {
-                const products = (t.products || []).map(p => `${p.name || p.code}: ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'Kg'}`).join(', ');
+                const products = (t.products || []).map(p => `${p.name || p.code}: ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'Kg'}`).join('<br>');
                 return `
-                <div style="background:white; border:1px solid #E5E7EB; border-radius:12px; padding:12px 16px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-                    <div style="flex:1; min-width:200px;">
+                <div style="background:white; border:1px solid #E5E7EB; border-radius:12px; padding:12px 16px; display:flex; align-items:flex-start; gap:12px; flex-wrap:wrap;">
+                    <div style="flex:1; min-width:0;">
                         <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                             <span style="font-weight:600; color:#dc2626; font-size:13px;">#${t.ticket_no || t.id}</span>
                             ${t.merged_order_no ? `<span style="background:#dcfce7; color:#16a34a; font-size:10px; padding:2px 6px; border-radius:4px; font-weight:600;">🔗Ghép: ${t.source_order_nos ? t.source_order_nos.filter(n => n !== (t.ticket_no || t.id)).join(', ') : t.merged_order_no}</span>` : ''}
@@ -10969,7 +10969,7 @@ async function loadPendingConfirmOrders() {
             container.innerHTML = orders.map(o => {
                 const orderNo = o.sale_order_no || o.id;
                 const fmtDate = o.sale_order_date ? new Date(o.sale_order_date).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : '';
-                const products = (o.products || []).map(p => `${p.name || p.code}: ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'Kg'}`).join(', ');
+                const products = (o.products || []).map(p => `${p.name || p.code}: ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'Kg'}`).join('<br>');
                 const driver = o.custom_field13 || o.taiXe || '';
                 const approvedBy = o.admin_approved_by || 'N/A';
                 const approvedAt = o.admin_approved_at ? new Date(o.admin_approved_at).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
@@ -10978,7 +10978,7 @@ async function loadPendingConfirmOrders() {
                 return `
                 <div style="background:white; border:1px solid #10b981; border-left:4px solid #10b981; border-radius:12px; padding:16px;" id="confirm-card-${o.id}">
                     <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap;">
-                        <div style="flex:1; min-width:250px;">
+                        <div style="flex:1; min-width:0;">
                             <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:6px;">
                                 <span style="color:#10b981; font-size:18px;">✅</span>
                                 <span style="font-weight:700; color:var(--primary); font-size:14px;">#${orderNo}</span>
@@ -11007,7 +11007,7 @@ async function loadPendingConfirmOrders() {
         } else if (confirmCurrentTab === 'rejected') {
             // Rejected tab — show rejected import tickets with rejection info
             container.innerHTML = orders.map(t => {
-                const products = (t.products || []).map(p => `${p.name || p.code}: ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'Kg'}`).join(', ');
+                const products = (t.products || []).map(p => `${p.name || p.code}: ${Number(p.qty || 0).toLocaleString('vi-VN')} ${p.unit || 'Kg'}`).join('<br>');
                 // Parse rejection note: [TỪ CHỐI] Bởi X lúc Y - Lý do: Z
                 const note = t.note || '';
                 const rejMatch = note.match(/\[TỪ CHỐI\] Bởi (.+?) lúc ([^-]+)(?:- Lý do: (.+))?/);
@@ -11018,7 +11018,7 @@ async function loadPendingConfirmOrders() {
                 return `
                 <div style="background:white; border:1px solid #fca5a5; border-left:4px solid #ef4444; border-radius:12px; padding:12px 16px;">
                     <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap;">
-                        <div style="flex:1; min-width:200px;">
+                        <div style="flex:1; min-width:0;">
                             <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:4px;">
                                 <span style="color:#ef4444; font-size:16px;">❌</span>
                                 <span style="font-weight:600; color:#dc2626; font-size:13px;">#${t.ticket_no || t.id}</span>
