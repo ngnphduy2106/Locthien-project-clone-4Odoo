@@ -1,5 +1,5 @@
 // ===============================================
-// LỘC THIÊN ERP — Service Worker v4
+// LỘC THIÊN ERP — Service Worker v5
 // Handles: Caching ONLY (FCM handled by firebase-messaging-sw.js)
 // ===============================================
 
@@ -7,7 +7,7 @@
 // DO NOT import firebase here — it causes conflicts with the FCM service worker
 
 // === CACHING ===
-const CACHE_NAME = 'lt-erp-v4';
+const CACHE_NAME = 'lt-erp-v5';
 const STATIC_ASSETS = [
     '/',
     '/index.html',
@@ -136,28 +136,8 @@ self.addEventListener('notificationclick', (event) => {
     );
 });
 
-// Handle direct push events (fallback for non-FCM push)
-self.addEventListener('push', (event) => {
-    if (!event.data) return;
-    try {
-        const payload = event.data.json();
-        const title = payload.notification?.title || payload.data?.title || 'Lộc Thiên ERP';
-        const body = payload.notification?.body || payload.data?.body || 'Thông báo mới';
-
-        event.waitUntil(
-            self.registration.showNotification(title, {
-                body,
-                icon: '/logo.png',
-                badge: '/logo.png',
-                vibrate: [200, 100, 200],
-                data: payload.data || {},
-                requireInteraction: true
-            })
-        );
-    } catch (e) {
-        console.error('Push parse error:', e);
-    }
-});
+// NOTE: Push events are handled by firebase-messaging-sw.js
+// DO NOT add a 'push' listener here — it causes duplicate notifications
 
 // Listen for messages from main thread
 self.addEventListener('message', (event) => {
@@ -171,4 +151,4 @@ self.addEventListener('message', (event) => {
     }
 });
 
-console.log('🔔 SW v4 loaded (Caching only — FCM in firebase-messaging-sw.js)');
+console.log('🔔 SW v5 loaded (Caching only — FCM in firebase-messaging-sw.js)');

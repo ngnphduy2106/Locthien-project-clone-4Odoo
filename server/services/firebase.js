@@ -20,7 +20,7 @@ function initFirebase() {
     try {
         // Load service account from file
         const serviceAccountPath = path.join(__dirname, '../../firebase-service-account.json');
-        
+
         if (!fs.existsSync(serviceAccountPath)) {
             console.log('⚠️ Firebase service account not found');
             return false;
@@ -144,7 +144,7 @@ async function sendMulticastNotification(fcmTokens, title, body, data = {}) {
  */
 async function notifyDriverOrderAssigned(driverFcmToken, orderDetails) {
     const { orderId, orderNo, customerName, address, type = 'export' } = orderDetails;
-    
+
     const typeLabel = type === 'import' ? 'Đơn nhập' : 'Đơn xuất';
     const title = `🚚 ${typeLabel} mới được giao cho bạn!`;
     const body = `#${orderNo || orderId} - ${customerName || 'Khách hàng'}\n📍 ${address || 'Chưa có địa chỉ'}`;
@@ -162,7 +162,7 @@ async function notifyDriverOrderAssigned(driverFcmToken, orderDetails) {
  */
 async function notifyNewChatMessage(recipientFcmToken, messageDetails) {
     const { orderId, orderNo, senderName, preview, type = 'export' } = messageDetails;
-    
+
     const title = `💬 Tin nhắn mới - #${orderNo || orderId}`;
     const body = `${senderName}: ${preview}`;
 

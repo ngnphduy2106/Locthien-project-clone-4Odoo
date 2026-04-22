@@ -264,12 +264,14 @@ app.use((err, req, res, next) => {
 const IS_SERVERLESS = !!process.env.LAMBDA_TASK_ROOT || !!process.env.NETLIFY;
 
 if (!IS_SERVERLESS) {
-    // Basic startup sync
-    syncMisaOrders()
-        .then(() => syncMisaProducts())
-        .catch(err => console.error('Startup Sync Failed:', err));
+    // Defer startup sync by 30s — let API respond immediately
+    setTimeout(() => {
+        syncMisaOrders()
+            .then(() => syncMisaProducts())
+            .catch(err => console.error('Startup Sync Failed:', err));
+    }, 30 * 1000);
 
-    // Background sync: 30s for near-real-time CRM updates (with lock to prevent overlap)
+    // Background sync: 5 minutes (prevents Supabase rate limiting)
     let isSyncing = false;
     setInterval(async () => {
         if (isSyncing) return;
@@ -277,7 +279,7 @@ if (!IS_SERVERLESS) {
         try { await syncMisaOrders(); }
         catch (err) { console.error('Sync Job Failed:', err); }
         finally { isSyncing = false; }
-    }, 30 * 1000);
+    }, 5 * 60 * 1000);
 
     // Retry failed syncs every 30 minutes (low priority background task)
     setInterval(() => {

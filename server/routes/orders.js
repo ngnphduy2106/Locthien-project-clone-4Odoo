@@ -392,9 +392,11 @@ router.get('/my/:driverName', async (req, res) => {
 
 
         // =========================================================
-        // PHA 1: SONG SONG HOÁ TOÀN BỘ CÁC TRUY VẤN BASE
-        // (Thay vì chờ nhau, bắn 1 lúc 4 mũi tên)
+        // OPTIMIZED: Fetch assignments first, then ONLY relevant orders
+        // (NO db.getOrders() — that fetches ALL orders and times out)
         // =========================================================
+        const startTime = Date.now();
+
         const queryExportAssigns = isAdmin 
             ? supabase.from('order_driver_assignments').select('*').or(`driver_type.eq.external,driver_name.ilike.%${driverName}%,assistant_name.ilike.%${driverName}%`)
             : supabase.from('order_driver_assignments').select('*').or(`driver_name.ilike.%${driverName}%,assistant_name.ilike.%${driverName}%`);
@@ -403,26 +405,30 @@ router.get('/my/:driverName', async (req, res) => {
             ? supabase.from('import_driver_assignments').select('*').or(`driver_type.eq.external,driver_name.ilike.%${driverName}%,driver_name.eq.${driverName}`)
             : supabase.from('import_driver_assignments').select('*').or(`driver_name.ilike.%${driverName}%,driver_name.eq.${driverName}`);
 
+        // Legacy fallback: orders assigned directly via custom_field13 (no assignment table)
+        const queryLegacyOrders = isAdmin
+            ? supabase.from('orders').select('*').not('custom_field13', 'is', null).neq('custom_field13', '')
+            : supabase.from('orders').select('*').ilike('custom_field13', `%${driverName}%`);
+
         const mainResults = await Promise.allSettled([
-            db.getOrders(),
-            db.getUsers(),
             queryExportAssigns,
-            queryImportAssigns
+            queryImportAssigns,
+            queryLegacyOrders,
+            db.getUsers()
         ]);
 
-        const orders = mainResults[0].status === 'fulfilled' ? (mainResults[0].value || []) : [];
-        const users = mainResults[1].status === 'fulfilled' ? (mainResults[1].value || []) : [];
-        
         function dedupe(arr) {
             const seen = new Set();
             return arr.filter(i => { if (seen.has(i.id)) return false; seen.add(i.id); return true; });
         }
-        
-        const assignments = dedupe(mainResults[2].status === 'fulfilled' ? (mainResults[2].value.data || []) : []);
-        const preFetchedImportAssignments = dedupe(mainResults[3].status === 'fulfilled' ? (mainResults[3].value.data || []) : []);
+
+        const assignments = dedupe(mainResults[0].status === 'fulfilled' ? (mainResults[0].value.data || []) : []);
+        const preFetchedImportAssignments = dedupe(mainResults[1].status === 'fulfilled' ? (mainResults[1].value.data || []) : []);
+        const legacyOrdersRaw = mainResults[2].status === 'fulfilled' ? (mainResults[2].value.data || []) : [];
+        const users = mainResults[3].status === 'fulfilled' ? (mainResults[3].value || []) : [];
 
         if (mainResults.some(r => r.status === 'rejected')) {
-            console.warn('⚠️ My Orders warning: Some base queries timed out, showing partial data', mainResults.map(r => r.reason));
+            console.warn('⚠️ My Orders warning: Some queries failed', mainResults.map((r, i) => r.status === 'rejected' ? `query${i}: ${r.reason}` : 'ok'));
         }
 
         const internalDrivers = users
@@ -438,34 +444,62 @@ router.get('/my/:driverName', async (req, res) => {
             if (assignments && assignments.length > 0) {
                 console.log(`📦 Found ${assignments.length} driver assignments`);
 
-                // BATCH: Fetch all assignments for the relevant order_ids in ONE query
+                // Fetch ONLY the orders that have assignments (targeted query, not ALL orders)
                 const orderIds = [...new Set(assignments.map(a => a.order_id))];
-                const { data: batchAllAssigns } = await supabase
-                    .from('order_driver_assignments')
-                    .select('id, status, assigned_qty, actual_qty, driver_name, order_id')
-                    .in('order_id', orderIds);
 
-                // Group by order_id for fast lookup
+                // Parallel: fetch matching orders + all assignments for those orders
+                const [ordersResult, batchAssignsResult] = await Promise.all([
+                    supabase.from('orders').select('*').in('id', orderIds),
+                    supabase.from('order_driver_assignments')
+                        .select('id, status, assigned_qty, actual_qty, driver_name, order_id')
+                        .in('order_id', orderIds)
+                ]);
+
+                // Index orders by id for fast lookup
+                const orderMap = {};
+                (ordersResult.data || []).forEach(o => {
+                    // Map Supabase fields to frontend fields
+                    let products = [];
+                    try {
+                        if (typeof o.sale_order_product_mappings === 'string') products = JSON.parse(o.sale_order_product_mappings);
+                        else if (Array.isArray(o.sale_order_product_mappings)) products = o.sale_order_product_mappings;
+                    } catch (e) {}
+                    
+                    orderMap[o.id] = {
+                        ...o,
+                        soDon: o.sale_order_no,
+                        ngay: o.sale_order_date,
+                        khach: o.account_name,
+                        diaChi: o.shipping_address || o.billing_address || '',
+                        amount: o.sale_order_amount || 0,
+                        taiXe: o.custom_field13 || '',
+                        bienSo: o.custom_field14 || '',
+                        driver: o.custom_field13 || '',
+                        plate: o.custom_field14 || '',
+                        misa_note: o.description || '',
+                        creator_name: o.owner_name || '',
+                        products, cart: products,
+                        is_pinned: o.is_pinned || false
+                    };
+                });
+                // Also index by sale_order_no
+                Object.values(orderMap).forEach(o => { if (o.soDon) orderMap[o.soDon] = o; });
+
+                // Group assignments by order_id for fast lookup
                 const assignsByOrder = {};
-                (batchAllAssigns || []).forEach(a => {
+                (batchAssignsResult.data || []).forEach(a => {
                     if (!assignsByOrder[a.order_id]) assignsByOrder[a.order_id] = [];
                     assignsByOrder[a.order_id].push(a);
                 });
 
                 for (const assign of assignments) {
-                    const order = orders.find(o =>
-                        o.id === assign.order_id ||
-                        o.soDon === assign.order_id ||
-                        String(o.id) === String(assign.order_id)
-                    );
-
+                    const order = orderMap[assign.order_id];
                     if (!order) continue;
 
                     let statusCode = 'CHO_NHAN';
                     if (assign.status === 'delivering') statusCode = 'DANG_GIAO';
                     else if (assign.status === 'completed') statusCode = 'HOAN_THANH';
 
-                    // Use pre-fetched assignments (no extra query per iteration)
                     const allAssignments = assignsByOrder[assign.order_id] || [];
                     const isSplitOrder = allAssignments.length > 1;
                     const completedCount = allAssignments.filter(a => a.status === 'completed').length;
@@ -494,52 +528,69 @@ router.get('/my/:driverName', async (req, res) => {
         }
 
         // ===== 2. FALLBACK: ORDERS WITHOUT ASSIGNMENTS (legacy/single driver) =====
-        const assignedOrderIds = myOrders.map(o => o.id);
-        const legacyOrders = orders.filter(o => {
-            if (assignedOrderIds.includes(o.id)) return false; // Already have from assignments
-            if (!o.taiXe) return false;
+        try {
+            const assignedOrderIds = new Set(myOrders.map(o => o.id));
 
-            const tName = String(o.taiXe).trim().toUpperCase();
-            const match = (tName === myName) || tName.includes(myName) || myName.includes(tName);
+            // Map legacy orders from Supabase format
+            const legacyOrders = legacyOrdersRaw
+                .filter(o => !assignedOrderIds.has(o.id))
+                .filter(o => {
+                    const tName = String(o.custom_field13 || '').trim().toUpperCase();
+                    if (!tName) return false;
+                    const match = (tName === myName) || tName.includes(myName) || myName.includes(tName);
+                    if (isAdmin) {
+                        const isExternal = tName && !internalDrivers.includes(tName);
+                        return match || isExternal;
+                    }
+                    return match;
+                });
 
-            if (isAdmin) {
-                const isExternal = tName && !internalDrivers.includes(tName);
-                return match || isExternal;
+            for (const o of legacyOrders) {
+                let products = [];
+                try {
+                    if (typeof o.sale_order_product_mappings === 'string') products = JSON.parse(o.sale_order_product_mappings);
+                    else if (Array.isArray(o.sale_order_product_mappings)) products = o.sale_order_product_mappings;
+                } catch (e) {}
+
+                const s = String(o.status || '').toLowerCase();
+                let statusCode = 'CHO_GIAO';
+
+                const deliveringStatuses = ['in_transit', 'delivering', 'đang thực hiện', 'đang giao'];
+                const pendingStatuses = ['assigned', 'chưa thực hiện'];
+                const completedStatuses = ['đã thực hiện', 'completed'];
+
+                if (pendingStatuses.some(ps => s.includes(ps))) statusCode = 'CHO_NHAN';
+                else if (deliveringStatuses.some(ds => s.includes(ds))) statusCode = 'DANG_GIAO';
+                else if (completedStatuses.some(cs => s.includes(cs))) statusCode = 'HOAN_THANH';
+
+                myOrders.push({
+                    ...o,
+                    soDon: o.sale_order_no,
+                    ngay: o.sale_order_date,
+                    khach: o.account_name,
+                    diaChi: o.shipping_address || o.billing_address || '',
+                    amount: o.sale_order_amount || 0,
+                    taiXe: o.custom_field13 || '',
+                    bienSo: o.custom_field14 || '',
+                    products, cart: products,
+                    statusCode,
+                    type: 'export',
+                    is_split_order: false
+                });
             }
-            return match;
-        });
-
-        for (const order of legacyOrders) {
-            const s = String(order.status || '').toLowerCase();
-            let statusCode = 'CHO_GIAO';
-
-            const deliveringStatuses = ['in_transit', 'delivering', 'đang thực hiện', 'đang giao'];
-            const pendingStatuses = ['assigned', 'chưa thực hiện'];
-            const completedStatuses = ['đã thực hiện', 'completed'];
-
-            if (pendingStatuses.some(ps => s.includes(ps))) statusCode = 'CHO_NHAN';
-            else if (deliveringStatuses.some(ds => s.includes(ds))) statusCode = 'DANG_GIAO';
-            else if (completedStatuses.some(cs => s.includes(cs))) statusCode = 'HOAN_THANH';
-
-            myOrders.push({
-                ...order,
-                statusCode,
-                type: 'export',
-                is_split_order: false
-            });
+        } catch (legacyErr) {
+            console.error('Legacy orders error:', legacyErr.message);
         }
 
         console.log(`📋 Export orders for ${driverName}: ${myOrders.length}`);
 
         // ===== 3. IMPORT TICKETS - MULTI-DRIVER =====
         try {
-            // First check import_driver_assignments
             let importAssignments = preFetchedImportAssignments || [];
 
             if (importAssignments && importAssignments.length > 0) {
                 console.log(`📦 Found ${importAssignments.length} import driver assignments`);
 
-                // BATCH: Fetch all import tickets and all import assignments in parallel
                 const importIds = [...new Set(importAssignments.map(a => a.import_id))];
                 const importResults = await Promise.allSettled([
                     supabase.from('import_tickets').select('*').in('id', importIds),
@@ -551,11 +602,9 @@ router.get('/my/:driverName', async (req, res) => {
                 const ticketsResult = importResults[0].status === 'fulfilled' ? importResults[0].value : { data: [] };
                 const batchImportAssigns = importResults[1].status === 'fulfilled' ? importResults[1].value : { data: [] };
 
-                // Index tickets by id
                 const ticketMap = {};
                 (ticketsResult.data || []).forEach(t => { ticketMap[t.id] = t; });
 
-                // Group assignments by import_id
                 const importAssignsByTicket = {};
                 (batchImportAssigns.data || []).forEach(a => {
                     if (!importAssignsByTicket[a.import_id]) importAssignsByTicket[a.import_id] = [];
@@ -649,12 +698,11 @@ router.get('/my/:driverName', async (req, res) => {
                         statusCode: imp.status === 'assigned' ? 'CHO_NHAN' :
                             imp.status === 'in_transit' ? 'DANG_GIAO' :
                                 imp.status === 'completed' ? 'HOAN_THANH' : 'CHO_NHAN',
-                        // Date fields - extract directly from ISO string (no parsing)
                         ngay: (() => {
                             const raw = String(imp.expected_date || imp.created_at || '');
                             const parts = raw.split('T')[0].split('-');
                             if (parts.length === 3) {
-                                return `${parts[2]}/${parts[1]}/${parts[0]}`; // DD/MM/YYYY
+                                return `${parts[2]}/${parts[1]}/${parts[0]}`;
                             }
                             return raw;
                         })(),
@@ -667,7 +715,8 @@ router.get('/my/:driverName', async (req, res) => {
             console.error('Import tickets fetch error:', importErr.message);
         }
 
-        console.log(`📦 Total orders for ${driverName}: ${myOrders.length}`);
+        const elapsed = Date.now() - startTime;
+        console.log(`📦 Total orders for ${driverName}: ${myOrders.length} (${elapsed}ms)`);
         res.json({ error: false, data: myOrders });
 
     } catch (e) {
