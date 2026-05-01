@@ -266,9 +266,11 @@ router.get('/check-reload/:id', async (req, res) => {
 
 
         const { data } = await supabase.from('users').select('force_reload').eq('id', id).single();
-        if (data?.force_reload) {
+        // Must check explicitly: column is text type, 'false' string is truthy in JS!
+        const shouldReload = data?.force_reload === true || data?.force_reload === 'true';
+        if (shouldReload) {
             // Reset the flag
-            await supabase.from('users').update({ force_reload: false }).eq('id', id);
+            await supabase.from('users').update({ force_reload: 'false' }).eq('id', id);
             return res.json({ reload: true });
         }
         res.json({ reload: false });
