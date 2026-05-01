@@ -913,68 +913,36 @@ const performSync = async () => {
     }
 
     // ============================================
-    // CLEANUP: Detect orders removed from MISA
+    // CLEANUP: DISABLED — Log-only mode
     // ============================================
-    // After sync, check DB orders that weren't in MISA results.
-    // SAFETY: Use 2-strike system — only mark as "missing" on first check,
-    // actually delete on SECOND confirmed miss (next sync cycle).
-    // This prevents false deletions from MISA API pagination/timeout issues.
+    // REASON: MISA API pagination only returns ~3000 orders (3 pages × 1000).
+    // Orders older than this window naturally fall out of the pagination results
+    // and were being FALSELY flagged as "missing" → auto-cancelled.
+    // The getMisaOrderDetail() verification also fails on API timeout/rate-limit,
+    // causing valid CRM orders to be incorrectly marked as 'Đã hủy bỏ'.
+    //
+    // FIX (2026-05-01): Auto-cancel is now DISABLED. Only logging for diagnostics.
+    // If an order is truly deleted on MISA, it should be manually cancelled in ERP.
     try {
         const misaSyncedNos = new Set(misaOrders.map(o => o.sale_order_no || o.SaleOrderNo).filter(Boolean));
 
-        // Find DB orders from MISA (have misa_id) that are NOT completed/cancelled
-        // and were NOT in this sync batch
         const candidatesForDeletion = dbOrders.filter(o => {
             const orderNo = o.soDon || o.id;
             const hasMisaOrigin = !!o.misa_id;
             const isActive = !['Đã thực hiện', 'completed', 'COMPLETED', 'Hoàn thành', 'Đã hủy bỏ'].includes(o.status);
             const notInMisa = !misaSyncedNos.has(orderNo);
-            // SAFETY: Never delete dispatched orders (driver assigned = operational)
-            const isDispatched = !!(o.taiXe || o.custom_field13 || o.driver);
-            const isInProgress = ['Đang thực hiện', 'PENDING_APPROVAL'].includes(o.status);
-            return hasMisaOrigin && isActive && notInMisa && !isDispatched && !isInProgress;
+            return hasMisaOrigin && isActive && notInMisa;
         });
 
         if (candidatesForDeletion.length > 0) {
-            // SAFETY CAP: If too many candidates, likely a MISA API issue — skip entirely
-            if (candidatesForDeletion.length > 10) {
-                console.log(`🚫 SAFETY: ${candidatesForDeletion.length} orders missing from MISA sync — too many, likely API issue. Skipping cleanup.`);
-            } else {
-                console.log(`🔍 Checking ${candidatesForDeletion.length} DB orders not found in MISA sync...`);
-
-                for (const candidate of candidatesForDeletion) {
-                    const orderNo = candidate.soDon || candidate.id;
-                    try {
-                        // Verify with MISA API - does this order still exist?
-                        const misaCheck = await getMisaOrderDetail(orderNo, false);
-
-                        if (!misaCheck) {
-                            // Don't delete immediately — soft-mark as cancelled
-                            // to prevent false positive from API timeout/rate limit
-                            console.log(`⚠️ Order ${orderNo} not found on MISA — marking as cancelled (NOT deleting)`);
-                            await db.updateOrder(orderNo, {
-                                status: 'Đã hủy bỏ',
-                                description: `[HỦY TỪ MISA] Đơn đã bị xóa trên CRM lúc ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}`
-                            });
-
-                            // Notify via Telegram
-                            const customerName = candidate.khach || candidate.account_name || 'N/A';
-                            let delMsg = `🗑️ <b>ĐƠN HÀNG ĐÃ HỦY TRÊN MISA</b>\n`;
-                            delMsg += `📦 Mã: <b>#${orderNo}</b>\n`;
-                            delMsg += `👤 KH: ${customerName}\n`;
-                            delMsg += `⚠️ Đơn đã bị xóa/hủy trên CRM`;
-                            await sendTelegramMessage(delMsg, 'NOTIFY', candidate.telegram_message_id || null);
-                        } else {
-                            console.log(`✅ Order ${orderNo} still exists in MISA (not in sync page)`);
-                        }
-
-                        // Rate limit: 300ms between API calls
-                        await new Promise(r => setTimeout(r, 300));
-                    } catch (checkErr) {
-                        // On error, do NOTHING — safer to keep the order than delete it
-                        console.error(`⚠️ Error checking ${orderNo}: ${checkErr.message} — keeping order (safe default)`);
-                    }
-                }
+            // LOG ONLY — no destructive action taken
+            console.log(`ℹ️ [CLEANUP-DISABLED] ${candidatesForDeletion.length} DB orders not in MISA sync window (pagination limit). No action taken.`);
+            if (candidatesForDeletion.length <= 20) {
+                candidatesForDeletion.forEach(o => {
+                    const orderNo = o.soDon || o.id;
+                    const customer = o.khach || o.account_name || 'N/A';
+                    console.log(`   📋 ${orderNo} — ${customer} (status: ${o.status})`);
+                });
             }
         }
     } catch (cleanupErr) {
