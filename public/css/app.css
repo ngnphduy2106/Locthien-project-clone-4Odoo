@@ -1,0 +1,407 @@
+/* ===============================================
+   LỘC THIÊN ERP - STYLES
+   =============================================== */
+
+:root {
+  --primary: #2563eb;
+  --primary-dark: #1d4ed8;
+  --secondary: #64748b;
+  --success: #22c55e;
+  --warning: #f97316;
+  --danger: #ef4444;
+  --info: #06b6d4;
+  --bg: #f8fafc;
+  --card-bg: #ffffff;
+  --text: #0f172a;
+  --text-muted: #64748b;
+  --border: #e2e8f0;
+  --radius: 16px;
+  --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--bg);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 14px;
+  color: var(--text);
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+}
+
+.app-container {
+  width: 100%;
+  margin: 0 auto;
+  min-height: 100vh;
+  /* Default mobile padding */
+  padding: 16px;
+  padding-bottom: 100px;
+}
+
+/* Desktop: Allow full width for Dashboard */
+@media (min-width: 992px) {
+  .app-container {
+    padding: 0;
+    max-width: 100%;
+  }
+
+  /* Constrain specific views that look bad full-width */
+  #view-login {
+    max-width: 420px;
+    margin: 80px auto;
+  }
+}
+
+/* Mobile Constraint (only apply max-width if NOT in dashboard mode) - handled via layout classes or just let it stretch for now as user requested desktop view */
+
+.hidden {
+  display: none !important;
+}
+
+/* === LOADING === */
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.95);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+}
+
+.loading-spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes shimmer {
+  to {
+    background-position-x: -200%;
+  }
+}
+
+/* === LOGIN === */
+.view-login {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  background: white;
+  padding: 32px 24px;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  margin-top: 40px;
+  min-height: 60vh;
+}
+
+.login-icon {
+  width: 80px;
+  height: 80px;
+  background: linear-gradient(135deg, #eff6ff, #dbeafe);
+  color: var(--primary);
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.5rem;
+  margin-bottom: 24px;
+}
+
+/* === BUTTONS === */
+.btn {
+  border-radius: 12px;
+  font-weight: 600;
+  padding: 12px 20px;
+  box-shadow: var(--shadow);
+  transition: all 0.2s ease;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-lg);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  border: none;
+}
+
+.btn-success {
+  background: linear-gradient(135deg, var(--success), #16a34a);
+  border: none;
+}
+
+.btn-warning {
+  background: linear-gradient(135deg, var(--warning), #ea580c);
+  border: none;
+  color: white;
+}
+
+.btn-secondary {
+  background: linear-gradient(135deg, var(--secondary), #475569);
+  border: none;
+  color: white;
+}
+
+.btn-info {
+  background: linear-gradient(135deg, var(--info), #0891b2);
+  border: none;
+  color: white;
+}
+
+/* === MENU BUTTONS === */
+.btnui {
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 20px 16px;
+  text-align: center;
+  height: 100px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btnui:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+  border-color: var(--primary);
+}
+
+.btnui i {
+  font-size: 28px;
+  margin-bottom: 8px;
+}
+
+.btnui b {
+  font-size: 12px;
+  color: var(--text);
+}
+
+/* === FORMS === */
+.form-control,
+.form-select {
+  border-radius: 12px;
+  padding: 12px 16px;
+  border: 1.5px solid var(--border);
+  font-size: 14px;
+  height: 48px;
+  transition: all 0.2s ease;
+}
+
+.form-control:focus,
+.form-select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+/* === HEADER === */
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.view-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+/* === TABS === */
+.tab-container {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  background: var(--card-bg);
+  padding: 4px;
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 12px;
+  border: none;
+  border-radius: 10px;
+  font-weight: 600;
+  background: transparent;
+  color: var(--text-muted);
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.tab-btn.active {
+  background: var(--primary);
+  color: white;
+}
+
+/* === CARDS === */
+.card-custom {
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  padding: 20px;
+  box-shadow: var(--shadow);
+  margin-bottom: 16px;
+  border: 1px solid var(--border);
+}
+
+.order-card {
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 12px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+  transition: all 0.2s ease;
+}
+
+.order-card:hover {
+  border-color: var(--primary);
+}
+
+/* === STATS === */
+.stat-card {
+  color: white;
+  border-radius: var(--radius);
+  padding: 20px;
+  text-align: center;
+  box-shadow: var(--shadow);
+}
+
+.stat-value {
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+.stat-label {
+  font-size: 0.85rem;
+  opacity: 0.9;
+}
+
+/* === BADGES === */
+.badge {
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 20px;
+}
+
+/* === LIST ITEMS === */
+.list-item {
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 12px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.list-item:hover {
+  border-color: var(--primary);
+}
+
+/* === INVENTORY === */
+.inventory-item {
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 12px;
+  box-shadow: var(--shadow);
+  border-left: 4px solid var(--success);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.inventory-item.low {
+  border-left-color: var(--warning);
+}
+
+.inventory-item.out {
+  border-left-color: var(--danger);
+}
+
+/* === EMPTY STATE === */
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-muted);
+}
+
+.empty-state i {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+/* === ALERTS === */
+.alert-custom {
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  margin-bottom: 16px;
+}
+
+/* === CHAT MESSAGES === */
+.chat-msg {
+  padding: 4px 8px;
+}
+
+.chat-me {
+  text-align: right;
+}
+
+.chat-other {
+  text-align: left;
+}
+
+.chat-sender {
+  margin-bottom: 2px;
+}
+
+.chat-bubble {
+  display: inline-block;
+  padding: 8px 12px;
+  border-radius: 12px;
+  max-width: 80%;
+  word-wrap: break-word;
+  text-align: left;
+}
+
+.chat-me .chat-bubble {
+  border-bottom-right-radius: 4px;
+}
+
+.chat-other .chat-bubble {
+  border-bottom-left-radius: 4px;
+}
+
+.chat-time {
+  font-size: 10px;
+  margin-top: 2px;
+}
