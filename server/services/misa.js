@@ -200,7 +200,7 @@ export async function getMisaOrders(retryCount = 0, fullSync = true) {
     };
 
     const orderMap = new Map();
-    const PAGE_SIZE = 500; // Reduced from 1000 to limit memory usage on 512MB Render
+    const PAGE_SIZE = 1000; // Restored: RAM savings come from Map + explicit mapping, not page reduction
 
     // PRIORITY 1: Fetch newest orders (no Page param = realtime data)
     try {
@@ -227,9 +227,9 @@ export async function getMisaOrders(retryCount = 0, fullSync = true) {
         console.error(`❌ Realtime fetch error:`, e.message);
     }
 
-    // PRIORITY 2: Fetch historical pages (only if fullSync enabled, max 1 page to save memory)
+    // PRIORITY 2: Fetch historical pages (only if fullSync enabled)
     if (fullSync) {
-        for (let page = 1; page <= 1; page++) {
+        for (let page = 1; page <= 3; page++) {
             try {
                 await new Promise(r => setTimeout(r, 200));
                 console.log(`📡 [HISTORICAL] Page ${page}...`);
@@ -626,12 +626,17 @@ const performSync = async () => {
             sale_order_date: item.sale_order_date || null,
             book_date: item.book_date || null,
             deadline_date: item.deadline_date || null,
+            due_date: item.due_date || null,
+            delivery_date: item.delivery_date || null,
             account_name: item.account_name || null,
             account_code: item.account_code || null,
             contact_name: item.contact_name || null,
             shipping_address: item.shipping_address || null,
+            billing_address: item.billing_address || null,
             shipping_province: item.shipping_province || null,
             shipping_district: item.shipping_district || null,
+            shipping_ward: item.shipping_ward || null,
+            shipping_code: item.shipping_code || null,
             sale_order_amount: Number(item.sale_order_amount || 0),
             total_summary: Number(item.total_summary || 0),
             tax_summary: Number(item.tax_summary || 0),
@@ -643,6 +648,7 @@ const performSync = async () => {
             form_layout: item.form_layout || null,
             created_date: item.created_date || null,
             modified_date: item.modified_date || null,
+            list_product: item.list_product || null,
             custom_field13: item.custom_field13 || null,
             custom_field14: item.custom_field14 || null,
             status: mapMisaStatus(item),
