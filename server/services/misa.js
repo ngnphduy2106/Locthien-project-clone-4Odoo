@@ -4,6 +4,7 @@
 
 import fetch from 'node-fetch';
 import db from '../db/index.js';
+import { supabase } from '../db/supabase.js';
 import { sendTelegramMessage } from './telegram.js';
 
 const MISA_AUTH_URL = 'https://crmconnect.misa.vn/api/v2/Account';
@@ -199,7 +200,7 @@ export async function getMisaOrders(retryCount = 0, fullSync = true) {
     };
 
     const orderMap = new Map();
-    const PAGE_SIZE = 1000;
+    const PAGE_SIZE = 500; // Reduced from 1000 to limit memory usage on 512MB Render
 
     // PRIORITY 1: Fetch newest orders (no Page param = realtime data)
     try {
@@ -226,9 +227,9 @@ export async function getMisaOrders(retryCount = 0, fullSync = true) {
         console.error(`❌ Realtime fetch error:`, e.message);
     }
 
-    // PRIORITY 2: Fetch historical pages (only if fullSync enabled)
+    // PRIORITY 2: Fetch historical pages (only if fullSync enabled, max 1 page to save memory)
     if (fullSync) {
-        for (let page = 1; page <= 3; page++) {
+        for (let page = 1; page <= 1; page++) {
             try {
                 await new Promise(r => setTimeout(r, 200));
                 console.log(`📡 [HISTORICAL] Page ${page}...`);
@@ -362,11 +363,10 @@ const performSync = async () => {
         return;
     }
 
-    // 2. Get Existing Orders from DB to check for duplicates
-    // Include deleted orders so we can compare against MISA for sync
+    // 2. Get Existing Orders from DB — ONLY fetch columns needed for comparison (memory optimization)
     let dbOrders = [];
     try {
-        dbOrders = await db.getOrders(true); // true = includeDeleted
+        dbOrders = await db.getOrdersForSync(); // Lightweight: only sync-needed columns
     } catch (dbErr) {
         console.error('❌ CRITICAL: Cannot fetch DB orders for sync:', dbErr.message);
         console.error('🚫 ABORTING SYNC to prevent data corruption');
@@ -380,7 +380,18 @@ const performSync = async () => {
         return;
     }
 
+    // Use Map for O(1) lookups instead of O(n) find() — critical for 2000+ orders
     const existingIds = new Set(dbOrders.map(o => o.soDon || o.id));
+    const dbOrderMap = new Map();
+    for (const o of dbOrders) {
+        dbOrderMap.set(o.soDon || o.id, o);
+        if (o.id && o.id !== o.soDon) dbOrderMap.set(o.id, o);
+    }
+    // Free the array — we only need the Map now
+    dbOrders = null;
+
+    const memMB = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
+    console.log(`💾 Memory after loading: ${memMB}MB | MISA: ${misaOrders.length} | DB: ${existingIds.size} orders`);
 
     let newCount = 0;
     const newOrdersInBatch = []; // Flood guard: track new orders for summary notification
@@ -418,7 +429,7 @@ const performSync = async () => {
             newCount++;
         } else {
             // Existing Order: Check if it has products. If not, update it.
-            const existingOrder = dbOrders.find(o => o.id === saleOrderNo || o.soDon === saleOrderNo);
+            const existingOrder = dbOrderMap.get(saleOrderNo);
 
             if (existingOrder) {
                 // 1. Missing Data Check
@@ -426,8 +437,11 @@ const performSync = async () => {
                 const hasZeroQty = hasProducts && existingOrder.products.some(p => p.qty === 0);
                 const hasMisaId = !!existingOrder.misa_id;
 
-                // 2. Check if products are missing price data (force update to get prices)
-                const hasMissingPrice = hasProducts && existingOrder.products.some(p =>
+                // 2. Check if products are missing price data — BUT only if MISA actually has prices
+                // (Prevents infinite sync loop when MISA also returns price=0)
+                const misaProducts_price = item.sale_order_product_mappings || [];
+                const misaHasPrice = misaProducts_price.some(mp => Number(mp.price || 0) > 0 || Number(mp.total || mp.to_currency || 0) > 0);
+                const hasMissingPrice = hasProducts && misaHasPrice && existingOrder.products.some(p =>
                     (p.price === undefined || p.price === null || p.price === 0) &&
                     (p.total === undefined || p.total === null || p.total === 0)
                 );
@@ -492,7 +506,9 @@ const performSync = async () => {
                         console.log(`📦 Product count mismatch for ${saleOrderNo}: local=${(existingOrder.products || []).length} vs MISA=${misaProducts.length}`);
                     }
                 }
-                const hasMissingSpec = hasProducts && existingOrder.products.some(p => !p.spec);
+                // Only trigger spec update if MISA actually HAS spec data (prevents infinite loop)
+                const misaHasSpec = misaProducts.some(mp => mp.custom_field7);
+                const hasMissingSpec = hasProducts && misaHasSpec && existingOrder.products.some(p => !p.spec);
 
                 // 8. Check if address changed on MISA (continuous sync)
                 const misaAddress = item.shipping_address || '';
@@ -601,14 +617,37 @@ const performSync = async () => {
             }
         }
 
-        // Pass RAW MISA data directly - addOrder will map to Supabase columns
+        // Map ONLY needed MISA fields (avoid ...item spread which copies unnecessary data → RAM waste)
         const mappedOrder = {
-            ...item,  // All MISA fields including delivery_status
             id: saleOrderNo,
-            misa_id: item.id, // Store Numeric MISA ID for reliable updates
+            misa_id: item.id,
+            sale_order_no: item.sale_order_no,
+            sale_order_name: item.sale_order_name || null,
+            sale_order_date: item.sale_order_date || null,
+            book_date: item.book_date || null,
+            deadline_date: item.deadline_date || null,
+            account_name: item.account_name || null,
+            account_code: item.account_code || null,
+            contact_name: item.contact_name || null,
+            shipping_address: item.shipping_address || null,
+            shipping_province: item.shipping_province || null,
+            shipping_district: item.shipping_district || null,
+            sale_order_amount: Number(item.sale_order_amount || 0),
+            total_summary: Number(item.total_summary || 0),
+            tax_summary: Number(item.tax_summary || 0),
+            discount_summary: Number(item.discount_summary || 0),
+            pay_status: item.pay_status || null,
+            revenue_status: item.revenue_status || null,
+            sale_order_type: item.sale_order_type || null,
+            organization_unit_name: item.organization_unit_name || null,
+            form_layout: item.form_layout || null,
+            created_date: item.created_date || null,
+            modified_date: item.modified_date || null,
+            custom_field13: item.custom_field13 || null,
+            custom_field14: item.custom_field14 || null,
             status: mapMisaStatus(item),
-            delivery_status: item.delivery_status || 'Chưa giao hàng', // Preserve MISA delivery_status
-            sale_order_product_mappings: products,  // Products array
+            delivery_status: item.delivery_status || 'Chưa giao hàng',
+            sale_order_product_mappings: products,
             // Explicitly map description & owner_name (MISA may return camelCase or snake_case)
             description: item.description || item.Description || '',
             owner_name: item.owner_name || item.OwnerName || item.ownerName || '',
@@ -618,7 +657,7 @@ const performSync = async () => {
 
         if (existingIds.has(saleOrderNo)) {
             // Preserve Local Fields (Driver, Status, Note, Merged Trip, etc.)
-            const oldOrder = dbOrders.find(o => o.soDon === saleOrderNo);
+            const oldOrder = dbOrderMap.get(saleOrderNo);
             if (oldOrder) {
                 // Only preserve driver/dispatch fields for orders already dispatched
                 // AND where MISA hasn't reset the order back to 'Mới' (cancelled & recreated)
@@ -647,14 +686,17 @@ const performSync = async () => {
                     'admin_approved', 'admin_approved_at', 'admin_approved_by',
                     'delivery_note', 'local_items', 'is_pinned'];
 
-                if (oldOrder.status !== 'Mới') {
+                // Protect ALL ERP-specific statuses from MISA overwrite
+                // 'Mới' and 'Chưa thực hiện' are both "new" — only protect driver/plate
+                const isNewStatus = oldOrder.status === 'Mới' || oldOrder.status === 'Chưa thực hiện';
+                if (!isNewStatus) {
                     // Order is in-progress/completed locally — protect ALL local fields
                     for (const field of LOCAL_PROTECTED_FIELDS) {
                         delete mappedOrder[field];
                     }
                     console.log(`🛡️ Protected local fields for ${saleOrderNo} (status: ${oldOrder.status})`);
                 } else {
-                    // Order is still 'Mới' — only protect driver/plate from stale MISA data
+                    // Order is still new — only protect driver/plate from stale MISA data
                     delete mappedOrder.custom_field13;
                     delete mappedOrder.custom_field14;
                 }
@@ -804,6 +846,18 @@ const performSync = async () => {
                     }
                 }
             }
+            // AUDIT: Log status changes caused by sync
+            if (mappedOrder.status && oldOrder && mappedOrder.status !== oldOrder.status) {
+                console.warn(`⚠️ SYNC STATUS CHANGE: ${saleOrderNo} "${oldOrder.status}" → "${mappedOrder.status}"`);
+                // Log to audit table (fire-and-forget)
+                supabase.from('order_status_log').insert({
+                    order_id: saleOrderNo,
+                    old_status: oldOrder.status,
+                    new_status: mappedOrder.status,
+                    changed_by: 'MISA_SYNC',
+                    reason: 'Automatic MISA sync'
+                }).then(() => {}).catch(() => {});
+            }
             await db.updateOrder(saleOrderNo, mappedOrder);
         } else {
             // NEW ORDER: Clear driver/plate from MISA to prevent stale data
@@ -926,24 +980,22 @@ const performSync = async () => {
     try {
         const misaSyncedNos = new Set(misaOrders.map(o => o.sale_order_no || o.SaleOrderNo).filter(Boolean));
 
-        const candidatesForDeletion = dbOrders.filter(o => {
-            const orderNo = o.soDon || o.id;
+        // Use dbOrderMap (Map) instead of dbOrders (null) for cleanup check
+        let candidateCount = 0;
+        for (const [orderNo, o] of dbOrderMap) {
+            if (orderNo === o.id && orderNo !== o.soDon) continue; // Skip duplicate Map entries
             const hasMisaOrigin = !!o.misa_id;
             const isActive = !['Đã thực hiện', 'completed', 'COMPLETED', 'Hoàn thành', 'Đã hủy bỏ'].includes(o.status);
             const notInMisa = !misaSyncedNos.has(orderNo);
-            return hasMisaOrigin && isActive && notInMisa;
-        });
-
-        if (candidatesForDeletion.length > 0) {
-            // LOG ONLY — no destructive action taken
-            console.log(`ℹ️ [CLEANUP-DISABLED] ${candidatesForDeletion.length} DB orders not in MISA sync window (pagination limit). No action taken.`);
-            if (candidatesForDeletion.length <= 20) {
-                candidatesForDeletion.forEach(o => {
-                    const orderNo = o.soDon || o.id;
-                    const customer = o.khach || o.account_name || 'N/A';
-                    console.log(`   📋 ${orderNo} — ${customer} (status: ${o.status})`);
-                });
+            if (hasMisaOrigin && isActive && notInMisa) {
+                candidateCount++;
+                if (candidateCount <= 20) {
+                    console.log(`   📋 ${orderNo} — ${o.khach || o.account_name || 'N/A'} (status: ${o.status})`);
+                }
             }
+        }
+        if (candidateCount > 0) {
+            console.log(`ℹ️ [CLEANUP-DISABLED] ${candidateCount} DB orders not in MISA sync window. No action taken.`);
         }
     } catch (cleanupErr) {
         console.error('⚠️ Cleanup check error:', cleanupErr.message);
@@ -969,7 +1021,10 @@ const performSync = async () => {
         }
     }
 
-    console.log(`✨ Sync Complete. New orders synced: ${newCount}`);
+    // Memory cleanup: release large data structures
+    dbOrderMap.clear();
+    const endMemMB = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
+    console.log(`✨ Sync Complete. New: ${newCount} | Memory: ${endMemMB}MB`);
 };
 
 // ============================================================

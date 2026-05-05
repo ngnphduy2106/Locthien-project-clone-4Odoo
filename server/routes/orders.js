@@ -9,6 +9,20 @@ import db from '../db/index.js';
 import { updateMisaOrder } from '../services/misa.js';
 import { createNotification } from './notifications.js';
 
+// AUDIT: Log all status changes to order_status_log table for debugging
+// Fire-and-forget — never blocks the main operation
+function logStatusChange(orderId, oldStatus, newStatus, changedBy, reason) {
+    if (!orderId || oldStatus === newStatus) return;
+    console.log(`📋 STATUS LOG: ${orderId} "${oldStatus}" → "${newStatus}" by ${changedBy} (${reason})`);
+    supabase.from('order_status_log').insert({
+        order_id: String(orderId),
+        old_status: oldStatus || null,
+        new_status: newStatus || null,
+        changed_by: changedBy || 'SYSTEM',
+        reason: reason || null
+    }).then(() => {}).catch(err => console.error('Status log error:', err.message));
+}
+
 // Helper: Create Telegram mention tag
 // Priority: 1) tg://user?id= (works without username), 2) @username, 3) skip
 function getTelegramTag(telegramUsername, telegramUserId, displayName) {
@@ -1170,6 +1184,10 @@ router.put('/:id/assign', async (req, res) => {
         const { id } = req.params;
         const { driverName, plate, note, assistantName, deliveryTime } = req.body;
 
+        // Get current status for audit log
+        const currentOrder = await db.getOrder(id);
+        const oldStatus = currentOrder?.status || 'unknown';
+
         const order = await db.updateOrder(id, {
             taiXe: driverName,
             bienSo: plate,
@@ -1179,6 +1197,8 @@ router.put('/:id/assign', async (req, res) => {
             delivery_status: 'Đang giao hàng',
             note: note || '' // Save internal note
         });
+
+        logStatusChange(id, oldStatus, CONFIG.STATUS.DELIVERING, req.body.dispatcherName || 'DISPATCHER', `Assign driver: ${driverName}`);
 
         if (!order) {
             return res.json(createResponse(true, 'Không tìm thấy đơn hàng!'));
@@ -1407,6 +1427,7 @@ router.put('/:id/unassign', async (req, res) => {
             delivery_status: CONFIG.STATUS.NEW,
             note: reason ? `[HỦY ĐIỀU PHỐI] ${reason}` : '[HỦY ĐIỀU PHỐI]'
         });
+        logStatusChange(id, order.status, CONFIG.STATUS.NEW, req.body.userName || 'DISPATCHER', `Unassign driver: ${previousDriver}. Reason: ${reason || 'N/A'}`);
         console.log(`✅ Order ${orderNo} reset to ${CONFIG.STATUS.NEW}`);
 
         // 3. Sync to MISA
@@ -2042,6 +2063,7 @@ router.post('/:id/complete', async (req, res) => {
         console.log(`👔 Admin Complete Flow - Order: ${id}`);
 
         // Update order status to completed
+        const prevOrder = await db.getOrder(id);
         const order = await db.updateOrder(id, {
             status: CONFIG.STATUS.COMPLETED,
             delivery_status: 'Hoàn thành',
@@ -2050,6 +2072,7 @@ router.post('/:id/complete', async (req, res) => {
             local_items: local_items || [],
             admin_completed: admin_completed || false
         });
+        logStatusChange(id, prevOrder?.status, CONFIG.STATUS.COMPLETED, req.body.admin_name || 'ADMIN', 'Admin complete flow');
 
         if (!order) {
             return res.json(createResponse(true, 'Không tìm thấy đơn hàng!'));
