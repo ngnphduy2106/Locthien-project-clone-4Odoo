@@ -8847,13 +8847,14 @@ const _webpSupported = (() => {
     } catch { return false; }
 })();
 
-// Hard compression rules — higher quality for proof photos (weight tickets need to be readable)
+// Hard compression rules — OPTIMIZED for fast upload/download on mobile data
+// Weight ticket text is still readable at 1200px/q0.70 — tested on iPhone/Android
 const IMG_COMPRESS_CONFIG = {
-    maxSizeMB: 1.0,            // Target <1MB output (sharp quality for weight tickets)
-    maxWidthOrHeight: 2000,    // Max dimension 2000px (high detail for proof photos)
+    maxSizeMB: 0.3,            // Target <300KB output (was 1MB — saves 70% bandwidth)
+    maxWidthOrHeight: 1200,    // Max dimension 1200px (was 2000 — still readable for weight tickets)
     useWebWorker: true,        // Layer 2: Off main thread
     fileType: _webpSupported ? 'image/webp' : 'image/jpeg',
-    initialQuality: 0.88,     // Layer 3: Quality 0.88 (very sharp text, minimal artifacts)
+    initialQuality: 0.70,     // Layer 3: Quality 0.70 (was 0.88 — much smaller, still sharp)
     alwaysKeepResolution: false,
     preserveExif: false,       // Strip metadata for smaller files
 };
