@@ -5103,7 +5103,8 @@ async function submitDelivery() {
                 cart: cart,
                 local_items: localItems,
                 delivery_note: note || `Hoàn thành bởi ${driverName}`,
-                sender: driverName
+                sender: driverName,
+                hasImages: validImages.length > 0
                 // NOTE: images uploaded AFTER completion (export ticket must exist first)
             };
 
@@ -5134,19 +5135,21 @@ async function submitDelivery() {
         if (window.MyOrdersModule?.loadMyOrders) window.MyOrdersModule.loadMyOrders();
 
         // BACKGROUND: Upload images one-by-one (non-blocking, with retry)
+        // Last image sends sendTelegram:true to trigger consolidated album
         if (validImages.length > 0 && !order.merged_order_no) {
             const uploadUrl = `/api/orders/${order.id}/add-proof-images`;
             (async () => {
                 for (let i = 0; i < validImages.length; i++) {
+                    const isLast = (i === validImages.length - 1);
                     for (let attempt = 0; attempt < 2; attempt++) {
                         try {
                             const r = await fetch(uploadUrl, {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ images: [validImages[i]] })
+                                body: JSON.stringify({ images: [validImages[i]], sendTelegram: isLast })
                             });
                             const d = await r.json();
-                            if (!d.error) { console.log(`📸 BG: image ${i+1}/${validImages.length} OK`); break; }
+                            if (!d.error) { console.log(`📸 BG: image ${i+1}/${validImages.length} OK${isLast ? ' (+ Telegram)' : ''}`); break; }
                         } catch (e) {
                             if (attempt === 0) await new Promise(r => setTimeout(r, 1500));
                             else console.warn(`📸 BG: image ${i+1} failed after retry`);
@@ -9435,7 +9438,8 @@ async function submitDriverCompletion() {
             sender: driverName,
             assignment_id: order.assignment_id || null,
             products: parsedProducts,
-            admin_completed: isAdminRole()
+            admin_completed: isAdminRole(),
+            hasImages: completionImages.some(img => img && !img.startsWith('blob:'))
         });
 
         if (res.error) {

@@ -1649,7 +1649,9 @@ router.post('/:id/complete', async (req, res) => {
             // Driver complete fields
             type, warehouse, partner, driver_name, plate, cart, note, sender, images,
             // Multi-driver fields
-            assignment_id
+            assignment_id,
+            // Flag: client will send images via add-proof-images (skip text-only Telegram)
+            hasImages
         } = req.body;
 
         console.log(`\n🏁 COMPLETE ORDER - ID: ${id}`);
@@ -2026,9 +2028,11 @@ router.post('/:id/complete', async (req, res) => {
                     } catch (e) { console.error('Dispatcher complete notification error:', e.message); }
 
                     // 2. Telegram notification
-                    if (!alreadyCompleted) {
+                    // If driver has images → SKIP text here (photos+caption sent from add-proof-images)
+                    // If no images (admin complete, etc.) → send text notification here
+                    if (!alreadyCompleted && !hasImages) {
                         try {
-                            const { sendTelegramMessage, sendTelegramPhotos } = await import('../services/telegram.js');
+                            const { sendTelegramMessage } = await import('../services/telegram.js');
                             const isImport = type === 'NHAP';
                             const tgGroup = isImport ? 'NHAP' : 'XUAT';
                             const label = isImport ? 'ĐƠN NHẬP HOÀN THÀNH' : 'ĐƠN ĐÃ HOÀN THÀNH';
@@ -2050,11 +2054,11 @@ router.post('/:id/complete', async (req, res) => {
                                 const pQty = Number(p.weight_kg || p.qty || p.quantity || 0);
                                 if (pName) msg += `📦 ${pName} — ${pQty.toLocaleString('vi-VN')} ${p.unit || 'Kg'}\n`;
                             });
-                            // NOTE: Images are sent to Telegram from add-proof-images endpoint
-                            // (called by client AFTER completion). Here we only send text notification.
                             await sendTelegramMessage(msg, tgGroup);
                             console.log(`📨 Telegram text sent to ${tgGroup} for ${orderNo}`);
                         } catch (tgErr) { console.error('Telegram error:', tgErr.message); }
+                    } else if (hasImages) {
+                        console.log(`⏳ Skipping Telegram text — images will be sent via add-proof-images`);
                     }
 
                     // Merged auto-complete DISABLED — drivers complete each order manually
