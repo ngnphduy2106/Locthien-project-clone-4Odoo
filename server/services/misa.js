@@ -346,7 +346,7 @@ export const syncMisaOrders = async () => {
         await Promise.race([
             performSync(),
             new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('Sync timeout (60s)')), SYNC_TIMEOUT_MS)
+                setTimeout(() => reject(new Error('Sync timeout (180s)')), SYNC_TIMEOUT_MS)
             )
         ]);
     } catch (e) {
@@ -877,7 +877,6 @@ const performSync = async () => {
             // DEDUP: Skip if already notified in this process lifecycle
             if (notifiedNewOrders.has(saleOrderNo)) {
                 console.log(`⏭️ Skipping ${saleOrderNo} — already notified`);
-                newCount++;
                 continue;
             }
 
