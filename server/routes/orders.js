@@ -7,6 +7,7 @@ import { supabase } from '../db/supabase.js';
 import { CONFIG, createResponse, formatDate, getTimestamp, standardizeData, generateOrderCode } from '../config.js';
 import db from '../db/index.js';
 import { updateMisaOrder } from '../services/misa.js';
+import { uploadImages } from '../services/storage.js';
 import { createNotification } from './notifications.js';
 
 // AUDIT: Log all status changes to order_status_log table for debugging
@@ -1733,7 +1734,9 @@ router.post('/:id/complete', async (req, res) => {
             // Only set proof_images if provided in body (merged orders send images with completion)
             // For normal orders, images are uploaded separately via add-proof-images endpoint
             if (images && images.length > 0) {
-                assignUpdate.proof_images = images;
+                // Upload to Supabase Storage for fast CDN loading
+                const uploadedUrls = await uploadImages(images, id);
+                assignUpdate.proof_images = uploadedUrls;
             }
             const { data: updateResult, error: updateErr } = await supabase
                 .from('order_driver_assignments')
@@ -1928,6 +1931,17 @@ router.post('/:id/complete', async (req, res) => {
             // BACKGROUND: Warehouse tickets, export ticket, notifications, merged auto-complete
             setImmediate(async () => {
                 try {
+                    // 0. Upload images to Supabase Storage (CDN) — used by export_ticket + assignment
+                    let uploadedUrls = null;
+                    if (images && images.length > 0) {
+                        try {
+                            uploadedUrls = await uploadImages(images, id);
+                            console.log(`📸 BG: Uploaded ${uploadedUrls.filter(u => u.startsWith('http')).length}/${images.length} images to CDN`);
+                        } catch (uploadErr) {
+                            console.warn('BG: Image upload to storage failed, keeping base64:', uploadErr.message);
+                        }
+                    }
+
                     // 0a. Create warehouse tickets (moved from blocking path)
                     try {
                         for (const item of cart) {
@@ -1972,7 +1986,7 @@ router.post('/:id/complete', async (req, res) => {
                             total_qty: totalQty,
                             note: note || delivery_note || `Tạo bởi: ${sender || driver_name}`,
                             local_items: local_items || [],
-                            images: images || []
+                            images: uploadedUrls || images || []
                         });
                     } catch (etErr) { console.error('BG: Export ticket error:', etErr.message); }
 
@@ -1988,7 +2002,7 @@ router.post('/:id/complete', async (req, res) => {
                                 for (const assign of existingAssigns) {
                                     await supabase.from('order_driver_assignments').update({
                                         status: 'completed',
-                                        proof_images: images,
+                                        proof_images: uploadedUrls || images,
                                         delivery_note: note || delivery_note || '',
                                         completed_at: new Date().toISOString()
                                     }).eq('id', assign.id);
@@ -2605,7 +2619,10 @@ router.post('/:id/add-proof-images', async (req, res) => {
             return res.json(createResponse(true, 'Vui lòng chọn ít nhất 1 ảnh!'));
         }
 
-
+        // UPLOAD TO SUPABASE STORAGE: Convert base64 → CDN URLs for fast loading
+        // Falls back to base64 if storage upload fails (graceful degradation)
+        const imageUrls = await uploadImages(images, id);
+        console.log(`📸 Storage upload: ${imageUrls.filter(u => u.startsWith('http')).length}/${images.length} uploaded to CDN`);
 
 
         // Also save to order_driver_assignments if any exist for this order
@@ -2620,7 +2637,7 @@ router.post('/:id/add-proof-images', async (req, res) => {
             if (assignments && assignments.length > 0) {
                 const assignment = assignments[0];
                 const existingImages = assignment.proof_images || [];
-                const updatedImages = [...existingImages, ...images].slice(0, 10);
+                const updatedImages = [...existingImages, ...imageUrls].slice(0, 10);
 
                 await supabase
                     .from('order_driver_assignments')
@@ -2672,7 +2689,7 @@ router.post('/:id/add-proof-images', async (req, res) => {
                 plate: orderInfo?.bienSo || '',
                 warehouse: 'LT1',
                 products: orderInfo?.cart || [],
-                images: images.slice(0, 10), // Max 10 images
+                images: imageUrls.slice(0, 10), // Max 10 images
                 note: 'Ảnh bổ sung'
             });
 
@@ -2681,8 +2698,8 @@ router.post('/:id/add-proof-images', async (req, res) => {
                 return res.json(createResponse(true, 'Lỗi tạo phiếu: ' + insertError.message));
             }
 
-            console.log(`✅ Created export_ticket with ${images.length} images`);
-            return res.json(createResponse(false, `Đã thêm ${images.length} ảnh chứng minh!`));
+            console.log(`✅ Created export_ticket with ${imageUrls.length} images (CDN)`);
+            return res.json(createResponse(false, `Đã thêm ${imageUrls.length} ảnh chứng minh!`));
         }
 
         // Ticket exists - append new images
@@ -2693,7 +2710,7 @@ router.post('/:id/add-proof-images', async (req, res) => {
             return res.json(createResponse(true, 'Đã đạt giới hạn 10 ảnh!'));
         }
 
-        const newImages = images.slice(0, totalAllowed);
+        const newImages = imageUrls.slice(0, totalAllowed);
         const updatedImages = [...existingImages, ...newImages];
 
         const { error: updateError } = await supabase

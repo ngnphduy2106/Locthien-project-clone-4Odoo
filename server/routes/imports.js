@@ -5,6 +5,7 @@
 import { Router } from 'express';
 import { supabase } from '../db/supabase.js';
 import { createResponse, getTimestamp, generateOrderCode } from '../config.js';
+import { uploadImages } from '../services/storage.js';
 import { createNotification } from './notifications.js';
 
 const router = Router();
@@ -1305,8 +1306,10 @@ router.post('/:id/proof-images', async (req, res) => {
             return res.json(createResponse(true, 'Đã đạt giới hạn 10 ảnh!'));
         }
 
-        const newImages = images.slice(0, totalAllowed);
-        const updatedImages = [...existingImages, ...newImages];
+        // Upload to Supabase Storage: convert base64 → CDN URLs
+        const imageUrls = await uploadImages(images.slice(0, totalAllowed), id);
+        console.log(`📸 Import storage: ${imageUrls.filter(u => u.startsWith('http')).length}/${images.length} uploaded`);
+        const updatedImages = [...existingImages, ...imageUrls];
 
         const { error: updateError } = await getSupabase()
             .from('import_tickets')
@@ -1317,7 +1320,7 @@ router.post('/:id/proof-images', async (req, res) => {
             return res.json(createResponse(true, 'Lỗi lưu ảnh: ' + updateError.message));
         }
 
-        res.json(createResponse(false, `Đã thêm ${newImages.length} ảnh (${updatedImages.length}/10)!`));
+        res.json(createResponse(false, `Đã thêm ${imageUrls.length} ảnh (${updatedImages.length}/10)!`));
 
     } catch (e) {
         console.error('Add import proof images error:', e.message);
