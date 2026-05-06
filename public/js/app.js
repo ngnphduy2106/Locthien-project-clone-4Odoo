@@ -8936,28 +8936,32 @@ async function handleCompletionImagesSelect(input) {
     const isImport = order?.ticket_no?.startsWith('N');
 
     // INSTANT PREVIEW: Show ObjectURL thumbnails immediately (no compression wait)
-    // Driver sees images in <100ms instead of waiting 20-30s for compress+upload
+    // Driver sees images in <100ms. We track indices to replace with base64 after compress.
+    const startIdx = completionImages.length;
     for (const file of toProcess) {
         const objectUrl = URL.createObjectURL(file);
-        completionImages.push(objectUrl); // Temporary preview URL
+        completionImages.push(objectUrl); // Temporary blob: URL for preview only
     }
     renderCompletionImagesPreviews();
     input.value = '';
 
-    // BACKGROUND: Compress + Upload (fire-and-forget, no blocking)
-    // Driver can continue working while images process in background
-    if (orderId) {
-        const uploadUrl = isImport
-            ? `/api/imports/${orderId}/proof-images`
-            : `/api/orders/${orderId}/add-proof-images`;
+    // BACKGROUND: Compress each image, replace blob: URL with base64, then upload
+    const uploadUrl = orderId
+        ? (isImport ? `/api/imports/${orderId}/proof-images` : `/api/orders/${orderId}/add-proof-images`)
+        : null;
 
-        // Process each image independently in background
-        let uploadedCount = 0;
-        const totalCount = toProcess.length;
+    toProcess.forEach((file, i) => {
+        const imgIdx = startIdx + i; // Index in completionImages array
 
-        for (const file of toProcess) {
-            // Compress → Upload sequentially per image to avoid RAM spike on mobile
-            compressImage(file).then(async (compressed) => {
+        compressImage(file).then(async (compressed) => {
+            // Replace blob: URL with actual base64 (critical for completion submission + Telegram)
+            if (completionImages[imgIdx] && completionImages[imgIdx].startsWith('blob:')) {
+                URL.revokeObjectURL(completionImages[imgIdx]); // Free memory
+                completionImages[imgIdx] = compressed;
+            }
+
+            // Upload to server in background (fire-and-forget)
+            if (uploadUrl) {
                 try {
                     const res = await fetch(uploadUrl, {
                         method: 'POST',
@@ -8965,29 +8969,22 @@ async function handleCompletionImagesSelect(input) {
                         body: JSON.stringify({ images: [compressed] })
                     });
                     const data = await res.json();
-                    if (!data.error) {
-                        uploadedCount++;
-                        console.log(`📸 Uploaded ${uploadedCount}/${totalCount}`);
-                    } else {
-                        console.warn('📸 Upload failed:', data.msg);
-                    }
+                    if (data.error) console.warn('📸 Upload failed:', data.msg);
+                    else console.log(`📸 Uploaded image ${i + 1}/${toProcess.length}`);
                 } catch (err) {
-                    console.warn('📸 Upload error:', err.message);
-                    // Retry once after 2s
+                    console.warn('📸 Upload error, retrying...', err.message);
                     try {
                         await new Promise(r => setTimeout(r, 2000));
-                        const res2 = await fetch(uploadUrl, {
+                        await fetch(uploadUrl, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ images: [compressed] })
                         });
-                        const data2 = await res2.json();
-                        if (!data2.error) uploadedCount++;
                     } catch (e2) { console.error('📸 Retry failed:', e2.message); }
                 }
-            }).catch(err => console.warn('📸 Compress error:', err.message));
-        }
-    }
+            }
+        }).catch(err => console.warn('📸 Compress error:', err.message));
+    });
 }
 
 // Render image previews
@@ -9467,19 +9464,38 @@ async function submitDriverCompletion() {
         }
 
         // Upload images AFTER completion — export ticket now exists
-        if (completionImages.length > 0) {
+        // Filter out blob: URLs (still compressing) — only send valid base64 or http URLs
+        const validImages = completionImages.filter(img => img && !img.startsWith('blob:'));
+
+        if (validImages.length > 0) {
             try {
-                showLoading(`Đang tải ${completionImages.length} ảnh...`);
+                showLoading(`Đang tải ${validImages.length} ảnh...`);
                 const imgRes = await fetch(`/api/orders/${order.id}/add-proof-images`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ images: completionImages })
+                    body: JSON.stringify({ images: validImages })
                 });
                 const imgData = await imgRes.json();
                 if (imgData.error) console.warn('⚠️ Image upload warning:', imgData.msg);
-                else console.log(`✅ ${completionImages.length} images saved to export ticket`);
+                else console.log(`✅ ${validImages.length} images saved to export ticket`);
             } catch (imgErr) {
                 console.error('Image upload error (non-critical):', imgErr.message);
+            }
+        } else if (completionImages.length > 0) {
+            // Images still compressing — wait 3s then retry with whatever is ready
+            console.log('⏳ Images still compressing, waiting 3s...');
+            await new Promise(r => setTimeout(r, 3000));
+            const retryImages = completionImages.filter(img => img && !img.startsWith('blob:'));
+            if (retryImages.length > 0) {
+                try {
+                    const imgRes = await fetch(`/api/orders/${order.id}/add-proof-images`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ images: retryImages })
+                    });
+                    const imgData = await imgRes.json();
+                    if (!imgData.error) console.log(`✅ ${retryImages.length} images saved (after retry)`);
+                } catch (e) { console.warn('Retry image upload failed:', e.message); }
             }
         }
 
