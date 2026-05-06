@@ -224,13 +224,33 @@ export const db = {
 
         const SYNC_COLUMNS = 'id,sale_order_no,sale_order_date,account_name,status,delivery_status,misa_id,description,owner_name,shipping_address,phone,mobile,receiver_mobile,contact_name,custom_field13,custom_field14,assistant_name,delivery_time,note,merged_order_no,delivery_note,telegram_message_id,sale_confirmed,sale_confirmed_at,sale_confirmed_by,admin_approved,admin_approved_at,admin_approved_by,local_items,is_pinned,sale_order_product_mappings';
 
-        const { data, error } = await supabase.from('orders').select(SYNC_COLUMNS);
-        if (error) {
-            console.error('Supabase getOrdersForSync error:', error);
-            return [];
+        // PAGINATION: Supabase default limit = 1000 rows.
+        // With 2000+ orders, we MUST paginate to get ALL orders for accurate sync.
+        const PAGE_SIZE = 1000;
+        let allData = [];
+        let from = 0;
+
+        while (true) {
+            const { data, error } = await supabase
+                .from('orders')
+                .select(SYNC_COLUMNS)
+                .range(from, from + PAGE_SIZE - 1);
+
+            if (error) {
+                console.error('Supabase getOrdersForSync error:', error);
+                break;
+            }
+
+            if (!data || data.length === 0) break;
+            allData = allData.concat(data);
+
+            if (data.length < PAGE_SIZE) break; // Last page
+            from += PAGE_SIZE;
         }
 
-        return (data || []).map(o => {
+        console.log(`📊 getOrdersForSync: fetched ${allData.length} orders (${Math.ceil(allData.length / PAGE_SIZE)} pages)`);
+
+        return allData.map(o => {
             let products = [];
             try {
                 if (typeof o.sale_order_product_mappings === 'string') products = JSON.parse(o.sale_order_product_mappings);
