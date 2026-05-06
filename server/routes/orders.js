@@ -2604,9 +2604,9 @@ router.get('/:id/proof-images', async (req, res) => {
 router.post('/:id/add-proof-images', async (req, res) => {
     try {
         const { id } = req.params;
-        const { images } = req.body;
+        const { images, sendTelegram } = req.body;
 
-        console.log(`📸 Add proof images for order: ${id}, images count: ${images?.length || 0}`);
+        console.log(`📸 Add proof images for order: ${id}, images count: ${images?.length || 0}, sendTelegram: ${!!sendTelegram}`);
 
         if (!images || !Array.isArray(images) || images.length === 0) {
             return res.json(createResponse(true, 'Vui lòng chọn ít nhất 1 ảnh!'));
@@ -2738,64 +2738,76 @@ router.post('/:id/add-proof-images', async (req, res) => {
 
                         console.log(`📸 BG: Replaced ${cdnCount} base64 with CDN URLs for order ${id}`);
 
-                        // SEND TELEGRAM PHOTOS: Now that we have CDN URLs, send to Telegram
-                        // This is the CORRECT place — images are ready and uploaded
-                        try {
-                            const { sendTelegramPhotos } = await import('../services/telegram.js');
-                            const orderInfo = await db.getOrder(id);
-                            const orderNo = orderInfo?.soDon || orderInfo?.sale_order_no || id;
-                            const customer = orderInfo?.khach || orderInfo?.account_name || '';
-                            const driverName = orderInfo?.taiXe || orderInfo?.custom_field13 || '';
-                            const drvPlate = orderInfo?.bienSo || orderInfo?.custom_field14 || '';
-                            const assistant = orderInfo?.assistant_name || '';
+                        // SEND TELEGRAM PHOTOS: Only when client requests (completion submit)
+                        // Background uploads during image selection do NOT trigger Telegram
+                        if (sendTelegram) {
+                            try {
+                                const { sendTelegramPhotos } = await import('../services/telegram.js');
+                                const orderInfo = await db.getOrder(id);
+                                const orderNo = orderInfo?.soDon || orderInfo?.sale_order_no || id;
+                                const customer = orderInfo?.khach || orderInfo?.account_name || '';
+                                const driverName = orderInfo?.taiXe || orderInfo?.custom_field13 || '';
+                                const drvPlate = orderInfo?.bienSo || orderInfo?.custom_field14 || '';
+                                const assistant = orderInfo?.assistant_name || '';
 
-                            let caption = `✅ <b>ĐƠN ĐÃ HOÀN THÀNH</b>\n📦 Mã: <b>#${orderNo}</b>\n`;
-                            caption += `👤 Khách: <b>${customer}</b>\n`;
-                            if (driverName) caption += `🚛 TX: ${driverName}${drvPlate ? ` (${drvPlate})` : ''}\n`;
-                            if (assistant) caption += `👷 PX: ${assistant}\n`;
-                            // Add product summary
-                            (orderInfo?.products || orderInfo?.cart || []).forEach(p => {
-                                const pName = p.name || p.code || '';
-                                const pQty = Number(p.qty || 0);
-                                if (pName) caption += `📦 ${pName} — ${pQty.toLocaleString('vi-VN')} ${p.unit || 'Kg'}\n`;
-                            });
+                                let caption = `✅ <b>ĐƠN ĐÃ HOÀN THÀNH</b>\n📦 Mã: <b>#${orderNo}</b>\n`;
+                                caption += `👤 Khách: <b>${customer}</b>\n`;
+                                if (driverName) caption += `🚛 TX: ${driverName}${drvPlate ? ` (${drvPlate})` : ''}\n`;
+                                if (assistant) caption += `👷 PX: ${assistant}\n`;
+                                (orderInfo?.products || orderInfo?.cart || []).forEach(p => {
+                                    const pName = p.name || p.code || '';
+                                    const pQty = Number(p.qty || 0);
+                                    if (pName) caption += `📦 ${pName} — ${pQty.toLocaleString('vi-VN')} ${p.unit || 'Kg'}\n`;
+                                });
 
-                            // Use CDN URLs for Telegram (fast, reliable)
-                            const photoUrls = updatedWithUrls.filter(u => u && u.startsWith('http'));
-                            if (photoUrls.length > 0) {
-                                await sendTelegramPhotos(photoUrls, caption, 'XUAT');
-                                console.log(`📨 Telegram: ${photoUrls.length} proof photos sent for ${orderNo}`);
+                                // Get ALL images from ticket (not just this batch) for consolidated album
+                                const allPhotoUrls = updatedWithUrls.filter(u => u && u.startsWith('http'));
+                                if (allPhotoUrls.length > 0) {
+                                    await sendTelegramPhotos(allPhotoUrls, caption, 'XUAT');
+                                    console.log(`📨 Telegram: ${allPhotoUrls.length} proof photos sent for ${orderNo}`);
+                                }
+                            } catch (tgErr) {
+                                console.warn('BG: Telegram photo send failed:', tgErr.message);
                             }
-                        } catch (tgErr) {
-                            console.warn('BG: Telegram photo send failed:', tgErr.message);
                         }
                     }
                 } catch (bgErr) {
                     console.warn('BG: CDN URL replacement failed:', bgErr.message);
                 }
 
-                // FALLBACK: If CDN upload failed, try sending base64 photos to Telegram
-                if (cdnCount === 0 && images.length > 0) {
+                // FALLBACK: If CDN upload failed AND Telegram requested, send base64
+                if (sendTelegram && cdnCount === 0 && images.length > 0) {
                     try {
                         const { sendTelegramPhotos } = await import('../services/telegram.js');
                         const orderInfo = await db.getOrder(id);
                         const orderNo = orderInfo?.soDon || id;
                         let caption = `✅ <b>ĐƠN ĐÃ HOÀN THÀNH</b>\n📦 Mã: <b>#${orderNo}</b>\n`;
                         caption += `👤 Khách: ${orderInfo?.khach || ''}\n`;
-                        await sendTelegramPhotos(images.filter(i => i && !i.startsWith('blob:')), caption, 'XUAT');
+                        // Get ALL images from ticket for consolidated album
+                        const { data: fullTicket } = await supabase.from('export_tickets')
+                            .select('images').eq('order_id', id)
+                            .order('created_at', { ascending: false }).limit(1).single();
+                        const allImages = (fullTicket?.images || images).filter(i => i && !i.startsWith('blob:'));
+                        await sendTelegramPhotos(allImages, caption, 'XUAT');
                     } catch (e) { console.warn('BG: Fallback telegram failed:', e.message); }
                 }
             } catch (storageErr) {
                 console.warn('BG: Storage upload failed (base64 preserved):', storageErr.message);
-                // Still try to send base64 to Telegram
-                try {
-                    const { sendTelegramPhotos } = await import('../services/telegram.js');
-                    const orderInfo = await db.getOrder(id);
-                    const orderNo = orderInfo?.soDon || id;
-                    let caption = `✅ <b>ĐƠN ĐÃ HOÀN THÀNH</b>\n📦 Mã: <b>#${orderNo}</b>\n`;
-                    caption += `👤 Khách: ${orderInfo?.khach || ''}\n`;
-                    await sendTelegramPhotos(images.filter(i => i && !i.startsWith('blob:')), caption, 'XUAT');
-                } catch (e) { console.warn('BG: Storage-fallback telegram failed:', e.message); }
+                // Still try to send base64 to Telegram if requested
+                if (sendTelegram) {
+                    try {
+                        const { sendTelegramPhotos } = await import('../services/telegram.js');
+                        const orderInfo = await db.getOrder(id);
+                        const orderNo = orderInfo?.soDon || id;
+                        let caption = `✅ <b>ĐƠN ĐÃ HOÀN THÀNH</b>\n📦 Mã: <b>#${orderNo}</b>\n`;
+                        caption += `👤 Khách: ${orderInfo?.khach || ''}\n`;
+                        const { data: fullTicket } = await supabase.from('export_tickets')
+                            .select('images').eq('order_id', id)
+                            .order('created_at', { ascending: false }).limit(1).single();
+                        const allImages = (fullTicket?.images || images).filter(i => i && !i.startsWith('blob:'));
+                        await sendTelegramPhotos(allImages, caption, 'XUAT');
+                    } catch (e) { console.warn('BG: Storage-fallback telegram failed:', e.message); }
+                }
             }
         });
 

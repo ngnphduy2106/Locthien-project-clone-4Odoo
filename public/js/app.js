@@ -9473,7 +9473,7 @@ async function submitDriverCompletion() {
                 const imgRes = await fetch(`/api/orders/${order.id}/add-proof-images`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ images: validImages })
+                    body: JSON.stringify({ images: validImages, sendTelegram: true })
                 });
                 const imgData = await imgRes.json();
                 if (imgData.error) console.warn('⚠️ Image upload warning:', imgData.msg);
@@ -9491,7 +9491,7 @@ async function submitDriverCompletion() {
                     const imgRes = await fetch(`/api/orders/${order.id}/add-proof-images`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ images: retryImages })
+                        body: JSON.stringify({ images: retryImages, sendTelegram: true })
                     });
                     const imgData = await imgRes.json();
                     if (!imgData.error) console.log(`✅ ${retryImages.length} images saved (after retry)`);
