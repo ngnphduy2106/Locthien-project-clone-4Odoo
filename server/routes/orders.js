@@ -2050,17 +2050,10 @@ router.post('/:id/complete', async (req, res) => {
                                 const pQty = Number(p.weight_kg || p.qty || p.quantity || 0);
                                 if (pName) msg += `📦 ${pName} — ${pQty.toLocaleString('vi-VN')} ${p.unit || 'Kg'}\n`;
                             });
-                            let proofImages = images || [];
-                            if (proofImages.length === 0) {
-                                try {
-                                    const ticketTable = isImport ? 'import_tickets' : 'export_tickets';
-                                    const { data: ticket } = await supabase.from(ticketTable).select('images').eq('order_id', id).order('created_at', { ascending: false }).limit(1).single();
-                                    if (ticket?.images?.length > 0) proofImages = ticket.images;
-                                } catch (e) { /* no images */ }
-                            }
-                            if (proofImages.length > 0) await sendTelegramPhotos(proofImages, msg, tgGroup);
-                            else await sendTelegramMessage(msg, tgGroup);
-                            console.log(`📨 Telegram sent to ${tgGroup} for ${orderNo}`);
+                            // NOTE: Images are sent to Telegram from add-proof-images endpoint
+                            // (called by client AFTER completion). Here we only send text notification.
+                            await sendTelegramMessage(msg, tgGroup);
+                            console.log(`📨 Telegram text sent to ${tgGroup} for ${orderNo}`);
                         } catch (tgErr) { console.error('Telegram error:', tgErr.message); }
                     }
 
@@ -2744,12 +2737,65 @@ router.post('/:id/add-proof-images', async (req, res) => {
                             .eq('id', freshTicket.id);
 
                         console.log(`📸 BG: Replaced ${cdnCount} base64 with CDN URLs for order ${id}`);
+
+                        // SEND TELEGRAM PHOTOS: Now that we have CDN URLs, send to Telegram
+                        // This is the CORRECT place — images are ready and uploaded
+                        try {
+                            const { sendTelegramPhotos } = await import('../services/telegram.js');
+                            const orderInfo = await db.getOrder(id);
+                            const orderNo = orderInfo?.soDon || orderInfo?.sale_order_no || id;
+                            const customer = orderInfo?.khach || orderInfo?.account_name || '';
+                            const driverName = orderInfo?.taiXe || orderInfo?.custom_field13 || '';
+                            const drvPlate = orderInfo?.bienSo || orderInfo?.custom_field14 || '';
+                            const assistant = orderInfo?.assistant_name || '';
+
+                            let caption = `✅ <b>ĐƠN ĐÃ HOÀN THÀNH</b>\n📦 Mã: <b>#${orderNo}</b>\n`;
+                            caption += `👤 Khách: <b>${customer}</b>\n`;
+                            if (driverName) caption += `🚛 TX: ${driverName}${drvPlate ? ` (${drvPlate})` : ''}\n`;
+                            if (assistant) caption += `👷 PX: ${assistant}\n`;
+                            // Add product summary
+                            (orderInfo?.products || orderInfo?.cart || []).forEach(p => {
+                                const pName = p.name || p.code || '';
+                                const pQty = Number(p.qty || 0);
+                                if (pName) caption += `📦 ${pName} — ${pQty.toLocaleString('vi-VN')} ${p.unit || 'Kg'}\n`;
+                            });
+
+                            // Use CDN URLs for Telegram (fast, reliable)
+                            const photoUrls = updatedWithUrls.filter(u => u && u.startsWith('http'));
+                            if (photoUrls.length > 0) {
+                                await sendTelegramPhotos(photoUrls, caption, 'XUAT');
+                                console.log(`📨 Telegram: ${photoUrls.length} proof photos sent for ${orderNo}`);
+                            }
+                        } catch (tgErr) {
+                            console.warn('BG: Telegram photo send failed:', tgErr.message);
+                        }
                     }
                 } catch (bgErr) {
                     console.warn('BG: CDN URL replacement failed:', bgErr.message);
                 }
+
+                // FALLBACK: If CDN upload failed, try sending base64 photos to Telegram
+                if (cdnCount === 0 && images.length > 0) {
+                    try {
+                        const { sendTelegramPhotos } = await import('../services/telegram.js');
+                        const orderInfo = await db.getOrder(id);
+                        const orderNo = orderInfo?.soDon || id;
+                        let caption = `✅ <b>ĐƠN ĐÃ HOÀN THÀNH</b>\n📦 Mã: <b>#${orderNo}</b>\n`;
+                        caption += `👤 Khách: ${orderInfo?.khach || ''}\n`;
+                        await sendTelegramPhotos(images.filter(i => i && !i.startsWith('blob:')), caption, 'XUAT');
+                    } catch (e) { console.warn('BG: Fallback telegram failed:', e.message); }
+                }
             } catch (storageErr) {
                 console.warn('BG: Storage upload failed (base64 preserved):', storageErr.message);
+                // Still try to send base64 to Telegram
+                try {
+                    const { sendTelegramPhotos } = await import('../services/telegram.js');
+                    const orderInfo = await db.getOrder(id);
+                    const orderNo = orderInfo?.soDon || id;
+                    let caption = `✅ <b>ĐƠN ĐÃ HOÀN THÀNH</b>\n📦 Mã: <b>#${orderNo}</b>\n`;
+                    caption += `👤 Khách: ${orderInfo?.khach || ''}\n`;
+                    await sendTelegramPhotos(images.filter(i => i && !i.startsWith('blob:')), caption, 'XUAT');
+                } catch (e) { console.warn('BG: Storage-fallback telegram failed:', e.message); }
             }
         });
 
