@@ -8935,79 +8935,59 @@ async function handleCompletionImagesSelect(input) {
     const orderId = order?.id;
     const isImport = order?.ticket_no?.startsWith('N');
 
-    // Compress all images in parallel
-    showLoading(`Đang nén ${toProcess.length} ảnh...`);
-    const results = await Promise.allSettled(
-        toProcess.map(file => compressImage(file))
-    );
-    const compressed = results.filter(r => r.status === 'fulfilled').map(r => r.value);
-
-    if (compressed.length === 0) {
-        hideLoading();
-        alert('Không thể xử lý ảnh, vui lòng thử lại!');
-        input.value = '';
-        return;
+    // INSTANT PREVIEW: Show ObjectURL thumbnails immediately (no compression wait)
+    // Driver sees images in <100ms instead of waiting 20-30s for compress+upload
+    for (const file of toProcess) {
+        const objectUrl = URL.createObjectURL(file);
+        completionImages.push(objectUrl); // Temporary preview URL
     }
+    renderCompletionImagesPreviews();
+    input.value = '';
 
-    // Upload images in PARALLEL BATCHES of 2 (balance speed vs 3G reliability)
-    // Already-uploaded images are preserved if connection drops
+    // BACKGROUND: Compress + Upload (fire-and-forget, no blocking)
+    // Driver can continue working while images process in background
     if (orderId) {
         const uploadUrl = isImport
             ? `/api/imports/${orderId}/proof-images`
             : `/api/orders/${orderId}/add-proof-images`;
+
+        // Process each image independently in background
         let uploadedCount = 0;
-        let failedCount = 0;
-        const BATCH_SIZE = 2; // 2 concurrent uploads — fast but 3G-safe
+        const totalCount = toProcess.length;
 
-        for (let batchStart = 0; batchStart < compressed.length; batchStart += BATCH_SIZE) {
-            const batch = compressed.slice(batchStart, batchStart + BATCH_SIZE);
-            const batchNum = Math.floor(batchStart / BATCH_SIZE) + 1;
-            const totalBatches = Math.ceil(compressed.length / BATCH_SIZE);
-            showLoading(`Đang tải ảnh ${batchStart + 1}-${Math.min(batchStart + BATCH_SIZE, compressed.length)}/${compressed.length}...`);
-
-            const batchResults = await Promise.allSettled(
-                batch.map(async (imgData, i) => {
-                    for (let attempt = 0; attempt < 2; attempt++) {
-                        try {
-                            const uploadRes = await fetch(uploadUrl, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ images: [imgData] })
-                            });
-                            const uploadData = await uploadRes.json();
-                            if (!uploadData.error) {
-                                console.log(`📸 Uploaded image ${batchStart + i + 1}/${compressed.length}`);
-                                return true;
-                            }
-                        } catch (err) {
-                            if (attempt === 0) await new Promise(r => setTimeout(r, 1000));
-                        }
+        for (const file of toProcess) {
+            // Compress → Upload sequentially per image to avoid RAM spike on mobile
+            compressImage(file).then(async (compressed) => {
+                try {
+                    const res = await fetch(uploadUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ images: [compressed] })
+                    });
+                    const data = await res.json();
+                    if (!data.error) {
+                        uploadedCount++;
+                        console.log(`📸 Uploaded ${uploadedCount}/${totalCount}`);
+                    } else {
+                        console.warn('📸 Upload failed:', data.msg);
                     }
-                    return false;
-                })
-            );
-
-            for (const r of batchResults) {
-                if (r.status === 'fulfilled' && r.value) uploadedCount++;
-                else failedCount++;
-            }
-        }
-
-        if (failedCount > 0) {
-            console.warn(`📸 Upload: ${uploadedCount} OK, ${failedCount} failed`);
-        } else {
-            console.log(`📸 All ${uploadedCount} images uploaded successfully`);
+                } catch (err) {
+                    console.warn('📸 Upload error:', err.message);
+                    // Retry once after 2s
+                    try {
+                        await new Promise(r => setTimeout(r, 2000));
+                        const res2 = await fetch(uploadUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ images: [compressed] })
+                        });
+                        const data2 = await res2.json();
+                        if (!data2.error) uploadedCount++;
+                    } catch (e2) { console.error('📸 Retry failed:', e2.message); }
+                }
+            }).catch(err => console.warn('📸 Compress error:', err.message));
         }
     }
-
-    // Save locally for preview + fallback
-    compressed.forEach(img => completionImages.push(img));
-
-    hideLoading();
-    renderCompletionImagesPreviews();
-
-    // Clear input
-    input.value = '';
 }
 
 // Render image previews

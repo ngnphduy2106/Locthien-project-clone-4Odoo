@@ -1306,10 +1306,9 @@ router.post('/:id/proof-images', async (req, res) => {
             return res.json(createResponse(true, 'Đã đạt giới hạn 10 ảnh!'));
         }
 
-        // Upload to Supabase Storage: convert base64 → CDN URLs
-        const imageUrls = await uploadImages(images.slice(0, totalAllowed), id);
-        console.log(`📸 Import storage: ${imageUrls.filter(u => u.startsWith('http')).length}/${images.length} uploaded`);
-        const updatedImages = [...existingImages, ...imageUrls];
+        // STEP 1: Save base64 to DB immediately (fast response)
+        const newImages = images.slice(0, totalAllowed);
+        const updatedImages = [...existingImages, ...newImages];
 
         const { error: updateError } = await getSupabase()
             .from('import_tickets')
@@ -1320,7 +1319,35 @@ router.post('/:id/proof-images', async (req, res) => {
             return res.json(createResponse(true, 'Lỗi lưu ảnh: ' + updateError.message));
         }
 
-        res.json(createResponse(false, `Đã thêm ${imageUrls.length} ảnh (${updatedImages.length}/10)!`));
+        res.json(createResponse(false, `Đã thêm ${newImages.length} ảnh (${updatedImages.length}/10)!`));
+
+        // STEP 2: BACKGROUND — Upload to Storage and replace base64 with CDN URLs
+        setImmediate(async () => {
+            try {
+                const imageUrls = await uploadImages(newImages, resolvedId);
+                const cdnCount = imageUrls.filter(u => u.startsWith('http')).length;
+                if (cdnCount === 0) return;
+
+                const { data: fresh } = await getSupabase()
+                    .from('import_tickets')
+                    .select('images')
+                    .eq('id', resolvedId)
+                    .single();
+
+                if (fresh) {
+                    const current = fresh.images || [];
+                    const replaced = current.map(img => {
+                        if (img.startsWith('http')) return img;
+                        const idx = newImages.indexOf(img);
+                        return (idx >= 0 && imageUrls[idx]?.startsWith('http')) ? imageUrls[idx] : img;
+                    });
+                    await getSupabase().from('import_tickets').update({ images: replaced }).eq('id', resolvedId);
+                    console.log(`📸 BG: Replaced ${cdnCount} base64 with CDN URLs for import ${resolvedId}`);
+                }
+            } catch (e) {
+                console.warn('BG: Import storage upload failed:', e.message);
+            }
+        });
 
     } catch (e) {
         console.error('Add import proof images error:', e.message);

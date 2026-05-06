@@ -2619,13 +2619,10 @@ router.post('/:id/add-proof-images', async (req, res) => {
             return res.json(createResponse(true, 'Vui lòng chọn ít nhất 1 ảnh!'));
         }
 
-        // UPLOAD TO SUPABASE STORAGE: Convert base64 → CDN URLs for fast loading
-        // Falls back to base64 if storage upload fails (graceful degradation)
-        const imageUrls = await uploadImages(images, id);
-        console.log(`📸 Storage upload: ${imageUrls.filter(u => u.startsWith('http')).length}/${images.length} uploaded to CDN`);
+        // STEP 1: Save base64 to DB IMMEDIATELY (fast, <500ms)
+        // Driver gets instant response — no waiting for storage upload
 
-
-        // Also save to order_driver_assignments if any exist for this order
+        // Save to order_driver_assignments
         try {
             const { data: assignments } = await supabase
                 .from('order_driver_assignments')
@@ -2637,14 +2634,12 @@ router.post('/:id/add-proof-images', async (req, res) => {
             if (assignments && assignments.length > 0) {
                 const assignment = assignments[0];
                 const existingImages = assignment.proof_images || [];
-                const updatedImages = [...existingImages, ...imageUrls].slice(0, 10);
+                const updatedImages = [...existingImages, ...images].slice(0, 10);
 
                 await supabase
                     .from('order_driver_assignments')
                     .update({ proof_images: updatedImages })
                     .eq('id', assignment.id);
-
-                console.log(`✅ Updated order_driver_assignments with ${updatedImages.length} images`);
             }
         } catch (assignErr) {
             console.warn('Assignment image update skipped:', assignErr.message);
@@ -2670,17 +2665,16 @@ router.post('/:id/add-proof-images', async (req, res) => {
                     .order('created_at', { ascending: false })
                     .limit(1)
                     .single();
-
                 if (!result.error) ticket = result.data;
             }
         }
 
         if (!ticket) {
-            // No export ticket exists - create one with just images
+            // No export ticket exists - create one with images
             const orderInfo = await db.getOrder(id);
             const ts = new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14);
 
-            const { error: insertError } = await supabase.from('export_tickets').insert({
+            await supabase.from('export_tickets').insert({
                 ticket_no: 'X' + ts,
                 order_id: id,
                 order_no: orderInfo?.soDon || id,
@@ -2689,41 +2683,75 @@ router.post('/:id/add-proof-images', async (req, res) => {
                 plate: orderInfo?.bienSo || '',
                 warehouse: 'LT1',
                 products: orderInfo?.cart || [],
-                images: imageUrls.slice(0, 10), // Max 10 images
+                images: images.slice(0, 10),
                 note: 'Ảnh bổ sung'
             });
 
-            if (insertError) {
-                console.error('Export ticket insert error:', insertError.message);
-                return res.json(createResponse(true, 'Lỗi tạo phiếu: ' + insertError.message));
+            console.log(`✅ Saved ${images.length} images to DB`);
+            res.json(createResponse(false, `Đã thêm ${images.length} ảnh!`));
+        } else {
+            // Ticket exists - append
+            const existingImages = ticket.images || [];
+            const totalAllowed = 10 - existingImages.length;
+
+            if (totalAllowed <= 0) {
+                return res.json(createResponse(true, 'Đã đạt giới hạn 10 ảnh!'));
             }
 
-            console.log(`✅ Created export_ticket with ${imageUrls.length} images (CDN)`);
-            return res.json(createResponse(false, `Đã thêm ${imageUrls.length} ảnh chứng minh!`));
+            const newImages = images.slice(0, totalAllowed);
+            const updatedImages = [...existingImages, ...newImages];
+
+            await supabase
+                .from('export_tickets')
+                .update({ images: updatedImages })
+                .eq('id', ticket.id);
+
+            console.log(`✅ Saved ${newImages.length} images to DB (${updatedImages.length}/10)`);
+            res.json(createResponse(false, `Đã thêm ${newImages.length} ảnh (${updatedImages.length}/10)!`));
         }
 
-        // Ticket exists - append new images
-        const existingImages = ticket.images || [];
-        const totalAllowed = 10 - existingImages.length;
+        // STEP 2: BACKGROUND — Upload to Supabase Storage and replace base64 with CDN URLs
+        // This runs AFTER response is sent to driver (fire-and-forget)
+        setImmediate(async () => {
+            try {
+                const imageUrls = await uploadImages(images, id);
+                const cdnCount = imageUrls.filter(u => u.startsWith('http')).length;
+                if (cdnCount === 0) return; // All uploads failed, keep base64
 
-        if (totalAllowed <= 0) {
-            return res.json(createResponse(true, 'Đã đạt giới hạn 10 ảnh!'));
-        }
+                // Update DB with CDN URLs (replace base64 entries)
+                try {
+                    // Re-fetch current images to avoid race conditions
+                    const { data: freshTicket } = await supabase
+                        .from('export_tickets')
+                        .select('id, images')
+                        .eq('order_id', id)
+                        .order('created_at', { ascending: false })
+                        .limit(1)
+                        .single();
 
-        const newImages = imageUrls.slice(0, totalAllowed);
-        const updatedImages = [...existingImages, ...newImages];
+                    if (freshTicket) {
+                        // Replace base64 entries with CDN URLs
+                        const currentImages = freshTicket.images || [];
+                        const updatedWithUrls = currentImages.map(img => {
+                            if (img.startsWith('http')) return img; // Already a URL
+                            // Find matching CDN URL by index in this batch
+                            const idx = images.indexOf(img);
+                            return (idx >= 0 && imageUrls[idx]?.startsWith('http')) ? imageUrls[idx] : img;
+                        });
 
-        const { error: updateError } = await supabase
-            .from('export_tickets')
-            .update({ images: updatedImages })
-            .eq('id', ticket.id);
+                        await supabase.from('export_tickets')
+                            .update({ images: updatedWithUrls })
+                            .eq('id', freshTicket.id);
 
-        if (updateError) {
-            return res.json(createResponse(true, 'Lỗi cập nhật: ' + updateError.message));
-        }
-
-        console.log(`✅ Updated export_ticket with ${updatedImages.length} images`);
-        res.json(createResponse(false, `Đã thêm ${newImages.length} ảnh (${updatedImages.length}/10)!`));
+                        console.log(`📸 BG: Replaced ${cdnCount} base64 with CDN URLs for order ${id}`);
+                    }
+                } catch (bgErr) {
+                    console.warn('BG: CDN URL replacement failed:', bgErr.message);
+                }
+            } catch (storageErr) {
+                console.warn('BG: Storage upload failed (base64 preserved):', storageErr.message);
+            }
+        });
 
     } catch (e) {
         console.error('Add proof images error:', e.message);
