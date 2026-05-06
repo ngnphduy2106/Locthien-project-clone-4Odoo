@@ -8960,29 +8960,10 @@ async function handleCompletionImagesSelect(input) {
                 completionImages[imgIdx] = compressed;
             }
 
-            // Upload to server in background (fire-and-forget)
-            if (uploadUrl) {
-                try {
-                    const res = await fetch(uploadUrl, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ images: [compressed] })
-                    });
-                    const data = await res.json();
-                    if (data.error) console.warn('📸 Upload failed:', data.msg);
-                    else console.log(`📸 Uploaded image ${i + 1}/${toProcess.length}`);
-                } catch (err) {
-                    console.warn('📸 Upload error, retrying...', err.message);
-                    try {
-                        await new Promise(r => setTimeout(r, 2000));
-                        await fetch(uploadUrl, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ images: [compressed] })
-                        });
-                    } catch (e2) { console.error('📸 Retry failed:', e2.message); }
-                }
-            }
+            // Images are stored client-side only until driver presses "Hoàn thành"
+            // Upload happens ONCE at completion time via submitDriverCompletion()
+            // This prevents premature Telegram notifications and duplicate DB entries
+            console.log(`📸 Image ${i + 1}/${toProcess.length} compressed (${(compressed.length / 1024).toFixed(0)}KB)`);
         }).catch(err => console.warn('📸 Compress error:', err.message));
     });
 }
