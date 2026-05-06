@@ -200,9 +200,11 @@ export async function getMisaOrders(retryCount = 0, fullSync = true) {
     };
 
     const orderMap = new Map();
-    const PAGE_SIZE = 1000; // Restored: RAM savings come from Map + explicit mapping, not page reduction
+    // MISA API actually returns max 100 orders per page regardless of PageSize param
+    const PAGE_SIZE = 100;
+    const MAX_PAGES = 50; // Safety: max 50 pages = 5000 orders (prevent infinite loop)
 
-    // PRIORITY 1: Fetch newest orders (no Page param = realtime data)
+    // PRIORITY 1: Fetch newest orders (Page 0 / no Page param = realtime data)
     try {
         console.log(`📡 [REALTIME] Fetching newest orders...`);
         const url = `${MISA_ORDERS_URL}?PageSize=${PAGE_SIZE}`;
@@ -227,9 +229,9 @@ export async function getMisaOrders(retryCount = 0, fullSync = true) {
         console.error(`❌ Realtime fetch error:`, e.message);
     }
 
-    // PRIORITY 2: Fetch historical pages (only if fullSync enabled)
+    // PRIORITY 2: Fetch ALL historical pages until no more data
     if (fullSync) {
-        for (let page = 1; page <= 3; page++) {
+        for (let page = 1; page <= MAX_PAGES; page++) {
             try {
                 await new Promise(r => setTimeout(r, 200));
                 console.log(`📡 [HISTORICAL] Page ${page}...`);
@@ -246,7 +248,8 @@ export async function getMisaOrders(retryCount = 0, fullSync = true) {
                 data.forEach(order => orderMap.set(order.sale_order_no, order));
                 console.log(`   + ${data.length} orders, ${orderMap.size - before} new`);
 
-                if (data.length < PAGE_SIZE) break; // Fixed: was < 100, should be < PAGE_SIZE
+                // Break when MISA returns fewer than requested — last page reached
+                if (data.length < PAGE_SIZE) break;
             } catch (e) {
                 console.error(`❌ Page ${page} error:`, e.message);
                 break;
@@ -319,7 +322,7 @@ async function getMisaOrderDetail(idOrName, isUuid = false) {
 
 // Track sync start time for stale lock detection
 let syncStartTime = 0;
-const SYNC_TIMEOUT_MS = 60_000;      // 60s max for a single sync cycle
+const SYNC_TIMEOUT_MS = 180_000;     // 180s (3 min) — needed for full MISA pagination (900+ orders)
 const STALE_LOCK_MS = 5 * 60_000;    // 5 min = definitely stuck
 
 export const syncMisaOrders = async () => {
