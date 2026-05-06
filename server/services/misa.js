@@ -895,13 +895,13 @@ const performSync = async () => {
                 skipTelegram = true;
             }
 
-            // TIME-BASED GUARD: Skip notification for orders created > 2 hours ago on MISA
-            // (Prevents re-notifying old orders after server restart)
+            // TIME-BASED GUARD: Skip notification for orders created > 7 days ago on MISA
+            // (Prevents re-notifying old orders after server restart or DB wipe)
             if (item.created_date) {
                 const orderCreatedMs = new Date(item.created_date).getTime();
-                const twoHoursAgo = Date.now() - (2 * 60 * 60 * 1000);
-                if (orderCreatedMs < twoHoursAgo) {
-                    console.log(`⏭️ Skipping notification for ${saleOrderNo} — created ${item.created_date} (older than 2h)`);
+                const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
+                if (orderCreatedMs < sevenDaysAgo) {
+                    console.log(`⏭️ Skipping notification for ${saleOrderNo} — created ${item.created_date} (older than 7 days)`);
                     skipTelegram = true;
                 }
             }
