@@ -874,16 +874,17 @@ const performSync = async () => {
             delete mappedOrder.custom_field13;
             delete mappedOrder.custom_field14;
 
-            // DEDUP: Skip if already notified in this process lifecycle
+            // DEDUP: Check if already notified in this process lifecycle
+            let skipTelegram = false;
             if (notifiedNewOrders.has(saleOrderNo)) {
-                console.log(`⏭️ Skipping ${saleOrderNo} — already notified`);
-                continue;
+                console.log(`⏭️ Skipping Telegram for ${saleOrderNo} — already notified`);
+                skipTelegram = true;
+            } else {
+                notifiedNewOrders.set(saleOrderNo, Date.now());
             }
 
-            // Mark as notified BEFORE addOrder + Telegram to prevent any race
-            notifiedNewOrders.set(saleOrderNo, Date.now());
+            // ALWAYS add to DB (prevents "sót đơn" if previous addOrder failed)
             existingIds.add(saleOrderNo); // prevent in-batch duplicates
-
             mappedOrder.createdAt = new Date().toISOString();
             const addResult = await db.addOrder(mappedOrder);
 
@@ -891,8 +892,7 @@ const performSync = async () => {
             // it was already notified in a previous server lifecycle — skip notification
             if (addResult && addResult.telegram_message_id) {
                 console.log(`⏭️ Skipping notification for ${saleOrderNo} — already has telegram_message_id`);
-                newCount++;
-                continue;
+                skipTelegram = true;
             }
 
             // TIME-BASED GUARD: Skip notification for orders created > 2 hours ago on MISA
@@ -902,14 +902,18 @@ const performSync = async () => {
                 const twoHoursAgo = Date.now() - (2 * 60 * 60 * 1000);
                 if (orderCreatedMs < twoHoursAgo) {
                     console.log(`⏭️ Skipping notification for ${saleOrderNo} — created ${item.created_date} (older than 2h)`);
-                    newCount++;
-                    continue;
+                    skipTelegram = true;
                 }
             }
 
             // Auto-clean dedup map: remove entries older than 24 hours
             for (const [key, ts] of notifiedNewOrders) {
                 if (Date.now() - ts > 24 * 60 * 60 * 1000) notifiedNewOrders.delete(key);
+            }
+
+            if (skipTelegram) {
+                newCount++; // Track as new order for summary logging
+                continue;
             }
 
             // FLOOD GUARD: If too many new orders in one batch, collect for summary instead
