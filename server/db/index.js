@@ -222,7 +222,7 @@ export const db = {
         const { useSupabase } = getMode();
         if (!useSupabase) return [];
 
-        const SYNC_COLUMNS = 'id,sale_order_no,sale_order_date,account_name,status,delivery_status,misa_id,description,owner_name,shipping_address,phone,mobile,receiver_mobile,contact_name,custom_field13,custom_field14,assistant_name,delivery_time,note,merged_order_no,delivery_note,telegram_message_id,sale_confirmed,sale_confirmed_at,sale_confirmed_by,admin_approved,admin_approved_at,admin_approved_by,local_items,is_pinned,sale_order_product_mappings';
+        const SYNC_COLUMNS = 'id,sale_order_no,sale_order_date,account_name,status,delivery_status,misa_id,description,owner_name,shipping_address,phone,contact_name,custom_field13,custom_field14,assistant_name,delivery_time,merged_order_no,delivery_note,telegram_message_id,sale_confirmed,sale_confirmed_at,sale_confirmed_by,admin_approved,admin_approved_at,admin_approved_by,local_items,is_pinned,sale_order_product_mappings';
 
         // PAGINATION: Supabase default limit = 1000 rows.
         // With 2000+ orders, we MUST paginate to get ALL orders for accurate sync.
