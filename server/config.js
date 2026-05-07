@@ -14,12 +14,13 @@ export const CONFIG = {
     // Google Drive
     FOLDER_ID: process.env.FOLDER_ID || '17n4ix3miAiQI7ekhwTQTjPnXhOgLmsho',
 
-    // Telegram
+    // Telegram (Group IDs from managed channels)
     TELEGRAM_TOKEN: process.env.TELEGRAM_TOKEN || '',
-    TELEGRAM_CHAT_NHAP: process.env.TELEGRAM_CHAT_NHAP || '',
-    TELEGRAM_CHAT_XUAT: process.env.TELEGRAM_CHAT_XUAT || '',
-    TELEGRAM_CHAT_NOTIFY: process.env.TELEGRAM_CHAT_NOTIFY || '',
-    TELEGRAM_CHAT_NOTIFY_NHAP: process.env.TELEGRAM_CHAT_NOTIFY_NHAP || '',
+    TELEGRAM_CHAT_DIEU_PHOI: process.env.TELEGRAM_CHAT_DIEU_PHOI || '-1003949258230', // Điều phối
+    TELEGRAM_CHAT_XUAT: process.env.TELEGRAM_CHAT_XUAT || '-1003922271250', // Xuất đơn hàng
+    TELEGRAM_CHAT_NHAP: process.env.TELEGRAM_CHAT_NHAP || '-1003912407275', // Nhập đơn hàng
+    TELEGRAM_CHAT_DELIVERY: process.env.TELEGRAM_CHAT_DELIVERY || '-1003916372862', // Phiếu giao hàng
+    TELEGRAM_CHAT_IMPORT_TICKETS: process.env.TELEGRAM_CHAT_IMPORT_TICKETS || '-1003908060354', // Phiếu nhập hàng
     TELEGRAM_CHAT_DRIVER: process.env.TELEGRAM_CHAT_DRIVER || '',
     TELEGRAM_CHAT_ERROR: process.env.TELEGRAM_CHAT_ERROR || '',
 
