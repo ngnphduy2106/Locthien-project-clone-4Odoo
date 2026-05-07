@@ -19,15 +19,17 @@ export function getNotifyGroupMentions() {
 
 export const sendTelegramMessage = async (text, type = 'NOTIFY', replyToMessageId = null) => {
     const token = process.env.TELEGRAM_TOKEN;
+    const { CONFIG } = await import('../config.js');
 
-    // Select chat ID based on type
-    let chatId = process.env.TELEGRAM_CHAT_NOTIFY;
-    if (type === 'NOTIFY_NHAP') chatId = process.env.TELEGRAM_CHAT_NOTIFY_NHAP;
-    if (type === 'NHAP') chatId = process.env.TELEGRAM_CHAT_NHAP;
-    if (type === 'XUAT') chatId = process.env.TELEGRAM_CHAT_XUAT;
-    if (type === 'DRIVER') chatId = process.env.TELEGRAM_CHAT_DRIVER;
-    if (type === 'SALES') chatId = process.env.TELEGRAM_CHAT_SALES;
-    if (type === 'ERROR') chatId = process.env.TELEGRAM_CHAT_ERROR;
+    // Select chat ID based on type — map old names to new config values
+    let chatId = CONFIG.TELEGRAM_CHAT_DIEU_PHOI; // Default: Điều phối
+    if (type === 'NOTIFY_NHAP' || type === 'IMPORT_TICKETS') chatId = CONFIG.TELEGRAM_CHAT_IMPORT_TICKETS;
+    if (type === 'NHAP') chatId = CONFIG.TELEGRAM_CHAT_NHAP;
+    if (type === 'XUAT') chatId = CONFIG.TELEGRAM_CHAT_XUAT;
+    if (type === 'DRIVER' || type === 'DELIVERY') chatId = CONFIG.TELEGRAM_CHAT_DELIVERY;
+    if (type === 'SALES') chatId = CONFIG.TELEGRAM_CHAT_DRIVER;
+    if (type === 'ERROR') chatId = CONFIG.TELEGRAM_CHAT_ERROR;
+    if (type === 'NOTIFY') chatId = CONFIG.TELEGRAM_CHAT_DIEU_PHOI;
 
     if (!token || !chatId || token.includes('YOUR_')) {
         console.warn(`⚠️ Telegram not configured for ${type}. token=${token ? 'SET' : 'MISSING'}, chatId=${chatId || 'MISSING'}. Skipping.`);
@@ -77,14 +79,16 @@ export const sendTelegramMessage = async (text, type = 'NOTIFY', replyToMessageI
  */
 export const sendTelegramPhotos = async (photoUrls, caption = '', type = 'XUAT', replyToMessageId = null) => {
     const token = process.env.TELEGRAM_TOKEN;
+    const { CONFIG } = await import('../config.js');
 
-    let chatId = process.env.TELEGRAM_CHAT_NOTIFY;
-    if (type === 'NOTIFY_NHAP') chatId = process.env.TELEGRAM_CHAT_NOTIFY_NHAP;
-    if (type === 'NHAP') chatId = process.env.TELEGRAM_CHAT_NHAP;
-    if (type === 'XUAT') chatId = process.env.TELEGRAM_CHAT_XUAT;
-    if (type === 'DRIVER') chatId = process.env.TELEGRAM_CHAT_DRIVER;
-    if (type === 'SALES') chatId = process.env.TELEGRAM_CHAT_SALES;
-    if (type === 'ERROR') chatId = process.env.TELEGRAM_CHAT_ERROR;
+    let chatId = CONFIG.TELEGRAM_CHAT_DIEU_PHOI; // Default: Điều phối
+    if (type === 'NOTIFY_NHAP' || type === 'IMPORT_TICKETS') chatId = CONFIG.TELEGRAM_CHAT_IMPORT_TICKETS;
+    if (type === 'NHAP') chatId = CONFIG.TELEGRAM_CHAT_NHAP;
+    if (type === 'XUAT') chatId = CONFIG.TELEGRAM_CHAT_XUAT;
+    if (type === 'DRIVER' || type === 'DELIVERY') chatId = CONFIG.TELEGRAM_CHAT_DELIVERY;
+    if (type === 'SALES') chatId = CONFIG.TELEGRAM_CHAT_DRIVER;
+    if (type === 'ERROR') chatId = CONFIG.TELEGRAM_CHAT_ERROR;
+    if (type === 'NOTIFY') chatId = CONFIG.TELEGRAM_CHAT_DIEU_PHOI;
 
     if (!token || !chatId || !photoUrls?.length) return null;
 
