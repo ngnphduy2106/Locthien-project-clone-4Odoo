@@ -2616,20 +2616,29 @@ router.post('/:id/add-proof-images', async (req, res) => {
             return res.json(createResponse(true, 'Vui lòng chọn ít nhất 1 ảnh!'));
         }
 
-        // STEP 1: Save base64 to DB IMMEDIATELY (fast, <500ms)
-        // Driver gets instant response — no waiting for storage upload
+        // STEP 0: Resolve order to get all possible IDs (prevents lookup misses)
+        const orderInfo = await db.getOrder(id);
+        const orderUuid = orderInfo?.id || id;
+        const orderSoDon = orderInfo?.soDon || orderInfo?.sale_order_no || id;
+        const lookupIds = [...new Set([orderUuid, orderSoDon, id])];
 
-        // Save to order_driver_assignments
+        console.log(`📸 Resolved IDs: uuid=${orderUuid}, soDon=${orderSoDon}, param=${id}`);
+
+        // STEP 1: Save images to DB IMMEDIATELY (fast response to driver)
+
+        // 1a. Save to order_driver_assignments (try all possible order_ids)
+        let assignmentId = null;
         try {
             const { data: assignments } = await supabase
                 .from('order_driver_assignments')
                 .select('id, proof_images')
-                .eq('order_id', id)
+                .in('order_id', lookupIds)
                 .order('created_at', { ascending: false })
                 .limit(1);
 
             if (assignments && assignments.length > 0) {
                 const assignment = assignments[0];
+                assignmentId = assignment.id;
                 const existingImages = assignment.proof_images || [];
                 const updatedImages = [...existingImages, ...images].slice(0, 10);
 
@@ -2637,44 +2646,37 @@ router.post('/:id/add-proof-images', async (req, res) => {
                     .from('order_driver_assignments')
                     .update({ proof_images: updatedImages })
                     .eq('id', assignment.id);
+                console.log(`📸 Assignment ${assignment.id}: ${existingImages.length} existing + ${images.length} new = ${updatedImages.length} total`);
+            } else {
+                console.log(`📸 No assignment found for order IDs: ${lookupIds.join(', ')}`);
             }
         } catch (assignErr) {
             console.warn('Assignment image update skipped:', assignErr.message);
         }
 
-        // Find existing export ticket
-        let { data: ticket, error } = await supabase
-            .from('export_tickets')
-            .select('id, images')
-            .eq('order_id', id)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single();
-
-        // If not found by order_id, try by order_no
-        if (error || !ticket) {
-            const orderInfo = await db.getOrder(id);
-            if (orderInfo?.soDon) {
-                const result = await supabase
-                    .from('export_tickets')
-                    .select('id, images')
-                    .eq('order_no', orderInfo.soDon)
-                    .order('created_at', { ascending: false })
-                    .limit(1)
-                    .single();
-                if (!result.error) ticket = result.data;
-            }
-        }
+        // 1b. Save to export_tickets (try multiple ID formats)
+        let ticket = null;
+        try {
+            // Build OR filter for all possible IDs
+            const orFilter = lookupIds.map(lid => `order_id.eq.${lid},order_no.eq.${lid}`).join(',');
+            const { data: ticketData } = await supabase
+                .from('export_tickets')
+                .select('id, images')
+                .or(orFilter)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .single();
+            ticket = ticketData;
+        } catch (e) { /* no ticket found */ }
 
         if (!ticket) {
             // No export ticket exists - create one with images
-            const orderInfo = await db.getOrder(id);
             const ts = new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14);
 
             await supabase.from('export_tickets').insert({
                 ticket_no: 'X' + ts,
-                order_id: id,
-                order_no: orderInfo?.soDon || id,
+                order_id: orderUuid,
+                order_no: orderSoDon,
                 customer_name: orderInfo?.khach || orderInfo?.account_name || '',
                 driver_name: orderInfo?.taiXe || 'Admin',
                 plate: orderInfo?.bienSo || '',
@@ -2684,10 +2686,10 @@ router.post('/:id/add-proof-images', async (req, res) => {
                 note: 'Ảnh bổ sung'
             });
 
-            console.log(`✅ Saved ${images.length} images to DB`);
+            console.log(`✅ Created export ticket with ${images.length} images`);
             res.json(createResponse(false, `Đã thêm ${images.length} ảnh!`));
         } else {
-            // Ticket exists - append
+            // Ticket exists - append new images
             const existingImages = ticket.images || [];
             const totalAllowed = 10 - existingImages.length;
 
@@ -2703,60 +2705,88 @@ router.post('/:id/add-proof-images', async (req, res) => {
                 .update({ images: updatedImages })
                 .eq('id', ticket.id);
 
-            console.log(`✅ Saved ${newImages.length} images to DB (${updatedImages.length}/10)`);
+            console.log(`✅ Appended ${newImages.length} images to ticket ${ticket.id} (${updatedImages.length}/10)`);
             res.json(createResponse(false, `Đã thêm ${newImages.length} ảnh (${updatedImages.length}/10)!`));
         }
 
-        // STEP 2: BACKGROUND — Upload to Supabase Storage, replace base64, send Telegram
-        // This runs AFTER response is sent to driver (fire-and-forget)
+        // STEP 2: BACKGROUND — Upload to Supabase Storage (CDN), replace base64, send Telegram
         setImmediate(async () => {
-            // 2a. Try CDN upload (non-blocking, best-effort)
+            // 2a. CDN upload (non-blocking, best-effort)
+            let cdnUrls = null;
             try {
-                const imageUrls = await uploadImages(images, id);
-                const cdnCount = imageUrls.filter(u => u.startsWith('http')).length;
+                cdnUrls = await uploadImages(images, orderUuid);
+                const cdnCount = cdnUrls.filter(u => u.startsWith('http')).length;
+                console.log(`📸 BG: Uploaded ${cdnCount}/${images.length} images to CDN`);
 
                 if (cdnCount > 0) {
-                    // Replace base64 in DB with CDN URLs
+                    // Replace base64 with CDN URLs in export_tickets
                     try {
+                        const orFilter = lookupIds.map(lid => `order_id.eq.${lid},order_no.eq.${lid}`).join(',');
                         const { data: freshTicket } = await supabase
                             .from('export_tickets')
                             .select('id, images')
-                            .eq('order_id', id)
+                            .or(orFilter)
                             .order('created_at', { ascending: false })
                             .limit(1)
                             .single();
 
                         if (freshTicket) {
                             const currentImages = freshTicket.images || [];
+                            // Replace: for each current image that's base64, find its CDN URL
                             const updatedWithUrls = currentImages.map(img => {
-                                if (img.startsWith('http')) return img;
+                                if (img.startsWith('http')) return img; // Already CDN
+                                // Find matching base64 in the batch we just uploaded
                                 const idx = images.indexOf(img);
-                                return (idx >= 0 && imageUrls[idx]?.startsWith('http')) ? imageUrls[idx] : img;
+                                if (idx >= 0 && cdnUrls[idx]?.startsWith('http')) return cdnUrls[idx];
+                                return img; // Keep as-is if no match
                             });
 
                             await supabase.from('export_tickets')
                                 .update({ images: updatedWithUrls })
                                 .eq('id', freshTicket.id);
-
-                            console.log(`📸 BG: Replaced ${cdnCount} base64 with CDN URLs for order ${id}`);
+                            console.log(`📸 BG: Replaced base64 with CDN in export_ticket ${freshTicket.id}`);
                         }
                     } catch (bgErr) {
-                        console.warn('BG: CDN URL replacement failed:', bgErr.message);
+                        console.warn('BG: CDN URL replacement in export_tickets failed:', bgErr.message);
                     }
-                } else {
-                    console.warn(`⚠️ BG: CDN upload returned 0 URLs for order ${id} — keeping base64`);
+
+                    // Also replace in assignment proof_images
+                    if (assignmentId) {
+                        try {
+                            const { data: freshAssign } = await supabase
+                                .from('order_driver_assignments')
+                                .select('id, proof_images')
+                                .eq('id', assignmentId)
+                                .single();
+
+                            if (freshAssign) {
+                                const currentImgs = freshAssign.proof_images || [];
+                                const updatedAssignImgs = currentImgs.map(img => {
+                                    if (img.startsWith('http')) return img;
+                                    const idx = images.indexOf(img);
+                                    if (idx >= 0 && cdnUrls[idx]?.startsWith('http')) return cdnUrls[idx];
+                                    return img;
+                                });
+
+                                await supabase.from('order_driver_assignments')
+                                    .update({ proof_images: updatedAssignImgs })
+                                    .eq('id', assignmentId);
+                                console.log(`📸 BG: Replaced base64 with CDN in assignment ${assignmentId}`);
+                            }
+                        } catch (bgErr) {
+                            console.warn('BG: CDN URL replacement in assignments failed:', bgErr.message);
+                        }
+                    }
                 }
             } catch (storageErr) {
                 console.warn('BG: Storage upload failed (base64 preserved):', storageErr.message);
             }
 
-            // 2b. Send Telegram photos — ALWAYS runs when sendTelegram=true
-            // Uses ALL images from ticket (includes previously uploaded images)
+            // 2b. Send Telegram photos
             if (sendTelegram) {
                 try {
                     const { sendTelegramPhotos } = await import('../services/telegram.js');
-                    const orderInfo = await db.getOrder(id);
-                    const orderNo = orderInfo?.soDon || orderInfo?.sale_order_no || id;
+                    const orderNo = orderSoDon;
                     const customer = orderInfo?.khach || orderInfo?.account_name || '';
                     const driverName = orderInfo?.taiXe || orderInfo?.custom_field13 || '';
                     const drvPlate = orderInfo?.bienSo || orderInfo?.custom_field14 || '';
@@ -2772,17 +2802,13 @@ router.post('/:id/add-proof-images', async (req, res) => {
                         if (pName) caption += `📦 ${pName} — ${pQty.toLocaleString('vi-VN')} ${p.unit || 'Kg'}\n`;
                     });
 
-                    // Fetch ALL images from the ticket (includes CDN URLs + any remaining base64)
-                    const { data: finalTicket } = await supabase.from('export_tickets')
-                        .select('images').eq('order_id', id)
-                        .order('created_at', { ascending: false }).limit(1).single();
-
-                    const allImages = (finalTicket?.images || images)
+                    // Use CDN URLs if available, otherwise fall back to original images
+                    const photosToSend = (cdnUrls || images)
                         .filter(i => i && !i.startsWith('blob:'));
 
-                    if (allImages.length > 0) {
-                        await sendTelegramPhotos(allImages, caption, 'XUAT');
-                        console.log(`📨 Telegram: ${allImages.length} proof photos sent for ${orderNo}`);
+                    if (photosToSend.length > 0) {
+                        await sendTelegramPhotos(photosToSend, caption, 'XUAT');
+                        console.log(`📨 Telegram: ${photosToSend.length} proof photos sent for ${orderNo}`);
                     } else {
                         console.warn(`⚠️ No valid images for Telegram on order ${orderNo}`);
                     }

@@ -572,21 +572,8 @@ function initApp() {
     // Initialize Flatpickr date pickers with dd/mm/yyyy format
     initDatePickers();
 
-    // Show appropriate section based on role
-    const normalizedRole = (state.user?.role || '').toLowerCase();
-    const isDriverRole = normalizedRole === 'driver' || normalizedRole === 'assistant' || normalizedRole === 'phụ xe';
-    const isSalesRole = normalizedRole === 'sales' || normalizedRole === 'nhân viên kinh doanh' || normalizedRole === 'nhân viên' || normalizedRole === 'kinh doanh';
-    const isGuardRole = normalizedRole === 'guard' || normalizedRole === 'bảo vệ' || normalizedRole === 'bao ve';
-
-    if (isDriverRole) {
-        showSection('my-orders');
-    } else if (isSalesRole) {
-        showSection('order-history');
-    } else if (isGuardRole) {
-        showSection('pending-orders');
-    } else {
-        showSection('dashboard');
-    }
+    // All roles land on dashboard — widget visibility is handled by DashboardModule
+    showSection('dashboard');
 
     // Check for remote force-reload flag
     checkForceReload();
@@ -698,9 +685,9 @@ function applyRoleBasedUI(role) {
     if (navCreateOrder) navCreateOrder.style.display = isDispatcher ? 'none' : 'block';
     if (navCreateExport) navCreateExport.style.display = isDispatcher ? 'none' : 'block';
 
-    // Hide Dashboard for DRIVERS
+    // Dashboard visible for ALL roles — DashboardModule handles per-role widget scoping
     const navDashboard = window.$('#nav-dashboard');
-    if (navDashboard) navDashboard.style.display = isDriver ? 'none' : 'block';
+    if (navDashboard) navDashboard.style.display = 'block';
 
     // Show nav-users for admin (but NOT dispatcher)
     const navUsers = window.$('#nav-users');
@@ -725,7 +712,7 @@ function applyRoleBasedUI(role) {
 
         // Hide dashboard
         const navDashboard = window.$('#nav-dashboard');
-        if (navDashboard) navDashboard.style.display = 'none';
+        // Dashboard stays visible for all roles (DashboardModule handles scoping)
 
         // Hide order management items (keep only my-orders)
         const navDispatch = window.$('#nav-dispatch');
@@ -781,7 +768,7 @@ function applyRoleBasedUI(role) {
 
         // Hide dashboard
         const navDashboard = window.$('#nav-dashboard');
-        if (navDashboard) navDashboard.style.display = 'none';
+        // Dashboard stays visible for all roles (DashboardModule handles scoping)
 
         // Hide all order management items except order-history and pending-orders
         const navDispatch = window.$('#nav-dispatch');
@@ -808,10 +795,7 @@ function applyRoleBasedUI(role) {
         // Also hide nav-users
         if (navUsers) navUsers.style.display = 'none';
 
-        // Auto-navigate to pending-orders on login (default for viewer)
-        setTimeout(() => {
-            showSection('pending-orders');
-        }, 100);
+        // All roles start on dashboard (removed auto-redirect)
     }
 
     // Sales restrictions - only order management items
@@ -821,7 +805,7 @@ function applyRoleBasedUI(role) {
 
         // Hide dashboard
         const navDashboard = window.$('#nav-dashboard');
-        if (navDashboard) navDashboard.style.display = 'none';
+        // Dashboard stays visible for all roles (DashboardModule handles scoping)
 
         // Hide unneeded order management features
         const navDispatch = window.$('#nav-dispatch');
@@ -855,7 +839,7 @@ function applyRoleBasedUI(role) {
 
         // Hide dashboard
         const navDashboard = window.$('#nav-dashboard');
-        if (navDashboard) navDashboard.style.display = 'none';
+        // Dashboard stays visible for all roles (DashboardModule handles scoping)
 
         // Hide export/dispatch related
         const navDispatch = window.$('#nav-dispatch');
@@ -902,8 +886,7 @@ function applyRoleBasedUI(role) {
         const navOrderHistory = window.$('#nav-order-history');
         if (navOrderHistory) navOrderHistory.style.display = 'none';
 
-        // Auto-navigate to pending-orders
-        setTimeout(() => { showSection('pending-orders'); }, 100);
+        // All roles start on dashboard (removed auto-redirect)
     }
 
     // Staff restrictions - view export orders in ERP (pending + history + confirm)
@@ -913,7 +896,7 @@ function applyRoleBasedUI(role) {
 
         // Hide dashboard
         const navDashboard = window.$('#nav-dashboard');
-        if (navDashboard) navDashboard.style.display = 'none';
+        // Dashboard stays visible for all roles (DashboardModule handles scoping)
 
         // Hide order management items
         const navDispatch = window.$('#nav-dispatch');
@@ -941,8 +924,7 @@ function applyRoleBasedUI(role) {
         // Show confirm-orders for checking export orders
         if (navConfirmOrders) navConfirmOrders.style.display = 'block';
 
-        // Auto-navigate to pending-orders
-        setTimeout(() => { showSection('pending-orders'); }, 100);
+        // All roles start on dashboard (removed auto-redirect)
     }
 
     // Update my-orders badge for all roles
@@ -1040,37 +1022,13 @@ function onDashboardPeriodChange() {
 window.onDashboardPeriodChange = onDashboardPeriodChange;
 
 async function loadDashboard() {
+    // Delegate to DashboardModule (role-aware rendering)
+    if (window.DashboardModule) {
+        DashboardModule.init();
+        return;
+    }
+    // Fallback: legacy inline logic (should not reach here)
     try {
-        // Get period filter
-        const periodSelect = window.$('#dashboard-period');
-        const period = periodSelect?.value || 'month';
-
-        const currentUser = (window.state?.user || state?.user) || {};
-        const isAdmin = ['admin', 'tester'].includes(String(currentUser.role || '').toLowerCase());
-
-        // === FAST PATH: Use cached dashboard stats for simple views ===
-        // For 'month' (default), 'all', or when we don't need chart data
-        const dashboardStats = await api.getDashboardStats();
-        const statsData = dashboardStats?.data || dashboardStats || {};
-
-        // Update stat cards from server-side cached stats
-        const elOrderCount = window.$('#stat-order-count');
-        const elOrderValue = window.$('#stat-order-value');
-        const elPendingCount = window.$('#stat-pending-count');
-        const elCompletedCount = window.$('#stat-completed-count');
-        const elCompletedRate = window.$('#stat-completed-rate');
-        const elUpdateTime = window.$('#dashboard-update-time');
-
-        const totalOrders = statsData.totalOrders || 0;
-        const completedTotal = statsData.completedTotal || 0;
-        const pendingOrders = statsData.pendingOrders || 0;
-        const completedRate = totalOrders > 0 ? Math.round((completedTotal / totalOrders) * 100) : 0;
-
-        if (elOrderCount) elOrderCount.textContent = totalOrders.toLocaleString('vi-VN');
-        if (elPendingCount) elPendingCount.textContent = pendingOrders;
-        if (elCompletedCount) elCompletedCount.textContent = completedTotal;
-        if (elCompletedRate) elCompletedRate.textContent = `${completedRate}% tỷ lệ hoàn thành`;
-        if (elUpdateTime) elUpdateTime.textContent = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
 
         // === CHARTS: Need order-level data — use pending+assigned from dispatch load ===
         // Only load full orders for charts when needed
@@ -5134,27 +5092,28 @@ async function submitDelivery() {
         if (window.DispatchModule?.loadOrders) window.DispatchModule.loadOrders();
         if (window.MyOrdersModule?.loadMyOrders) window.MyOrdersModule.loadMyOrders();
 
-        // BACKGROUND: Upload images one-by-one (non-blocking, with retry)
-        // Last image sends sendTelegram:true to trigger consolidated album
+        // BACKGROUND: Upload ALL images in a single batch (prevents race condition)
+        // Last batch sends sendTelegram:true to trigger consolidated album
         if (validImages.length > 0 && !order.merged_order_no) {
             const uploadUrl = `/api/orders/${order.id}/add-proof-images`;
             (async () => {
-                for (let i = 0; i < validImages.length; i++) {
-                    const isLast = (i === validImages.length - 1);
-                    for (let attempt = 0; attempt < 2; attempt++) {
-                        try {
-                            const r = await fetch(uploadUrl, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ images: [validImages[i]], sendTelegram: isLast })
-                            });
-                            const d = await r.json();
-                            if (!d.error) { console.log(`📸 BG: image ${i+1}/${validImages.length} OK${isLast ? ' (+ Telegram)' : ''}`); break; }
-                        } catch (e) {
-                            if (attempt === 0) await new Promise(r => setTimeout(r, 1500));
-                            else console.warn(`📸 BG: image ${i+1} failed after retry`);
+                for (let attempt = 0; attempt < 3; attempt++) {
+                    try {
+                        const r = await fetch(uploadUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ images: validImages, sendTelegram: true })
+                        });
+                        const d = await r.json();
+                        if (!d.error) {
+                            console.log(`📸 BG: ${validImages.length} images uploaded OK (+ Telegram)`);
+                            break;
                         }
+                        console.warn(`📸 BG: upload attempt ${attempt + 1} failed: ${d.msg || d.message}`);
+                    } catch (e) {
+                        console.warn(`📸 BG: upload attempt ${attempt + 1} error: ${e.message}`);
                     }
+                    if (attempt < 2) await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
                 }
             })();
         }

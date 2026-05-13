@@ -283,153 +283,14 @@
 
                 <!-- ==================== DASHBOARD SECTION ==================== -->
                 <section id="section-dashboard">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-                        <h2 class="page-heading" style="margin-bottom:0;">Tổng quan thương mại</h2>
-                        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-                            <select id="dashboard-period" class="form-select" style="width:auto;"
-                                onchange="onDashboardPeriodChange()">
-                                <option value="all">Tất cả</option>
-                                <option value="today">Hôm nay</option>
-                                <option value="week">Tuần này</option>
-                                <option value="month" selected>Tháng này</option>
-                                <option value="year">Năm nay</option>
-                                <option value="custom">Khoảng ngày...</option>
-                            </select>
-                            <div id="dashboard-date-range" class="hidden"
-                                style="display:flex; gap:6px; align-items:center;">
-                                <input type="text" id="dashboard-date-from" class="form-control"
-                                    style="width:auto; padding:6px 10px;" placeholder="dd/mm/yyyy">
-                                <span>đến</span>
-                                <input type="text" id="dashboard-date-to" class="form-control"
-                                    style="width:auto; padding:6px 10px;" placeholder="dd/mm/yyyy">
-                            </div>
-                            <button class="btn btn-outline" onclick="loadDashboard()" style="padding:8px 12px;">
-                                <i class="bi bi-arrow-clockwise"></i>
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Top Stat Cards Row -->
-                    <div class="stat-cards" style="grid-template-columns: repeat(4, 1fr);">
-                        <div class="stat-card" style="background: linear-gradient(135deg, #4dabf7, #339af0);">
-                            <div class="stat-card-content">
-                                <div class="stat-card-label" style="color:#fff; opacity:0.9;">Số lượng đơn hàng</div>
-                                <div class="stat-card-value" id="stat-order-count" style="color:#fff; font-size:2rem;">0
-                                </div>
-                                <div class="stat-card-change" style="color:#fff; opacity:0.8;">
-                                    <i class="bi bi-graph-up"></i>
-                                    <span id="stat-order-trend">--</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="stat-card" id="money-stat-card"
-                            style="background: linear-gradient(135deg, #51cf66, #40c057);">
-                            <div class="stat-card-content">
-                                <div class="stat-card-label" style="color:#fff; opacity:0.9;">Giá trị đơn hàng</div>
-                                <div class="stat-card-value" id="stat-order-value"
-                                    style="color:#fff; font-size:1.5rem;">0đ</div>
-                                <div class="stat-card-change" style="color:#fff; opacity:0.8;">
-                                    <i class="bi bi-currency-dollar"></i>
-                                    <span id="stat-value-trend">--</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="stat-card" style="background: linear-gradient(135deg, #ffa94d, #fd7e14);">
-                            <div class="stat-card-content">
-                                <div class="stat-card-label" style="color:#fff; opacity:0.9;">Đơn chờ xử lý</div>
-                                <div class="stat-card-value" id="stat-pending-count"
-                                    style="color:#fff; font-size:2rem;">0</div>
-                                <div class="stat-card-change" style="color:#fff; opacity:0.8;">
-                                    <i class="bi bi-clock-history"></i>
-                                    <span>Cần phân tài xế</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="stat-card" style="background: linear-gradient(135deg, #845ef7, #7950f2);">
-                            <div class="stat-card-content">
-                                <div class="stat-card-label" style="color:#fff; opacity:0.9;">Đơn hoàn thành</div>
-                                <div class="stat-card-value" id="stat-completed-count"
-                                    style="color:#fff; font-size:2rem;">0</div>
-                                <div class="stat-card-change" style="color:#fff; opacity:0.8;">
-                                    <i class="bi bi-check-circle"></i>
-                                    <span id="stat-completed-rate">--</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Charts Row -->
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-top:20px;">
-                        <div class="chart-card">
-                            <div class="chart-card-header">
-                                <h3 class="chart-card-title">Số lượng đơn hàng theo thời gian</h3>
-                                <p class="chart-card-subtitle" id="chart-orders-subtitle">Dữ liệu tháng này</p>
-                            </div>
-                            <div style="height: 300px; position: relative;">
-                                <canvas id="ordersTimeChart"></canvas>
-                            </div>
-                        </div>
-
-                        <div class="chart-card" id="money-chart-card">
-                            <div class="chart-card-header">
-                                <h3 class="chart-card-title">Giá trị đơn hàng theo thời gian</h3>
-                                <p class="chart-card-subtitle" id="chart-value-subtitle">Dữ liệu tháng này</p>
-                            </div>
-                            <div style="height: 300px; position: relative;">
-                                <canvas id="valueTimeChart"></canvas>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Analytics Row -->
-                    <div class="analytics-row"
-                        style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:20px; margin-top:20px;">
-                        <div class="chart-card">
-                            <div class="chart-card-header">
-                                <h3 class="chart-card-title">Top sản phẩm bán chạy</h3>
-                            </div>
-                            <div id="top-products-list" style="padding:16px;">
-                                <div style="text-align:center; color:var(--text-muted); padding:40px;">
-                                    <i class="bi bi-box-seam" style="font-size:32px; opacity:0.5;"></i>
-                                    <p style="margin-top:8px;">Đang tải...</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="chart-card" id="top-customers-card">
-                            <div class="chart-card-header">
-                                <h3 class="chart-card-title">Top khách hàng</h3>
-                            </div>
-                            <div id="top-customers-list" style="padding:16px;">
-                                <div style="text-align:center; color:var(--text-muted); padding:40px;">
-                                    <i class="bi bi-people" style="font-size:32px; opacity:0.5;"></i>
-                                    <p style="margin-top:8px;">Đang tải...</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="chart-card" id="top-drivers-card">
-                            <div class="chart-card-header">
-                                <h3 class="chart-card-title">Top tài xế</h3>
-                            </div>
-                            <div id="top-drivers-list" style="padding:16px;">
-                                <div style="text-align:center; color:var(--text-muted); padding:40px;">
-                                    <i class="bi bi-truck" style="font-size:32px; opacity:0.5;"></i>
-                                    <p style="margin-top:8px;">Đang tải...</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Last Update Time -->
-                    <div style="text-align:right; margin-top:16px; color:var(--text-muted); font-size:12px;">
-                        <span>Số liệu tính đến: <span id="dashboard-update-time">--:--</span></span>
-                        <a href="#" onclick="loadDashboard(); return false;" style="margin-left:8px;">Tải lại</a>
+                    <!-- Dashboard content rendered dynamically by DashboardModule -->
+                    <div class="db-loading" style="padding:60px; text-align:center;">
+                        <div class="loading-spinner" style="margin:0 auto 16px;"></div>
+                        <p style="color:var(--text-muted);">Đang tải tổng quan...</p>
                     </div>
                 </section>
+
+
 
                 <!-- ==================== DISPATCH SECTION ==================== -->
                 <section id="section-dispatch" class="hidden">
@@ -2025,7 +1886,8 @@
     <script src="/js/api.js?v=18"></script>
     <script src="/js/notifications.js?v=7"></script>
     <script src="/js/announcements.js?v=1"></script>
-    <script src="/js/app.js?v=27"></script>
+    <script src="/js/modules/dashboard.js?v=4"></script>
+    <script src="/js/app.js?v=28"></script>
     <script src="/js/modules/create-order.js?v=1"></script>
     <script src="/js/modules/order-history.js?v=101"></script>
     <script src="/js/modules/suppliers.js?v=1"></script>
