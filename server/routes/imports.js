@@ -43,7 +43,8 @@ router.get('/', async (req, res) => {
         const tab = req.query.tab || '';
 
         // Columns to fetch for listing (excludes 'images' — base64 data is huge)
-        const LISTING_COLUMNS = 'id,ticket_no,supplier_name,supplier_address,products,total_qty,expected_date,warehouse,status,assigned_driver,assigned_plate,assistant_name,note,description,created_at,created_by,merged_order_no,is_pinned,has_external_driver';
+        // NOTE: 'has_external_driver' is NOT a DB column — it's computed from assignments
+        const LISTING_COLUMNS = 'id,ticket_no,supplier_name,supplier_address,products,total_qty,expected_date,warehouse,status,assigned_driver,assigned_plate,assistant_name,note,description,created_at,created_by,merged_order_no,is_pinned';
 
         // === COMPLETED TAB: Paginated ===
         if (tab === 'completed') {
