@@ -1480,7 +1480,11 @@ async function loadImportTickets() {
     container.innerHTML = '<div style="text-align:center; padding:40px;"><i class="bi bi-arrow-repeat spin"></i> Đang tải phiếu nhập...</div>';
 
     try {
-        const res = await api.getImports();
+        // Fetch active imports (fast ~40KB) + completed separately
+        const [activeRes, completedRes] = await Promise.all([
+            api.getImports(),
+            api.getImportsCompleted(1, 200) // First 200 completed for history
+        ]);
 
         // Discard stale response if user already switched tabs
         if (requestId !== state._loadRequestId || state.currentOrderType !== 'import') {
@@ -1488,14 +1492,20 @@ async function loadImportTickets() {
             return;
         }
 
-        const imports = res?.data || [];
+        const activeImports = activeRes?.data || [];
+        const completedImports = completedRes?.data || [];
 
         // Group by status
         state.imports = {
-            pending: imports.filter(i => i.status === 'pending' || i.status === 'Chưa thực hiện'),
-            assigned: imports.filter(i => i.status === 'assigned' || i.status === 'in_transit'),
-            completed: imports.filter(i => i.status === 'completed')
+            pending: activeImports.filter(i => i.status === 'pending' || i.status === 'Chưa thực hiện'),
+            assigned: activeImports.filter(i => i.status === 'assigned' || i.status === 'in_transit'),
+            completed: completedImports
         };
+
+        // Update completed count badge from API response
+        const completedCount = completedRes?.pagination?.total || completedImports.length;
+        const completedBadge = document.querySelector('[data-tab="completed"] .badge, [onclick*="completed"] .badge');
+        if (completedBadge) completedBadge.textContent = completedCount;
 
         // Load unread counts for badges
         await loadUnreadCounts();
