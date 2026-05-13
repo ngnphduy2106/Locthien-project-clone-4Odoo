@@ -23,7 +23,10 @@ export async function uploadImage(base64Data, orderId) {
             return { url: null, error: 'Invalid base64 format' };
         }
 
-        const ext = matches[1] === 'webp' ? 'webp' : 'jpg';
+        const rawExt = matches[1].toLowerCase(); // jpg, jpeg, png, webp, gif
+        const ext = rawExt === 'jpeg' ? 'jpg' : rawExt; // normalize filename extension
+        // Supabase requires 'image/jpeg' not 'image/jpg' — always normalize MIME type
+        const mimeType = rawExt === 'jpg' ? 'image/jpeg' : `image/${rawExt}`;
         const buffer = Buffer.from(matches[2], 'base64');
 
         // Generate unique filename: orderId/timestamp_random.ext
@@ -35,7 +38,7 @@ export async function uploadImage(base64Data, orderId) {
         const { data, error } = await supabase.storage
             .from(BUCKET)
             .upload(filePath, buffer, {
-                contentType: `image/${ext}`,
+                contentType: mimeType,
                 cacheControl: '31536000', // 1 year cache (images never change)
                 upsert: false
             });

@@ -1364,9 +1364,18 @@ router.post('/:id/proof-images', async (req, res) => {
             return res.json(createResponse(true, 'Đã đạt giới hạn 10 ảnh!'));
         }
 
-        // STEP 1: Save base64 to DB immediately (fast response)
+        // STEP 1: Upload to Storage FIRST, then save URLs to DB
+        // This ensures images are always stored as CDN URLs, never base64 in DB
         const newImages = images.slice(0, totalAllowed);
-        const updatedImages = [...existingImages, ...newImages];
+        let imageUrls;
+        try {
+            imageUrls = await uploadImages(newImages, resolvedId);
+        } catch (uploadErr) {
+            console.error('Storage upload failed, falling back to base64:', uploadErr.message);
+            imageUrls = newImages; // Fallback: save base64 directly
+        }
+
+        const updatedImages = [...existingImages, ...imageUrls];
 
         const { error: updateError } = await getSupabase()
             .from('import_tickets')
@@ -1377,35 +1386,10 @@ router.post('/:id/proof-images', async (req, res) => {
             return res.json(createResponse(true, 'Lỗi lưu ảnh: ' + updateError.message));
         }
 
+        const cdnCount = imageUrls.filter(u => u.startsWith('http')).length;
+        console.log(`📸 Import proof: saved ${imageUrls.length} images (${cdnCount} CDN, ${imageUrls.length - cdnCount} base64 fallback)`);
+
         res.json(createResponse(false, `Đã thêm ${newImages.length} ảnh (${updatedImages.length}/10)!`));
-
-        // STEP 2: BACKGROUND — Upload to Storage and replace base64 with CDN URLs
-        setImmediate(async () => {
-            try {
-                const imageUrls = await uploadImages(newImages, resolvedId);
-                const cdnCount = imageUrls.filter(u => u.startsWith('http')).length;
-                if (cdnCount === 0) return;
-
-                const { data: fresh } = await getSupabase()
-                    .from('import_tickets')
-                    .select('images')
-                    .eq('id', resolvedId)
-                    .single();
-
-                if (fresh) {
-                    const current = fresh.images || [];
-                    const replaced = current.map(img => {
-                        if (img.startsWith('http')) return img;
-                        const idx = newImages.indexOf(img);
-                        return (idx >= 0 && imageUrls[idx]?.startsWith('http')) ? imageUrls[idx] : img;
-                    });
-                    await getSupabase().from('import_tickets').update({ images: replaced }).eq('id', resolvedId);
-                    console.log(`📸 BG: Replaced ${cdnCount} base64 with CDN URLs for import ${resolvedId}`);
-                }
-            } catch (e) {
-                console.warn('BG: Import storage upload failed:', e.message);
-            }
-        });
 
     } catch (e) {
         console.error('Add import proof images error:', e.message);
