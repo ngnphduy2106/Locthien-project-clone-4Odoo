@@ -7664,7 +7664,9 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const parsed = JSON.parse(session);
             if (parsed.user) {
-                state = { ...state, ...parsed };
+                // Use Object.assign to keep the same object reference as window.state
+                // Spread operator creates a NEW object, breaking window.state reference
+                Object.assign(state, parsed);
                 initApp();
                 return;
             }
