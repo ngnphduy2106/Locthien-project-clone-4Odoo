@@ -4996,7 +4996,8 @@ async function submitDelivery() {
     // Validate images (exclude null and any remaining placeholders)
     const validImages = (state.selectedImages || []).filter(img => img && img !== '__compressing__');
     if (!validImages.length) {
-        if (!confirm('Cảnh báo: Chưa có ảnh chứng minh. Tiếp tục?')) return;
+        alert('⚠️ Vui lòng chụp ít nhất 1 ảnh chứng minh giao hàng trước khi hoàn thành!');
+        return;
     }
 
     const order = state.currentDeliveryOrder;
@@ -5407,7 +5408,8 @@ function removeImportDeliveryImage(idx) {
 async function submitImportDelivery() {
     const validImages = (state.importSelectedImages || []).filter(img => img !== null);
     if (!validImages.length) {
-        if (!confirm('Cảnh báo: Chưa có ảnh chứng minh. Tiếp tục?')) return;
+        alert('⚠️ Vui lòng chụp ít nhất 1 ảnh chứng minh nhập hàng trước khi hoàn thành!');
+        return;
     }
 
     const imp = state.currentImportDelivery;

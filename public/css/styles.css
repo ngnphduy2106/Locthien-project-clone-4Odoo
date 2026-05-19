@@ -1629,6 +1629,7 @@ button, a, [onclick], [role="button"], input[type="submit"] {
    =============================================== */
 @media (min-width: 1400px) {
     .page-content {
+        width: 100%; /* Force stretch in flex parent — without this, content collapses to intrinsic width */
         max-width: 1600px;
         margin: 0 auto;
     }
