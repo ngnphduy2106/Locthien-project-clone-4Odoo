@@ -6,8 +6,8 @@
 /* === CSS Variables === */
 :root {
     /* Colors */
-    --sidebar-bg: #3c4d71;
-    --sidebar-active: #5a6e94;
+    --sidebar-bg: #1e2a3a;
+    --sidebar-active: #2d3f54;
     --sidebar-text: rgba(255, 255, 255, 0.85);
     --sidebar-text-muted: rgba(255, 255, 255, 0.6);
 
@@ -1629,6 +1629,7 @@ button, a, [onclick], [role="button"], input[type="submit"] {
    =============================================== */
 @media (min-width: 1400px) {
     .page-content {
+        width: 100%; /* Force stretch in flex parent — without this, content collapses to intrinsic width */
         max-width: 1600px;
         margin: 0 auto;
     }
@@ -3348,5 +3349,819 @@ button, a, [onclick], [role="button"], input[type="submit"] {
 
     .user-stat-cards .stat-card-label {
         font-size: 11px !important;
+    }
+}
+
+/* ===============================================
+   DASHBOARD V5 — MISA AMIS Premium Style
+   Refined typography, spacing, animations
+   =============================================== */
+
+/* Entrance animation for cards */
+@keyframes dbFadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Role badge on dashboard */
+.db-role-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    background: var(--primary-light);
+    color: var(--primary);
+    border: 1px solid rgba(124,92,255,0.15);
+}
+.db-role-badge i { font-size: 12px; }
+
+.db-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+.db-header-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+.db-title {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+    letter-spacing: -0.3px;
+}
+.db-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+.db-select {
+    padding: 9px 34px 9px 14px;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: white;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236c757d' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+.db-select:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-light);
+}
+.db-refresh-btn {
+    width: 38px;
+    height: 38px;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: white;
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    transition: all 0.25s;
+}
+.db-refresh-btn:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: var(--primary-light);
+    transform: rotate(90deg);
+}
+
+/* KPI Cards Row */
+.db-kpi-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 16px;
+    margin-bottom: 28px;
+}
+.db-kpi-card {
+    border-radius: 14px;
+    padding: 22px 20px;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+    transition: transform 0.25s cubic-bezier(.4,0,.2,1), box-shadow 0.25s;
+    animation: dbFadeUp 0.4s ease both;
+    position: relative;
+    overflow: hidden;
+}
+.db-kpi-card::after {
+    content: '';
+    position: absolute;
+    top: -30%;
+    right: -20%;
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.08);
+    pointer-events: none;
+}
+.db-kpi-card:nth-child(1) { animation-delay: 0s; }
+.db-kpi-card:nth-child(2) { animation-delay: 0.05s; }
+.db-kpi-card:nth-child(3) { animation-delay: 0.1s; }
+.db-kpi-card:nth-child(4) { animation-delay: 0.15s; }
+.db-kpi-card:nth-child(5) { animation-delay: 0.2s; }
+.db-kpi-card:nth-child(6) { animation-delay: 0.25s; }
+.db-kpi-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+}
+.db-kpi-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 14px;
+    background: rgba(255,255,255,0.2);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    flex-shrink: 0;
+}
+.db-kpi-info {
+    flex: 1;
+    min-width: 0;
+}
+.db-kpi-label {
+    font-size: 12px;
+    opacity: 0.92;
+    font-weight: 500;
+    margin-bottom: 6px;
+    white-space: nowrap;
+    letter-spacing: 0.2px;
+}
+.db-kpi-value {
+    font-size: 28px;
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -0.5px;
+}
+.db-kpi-sub {
+    font-size: 11px;
+    opacity: 0.8;
+    margin-top: 4px;
+    font-weight: 500;
+}
+
+/* Charts Row — minmax 280px prevents mobile overflow */
+.db-charts-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+    margin-bottom: 28px;
+}
+.db-chart-card {
+    background: white;
+    border-radius: 14px;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    overflow: hidden;
+    animation: dbFadeUp 0.5s ease 0.15s both;
+    transition: box-shadow 0.25s;
+}
+.db-chart-card:hover {
+    box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+}
+.db-chart-header {
+    padding: 18px 22px 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.db-chart-header h3 {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+    letter-spacing: -0.2px;
+}
+.db-chart-sub {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+.db-chart-body {
+    height: 280px;
+    padding: 8px 18px 18px;
+    position: relative;
+}
+
+/* Analytics Row */
+.db-analytics-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 20px;
+    margin-bottom: 24px;
+}
+.db-analytics-card {
+    background: white;
+    border-radius: 14px;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    overflow: hidden;
+    animation: dbFadeUp 0.5s ease 0.25s both;
+    transition: box-shadow 0.25s;
+}
+.db-analytics-card:hover {
+    box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+}
+.db-analytics-header {
+    padding: 16px 22px;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-primary);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    letter-spacing: -0.1px;
+}
+.db-analytics-header i {
+    color: var(--primary);
+    font-size: 16px;
+}
+.db-analytics-body {
+    padding: 18px 22px;
+}
+
+/* MISA-style horizontal bar items */
+.db-bar-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    transition: transform 0.15s;
+}
+.db-bar-item:hover {
+    transform: translateX(2px);
+}
+.db-bar-item:last-child {
+    margin-bottom: 0;
+}
+.db-bar-label {
+    width: 140px;
+    font-size: 13px;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    font-weight: 500;
+}
+.db-bar-rank {
+    width: 24px;
+    height: 24px;
+    border-radius: 7px;
+    background: var(--primary);
+    color: white;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+.db-bar-item:nth-child(1) .db-bar-rank { background: #ff6b6b; }
+.db-bar-item:nth-child(2) .db-bar-rank { background: #ffa94d; }
+.db-bar-item:nth-child(3) .db-bar-rank { background: #ffd43b; color: #333; }
+.db-bar-item:nth-child(4) .db-bar-rank { background: #69db7c; }
+.db-bar-item:nth-child(5) .db-bar-rank { background: #4dabf7; }
+.db-bar-track {
+    flex: 1;
+    height: 26px;
+    background: #f1f3f6;
+    border-radius: 8px;
+    overflow: hidden;
+}
+.db-bar-fill {
+    height: 100%;
+    border-radius: 8px;
+    min-width: 6px;
+    transition: width 0.8s cubic-bezier(.4,0,.2,1);
+}
+.db-bar-value {
+    width: 85px;
+    text-align: right;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+/* Footer */
+.db-footer {
+    text-align: right;
+    color: var(--text-muted);
+    font-size: 12px;
+    padding: 12px 0 4px;
+    font-weight: 500;
+}
+
+/* Empty state */
+.db-empty {
+    text-align: center;
+    padding: 36px 20px;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 500;
+}
+.db-loading {
+    text-align: center;
+    padding: 36px 20px;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 500;
+}
+
+/* Restricted message */
+.db-restricted {
+    text-align: center;
+    padding: 48px 20px;
+    color: var(--text-muted);
+}
+.db-restricted i {
+    font-size: 40px;
+    display: block;
+    margin-bottom: 12px;
+    opacity: 0.4;
+}
+.db-restricted p {
+    font-size: 14px;
+    font-weight: 500;
+}
+
+/* ═══════════════════════════════════════════════════
+   ROLE-SPECIFIC DASHBOARD V2 — New Components
+   ═══════════════════════════════════════════════════ */
+
+/* Welcome text */
+.db-welcome {
+    font-size: 14px;
+    color: var(--text-muted);
+    margin: -6px 0 18px 0;
+    line-height: 1.5;
+}
+.db-welcome strong {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+/* Role badge color variants */
+.db-role-badge.badge-admin      { background: linear-gradient(135deg, #4dabf7, #339af0); }
+.db-role-badge.badge-dispatcher { background: linear-gradient(135deg, #ffa94d, #fd7e14); }
+.db-role-badge.badge-driver     { background: linear-gradient(135deg, #74c0fc, #4dabf7); }
+.db-role-badge.badge-sales      { background: linear-gradient(135deg, #69db7c, #40c057); }
+.db-role-badge.badge-accountant { background: linear-gradient(135deg, #b197fc, #845ef7); }
+.db-role-badge.badge-import     { background: linear-gradient(135deg, #f783ac, #e64980); }
+.db-role-badge.badge-viewer     { background: linear-gradient(135deg, #868e96, #495057); }
+
+/* Quick Action Buttons */
+.db-quick-actions {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 22px;
+    flex-wrap: wrap;
+}
+.db-quick-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 9px 18px;
+    border: 1.5px solid currentColor;
+    background: transparent;
+    color: var(--qb-c, #4dabf7);
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(.4,0,.2,1);
+    white-space: nowrap;
+    letter-spacing: 0.1px;
+}
+.db-quick-btn i { font-size: 15px; }
+.db-quick-btn:hover {
+    background: var(--qb-c, #4dabf7);
+    color: white;
+    border-color: var(--qb-c, #4dabf7);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+}
+.db-quick-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+/* Section Titles (for special panels) */
+.db-section-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 28px 0 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    letter-spacing: -0.1px;
+}
+.db-section-title i {
+    font-size: 16px;
+    color: var(--primary);
+}
+.db-section-title .bi-exclamation-triangle-fill {
+    color: #fd7e14;
+}
+
+/* Panel Grid (Driver orders, Dispatcher unassigned) */
+.db-panel {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 12px;
+    margin-bottom: 28px;
+}
+
+/* Panel Count Label */
+.db-panel-count {
+    grid-column: 1 / -1;
+    font-size: 13px;
+    color: #e8590c;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 14px;
+    background: #fff4e6;
+    border-radius: 10px;
+    border: 1px solid #ffe8cc;
+}
+.db-panel-count i {
+    font-size: 14px;
+}
+
+/* Panel "View More" link */
+.db-panel-more {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 12px;
+    color: var(--primary);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border-radius: 10px;
+    transition: background 0.2s;
+    border: 1px dashed var(--border-color);
+}
+.db-panel-more:hover {
+    background: var(--primary-light);
+    border-color: var(--primary);
+}
+
+/* ── Order Mini Card ── */
+.db-order-card {
+    background: white;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 16px;
+    animation: dbFadeUp 0.35s ease both;
+    transition: all 0.2s cubic-bezier(.4,0,.2,1);
+    cursor: default;
+}
+.db-order-card:hover {
+    border-color: var(--primary);
+    box-shadow: 0 4px 14px rgba(77, 171, 247, 0.12);
+    transform: translateY(-2px);
+}
+/* Urgent variant (unassigned orders) */
+.db-order-card.db-order-urgent {
+    border-left: 3.5px solid #fd7e14;
+    cursor: pointer;
+}
+.db-order-card.db-order-urgent:hover {
+    border-color: #fd7e14;
+    box-shadow: 0 4px 14px rgba(253, 126, 20, 0.15);
+}
+
+.db-order-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    gap: 8px;
+}
+.db-order-code {
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+.db-order-code i {
+    color: var(--primary);
+    font-size: 14px;
+}
+.db-order-date {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+/* Order Status Badges */
+.db-order-badge {
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-weight: 600;
+    background: #e9ecef;
+    color: #495057;
+    white-space: nowrap;
+    letter-spacing: 0.1px;
+}
+.db-badge-active {
+    background: #fff3bf;
+    color: #e67700;
+}
+
+.db-order-card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+.db-order-field {
+    font-size: 12.5px;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: flex-start;
+    gap: 7px;
+    line-height: 1.45;
+}
+.db-order-field i {
+    color: var(--text-muted);
+    font-size: 13px;
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+/* ── Empty State (large, with icon) ── */
+.db-empty-state {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 48px 20px;
+    color: var(--text-muted);
+}
+.db-empty-state i {
+    font-size: 52px;
+    display: block;
+    margin-bottom: 14px;
+    color: #69db7c;
+    opacity: 0.7;
+}
+.db-empty-state p {
+    font-size: 15px;
+    font-weight: 600;
+    margin: 0 0 4px;
+    color: var(--text-primary);
+}
+.db-empty-state span {
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+/* Loading spinner */
+.db-spin {
+    animation: dbSpin 0.8s linear infinite;
+    display: inline-block;
+}
+@keyframes dbSpin {
+    to { transform: rotate(360deg); }
+}
+
+/* ====== DASHBOARD DESKTOP (>1200px) — constrain width for pro look ====== */
+@media (min-width: 1200px) {
+    #section-dashboard {
+        max-width: 1400px;
+    }
+    .db-kpi-row {
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    }
+}
+
+/* ====== DASHBOARD TABLET (481px - 768px) ====== */
+@media (min-width: 481px) and (max-width: 768px) {
+    .db-kpi-row {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+    .db-charts-row {
+        grid-template-columns: 1fr;
+    }
+    .db-analytics-row {
+        grid-template-columns: 1fr;
+    }
+    .db-chart-body {
+        height: 220px;
+    }
+}
+
+/* ====== DASHBOARD MOBILE (<480px) — prevent all overflow ====== */
+@media (max-width: 480px) {
+    #section-dashboard {
+        overflow-x: hidden;
+    }
+    .db-header {
+        margin-bottom: 12px;
+        gap: 8px;
+    }
+    .db-header-left {
+        gap: 8px;
+    }
+    .db-title {
+        font-size: 18px;
+    }
+    .db-role-badge {
+        display: none;
+    }
+    .db-select {
+        padding: 7px 28px 7px 10px;
+        font-size: 12px;
+    }
+    .db-refresh-btn {
+        width: 34px;
+        height: 34px;
+        font-size: 14px;
+    }
+    /* KPI: 2 columns, compact */
+    .db-kpi-row {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+        margin-bottom: 16px;
+    }
+    .db-kpi-card {
+        padding: 12px 10px;
+        gap: 8px;
+        border-radius: 10px;
+        flex-direction: column;
+        align-items: flex-start;
+        text-align: left;
+    }
+    .db-kpi-card::after {
+        width: 60px;
+        height: 60px;
+    }
+    .db-kpi-icon {
+        width: 32px;
+        height: 32px;
+        font-size: 14px;
+        border-radius: 8px;
+    }
+    .db-kpi-value {
+        font-size: 20px;
+        font-weight: 700;
+    }
+    .db-kpi-label {
+        font-size: 10px;
+        margin-bottom: 3px;
+    }
+    .db-kpi-sub {
+        font-size: 9px;
+    }
+    /* Charts: single column, reduced height */
+    .db-charts-row {
+        grid-template-columns: 1fr;
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+    .db-chart-card {
+        border-radius: 10px;
+    }
+    .db-chart-header {
+        padding: 12px 14px 6px;
+    }
+    .db-chart-header h3 {
+        font-size: 13px;
+    }
+    .db-chart-sub {
+        font-size: 10px;
+    }
+    .db-chart-body {
+        height: 200px;
+        padding: 4px 10px 12px;
+    }
+    /* Analytics: single column, compact bars */
+    .db-analytics-row {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+    .db-analytics-card {
+        border-radius: 10px;
+    }
+    .db-analytics-header {
+        padding: 12px 14px;
+        font-size: 13px;
+    }
+    .db-analytics-body {
+        padding: 12px 14px;
+    }
+    .db-bar-item {
+        gap: 6px;
+        margin-bottom: 10px;
+    }
+    .db-bar-label {
+        width: 80px;
+        font-size: 11px;
+        gap: 4px;
+    }
+    .db-bar-rank {
+        width: 20px;
+        height: 20px;
+        font-size: 9px;
+        border-radius: 5px;
+    }
+    .db-bar-track {
+        height: 20px;
+    }
+    .db-bar-value {
+        width: 55px;
+        font-size: 11px;
+    }
+    .db-footer {
+        font-size: 11px;
+        padding: 8px 0 0;
+    }
+    /* V2: Mobile quick actions */
+    .db-quick-actions {
+        gap: 6px;
+        margin-bottom: 14px;
+    }
+    .db-quick-btn {
+        padding: 7px 12px;
+        font-size: 12px;
+        border-radius: 8px;
+        gap: 5px;
+    }
+    .db-quick-btn span { display: none; }
+    .db-quick-btn i { font-size: 16px; }
+    /* V2: Mobile welcome */
+    .db-welcome {
+        font-size: 12px;
+        margin-bottom: 12px;
+    }
+    /* V2: Mobile panels */
+    .db-section-title {
+        font-size: 13px;
+        margin: 16px 0 10px;
+    }
+    .db-panel {
+        grid-template-columns: 1fr;
+        gap: 8px;
+        margin-bottom: 16px;
+    }
+    .db-order-card {
+        padding: 12px;
+        border-radius: 10px;
+    }
+    .db-order-code { font-size: 12px; }
+    .db-order-badge { font-size: 10px; padding: 2px 8px; }
+    .db-order-field { font-size: 11.5px; }
+    .db-empty-state { padding: 32px 16px; }
+    .db-empty-state i { font-size: 40px; }
+    .db-empty-state p { font-size: 13px; }
+    .db-panel-count { font-size: 12px; padding: 8px 12px; }
+}
+
+/* ====== DASHBOARD (max-width: 768px) — general medium screen ====== */
+@media (max-width: 768px) {
+    .db-header { margin-bottom: 16px; }
+    .db-title { font-size: 20px; }
+    .db-role-badge { display: none; }
+    .db-charts-row {
+        grid-template-columns: 1fr;
+        margin-bottom: 20px;
+    }
+    .db-analytics-row {
+        grid-template-columns: 1fr;
     }
 }

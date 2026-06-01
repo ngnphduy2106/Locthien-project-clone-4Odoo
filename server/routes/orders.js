@@ -7,7 +7,22 @@ import { supabase } from '../db/supabase.js';
 import { CONFIG, createResponse, formatDate, getTimestamp, standardizeData, generateOrderCode } from '../config.js';
 import db from '../db/index.js';
 import { updateMisaOrder } from '../services/misa.js';
+import { uploadImages } from '../services/storage.js';
 import { createNotification } from './notifications.js';
+
+// AUDIT: Log all status changes to order_status_log table for debugging
+// Fire-and-forget — never blocks the main operation
+function logStatusChange(orderId, oldStatus, newStatus, changedBy, reason) {
+    if (!orderId || oldStatus === newStatus) return;
+    console.log(`📋 STATUS LOG: ${orderId} "${oldStatus}" → "${newStatus}" by ${changedBy} (${reason})`);
+    supabase.from('order_status_log').insert({
+        order_id: String(orderId),
+        old_status: oldStatus || null,
+        new_status: newStatus || null,
+        changed_by: changedBy || 'SYSTEM',
+        reason: reason || null
+    }).then(() => {}).catch(err => console.error('Status log error:', err.message));
+}
 
 // Helper: Create Telegram mention tag
 // Priority: 1) tg://user?id= (works without username), 2) @username, 3) skip
@@ -1170,6 +1185,10 @@ router.put('/:id/assign', async (req, res) => {
         const { id } = req.params;
         const { driverName, plate, note, assistantName, deliveryTime } = req.body;
 
+        // Get current status for audit log
+        const currentOrder = await db.getOrder(id);
+        const oldStatus = currentOrder?.status || 'unknown';
+
         const order = await db.updateOrder(id, {
             taiXe: driverName,
             bienSo: plate,
@@ -1179,6 +1198,8 @@ router.put('/:id/assign', async (req, res) => {
             delivery_status: 'Đang giao hàng',
             note: note || '' // Save internal note
         });
+
+        logStatusChange(id, oldStatus, CONFIG.STATUS.DELIVERING, req.body.dispatcherName || 'DISPATCHER', `Assign driver: ${driverName}`);
 
         if (!order) {
             return res.json(createResponse(true, 'Không tìm thấy đơn hàng!'));
@@ -1407,6 +1428,7 @@ router.put('/:id/unassign', async (req, res) => {
             delivery_status: CONFIG.STATUS.NEW,
             note: reason ? `[HỦY ĐIỀU PHỐI] ${reason}` : '[HỦY ĐIỀU PHỐI]'
         });
+        logStatusChange(id, order.status, CONFIG.STATUS.NEW, req.body.userName || 'DISPATCHER', `Unassign driver: ${previousDriver}. Reason: ${reason || 'N/A'}`);
         console.log(`✅ Order ${orderNo} reset to ${CONFIG.STATUS.NEW}`);
 
         // 3. Sync to MISA
@@ -1627,7 +1649,9 @@ router.post('/:id/complete', async (req, res) => {
             // Driver complete fields
             type, warehouse, partner, driver_name, plate, cart, note, sender, images,
             // Multi-driver fields
-            assignment_id
+            assignment_id,
+            // Flag: client will send images via add-proof-images (skip text-only Telegram)
+            hasImages
         } = req.body;
 
         console.log(`\n🏁 COMPLETE ORDER - ID: ${id}`);
@@ -1712,7 +1736,9 @@ router.post('/:id/complete', async (req, res) => {
             // Only set proof_images if provided in body (merged orders send images with completion)
             // For normal orders, images are uploaded separately via add-proof-images endpoint
             if (images && images.length > 0) {
-                assignUpdate.proof_images = images;
+                // Upload to Supabase Storage for fast CDN loading
+                const uploadedUrls = await uploadImages(images, id);
+                assignUpdate.proof_images = uploadedUrls;
             }
             const { data: updateResult, error: updateErr } = await supabase
                 .from('order_driver_assignments')
@@ -1907,6 +1933,17 @@ router.post('/:id/complete', async (req, res) => {
             // BACKGROUND: Warehouse tickets, export ticket, notifications, merged auto-complete
             setImmediate(async () => {
                 try {
+                    // 0. Upload images to Supabase Storage (CDN) — used by export_ticket + assignment
+                    let uploadedUrls = null;
+                    if (images && images.length > 0) {
+                        try {
+                            uploadedUrls = await uploadImages(images, id);
+                            console.log(`📸 BG: Uploaded ${uploadedUrls.filter(u => u.startsWith('http')).length}/${images.length} images to CDN`);
+                        } catch (uploadErr) {
+                            console.warn('BG: Image upload to storage failed, keeping base64:', uploadErr.message);
+                        }
+                    }
+
                     // 0a. Create warehouse tickets (moved from blocking path)
                     try {
                         for (const item of cart) {
@@ -1951,7 +1988,7 @@ router.post('/:id/complete', async (req, res) => {
                             total_qty: totalQty,
                             note: note || delivery_note || `Tạo bởi: ${sender || driver_name}`,
                             local_items: local_items || [],
-                            images: images || []
+                            images: uploadedUrls || images || []
                         });
                     } catch (etErr) { console.error('BG: Export ticket error:', etErr.message); }
 
@@ -1967,7 +2004,7 @@ router.post('/:id/complete', async (req, res) => {
                                 for (const assign of existingAssigns) {
                                     await supabase.from('order_driver_assignments').update({
                                         status: 'completed',
-                                        proof_images: images,
+                                        proof_images: uploadedUrls || images,
                                         delivery_note: note || delivery_note || '',
                                         completed_at: new Date().toISOString()
                                     }).eq('id', assign.id);
@@ -1991,9 +2028,11 @@ router.post('/:id/complete', async (req, res) => {
                     } catch (e) { console.error('Dispatcher complete notification error:', e.message); }
 
                     // 2. Telegram notification
-                    if (!alreadyCompleted) {
+                    // If driver has images → SKIP text here (photos+caption sent from add-proof-images)
+                    // If no images (admin complete, etc.) → send text notification here
+                    if (!alreadyCompleted && !hasImages) {
                         try {
-                            const { sendTelegramMessage, sendTelegramPhotos } = await import('../services/telegram.js');
+                            const { sendTelegramMessage } = await import('../services/telegram.js');
                             const isImport = type === 'NHAP';
                             const tgGroup = isImport ? 'NHAP' : 'XUAT';
                             const label = isImport ? 'ĐƠN NHẬP HOÀN THÀNH' : 'ĐƠN ĐÃ HOÀN THÀNH';
@@ -2015,18 +2054,11 @@ router.post('/:id/complete', async (req, res) => {
                                 const pQty = Number(p.weight_kg || p.qty || p.quantity || 0);
                                 if (pName) msg += `📦 ${pName} — ${pQty.toLocaleString('vi-VN')} ${p.unit || 'Kg'}\n`;
                             });
-                            let proofImages = images || [];
-                            if (proofImages.length === 0) {
-                                try {
-                                    const ticketTable = isImport ? 'import_tickets' : 'export_tickets';
-                                    const { data: ticket } = await supabase.from(ticketTable).select('images').eq('order_id', id).order('created_at', { ascending: false }).limit(1).single();
-                                    if (ticket?.images?.length > 0) proofImages = ticket.images;
-                                } catch (e) { /* no images */ }
-                            }
-                            if (proofImages.length > 0) await sendTelegramPhotos(proofImages, msg, tgGroup);
-                            else await sendTelegramMessage(msg, tgGroup);
-                            console.log(`📨 Telegram sent to ${tgGroup} for ${orderNo}`);
+                            await sendTelegramMessage(msg, tgGroup);
+                            console.log(`📨 Telegram text sent to ${tgGroup} for ${orderNo}`);
                         } catch (tgErr) { console.error('Telegram error:', tgErr.message); }
+                    } else if (hasImages) {
+                        console.log(`⏳ Skipping Telegram text — images will be sent via add-proof-images`);
                     }
 
                     // Merged auto-complete DISABLED — drivers complete each order manually
@@ -2042,6 +2074,7 @@ router.post('/:id/complete', async (req, res) => {
         console.log(`👔 Admin Complete Flow - Order: ${id}`);
 
         // Update order status to completed
+        const prevOrder = await db.getOrder(id);
         const order = await db.updateOrder(id, {
             status: CONFIG.STATUS.COMPLETED,
             delivery_status: 'Hoàn thành',
@@ -2050,6 +2083,7 @@ router.post('/:id/complete', async (req, res) => {
             local_items: local_items || [],
             admin_completed: admin_completed || false
         });
+        logStatusChange(id, prevOrder?.status, CONFIG.STATUS.COMPLETED, req.body.admin_name || 'ADMIN', 'Admin complete flow');
 
         if (!order) {
             return res.json(createResponse(true, 'Không tìm thấy đơn hàng!'));
@@ -2574,28 +2608,37 @@ router.get('/:id/proof-images', async (req, res) => {
 router.post('/:id/add-proof-images', async (req, res) => {
     try {
         const { id } = req.params;
-        const { images } = req.body;
+        const { images, sendTelegram } = req.body;
 
-        console.log(`📸 Add proof images for order: ${id}, images count: ${images?.length || 0}`);
+        console.log(`📸 Add proof images for order: ${id}, images count: ${images?.length || 0}, sendTelegram: ${!!sendTelegram}`);
 
         if (!images || !Array.isArray(images) || images.length === 0) {
             return res.json(createResponse(true, 'Vui lòng chọn ít nhất 1 ảnh!'));
         }
 
+        // STEP 0: Resolve order to get all possible IDs (prevents lookup misses)
+        const orderInfo = await db.getOrder(id);
+        const orderUuid = orderInfo?.id || id;
+        const orderSoDon = orderInfo?.soDon || orderInfo?.sale_order_no || id;
+        const lookupIds = [...new Set([orderUuid, orderSoDon, id])];
 
+        console.log(`📸 Resolved IDs: uuid=${orderUuid}, soDon=${orderSoDon}, param=${id}`);
 
+        // STEP 1: Save images to DB IMMEDIATELY (fast response to driver)
 
-        // Also save to order_driver_assignments if any exist for this order
+        // 1a. Save to order_driver_assignments (try all possible order_ids)
+        let assignmentId = null;
         try {
             const { data: assignments } = await supabase
                 .from('order_driver_assignments')
                 .select('id, proof_images')
-                .eq('order_id', id)
+                .in('order_id', lookupIds)
                 .order('created_at', { ascending: false })
                 .limit(1);
 
             if (assignments && assignments.length > 0) {
                 const assignment = assignments[0];
+                assignmentId = assignment.id;
                 const existingImages = assignment.proof_images || [];
                 const updatedImages = [...existingImages, ...images].slice(0, 10);
 
@@ -2603,87 +2646,177 @@ router.post('/:id/add-proof-images', async (req, res) => {
                     .from('order_driver_assignments')
                     .update({ proof_images: updatedImages })
                     .eq('id', assignment.id);
-
-                console.log(`✅ Updated order_driver_assignments with ${updatedImages.length} images`);
+                console.log(`📸 Assignment ${assignment.id}: ${existingImages.length} existing + ${images.length} new = ${updatedImages.length} total`);
+            } else {
+                console.log(`📸 No assignment found for order IDs: ${lookupIds.join(', ')}`);
             }
         } catch (assignErr) {
             console.warn('Assignment image update skipped:', assignErr.message);
         }
 
-        // Find existing export ticket
-        let { data: ticket, error } = await supabase
-            .from('export_tickets')
-            .select('id, images')
-            .eq('order_id', id)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single();
-
-        // If not found by order_id, try by order_no
-        if (error || !ticket) {
-            const orderInfo = await db.getOrder(id);
-            if (orderInfo?.soDon) {
-                const result = await supabase
-                    .from('export_tickets')
-                    .select('id, images')
-                    .eq('order_no', orderInfo.soDon)
-                    .order('created_at', { ascending: false })
-                    .limit(1)
-                    .single();
-
-                if (!result.error) ticket = result.data;
-            }
-        }
+        // 1b. Save to export_tickets (try multiple ID formats)
+        let ticket = null;
+        try {
+            // Build OR filter for all possible IDs
+            const orFilter = lookupIds.map(lid => `order_id.eq.${lid},order_no.eq.${lid}`).join(',');
+            const { data: ticketData } = await supabase
+                .from('export_tickets')
+                .select('id, images')
+                .or(orFilter)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .single();
+            ticket = ticketData;
+        } catch (e) { /* no ticket found */ }
 
         if (!ticket) {
-            // No export ticket exists - create one with just images
-            const orderInfo = await db.getOrder(id);
+            // No export ticket exists - create one with images
             const ts = new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14);
 
-            const { error: insertError } = await supabase.from('export_tickets').insert({
+            await supabase.from('export_tickets').insert({
                 ticket_no: 'X' + ts,
-                order_id: id,
-                order_no: orderInfo?.soDon || id,
+                order_id: orderUuid,
+                order_no: orderSoDon,
                 customer_name: orderInfo?.khach || orderInfo?.account_name || '',
                 driver_name: orderInfo?.taiXe || 'Admin',
                 plate: orderInfo?.bienSo || '',
                 warehouse: 'LT1',
                 products: orderInfo?.cart || [],
-                images: images.slice(0, 10), // Max 10 images
+                images: images.slice(0, 10),
                 note: 'Ảnh bổ sung'
             });
 
-            if (insertError) {
-                console.error('Export ticket insert error:', insertError.message);
-                return res.json(createResponse(true, 'Lỗi tạo phiếu: ' + insertError.message));
+            console.log(`✅ Created export ticket with ${images.length} images`);
+            res.json(createResponse(false, `Đã thêm ${images.length} ảnh!`));
+        } else {
+            // Ticket exists - append new images
+            const existingImages = ticket.images || [];
+            const totalAllowed = 10 - existingImages.length;
+
+            if (totalAllowed <= 0) {
+                return res.json(createResponse(true, 'Đã đạt giới hạn 10 ảnh!'));
             }
 
-            console.log(`✅ Created export_ticket with ${images.length} images`);
-            return res.json(createResponse(false, `Đã thêm ${images.length} ảnh chứng minh!`));
+            const newImages = images.slice(0, totalAllowed);
+            const updatedImages = [...existingImages, ...newImages];
+
+            await supabase
+                .from('export_tickets')
+                .update({ images: updatedImages })
+                .eq('id', ticket.id);
+
+            console.log(`✅ Appended ${newImages.length} images to ticket ${ticket.id} (${updatedImages.length}/10)`);
+            res.json(createResponse(false, `Đã thêm ${newImages.length} ảnh (${updatedImages.length}/10)!`));
         }
 
-        // Ticket exists - append new images
-        const existingImages = ticket.images || [];
-        const totalAllowed = 10 - existingImages.length;
+        // STEP 2: BACKGROUND — Upload to Supabase Storage (CDN), replace base64, send Telegram
+        setImmediate(async () => {
+            // 2a. CDN upload (non-blocking, best-effort)
+            let cdnUrls = null;
+            try {
+                cdnUrls = await uploadImages(images, orderUuid);
+                const cdnCount = cdnUrls.filter(u => u.startsWith('http')).length;
+                console.log(`📸 BG: Uploaded ${cdnCount}/${images.length} images to CDN`);
 
-        if (totalAllowed <= 0) {
-            return res.json(createResponse(true, 'Đã đạt giới hạn 10 ảnh!'));
-        }
+                if (cdnCount > 0) {
+                    // Replace base64 with CDN URLs in export_tickets
+                    try {
+                        const orFilter = lookupIds.map(lid => `order_id.eq.${lid},order_no.eq.${lid}`).join(',');
+                        const { data: freshTicket } = await supabase
+                            .from('export_tickets')
+                            .select('id, images')
+                            .or(orFilter)
+                            .order('created_at', { ascending: false })
+                            .limit(1)
+                            .single();
 
-        const newImages = images.slice(0, totalAllowed);
-        const updatedImages = [...existingImages, ...newImages];
+                        if (freshTicket) {
+                            const currentImages = freshTicket.images || [];
+                            // Replace: for each current image that's base64, find its CDN URL
+                            const updatedWithUrls = currentImages.map(img => {
+                                if (img.startsWith('http')) return img; // Already CDN
+                                // Find matching base64 in the batch we just uploaded
+                                const idx = images.indexOf(img);
+                                if (idx >= 0 && cdnUrls[idx]?.startsWith('http')) return cdnUrls[idx];
+                                return img; // Keep as-is if no match
+                            });
 
-        const { error: updateError } = await supabase
-            .from('export_tickets')
-            .update({ images: updatedImages })
-            .eq('id', ticket.id);
+                            await supabase.from('export_tickets')
+                                .update({ images: updatedWithUrls })
+                                .eq('id', freshTicket.id);
+                            console.log(`📸 BG: Replaced base64 with CDN in export_ticket ${freshTicket.id}`);
+                        }
+                    } catch (bgErr) {
+                        console.warn('BG: CDN URL replacement in export_tickets failed:', bgErr.message);
+                    }
 
-        if (updateError) {
-            return res.json(createResponse(true, 'Lỗi cập nhật: ' + updateError.message));
-        }
+                    // Also replace in assignment proof_images
+                    if (assignmentId) {
+                        try {
+                            const { data: freshAssign } = await supabase
+                                .from('order_driver_assignments')
+                                .select('id, proof_images')
+                                .eq('id', assignmentId)
+                                .single();
 
-        console.log(`✅ Updated export_ticket with ${updatedImages.length} images`);
-        res.json(createResponse(false, `Đã thêm ${newImages.length} ảnh (${updatedImages.length}/10)!`));
+                            if (freshAssign) {
+                                const currentImgs = freshAssign.proof_images || [];
+                                const updatedAssignImgs = currentImgs.map(img => {
+                                    if (img.startsWith('http')) return img;
+                                    const idx = images.indexOf(img);
+                                    if (idx >= 0 && cdnUrls[idx]?.startsWith('http')) return cdnUrls[idx];
+                                    return img;
+                                });
+
+                                await supabase.from('order_driver_assignments')
+                                    .update({ proof_images: updatedAssignImgs })
+                                    .eq('id', assignmentId);
+                                console.log(`📸 BG: Replaced base64 with CDN in assignment ${assignmentId}`);
+                            }
+                        } catch (bgErr) {
+                            console.warn('BG: CDN URL replacement in assignments failed:', bgErr.message);
+                        }
+                    }
+                }
+            } catch (storageErr) {
+                console.warn('BG: Storage upload failed (base64 preserved):', storageErr.message);
+            }
+
+            // 2b. Send Telegram photos
+            if (sendTelegram) {
+                try {
+                    const { sendTelegramPhotos } = await import('../services/telegram.js');
+                    const orderNo = orderSoDon;
+                    const customer = orderInfo?.khach || orderInfo?.account_name || '';
+                    const driverName = orderInfo?.taiXe || orderInfo?.custom_field13 || '';
+                    const drvPlate = orderInfo?.bienSo || orderInfo?.custom_field14 || '';
+                    const assistant = orderInfo?.assistant_name || '';
+
+                    let caption = `✅ <b>ĐƠN ĐÃ HOÀN THÀNH</b>\n📦 Mã: <b>#${orderNo}</b>\n`;
+                    caption += `👤 Khách: <b>${customer}</b>\n`;
+                    if (driverName) caption += `🚛 TX: ${driverName}${drvPlate ? ` (${drvPlate})` : ''}\n`;
+                    if (assistant) caption += `👷 PX: ${assistant}\n`;
+                    (orderInfo?.products || orderInfo?.cart || []).forEach(p => {
+                        const pName = p.name || p.code || '';
+                        const pQty = Number(p.qty || 0);
+                        if (pName) caption += `📦 ${pName} — ${pQty.toLocaleString('vi-VN')} ${p.unit || 'Kg'}\n`;
+                    });
+
+                    // Use CDN URLs if available, otherwise fall back to original images
+                    const photosToSend = (cdnUrls || images)
+                        .filter(i => i && !i.startsWith('blob:'));
+
+                    if (photosToSend.length > 0) {
+                        await sendTelegramPhotos(photosToSend, caption, 'XUAT');
+                        console.log(`📨 Telegram: ${photosToSend.length} proof photos sent for ${orderNo}`);
+                    } else {
+                        console.warn(`⚠️ No valid images for Telegram on order ${orderNo}`);
+                    }
+                } catch (tgErr) {
+                    console.error('BG: Telegram photo send failed:', tgErr.message);
+                }
+            }
+        });
 
     } catch (e) {
         console.error('Add proof images error:', e.message);

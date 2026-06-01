@@ -1,0 +1,34 @@
+[
+  {
+    "id": "29b318a8-3f52-4507-9e6e-7888fe7ec18e",
+    "import_id": "e2d98ac0-e6a9-4415-9e6c-6f23b6c6ec0e",
+    "driver_name": "Đoàn Văn Báu",
+    "driver_type": "internal",
+    "plate": "50H - 260.87",
+    "assigned_qty": 30000,
+    "actual_qty": 59610,
+    "status": "completed",
+    "local_items": [],
+    "delivery_note": "",
+    "proof_images": [],
+    "note": "",
+    "created_at": "2026-03-24T01:48:17.659659+00:00",
+    "completed_at": "2026-05-18T10:29:05.497+00:00"
+  },
+  {
+    "id": "c71560eb-47aa-4c18-a66d-c0537583060a",
+    "import_id": "e2d98ac0-e6a9-4415-9e6c-6f23b6c6ec0e",
+    "driver_name": "Đoàn Văn Báu",
+    "driver_type": "internal",
+    "plate": "50H - 260.87",
+    "assigned_qty": 30000,
+    "actual_qty": 59610,
+    "status": "completed",
+    "local_items": [],
+    "delivery_note": "",
+    "proof_images": [],
+    "note": "",
+    "created_at": "2026-03-24T01:48:17.659659+00:00",
+    "completed_at": "2026-05-18T11:18:03.961+00:00"
+  }
+]

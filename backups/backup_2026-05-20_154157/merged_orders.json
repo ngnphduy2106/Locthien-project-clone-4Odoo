@@ -1,0 +1,1531 @@
+[
+  {
+    "id": "04fd35bf-7ccd-42e7-8741-20076cdbfe75",
+    "merged_no": "M1335",
+    "source_order_nos": [
+      "X1116",
+      "X1312"
+    ],
+    "status": "pending",
+    "driver_name": null,
+    "plate": null,
+    "total_amount": 12100,
+    "total_stops": 2,
+    "note": "",
+    "created_by": "Admin",
+    "created_at": "2026-02-06T06:35:24.160785+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "61044aef-b57c-4104-9e59-5b5096c9d0b7",
+    "merged_no": "M1957",
+    "source_order_nos": [
+      "PO4100136899.25test",
+      "PO4100137016.25 testt"
+    ],
+    "status": "assigned",
+    "driver_name": "lalaa",
+    "plate": "123",
+    "total_amount": 328724460,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-03-06T12:57:35.302145+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "64beabdd-8bee-49cf-a735-f8d2e6602f88",
+    "merged_no": "M2026",
+    "source_order_nos": [
+      "PO4100136899.25test",
+      "PO4100137016.25 testt"
+    ],
+    "status": "assigned",
+    "driver_name": "123",
+    "plate": "123",
+    "total_amount": 328724460,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-03-06T13:26:34.270197+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "b467f19b-fe96-4934-91fa-e9a6e234a215",
+    "merged_no": "M1602",
+    "source_order_nos": [
+      "PO4101197458.25",
+      "X2056"
+    ],
+    "status": "completed",
+    "driver_name": "Ngô Đình Chiến",
+    "plate": "51M - 440.53",
+    "total_amount": 19770000,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-03-25T09:02:37.963497+00:00",
+    "assigned_at": null,
+    "completed_at": "2026-04-09T07:04:28.959+00:00",
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "15b3560d-2850-4486-b727-00a0488c8e8f",
+    "merged_no": "M2155",
+    "source_order_nos": [
+      "PO4100136899.25test",
+      "X0826"
+    ],
+    "status": "assigned",
+    "driver_name": "123",
+    "plate": "123",
+    "total_amount": 326424460,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-03-06T14:55:59.307797+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "dc030aa5-de3c-44ee-8014-d4e54cf0eeca",
+    "merged_no": "M0005",
+    "source_order_nos": [
+      "N2211",
+      "X2254"
+    ],
+    "status": "assigned",
+    "driver_name": "123123",
+    "plate": "123",
+    "total_amount": 1100,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-03-06T17:05:18.462759+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "a6fe29a8-d493-4a3e-9ad9-a91407d802ff",
+    "merged_no": "M1425",
+    "source_order_nos": [
+      "PO4101197424.25",
+      "N1316"
+    ],
+    "status": "assigned",
+    "driver_name": "Hồ Viết Hoàng (Lalamove)",
+    "plate": "60H - 326.35",
+    "total_amount": 7560000,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-03-21T07:25:30.419602+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "17cc6739-a38f-47bd-9a92-71a5e1e004a9",
+    "merged_no": "M2140",
+    "source_order_nos": [
+      "PO4101197414.25",
+      "X1336"
+    ],
+    "status": "assigned",
+    "driver_name": "Phan Đình Phi",
+    "plate": "51D-991.03",
+    "total_amount": 15552000,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-03-22T14:40:11.70698+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "35350e69-d39c-4326-a51b-805e35a88f0e",
+    "merged_no": "M2148",
+    "source_order_nos": [
+      "PO4101197432.25",
+      "N1531"
+    ],
+    "status": "assigned",
+    "driver_name": "Ngô Quang Đạt",
+    "plate": "51D - 609.69",
+    "total_amount": 38016000,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-03-22T14:48:57.344937+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "700b23ee-4a68-4351-a3ca-5d917339d17b",
+    "merged_no": "M1535",
+    "source_order_nos": [
+      "PO4100137016.25",
+      "PO4100137017.25"
+    ],
+    "status": "assigned",
+    "driver_name": "",
+    "plate": "",
+    "total_amount": 23328000,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-03-07T08:35:49.038969+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "b72d6035-6757-48fc-9a51-057df0374e8c",
+    "merged_no": "M0014",
+    "source_order_nos": [
+      "N2211",
+      "X1312"
+    ],
+    "status": "assigned",
+    "driver_name": "",
+    "plate": "",
+    "total_amount": 11000,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-03-06T17:14:54.603198+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "c3de8142-350e-432b-860a-21a1b0f7d3ba",
+    "merged_no": "M2048",
+    "source_order_nos": [
+      "PO4100137016.25 test",
+      "PO4100137016.25 testt"
+    ],
+    "status": "assigned",
+    "driver_name": "",
+    "plate": "",
+    "total_amount": 4887000,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-03-06T13:48:47.299532+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "831211e3-48dc-4c08-b884-193c23a8f21f",
+    "merged_no": "M1732",
+    "source_order_nos": [
+      "PO4100137033.25",
+      "PO4100137034.25"
+    ],
+    "status": "assigned",
+    "driver_name": "Phan Đình Phi",
+    "plate": "51D-991.03",
+    "total_amount": 69390000,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-03-09T10:32:37.242272+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "4488be73-2530-417f-b344-959dccdad8ad",
+    "merged_no": "M0834",
+    "source_order_nos": [
+      "N1816",
+      "PO4100137038.25"
+    ],
+    "status": "assigned",
+    "driver_name": "Ngô Đình Chiến",
+    "plate": "51M - 440.53",
+    "total_amount": 232243200,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-03-10T01:34:16.635904+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "b44ca65d-b2a2-4d47-b6aa-f63d977fe1ef",
+    "merged_no": "M1044",
+    "source_order_nos": [
+      "PO4100137047.25",
+      "PO4100137046.25"
+    ],
+    "status": "assigned",
+    "driver_name": "Ngô Quang Đạt",
+    "plate": "51D - 609.69",
+    "total_amount": 15264000,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-03-10T03:44:18.237301+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "10376782-eef4-4239-b263-0a214bc57dc1",
+    "merged_no": "M1340",
+    "source_order_nos": [
+      "N1055",
+      "PO4100137041.25"
+    ],
+    "status": "assigned",
+    "driver_name": "Đoàn Văn Báu",
+    "plate": "50H - 260.87",
+    "total_amount": 125452800,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-03-10T06:40:26.284157+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "deb92c10-4db7-4bbe-a72d-26b0caecefa8",
+    "merged_no": "M0844",
+    "source_order_nos": [
+      "N1324",
+      "PO4100137031.25"
+    ],
+    "status": "assigned",
+    "driver_name": "Trần Duy Bảo",
+    "plate": "50H - 202.15",
+    "total_amount": 18792000,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-03-11T01:44:51.012771+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "cfad1afa-72bf-4be6-b9d2-9db73459bde1",
+    "merged_no": "M1038",
+    "source_order_nos": [
+      "N1023",
+      "PO4100137053.25"
+    ],
+    "status": "completed",
+    "driver_name": "Ngô Quang Đạt",
+    "plate": "51D - 609.69",
+    "total_amount": 54216000,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-03-11T03:38:47.909197+00:00",
+    "assigned_at": null,
+    "completed_at": "2026-03-11T08:36:18.798+00:00",
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "5aa43b27-84ef-4438-b846-6a1f4150fec6",
+    "merged_no": "M1442",
+    "source_order_nos": [
+      "PO4100137062.25",
+      "N0926"
+    ],
+    "status": "assigned",
+    "driver_name": "Đoàn Văn Quý",
+    "plate": "50H - 232.92",
+    "total_amount": 304128000,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-03-12T07:42:49.281302+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "b326b4a6-82b4-4cd8-888c-329e212b0d67",
+    "merged_no": "M1705",
+    "source_order_nos": [
+      "PO4100137064.25",
+      "PO4100137066.25"
+    ],
+    "status": "assigned",
+    "driver_name": "Đặng Văn Tuấn",
+    "plate": "51C - 896.59",
+    "total_amount": 34511940,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-03-12T10:05:47.044952+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "5af97620-1338-4416-8d7d-53338ba7669a",
+    "merged_no": "M1102",
+    "source_order_nos": [
+      "PO4100137069.25",
+      "N1056",
+      "PO4100137068.25"
+    ],
+    "status": "completed",
+    "driver_name": "Trần Duy Bảo",
+    "plate": "50H - 202.15",
+    "total_amount": 22032000,
+    "total_stops": 3,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-03-13T04:02:56.101106+00:00",
+    "assigned_at": null,
+    "completed_at": "2026-03-13T09:47:02.092+00:00",
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "91423734-86c6-4d0d-8d71-1b01a7d42764",
+    "merged_no": "M1711",
+    "source_order_nos": [
+      "PO4100137065.25",
+      "PO4100137070.25"
+    ],
+    "status": "assigned",
+    "driver_name": "Ngô Quang Đạt",
+    "plate": "51D - 609.69",
+    "total_amount": 9558000,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-03-13T10:11:33.910792+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "cf4af490-48dd-41d0-959b-781ebe5ba988",
+    "merged_no": "M1351",
+    "source_order_nos": [
+      "PO4100137074.25",
+      "N1537"
+    ],
+    "status": "assigned",
+    "driver_name": "Ngô Quang Đạt",
+    "plate": "51D - 609.69",
+    "total_amount": 83394400,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-03-15T06:51:06.184955+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "8abf8363-01f4-4a05-9220-72f01a0c6b7d",
+    "merged_no": "M1309",
+    "source_order_nos": [
+      "PO4101197369.25",
+      "N1304"
+    ],
+    "status": "assigned",
+    "driver_name": "Ngô Quang Đạt",
+    "plate": "51D - 609.69",
+    "total_amount": 15768000,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-03-16T06:09:05.767722+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "7ddddd92-f87d-4f48-9b41-15463f38f441",
+    "merged_no": "M1354",
+    "source_order_nos": [
+      "PO4100070481",
+      "PO4100137077.25",
+      "PO4100070482",
+      "PO4101197363"
+    ],
+    "status": "assigned",
+    "driver_name": "Võ Thiếu Huy",
+    "plate": "50H - 051.91",
+    "total_amount": 155287800,
+    "total_stops": 4,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-03-16T06:54:16.837947+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "e352ea24-4426-4f89-ac34-79707a05820b",
+    "merged_no": "M1928",
+    "source_order_nos": [
+      "PO4101197384.25",
+      "N1638"
+    ],
+    "status": "assigned",
+    "driver_name": "Trương Quang Hào",
+    "plate": "51L - 697.62",
+    "total_amount": 87265080,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-03-16T12:28:54.422429+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "1a0b6e44-c5cf-46a1-8637-20fde08750a2",
+    "merged_no": "M1008",
+    "source_order_nos": [
+      "PO4101197381.25",
+      "N1640"
+    ],
+    "status": "assigned",
+    "driver_name": "Đoàn Văn Báu",
+    "plate": "50H - 260.87",
+    "total_amount": 137214000,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-03-17T03:08:50.638475+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "2930bf6a-6871-42ea-9882-7236f26c573c",
+    "merged_no": "M1011",
+    "source_order_nos": [
+      "PO4101197382.25",
+      "N1643"
+    ],
+    "status": "assigned",
+    "driver_name": "Đoàn Văn Quý",
+    "plate": "50H - 232.92",
+    "total_amount": 232243200,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-03-17T03:11:31.99671+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "6068f1af-c81a-45dc-8b48-febdd01a9722",
+    "merged_no": "M1738",
+    "source_order_nos": [
+      "PO4101197402.25",
+      "N1546",
+      "PO4101197401.25"
+    ],
+    "status": "assigned",
+    "driver_name": "Trần Duy Bảo",
+    "plate": "50H - 202.15",
+    "total_amount": 18414000,
+    "total_stops": 3,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-03-18T10:38:24.660993+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "620ab830-c6ba-4345-9d0a-d223bbd943f2",
+    "merged_no": "M1740",
+    "source_order_nos": [
+      "PO4101197397.25",
+      "X1608"
+    ],
+    "status": "assigned",
+    "driver_name": "Ngô Đình Chiến",
+    "plate": "51M - 440.53",
+    "total_amount": 34020000,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-03-18T10:40:16.652857+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "47f36a81-2909-400e-add8-f83940d5cbf2",
+    "merged_no": "M1755",
+    "source_order_nos": [
+      "PO4101197365.25",
+      "PO4101197366.25",
+      "PO4101197367.25",
+      "PO4101197404.25",
+      "PO4101197405.25",
+      "PO4101197409.25"
+    ],
+    "status": "assigned",
+    "driver_name": "Đỗ Quang Chép",
+    "plate": "51D - 171.82",
+    "total_amount": 146357280,
+    "total_stops": 6,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-03-18T10:55:16.504511+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "ad848f50-992c-42a8-9165-c8ef50e5c4ac",
+    "merged_no": "M1700",
+    "source_order_nos": [
+      "PO4101197412.25",
+      "N0945"
+    ],
+    "status": "assigned",
+    "driver_name": "Ngô Đình Chiến",
+    "plate": "51M - 440.53",
+    "total_amount": 304128000,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-03-19T10:00:32.92357+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "73895555-c024-4379-89ad-e1cf86f503a4",
+    "merged_no": "M1717",
+    "source_order_nos": [
+      "PO4101197408.25",
+      "PO4101197413.25"
+    ],
+    "status": "assigned",
+    "driver_name": "Phan Đình Phi",
+    "plate": "51D-991.03",
+    "total_amount": 76356000,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-03-19T10:17:25.285117+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "bec8ca64-09a0-401a-b495-f52e7eaacf78",
+    "merged_no": "M2050",
+    "source_order_nos": [
+      "PO4101197410.25",
+      "PO4101197428.25"
+    ],
+    "status": "assigned",
+    "driver_name": "Ngô Quang Đạt",
+    "plate": "51D - 609.69",
+    "total_amount": 98321040,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-03-20T13:50:07.7726+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "a5ce7d39-bf05-4f18-ad90-a69b6ce0bb3e",
+    "merged_no": "M1043",
+    "source_order_nos": [
+      "PO4101197442.25",
+      "N1027"
+    ],
+    "status": "assigned",
+    "driver_name": "Ngô Quang Đạt",
+    "plate": "51D - 609.69",
+    "total_amount": 18900000,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-03-23T03:43:49.78299+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "a1b6315c-f21b-4583-816a-4d2dc9ce4bac",
+    "merged_no": "M2220",
+    "source_order_nos": [
+      "PO4101197444.25",
+      "PO4101197445.25"
+    ],
+    "status": "assigned",
+    "driver_name": "Phan Đình Phi",
+    "plate": "51D-991.03",
+    "total_amount": 69390000,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-03-23T15:20:08.015546+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "08ffa29c-5ed6-4432-83da-fc68a1406555",
+    "merged_no": "M2225",
+    "source_order_nos": [
+      "PO4101197453.25",
+      "PO4101197451.25"
+    ],
+    "status": "assigned",
+    "driver_name": "Trương Quang Hào",
+    "plate": "51H - 570.84",
+    "total_amount": 28512000,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-03-23T15:25:40.213313+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "ac4075a1-d3d7-4e42-976b-6d62f29f2a02",
+    "merged_no": "M0853",
+    "source_order_nos": [
+      "PO4101197447.25",
+      "N0848",
+      "PO4101197446.25"
+    ],
+    "status": "assigned",
+    "driver_name": "Trần Duy Bảo",
+    "plate": "50H - 202.15",
+    "total_amount": 22032000,
+    "total_stops": 3,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-03-24T01:53:54.321984+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "57066410-4436-4d60-b66d-3051c1a06098",
+    "merged_no": "M1353",
+    "source_order_nos": [
+      "PO4101197441.25",
+      "N0944"
+    ],
+    "status": "assigned",
+    "driver_name": "Đoàn Văn Quý",
+    "plate": "50H - 232.92",
+    "total_amount": 137214000,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-03-24T06:53:07.347982+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "92801dbc-661d-422e-a3a5-6443258a6d5c",
+    "merged_no": "M1559",
+    "source_order_nos": [
+      "PO4101197459.25",
+      "PO4101197460.25"
+    ],
+    "status": "assigned",
+    "driver_name": "Phan Đình Phi",
+    "plate": "51D-991.03",
+    "total_amount": 66636000,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-03-25T08:59:22.911894+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "1668f170-df0d-46d1-95f1-15ba3dab2e36",
+    "merged_no": "M1749",
+    "source_order_nos": [
+      "PO4101197463.25",
+      "PO4101197464.25"
+    ],
+    "status": "assigned",
+    "driver_name": "Nguyễn Quốc Phục",
+    "plate": "51D - 398.74",
+    "total_amount": 21250000,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-03-25T10:49:48.213553+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "e27342ac-5525-4bc2-9ef0-d8da777b6ebf",
+    "merged_no": "M1616",
+    "source_order_nos": [
+      "PO4101197473.25",
+      "X1323"
+    ],
+    "status": "assigned",
+    "driver_name": "Trương Quang Hào",
+    "plate": "51L - 697.62",
+    "total_amount": 23220000,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-03-26T09:16:13.393197+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "a6713ee9-9895-4a3e-aee6-7856b667471c",
+    "merged_no": "M1625",
+    "source_order_nos": [
+      "PO4101197471.25",
+      "N1602"
+    ],
+    "status": "assigned",
+    "driver_name": "Trần Duy Bảo",
+    "plate": "50H 20215",
+    "total_amount": 18792000,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-03-26T09:25:37.460666+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "b27720b7-32fc-44a4-b033-146367eff466",
+    "merged_no": "M1511",
+    "source_order_nos": [
+      "PO4101197476.25",
+      "PO4101197477.25"
+    ],
+    "status": "assigned",
+    "driver_name": "Ngô Quang Đạt",
+    "plate": "51D - 609.69",
+    "total_amount": 15264000,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-03-27T08:11:48.952931+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "00d793a0-4fa7-4210-93b8-797e75b8ae3d",
+    "merged_no": "M1733",
+    "source_order_nos": [
+      "PO4101197480.25",
+      "PO4101197489.25"
+    ],
+    "status": "assigned",
+    "driver_name": "Tôn Thành Nguyên",
+    "plate": "61h 04989",
+    "total_amount": 74721960,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-03-27T10:33:20.287405+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "912fa4b9-1e8f-435b-a420-d4b3c54ff3a3",
+    "merged_no": "M0913",
+    "source_order_nos": [
+      "PO4101197486.25",
+      "N0910"
+    ],
+    "status": "assigned",
+    "driver_name": "Ngô Đình Chiến",
+    "plate": "51M - 440.53",
+    "total_amount": 304128000,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-03-28T02:14:00.64512+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "2af1d319-4a74-4b61-a628-7125be787898",
+    "merged_no": "M0907",
+    "source_order_nos": [
+      "PO4101197494.25",
+      "N0856"
+    ],
+    "status": "assigned",
+    "driver_name": "Đoàn Văn Báu",
+    "plate": "50H - 260.87",
+    "total_amount": 137214000,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-03-30T02:07:24.6357+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "09fd92a7-f21c-42e2-b833-e7af802e5802",
+    "merged_no": "M1343",
+    "source_order_nos": [
+      "PO4101197500.25",
+      "PO4101197498.25"
+    ],
+    "status": "assigned",
+    "driver_name": "Lương Mình Nhựt",
+    "plate": "50E 40848",
+    "total_amount": 3006600,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-03-30T06:43:58.630856+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "04841842-e7e0-4b28-8397-59467b706cf5",
+    "merged_no": "M1716",
+    "source_order_nos": [
+      "PO2603007",
+      "N2603078"
+    ],
+    "status": "completed",
+    "driver_name": "Ngô Đình Chiến",
+    "plate": "51M - 440.53",
+    "total_amount": 27540000,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-03-31T10:16:52.808969+00:00",
+    "assigned_at": null,
+    "completed_at": "2026-04-01T08:46:02.919+00:00",
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "4275d47b-145c-4975-a298-75c1051597f8",
+    "merged_no": "M2022",
+    "source_order_nos": [
+      "PO2604004",
+      "E2604002"
+    ],
+    "status": "assigned",
+    "driver_name": "Trương Quang Hào",
+    "plate": "51L - 697.62",
+    "total_amount": 23220000,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-04-01T13:22:27.129332+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "75343aa6-0dfb-45de-be3d-a353aee7659c",
+    "merged_no": "M2025",
+    "source_order_nos": [
+      "PO2604007",
+      "N2604004"
+    ],
+    "status": "assigned",
+    "driver_name": "Nguyễn Quốc Phục",
+    "plate": "51D - 398.74",
+    "total_amount": 17820000,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-04-01T13:25:43.460884+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "e209cbd8-db86-491f-9884-201133ba0f7f",
+    "merged_no": "M1548",
+    "source_order_nos": [
+      "PO2604009",
+      "PO2604010"
+    ],
+    "status": "assigned",
+    "driver_name": "Phan Đình Phi",
+    "plate": "51D-991.03",
+    "total_amount": 84672000,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-04-02T08:48:14.799218+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "11b9b579-b4e3-471d-bbe9-f1d306a81200",
+    "merged_no": "M1419",
+    "source_order_nos": [
+      "PO2604042",
+      "PO2604043"
+    ],
+    "status": "assigned",
+    "driver_name": "Phan Đình Phi",
+    "plate": "51D-991.03",
+    "total_amount": 77760000,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-04-07T07:19:46.934005+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "07a31da2-7221-4d23-a857-95bceb9544c8",
+    "merged_no": "M1129",
+    "source_order_nos": [
+      "PO2604054",
+      "N2604014"
+    ],
+    "status": "completed",
+    "driver_name": "Trần Duy Bảo",
+    "plate": "50h20215",
+    "total_amount": 20520000,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-04-08T04:29:44.208564+00:00",
+    "assigned_at": null,
+    "completed_at": "2026-04-08T04:33:22.819+00:00",
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "ec88434f-4fb5-44f5-990b-e36eb324ac48",
+    "merged_no": "M1608",
+    "source_order_nos": [
+      "PO2604055",
+      "PO2604056"
+    ],
+    "status": "assigned",
+    "driver_name": "Ngô Quang Đạt",
+    "plate": "51D - 609.69",
+    "total_amount": 15600000,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-04-08T09:08:42.012937+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "894d9d5a-1320-4a2c-b19c-9bce83e1717b",
+    "merged_no": "M1650",
+    "source_order_nos": [
+      "PO2604072",
+      "E2604006"
+    ],
+    "status": "assigned",
+    "driver_name": "Trương Quang Hào",
+    "plate": "51L - 697.62",
+    "total_amount": 16524000,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-04-09T09:50:15.842976+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "00274629-44ea-45e0-be3d-3446158b1f26",
+    "merged_no": "M1031",
+    "source_order_nos": [
+      "PO2604062",
+      "N2604024"
+    ],
+    "status": "completed",
+    "driver_name": "Ngô Quang Đạt",
+    "plate": "51D - 609.69",
+    "total_amount": 121435200,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-04-09T03:31:48.893645+00:00",
+    "assigned_at": null,
+    "completed_at": "2026-04-09T10:36:09.808+00:00",
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "01d344e3-339e-460c-8362-040ebc6f7b7d",
+    "merged_no": "M1615",
+    "source_order_nos": [
+      "PO2604040",
+      "N2604021"
+    ],
+    "status": "completed",
+    "driver_name": "DƯƠNG THIỆN TOÀN",
+    "plate": "60C-23745",
+    "total_amount": 255960000,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-04-08T09:15:33.163411+00:00",
+    "assigned_at": null,
+    "completed_at": "2026-04-09T11:49:14.645+00:00",
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "781aa778-7c04-405e-938f-28c61c3ed7ab",
+    "merged_no": "M1745",
+    "source_order_nos": [
+      "PO2604064",
+      "N2604028"
+    ],
+    "status": "assigned",
+    "driver_name": "Trần Duy Bảo",
+    "plate": "50H 20215",
+    "total_amount": 20520000,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-04-10T10:45:08.469343+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "361eb8a0-c93f-4e8b-8035-8b5a7519b60e",
+    "merged_no": "M0807",
+    "source_order_nos": [
+      "PO2604045",
+      "N2604027"
+    ],
+    "status": "assigned",
+    "driver_name": "Ngô Đình Chiến",
+    "plate": "51M - 440.53",
+    "total_amount": 290304000,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-04-11T01:07:58.72258+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "39b060c7-0456-4fc4-ada9-89b05d8a8225",
+    "merged_no": "M1208",
+    "source_order_nos": [
+      "PO2604082",
+      "E2604009"
+    ],
+    "status": "assigned",
+    "driver_name": "Trương Quang Hào",
+    "plate": "51L - 697.62",
+    "total_amount": 13230000,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-04-12T05:08:55.387233+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "5d98ade9-ce27-433a-9b9e-c1006248598e",
+    "merged_no": "M1211",
+    "source_order_nos": [
+      "PO2604085",
+      "N2604030"
+    ],
+    "status": "assigned",
+    "driver_name": "Ngô Quang Đạt",
+    "plate": "51D - 609.69",
+    "total_amount": 30240000,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-04-12T05:11:29.426928+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "393d5573-1e0f-44e4-8fae-e97999b89937",
+    "merged_no": "M1349",
+    "source_order_nos": [
+      "PO2604084",
+      "N2604031"
+    ],
+    "status": "assigned",
+    "driver_name": "Đoàn Văn Báu",
+    "plate": "50H - 260.87",
+    "total_amount": 147231000,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-04-13T06:49:52.787369+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "3d4e88cd-4029-4253-b3c5-ca95e7cdd542",
+    "merged_no": "M1628",
+    "source_order_nos": [
+      "PO2604102",
+      "N2604034"
+    ],
+    "status": "assigned",
+    "driver_name": "Ngô Quang Đạt",
+    "plate": "51D - 609.69",
+    "total_amount": 56311200,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-04-14T09:28:28.318325+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "991c9fd9-b879-4a2f-80f6-f2d4e0825461",
+    "merged_no": "M1630",
+    "source_order_nos": [
+      "PO2604103",
+      "N2604033"
+    ],
+    "status": "assigned",
+    "driver_name": "Ngô Quang Đạt",
+    "plate": "51D - 609.69",
+    "total_amount": 23760000,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-04-14T09:30:02.689185+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "660de95b-b4bc-4713-84a8-299336a92f10",
+    "merged_no": "M1617",
+    "source_order_nos": [
+      "PO2604115",
+      "E2604012"
+    ],
+    "status": "assigned",
+    "driver_name": "Trương Quang Hào",
+    "plate": "51L - 697.62",
+    "total_amount": 16524000,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-04-16T09:17:04.384552+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "eae8733e-6228-45a3-8cb1-82f9e9585afa",
+    "merged_no": "M1657",
+    "source_order_nos": [
+      "PO2604120",
+      "E2604013"
+    ],
+    "status": "assigned",
+    "driver_name": "Phan Đình Phi",
+    "plate": "51D-991.03",
+    "total_amount": 11664000,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-04-16T09:57:37.820879+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "e82672e9-5c78-4f48-abd8-e71e0822f315",
+    "merged_no": "M0901",
+    "source_order_nos": [
+      "PO2604107",
+      "N2604035"
+    ],
+    "status": "assigned",
+    "driver_name": "LÊ VĂN HÍT",
+    "plate": "62E-01088",
+    "total_amount": 27540000,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-04-17T02:01:58.915881+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "8f99d121-b1d8-4e17-849e-0ad9e61e2a61",
+    "merged_no": "M1328",
+    "source_order_nos": [
+      "PO2604135",
+      "PO26041389"
+    ],
+    "status": "assigned",
+    "driver_name": "Phan Đình Phi",
+    "plate": "51D-991.03",
+    "total_amount": 38772000,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-04-19T06:28:25.152228+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "630e60f1-5b76-4576-98f0-4b8b37287594",
+    "merged_no": "M0826",
+    "source_order_nos": [
+      "PO26041390",
+      "N2604041"
+    ],
+    "status": "assigned",
+    "driver_name": "Đoàn Văn Báu",
+    "plate": "51M - 440.53",
+    "total_amount": 147231000,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-04-20T01:26:16.383085+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "e795cee9-dfcb-4259-afba-8bda8fb6e3c3",
+    "merged_no": "M1624",
+    "source_order_nos": [
+      "PO26041398",
+      "N2604043"
+    ],
+    "status": "assigned",
+    "driver_name": "Ngô Đình Chiến",
+    "plate": "50H - 260.87",
+    "total_amount": 304128000,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-04-20T09:24:30.435119+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "8b57f0a6-a2b0-4e81-8e4f-70ef99f28de0",
+    "merged_no": "M1531",
+    "source_order_nos": [
+      "PO26041405",
+      "PO26041406"
+    ],
+    "status": "assigned",
+    "driver_name": "Phan Đình Phi",
+    "plate": "51D-991.03",
+    "total_amount": 83214000,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-04-21T08:31:34.706337+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "094d4676-8f9d-4f6d-badb-be78e752021e",
+    "merged_no": "M1607",
+    "source_order_nos": [
+      "PO26041409",
+      "N2604049"
+    ],
+    "status": "assigned",
+    "driver_name": "Trần Duy Bảo",
+    "plate": "50h 20215",
+    "total_amount": 20520000,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-04-22T09:07:36.652775+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "193f5c73-1529-4daa-91cc-4be7cbc4946e",
+    "merged_no": "M1554",
+    "source_order_nos": [
+      "PO4100047631",
+      "PO4100047632"
+    ],
+    "status": "assigned",
+    "driver_name": "Phan Đình Phi",
+    "plate": "51D-991.03",
+    "total_amount": 66636000,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-04-23T08:54:38.734675+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "40cb8703-4827-44ea-b89e-e15aa39c2058",
+    "merged_no": "M0840",
+    "source_order_nos": [
+      "PO26041114",
+      "PO26041115"
+    ],
+    "status": "assigned",
+    "driver_name": "Nguyễn Quốc Phục",
+    "plate": "51D - 398.74",
+    "total_amount": 22734000,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-04-25T01:40:35.149181+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  },
+  {
+    "id": "5ef416db-1ccf-491c-90c0-d0429015886f",
+    "merged_no": "M0905",
+    "source_order_nos": [
+      "PO26050068",
+      "PO26050069"
+    ],
+    "status": "assigned",
+    "driver_name": "ĐINH VĂN THÀNH",
+    "plate": "50H 29476",
+    "total_amount": 19170000,
+    "total_stops": 2,
+    "note": null,
+    "created_by": null,
+    "created_at": "2026-05-15T02:05:26.864529+00:00",
+    "assigned_at": null,
+    "completed_at": null,
+    "assistant_name": null,
+    "delivery_time": null
+  }
+]

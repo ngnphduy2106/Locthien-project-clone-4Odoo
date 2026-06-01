@@ -307,6 +307,11 @@ const api = {
         return res.json();
     },
 
+    getImportsCompleted: async (page = 1, limit = 50) => {
+        const res = await fetch(`${API_BASE}/imports?tab=completed&page=${page}&limit=${limit}`);
+        return res.json();
+    },
+
     assignImportDriver: async (id, driverName, plate) => {
         const res = await fetch(`${API_BASE}/imports/${id}/assign`, {
             method: 'PUT',

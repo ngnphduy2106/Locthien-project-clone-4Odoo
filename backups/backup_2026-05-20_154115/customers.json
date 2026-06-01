@@ -1,0 +1,1062 @@
+[
+  {
+    "id": "CUS-1772812527901",
+    "name": "Test Customer",
+    "address": "",
+    "phone": "",
+    "email": "invalidemail",
+    "note": "",
+    "active": true,
+    "created_at": "2026-03-06T15:55:28.046673+00:00"
+  },
+  {
+    "id": "SHEET-AMEII-VIỆT-NAM---CHI-1770349968730",
+    "name": "AMEII VIỆT NAM - CHI NHÁNH HẢI DƯƠNG",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "0108400885-001",
+    "active": true,
+    "created_at": "2026-02-06T03:52:48.956777+00:00"
+  },
+  {
+    "id": "SHEET-AMON-VIỆT-NAM-1770349969427",
+    "name": "AMON VIỆT NAM",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "3702649591",
+    "active": true,
+    "created_at": "2026-02-06T03:52:49.274555+00:00"
+  },
+  {
+    "id": "SHEET-AN-PHÚ-1770349969733",
+    "name": "AN PHÚ",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "0314515377",
+    "active": true,
+    "created_at": "2026-02-06T03:52:49.572924+00:00"
+  },
+  {
+    "id": "SHEET-ANH-HOÀNG-ANH-1770349970048",
+    "name": "ANH HOÀNG ANH",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "",
+    "active": true,
+    "created_at": "2026-02-06T03:52:49.887197+00:00"
+  },
+  {
+    "id": "SHEET-ANVY-1770349970342",
+    "name": "ANVY",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "0101651777",
+    "active": true,
+    "created_at": "2026-02-06T03:52:50.183996+00:00"
+  },
+  {
+    "id": "SHEET-B.M.T-1770349970640",
+    "name": "B.M.T",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "0301449021",
+    "active": true,
+    "created_at": "2026-02-06T03:52:50.499449+00:00"
+  },
+  {
+    "id": "SHEET-B&Q-1770349970961",
+    "name": "B&Q",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "3603963969",
+    "active": true,
+    "created_at": "2026-02-06T03:52:50.801698+00:00"
+  },
+  {
+    "id": "SHEET-BẢO-HUỆ-MINH-1770349971258",
+    "name": "BẢO HUỆ MINH",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "0317546006",
+    "active": true,
+    "created_at": "2026-02-06T03:52:51.100155+00:00"
+  },
+  {
+    "id": "SHEET-BÌNH-AN-1770349971561",
+    "name": "BÌNH AN",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "0304686454",
+    "active": true,
+    "created_at": "2026-02-06T03:52:51.398902+00:00"
+  },
+  {
+    "id": "SHEET-BM-WINDOWS-1770349971852",
+    "name": "BM WINDOWS",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "0313919539",
+    "active": true,
+    "created_at": "2026-02-06T03:52:51.69137+00:00"
+  },
+  {
+    "id": "SHEET-CẦU-ĐƯỜNG-HỒNG-AN-1770349972151",
+    "name": "CẦU ĐƯỜNG HỒNG AN",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "0305984693",
+    "active": true,
+    "created_at": "2026-02-06T03:52:51.990297+00:00"
+  },
+  {
+    "id": "SHEET-CELL-BIO-HUMAN-TECH--1770349972443",
+    "name": "CELL BIO HUMAN TECH VINA",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "4001196948",
+    "active": true,
+    "created_at": "2026-02-06T03:52:52.295815+00:00"
+  },
+  {
+    "id": "SHEET-CÔNG-NGHỆ-NANO-ỨNG-D-1770349972751",
+    "name": "CÔNG NGHỆ NANO ỨNG DỤNG",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "0104977350",
+    "active": true,
+    "created_at": "2026-02-06T03:52:52.601337+00:00"
+  },
+  {
+    "id": "SHEET-CÔNG-TY-28-1770349973068",
+    "name": "CÔNG TY 28",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "0300516772",
+    "active": true,
+    "created_at": "2026-02-06T03:52:52.90817+00:00"
+  },
+  {
+    "id": "SHEET-CRM-(VIỆT-NAM)-1770349973360",
+    "name": "CRM (VIỆT NAM)",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "1101830672",
+    "active": true,
+    "created_at": "2026-02-06T03:52:53.197908+00:00"
+  },
+  {
+    "id": "SHEET-DẦU-THỰC-VẬT-TÂN-BÌN-1770349973665",
+    "name": "DẦU THỰC VẬT TÂN BÌNH",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "0303587122",
+    "active": true,
+    "created_at": "2026-02-06T03:52:53.508136+00:00"
+  },
+  {
+    "id": "SHEET-DKPACK-1770349973978",
+    "name": "DKPACK",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "0315771334",
+    "active": true,
+    "created_at": "2026-02-06T03:52:53.837945+00:00"
+  },
+  {
+    "id": "SHEET-ĐẠI-THỊNH-PHÁT-1770349974300",
+    "name": "ĐẠI THỊNH PHÁT",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "0319139687",
+    "active": true,
+    "created_at": "2026-02-06T03:52:54.140901+00:00"
+  },
+  {
+    "id": "SHEET-ĐẦU-TƯ-PHÚC-LỘC-HOÀN-1770349974599",
+    "name": "ĐẦU TƯ PHÚC LỘC HOÀNG GIA",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "3702835887",
+    "active": true,
+    "created_at": "2026-02-06T03:52:54.437514+00:00"
+  },
+  {
+    "id": "SHEET-ĐẦU-TƯ-VÀ-THƯƠNG-MẠI-1770349974941",
+    "name": "ĐẦU TƯ VÀ THƯƠNG MẠI ĐỒNG TÂM SÀI GÒN",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "0315159298",
+    "active": true,
+    "created_at": "2026-02-06T03:52:54.779636+00:00"
+  },
+  {
+    "id": "SHEET-ĐIỆN-LẠNH-LIÊN-HƯNG-1770349975516",
+    "name": "ĐIỆN LẠNH LIÊN HƯNG",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "3703323440",
+    "active": true,
+    "created_at": "2026-02-06T03:52:55.355909+00:00"
+  },
+  {
+    "id": "SHEET-FINE-MS-VINA.-1770349975881",
+    "name": "FINE MS VINA.",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "2300851647",
+    "active": true,
+    "created_at": "2026-02-06T03:52:55.724765+00:00"
+  },
+  {
+    "id": "SHEET-GE-PMTP-1770349976184",
+    "name": "GE PMTP",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "3502208825",
+    "active": true,
+    "created_at": "2026-02-06T03:52:56.024875+00:00"
+  },
+  {
+    "id": "SHEET-GIA-NGẠN-1770349976485",
+    "name": "GIA NGẠN",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "3603496344",
+    "active": true,
+    "created_at": "2026-02-06T03:52:56.34423+00:00"
+  },
+  {
+    "id": "SHEET-GIAO-THÔNG-SÀI-GÒN-1770349976818",
+    "name": "GIAO THÔNG SÀI GÒN",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "0300460907",
+    "active": true,
+    "created_at": "2026-02-06T03:52:56.661091+00:00"
+  },
+  {
+    "id": "SHEET-GIẤY-MAI-ANH-1770349977179",
+    "name": "GIẤY MAI ANH",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "3603764868",
+    "active": true,
+    "created_at": "2026-02-06T03:52:57.01614+00:00"
+  },
+  {
+    "id": "SHEET-GOSHU-KOHSAN-(VIỆT-N-1770349977861",
+    "name": "GOSHU KOHSAN (VIỆT NAM)",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "3700611994-001",
+    "active": true,
+    "created_at": "2026-02-06T03:52:57.706734+00:00"
+  },
+  {
+    "id": "SHEET-HD-LONG-AN-1770349978166",
+    "name": "HD LONG AN",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "1101994857",
+    "active": true,
+    "created_at": "2026-02-06T03:52:58.002918+00:00"
+  },
+  {
+    "id": "SHEET-HUYNH-ĐỆ-TƯ-GIA-1770349978761",
+    "name": "HUYNH ĐỆ TƯ GIA",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "3702179522",
+    "active": true,
+    "created_at": "2026-02-06T03:52:58.606781+00:00"
+  },
+  {
+    "id": "SHEET-HƯNG-PHÁT-GROUP-1770349979064",
+    "name": "HƯNG PHÁT GROUP",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "5801506566",
+    "active": true,
+    "created_at": "2026-02-06T03:52:58.90243+00:00"
+  },
+  {
+    "id": "SHEET-INNOCRAFT-VIỆT-NAM-1770349979681",
+    "name": "INNOCRAFT VIỆT NAM",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "3701925400",
+    "active": true,
+    "created_at": "2026-02-06T03:52:59.519501+00:00"
+  },
+  {
+    "id": "SHEET-INSOL-VINA-1770349979974",
+    "name": "INSOL VINA",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "2300785391",
+    "active": true,
+    "created_at": "2026-02-06T03:52:59.813248+00:00"
+  },
+  {
+    "id": "SHEET-KHO-CẢNG-CÁI-MÉP-1770349980591",
+    "name": "KHO CẢNG CÁI MÉP",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "2601094849",
+    "active": true,
+    "created_at": "2026-02-06T03:53:00.437723+00:00"
+  },
+  {
+    "id": "SHEET-KIM-ĐẠT-HỒNG-1770349980900",
+    "name": "KIM ĐẠT HỒNG",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "1102009691",
+    "active": true,
+    "created_at": "2026-02-06T03:53:00.738004+00:00"
+  },
+  {
+    "id": "SHEET-KUN-TENG-1770349981507",
+    "name": "KUN TENG",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "1101870347",
+    "active": true,
+    "created_at": "2026-02-06T03:53:01.349068+00:00"
+  },
+  {
+    "id": "SHEET-KỸ-THUẬT-Á-CHÂU-1770349981823",
+    "name": "KỸ THUẬT Á CHÂU",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "0304798359",
+    "active": true,
+    "created_at": "2026-02-06T03:53:01.660626+00:00"
+  },
+  {
+    "id": "SHEET-LẬP-TÂN-1770349982418",
+    "name": "LẬP TÂN",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "0309985747",
+    "active": true,
+    "created_at": "2026-02-06T03:53:02.257326+00:00"
+  },
+  {
+    "id": "SHEET-MEKKI-VIỆT-NAM-1770349983061",
+    "name": "MEKKI VIỆT NAM",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "0313375582",
+    "active": true,
+    "created_at": "2026-02-06T03:53:02.903649+00:00"
+  },
+  {
+    "id": "SHEET-MINH-CHÂU-1770349983678",
+    "name": "MINH CHÂU",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "5801091720",
+    "active": true,
+    "created_at": "2026-02-06T03:53:03.514816+00:00"
+  },
+  {
+    "id": "SHEET-MÔI-TRƯỜNG-BÌNH-DƯƠN-1770349983979",
+    "name": "MÔI TRƯỜNG BÌNH DƯƠNG",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "3700145694",
+    "active": true,
+    "created_at": "2026-02-06T03:53:03.817192+00:00"
+  },
+  {
+    "id": "SHEET-NAM-THÁI-SƠN-1770349984608",
+    "name": "NAM THÁI SƠN",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "0301482452",
+    "active": true,
+    "created_at": "2026-02-06T03:53:04.45227+00:00"
+  },
+  {
+    "id": "SHEET-NGHIỆP-PHONG-1770349985247",
+    "name": "NGHIỆP PHONG",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "0302971618",
+    "active": true,
+    "created_at": "2026-02-06T03:53:05.08868+00:00"
+  },
+  {
+    "id": "SHEET-NGỌC-MỸ-KIM-1770349985558",
+    "name": "NGỌC MỸ KIM",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "6400429002",
+    "active": true,
+    "created_at": "2026-02-06T03:53:05.397647+00:00"
+  },
+  {
+    "id": "SHEET-NGŨ-KIM-MINH-VIỆT-1770349985856",
+    "name": "NGŨ KIM MINH VIỆT",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "0314253379",
+    "active": true,
+    "created_at": "2026-02-06T03:53:05.696625+00:00"
+  },
+  {
+    "id": "SHEET-NGUYỄN-TÍNH-1770349986242",
+    "name": "NGUYỄN TÍNH",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "0302866740",
+    "active": true,
+    "created_at": "2026-02-06T03:53:06.084701+00:00"
+  },
+  {
+    "id": "SHEET-NHẬT-KHÁNH-PHÁT-1770349986559",
+    "name": "NHẬT KHÁNH PHÁT",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "3603422977",
+    "active": true,
+    "created_at": "2026-02-06T03:53:06.393257+00:00"
+  },
+  {
+    "id": "SHEET-NÔNG-NGHIỆP-LÂM-ĐỒNG-1770349991961",
+    "name": "NÔNG NGHIỆP LÂM ĐỒNG",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "5800000336",
+    "active": true,
+    "created_at": "2026-02-06T03:53:11.798987+00:00"
+  },
+  {
+    "id": "SHEET-NUTIFOOD-BÌNH-DƯƠNG-1770349992255",
+    "name": "NUTIFOOD BÌNH DƯƠNG",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "3700521162",
+    "active": true,
+    "created_at": "2026-02-06T03:53:12.092457+00:00"
+  },
+  {
+    "id": "SHEET-POL-SHENG-FASTENER-(-1770349992846",
+    "name": "POL SHENG FASTENER (VIỆT NAM)",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "3702444160",
+    "active": true,
+    "created_at": "2026-02-06T03:53:12.687148+00:00"
+  },
+  {
+    "id": "SHEET-PUKU-VIỆT-NAM-1770349993152",
+    "name": "PUKU VIỆT NAM",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "3700480935",
+    "active": true,
+    "created_at": "2026-02-06T03:53:12.991067+00:00"
+  },
+  {
+    "id": "SHEET-QH-PLUS-1770349993470",
+    "name": "QH PLUS",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "3602713839",
+    "active": true,
+    "created_at": "2026-02-06T03:53:13.311109+00:00"
+  },
+  {
+    "id": "SHEET-RẠNG-ĐÔNG-HĐ-1770349994071",
+    "name": "RẠNG ĐÔNG HĐ",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "0318812451",
+    "active": true,
+    "created_at": "2026-02-06T03:53:13.916722+00:00"
+  },
+  {
+    "id": "SHEET-S-VÀ-T-TRƯƠNG-MAI-1770349994381",
+    "name": "S VÀ T TRƯƠNG MAI",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "0312601119",
+    "active": true,
+    "created_at": "2026-02-06T03:53:14.220551+00:00"
+  },
+  {
+    "id": "SHEET-SẢN-XUẤT-XÂY-DỰNG-QD-1770349995010",
+    "name": "SẢN XUẤT XÂY DỰNG QDS",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "3603922779",
+    "active": true,
+    "created_at": "2026-02-06T03:53:14.851911+00:00"
+  },
+  {
+    "id": "SHEET-SAO-VÀNG-THÁI-BÌNH-D-1770349995312",
+    "name": "SAO VÀNG THÁI BÌNH DƯƠNG",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "3500754635",
+    "active": true,
+    "created_at": "2026-02-06T03:53:15.151873+00:00"
+  },
+  {
+    "id": "SHEET-SẦM-NHỨT-1770349995942",
+    "name": "SẦM NHỨT",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "3900374638",
+    "active": true,
+    "created_at": "2026-02-06T03:53:15.778812+00:00"
+  },
+  {
+    "id": "SHEET-SHENYING-(VIỆT-NAM)-1770349996248",
+    "name": "SHENYING (VIỆT NAM)",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "0315776981",
+    "active": true,
+    "created_at": "2026-02-06T03:53:16.091207+00:00"
+  },
+  {
+    "id": "SHEET-SONG-NHUẬN-GLASS-1770349996846",
+    "name": "SONG NHUẬN GLASS",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "3703212500",
+    "active": true,
+    "created_at": "2026-02-06T03:53:16.687518+00:00"
+  },
+  {
+    "id": "SHEET-SOSA-INT-1770349997144",
+    "name": "SOSA INT",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "3603947237",
+    "active": true,
+    "created_at": "2026-02-06T03:53:16.982431+00:00"
+  },
+  {
+    "id": "SHEET-TÂN-PHÚ-TRUNG-1770349997741",
+    "name": "TÂN PHÚ TRUNG",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "0303006931",
+    "active": true,
+    "created_at": "2026-02-06T03:53:17.582161+00:00"
+  },
+  {
+    "id": "SHEET-TÂN-TRUNG-NAM-1770349998038",
+    "name": "TÂN TRUNG NAM",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "0310470005",
+    "active": true,
+    "created_at": "2026-02-06T03:53:17.877827+00:00"
+  },
+  {
+    "id": "SHEET-THÀNH-CÔNG-1770349998648",
+    "name": "THÀNH CÔNG",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "0301446221",
+    "active": true,
+    "created_at": "2026-02-06T03:53:18.489195+00:00"
+  },
+  {
+    "id": "SHEET-THÀNH-CÔNG-PHÁT-1770349998947",
+    "name": "THÀNH CÔNG PHÁT",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "3801277513",
+    "active": true,
+    "created_at": "2026-02-06T03:53:18.788224+00:00"
+  },
+  {
+    "id": "SHEET-THIÊN-HƯƠNG-1770349999539",
+    "name": "THIÊN HƯƠNG",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "0300629737",
+    "active": true,
+    "created_at": "2026-02-06T03:53:19.380422+00:00"
+  },
+  {
+    "id": "SHEET-THƯƠNG-MẠI-CHÍ-HUY-1770349999838",
+    "name": "THƯƠNG MẠI CHÍ HUY",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "0301786228",
+    "active": true,
+    "created_at": "2026-02-06T03:53:19.730433+00:00"
+  },
+  {
+    "id": "SHEET-THƯƠNG-MẠI-HOZENTECH-1770350000484",
+    "name": "THƯƠNG MẠI HOZENTECH",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "0312191663",
+    "active": true,
+    "created_at": "2026-02-06T03:53:20.326891+00:00"
+  },
+  {
+    "id": "SHEET-THƯƠNG-MẠI-THÉP-VIỆT-1770350000791",
+    "name": "THƯƠNG MẠI THÉP VIỆT",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "0310746260",
+    "active": true,
+    "created_at": "2026-02-06T03:53:20.628706+00:00"
+  },
+  {
+    "id": "SHEET-TIGER-ALWIN-1770350001394",
+    "name": "TIGER ALWIN",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "3700377825",
+    "active": true,
+    "created_at": "2026-02-06T03:53:21.239185+00:00"
+  },
+  {
+    "id": "SHEET-TM-DV-VIỆT-THÁI-1770350002007",
+    "name": "TM DV VIỆT THÁI",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "0317895871",
+    "active": true,
+    "created_at": "2026-02-06T03:53:21.847415+00:00"
+  },
+  {
+    "id": "SHEET-TRINH-TƯỜNG-1770350002328",
+    "name": "TRINH TƯỜNG",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "3900325711",
+    "active": true,
+    "created_at": "2026-02-06T03:53:22.166091+00:00"
+  },
+  {
+    "id": "SHEET-VẠN-CÁT-TƯỜNG-1770350002919",
+    "name": "VẠN CÁT TƯỜNG",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "0317657274",
+    "active": true,
+    "created_at": "2026-02-06T03:53:22.757429+00:00"
+  },
+  {
+    "id": "SHEET-VIET-SCREW-1770350003513",
+    "name": "VIET-SCREW",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "3702454426",
+    "active": true,
+    "created_at": "2026-02-06T03:53:23.349949+00:00"
+  },
+  {
+    "id": "SHEET-VIỆT-MA-LAY-1770350003808",
+    "name": "VIỆT MA LAY",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "0305370277",
+    "active": true,
+    "created_at": "2026-02-06T03:53:23.645648+00:00"
+  },
+  {
+    "id": "SHEET-VIỆT-TƯỜNG-1770350004416",
+    "name": "VIỆT TƯỜNG",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "3703057189",
+    "active": true,
+    "created_at": "2026-02-06T03:53:24.266225+00:00"
+  },
+  {
+    "id": "SHEET-VINPEARL-1770350004741",
+    "name": "VINPEARL",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "4200456848-014",
+    "active": true,
+    "created_at": "2026-02-06T03:53:24.578663+00:00"
+  },
+  {
+    "id": "SHEET-WANG-SHENG-INTERNATI-1770350005341",
+    "name": "WANG SHENG INTERNATIONAL VIỆT NAM",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "3700330834",
+    "active": true,
+    "created_at": "2026-02-06T03:53:25.181237+00:00"
+  },
+  {
+    "id": "SHEET-WITHUS-MRO-1770350005638",
+    "name": "WITHUS MRO",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "0317901998",
+    "active": true,
+    "created_at": "2026-02-06T03:53:25.475238+00:00"
+  },
+  {
+    "id": "SHEET-XÂY-DỰNG-GIAO-THÔNG--1770350006090",
+    "name": "XÂY DỰNG GIAO THÔNG ATS",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "0315416280",
+    "active": true,
+    "created_at": "2026-02-06T03:53:25.929929+00:00"
+  },
+  {
+    "id": "CUS-1772812734987",
+    "name": "<script>alert('XSS')</script>",
+    "address": "Test Address 123",
+    "phone": "0901234567",
+    "email": "test@test.com",
+    "note": "\"><img src=x onerror=alert(1)>",
+    "active": true,
+    "created_at": "2026-03-06T15:58:55.149497+00:00"
+  },
+  {
+    "id": "SHEET-GIẤY-XUÂN-MAI-1770349977482",
+    "name": "GIẤY XUÂN MAI",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "0303521717",
+    "active": true,
+    "created_at": "2026-02-06T03:52:57.329146+00:00"
+  },
+  {
+    "id": "SHEET-HOÀNG-NAM-PHÁT-1770349978465",
+    "name": "HOÀNG NAM PHÁT",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "3702210148",
+    "active": true,
+    "created_at": "2026-02-06T03:52:58.305253+00:00"
+  },
+  {
+    "id": "SHEET-HYOSUNG-VINA-1770349979373",
+    "name": "HYOSUNG VINA",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "3502363820",
+    "active": true,
+    "created_at": "2026-02-06T03:52:59.222113+00:00"
+  },
+  {
+    "id": "SHEET-KHÁNH-NGỌC-1770349980268",
+    "name": "KHÁNH NGỌC",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "1102002858",
+    "active": true,
+    "created_at": "2026-02-06T03:53:00.111443+00:00"
+  },
+  {
+    "id": "SHEET-KUBOTA-KASUI-VIỆT-NA-1770349981206",
+    "name": "KUBOTA KASUI VIỆT NAM",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "3700347436",
+    "active": true,
+    "created_at": "2026-02-06T03:53:01.047815+00:00"
+  },
+  {
+    "id": "SHEET-KỸ-THUẬT-DER-JINH-(V-1770349982118",
+    "name": "KỸ THUẬT DER JINH (VN)",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "3900334057",
+    "active": true,
+    "created_at": "2026-02-06T03:53:01.95886+00:00"
+  },
+  {
+    "id": "SHEET-ME-TA-FARM-1770349982723",
+    "name": "ME TA FARM",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "0318026930",
+    "active": true,
+    "created_at": "2026-02-06T03:53:02.565264+00:00"
+  },
+  {
+    "id": "SHEET-MH-TEXTILE-(VIỆT-NAM-1770349983364",
+    "name": "MH TEXTILE (VIỆT NAM)",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "4300832038",
+    "active": true,
+    "created_at": "2026-02-06T03:53:03.206711+00:00"
+  },
+  {
+    "id": "SHEET-NAM-QUỐC-1770349984277",
+    "name": "NAM QUỐC",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "0302185597",
+    "active": true,
+    "created_at": "2026-02-06T03:53:04.124923+00:00"
+  },
+  {
+    "id": "SHEET-NEWVISION-1770349984933",
+    "name": "NEWVISION",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "0105924224-001",
+    "active": true,
+    "created_at": "2026-02-06T03:53:04.77466+00:00"
+  },
+  {
+    "id": "SHEET-PHÚ-QUỐC-1770349992550",
+    "name": "PHÚ QUỐC",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "1701971178",
+    "active": true,
+    "created_at": "2026-02-06T03:53:12.388574+00:00"
+  },
+  {
+    "id": "SHEET-QUẢNG-LỢI-1770349993769",
+    "name": "QUẢNG LỢI",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "0104247770",
+    "active": true,
+    "created_at": "2026-02-06T03:53:13.613441+00:00"
+  },
+  {
+    "id": "SHEET-SẢN-XUẤT-&-THƯƠNG-MẠ-1770349994695",
+    "name": "SẢN XUẤT & THƯƠNG MẠI GITEXCO",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "1801728949",
+    "active": true,
+    "created_at": "2026-02-06T03:53:14.540585+00:00"
+  },
+  {
+    "id": "SHEET-SẮT-THÉP-HUÊ-MĨNH-1770349995613",
+    "name": "SẮT THÉP HUÊ MĨNH",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "1100711908",
+    "active": true,
+    "created_at": "2026-02-06T03:53:15.451448+00:00"
+  },
+  {
+    "id": "SHEET-SMALLFORTUNE-1770349996547",
+    "name": "SMALLFORTUNE",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "1101975798",
+    "active": true,
+    "created_at": "2026-02-06T03:53:16.386445+00:00"
+  },
+  {
+    "id": "SHEET-TAITAN-VIỆT-NAM.-1770349997442",
+    "name": "TAITAN VIỆT NAM.",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "3702424830",
+    "active": true,
+    "created_at": "2026-02-06T03:53:17.283613+00:00"
+  },
+  {
+    "id": "SHEET-THÁI-TUẤN-1770349998353",
+    "name": "THÁI TUẤN",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "0301455459",
+    "active": true,
+    "created_at": "2026-02-06T03:53:18.189123+00:00"
+  },
+  {
+    "id": "SHEET-THÉP-TRẢNG-BÀNG-1770349999245",
+    "name": "THÉP TRẢNG BÀNG",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "3900333085",
+    "active": true,
+    "created_at": "2026-02-06T03:53:19.082781+00:00"
+  },
+  {
+    "id": "SHEET-THƯƠNG-MẠI-DỊCH-VỤ-V-1770350000186",
+    "name": "THƯƠNG MẠI DỊCH VỤ VTS",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "3502280490",
+    "active": true,
+    "created_at": "2026-02-06T03:53:20.02365+00:00"
+  },
+  {
+    "id": "SHEET-THYE-MING-(VIỆT-NAM)-1770350001098",
+    "name": "THYE MING (VIỆT NAM)",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "3700772208",
+    "active": true,
+    "created_at": "2026-02-06T03:53:20.934834+00:00"
+  },
+  {
+    "id": "SHEET-TLV-VIỆT-NAM-1770350001695",
+    "name": "TLV VIỆT NAM",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "3702940151",
+    "active": true,
+    "created_at": "2026-02-06T03:53:21.546847+00:00"
+  },
+  {
+    "id": "SHEET-TRUNG-TÂM-Y-TẾ-HUYỆN-1770350002624",
+    "name": "TRUNG TÂM Y TẾ HUYỆN ĐẠ HUOAI",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "5800179820",
+    "active": true,
+    "created_at": "2026-02-06T03:53:22.462428+00:00"
+  },
+  {
+    "id": "SHEET-VẠN-LỢI-PHÁP-1770350003219",
+    "name": "VẠN LỢI PHÁP",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "0318061773",
+    "active": true,
+    "created_at": "2026-02-06T03:53:23.055575+00:00"
+  },
+  {
+    "id": "SHEET-VIỆT-TÍN-PHÁT-1770350004101",
+    "name": "VIỆT TÍN PHÁT",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "0315800592",
+    "active": true,
+    "created_at": "2026-02-06T03:53:23.943386+00:00"
+  },
+  {
+    "id": "SHEET-VÕ-THỊ-PHƯƠNG-DUNG-1770350005043",
+    "name": "VÕ THỊ PHƯƠNG DUNG",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "079165026994",
+    "active": true,
+    "created_at": "2026-02-06T03:53:24.883931+00:00"
+  },
+  {
+    "id": "SHEET-XUẤT-NHẬP-KHẨU-CÔNG--1770350006385",
+    "name": "XUẤT NHẬP KHẨU CÔNG NGHỆ TH",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "note": "0315832160",
+    "active": true,
+    "created_at": "2026-02-06T03:53:26.227042+00:00"
+  }
+]

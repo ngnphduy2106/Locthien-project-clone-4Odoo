@@ -106,7 +106,7 @@ export function invalidateDashboardCache() {
     console.log('📊 Dashboard cache invalidated');
 }
 
-// GET /api/reports/dashboard
+// GET /api/reports/dashboard — Enhanced with import stats for role-based dashboards
 router.get('/dashboard', async (req, res) => {
     try {
         // Return cached result if fresh
@@ -165,6 +165,29 @@ router.get('/dashboard', async (req, res) => {
             }
         }
 
+        // === IMPORT TICKET STATS from Supabase ===
+        let totalImports = 0, pendingImports = 0, deliveringImports = 0, completedImports = 0;
+        try {
+            const { data: importTickets, error: impErr } = await supabase
+                .from('import_tickets')
+                .select('status, assigned_driver');
+            if (!impErr && importTickets) {
+                totalImports = importTickets.length;
+                for (const t of importTickets) {
+                    const s = String(t.status || '').trim().toLowerCase();
+                    if (['completed', 'confirmed', 'hoàn thành', 'đã thực hiện'].includes(s)) {
+                        completedImports++;
+                    } else if (t.assigned_driver) {
+                        deliveringImports++;
+                    } else {
+                        pendingImports++;
+                    }
+                }
+            }
+        } catch (impErr) {
+            console.warn('⚠️ Dashboard: Could not fetch import stats:', impErr.message);
+        }
+
         const result = createResponse(false, 'OK', {
             totalOrders,
             pendingOrders,
@@ -173,7 +196,12 @@ router.get('/dashboard', async (req, res) => {
             cancelledTotal,
             completedToday,
             totalStock: Math.round(totalStock),
-            lowStockAlerts
+            lowStockAlerts,
+            // Import ticket stats for role-based dashboard
+            totalImports,
+            pendingImports,
+            deliveringImports,
+            completedImports
         });
 
         // Cache the result
@@ -243,9 +271,6 @@ router.get('/order-history', async (req, res) => {
         // === FETCH IMPORT TICKETS from Supabase ===
         let importOrders = [];
         try {
-
-
-
             const { data: importTickets, error: importErr } = await supabase
                 .from('import_tickets')
                 .select('*')

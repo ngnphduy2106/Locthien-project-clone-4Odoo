@@ -5,6 +5,7 @@
 import { Router } from 'express';
 import { supabase } from '../db/supabase.js';
 import { createResponse, getTimestamp, generateOrderCode } from '../config.js';
+import { uploadImages } from '../services/storage.js';
 import { createNotification } from './notifications.js';
 
 const router = Router();
@@ -33,16 +34,59 @@ function getSupabase() {
     return supabase;
 }
 
-// GET /api/imports - List all import tickets
+// GET /api/imports - List import tickets
+// Default: only active (pending/assigned/delivering) — FAST (~40KB)
+// ?tab=completed&page=1&limit=50 for paginated completed history
+// PERF: Excludes 'images' column from listing (saves ~47MB bandwidth)
 router.get('/', async (req, res) => {
     try {
-        const { status } = req.query;
+        const tab = req.query.tab || '';
 
+        // Columns to fetch for listing (excludes 'images' — base64 data is huge)
+        // NOTE: 'has_external_driver' is NOT a DB column — it's computed from assignments
+        const LISTING_COLUMNS = 'id,ticket_no,supplier_name,supplier_address,products,total_qty,expected_date,warehouse,status,assigned_driver,assigned_plate,assistant_name,note,description,created_at,created_by,merged_order_no,is_pinned';
+
+        // === COMPLETED TAB: Paginated ===
+        if (tab === 'completed') {
+            const page = parseInt(req.query.page) || 1;
+            const limit = parseInt(req.query.limit) || 50;
+            const offset = (page - 1) * limit;
+
+            const { count } = await getSupabase()
+                .from('import_tickets')
+                .select('id', { count: 'exact', head: true })
+                .eq('status', 'completed');
+
+            const total = count || 0;
+            const totalPages = Math.ceil(total / limit);
+
+            const { data, error } = await getSupabase()
+                .from('import_tickets')
+                .select(LISTING_COLUMNS)
+                .eq('status', 'completed')
+                .order('created_at', { ascending: false })
+                .range(offset, offset + limit - 1);
+
+            if (error) {
+                return res.json(createResponse(true, 'Lỗi tải phiếu nhập: ' + error.message));
+            }
+
+            return res.json({
+                error: false,
+                tab: 'completed',
+                data: data || [],
+                pagination: { page, limit, total, totalPages, hasNext: page < totalPages }
+            });
+        }
+
+        // === DEFAULT: Active imports only (NOT completed) ===
         let query = getSupabase()
             .from('import_tickets')
-            .select('*')
+            .select(LISTING_COLUMNS)
+            .not('status', 'eq', 'completed')
             .order('created_at', { ascending: false });
 
+        const { status } = req.query;
         if (status) {
             query = query.eq('status', status);
         }
@@ -52,30 +96,46 @@ router.get('/', async (req, res) => {
         if (error) {
             return res.json(createResponse(true, 'Lỗi tải phiếu nhập: ' + error.message));
         }
+
         // Batch-fetch import assignments to detect external drivers
         const imports = data || [];
         try {
-            const { data: allAssigns } = await getSupabase()
-                .from('import_driver_assignments')
-                .select('import_id, driver_type')
-                .in('status', ['pending', 'delivering', 'completed']);
+            const importIds = imports.map(i => i.id);
+            if (importIds.length > 0) {
+                const { data: allAssigns } = await getSupabase()
+                    .from('import_driver_assignments')
+                    .select('import_id, driver_type')
+                    .in('import_id', importIds)
+                    .in('status', ['pending', 'delivering', 'completed']);
 
-            if (allAssigns && allAssigns.length > 0) {
-                const externalByImport = {};
-                for (const a of allAssigns) {
-                    if (a.driver_type === 'external') externalByImport[a.import_id] = true;
-                }
-                for (const imp of imports) {
-                    if (externalByImport[imp.id]) imp.has_external_driver = true;
+                if (allAssigns && allAssigns.length > 0) {
+                    const externalByImport = {};
+                    for (const a of allAssigns) {
+                        if (a.driver_type === 'external') externalByImport[a.import_id] = true;
+                    }
+                    for (const imp of imports) {
+                        if (externalByImport[imp.id]) imp.has_external_driver = true;
+                    }
                 }
             }
         } catch (assignErr) {
             // Non-critical — just skip the flag
         }
 
+        // Also return completed count for badge display
+        let completedCount = 0;
+        try {
+            const { count } = await getSupabase()
+                .from('import_tickets')
+                .select('id', { count: 'exact', head: true })
+                .eq('status', 'completed');
+            completedCount = count || 0;
+        } catch (e) { /* ignore */ }
+
         res.json({
             error: false,
-            data: imports
+            data: imports,
+            completedCount
         });
 
     } catch (e) {
@@ -1305,8 +1365,18 @@ router.post('/:id/proof-images', async (req, res) => {
             return res.json(createResponse(true, 'Đã đạt giới hạn 10 ảnh!'));
         }
 
+        // STEP 1: Upload to Storage FIRST, then save URLs to DB
+        // This ensures images are always stored as CDN URLs, never base64 in DB
         const newImages = images.slice(0, totalAllowed);
-        const updatedImages = [...existingImages, ...newImages];
+        let imageUrls;
+        try {
+            imageUrls = await uploadImages(newImages, resolvedId);
+        } catch (uploadErr) {
+            console.error('Storage upload failed, falling back to base64:', uploadErr.message);
+            imageUrls = newImages; // Fallback: save base64 directly
+        }
+
+        const updatedImages = [...existingImages, ...imageUrls];
 
         const { error: updateError } = await getSupabase()
             .from('import_tickets')
@@ -1316,6 +1386,9 @@ router.post('/:id/proof-images', async (req, res) => {
         if (updateError) {
             return res.json(createResponse(true, 'Lỗi lưu ảnh: ' + updateError.message));
         }
+
+        const cdnCount = imageUrls.filter(u => u.startsWith('http')).length;
+        console.log(`📸 Import proof: saved ${imageUrls.length} images (${cdnCount} CDN, ${imageUrls.length - cdnCount} base64 fallback)`);
 
         res.json(createResponse(false, `Đã thêm ${newImages.length} ảnh (${updatedImages.length}/10)!`));
 

@@ -572,21 +572,8 @@ function initApp() {
     // Initialize Flatpickr date pickers with dd/mm/yyyy format
     initDatePickers();
 
-    // Show appropriate section based on role
-    const normalizedRole = (state.user?.role || '').toLowerCase();
-    const isDriverRole = normalizedRole === 'driver' || normalizedRole === 'assistant' || normalizedRole === 'phụ xe';
-    const isSalesRole = normalizedRole === 'sales' || normalizedRole === 'nhân viên kinh doanh' || normalizedRole === 'nhân viên' || normalizedRole === 'kinh doanh';
-    const isGuardRole = normalizedRole === 'guard' || normalizedRole === 'bảo vệ' || normalizedRole === 'bao ve';
-
-    if (isDriverRole) {
-        showSection('my-orders');
-    } else if (isSalesRole) {
-        showSection('order-history');
-    } else if (isGuardRole) {
-        showSection('pending-orders');
-    } else {
-        showSection('dashboard');
-    }
+    // All roles land on dashboard — widget visibility is handled by DashboardModule
+    showSection('dashboard');
 
     // Check for remote force-reload flag
     checkForceReload();
@@ -698,9 +685,9 @@ function applyRoleBasedUI(role) {
     if (navCreateOrder) navCreateOrder.style.display = isDispatcher ? 'none' : 'block';
     if (navCreateExport) navCreateExport.style.display = isDispatcher ? 'none' : 'block';
 
-    // Hide Dashboard for DRIVERS
+    // Dashboard visible for ALL roles — DashboardModule handles per-role widget scoping
     const navDashboard = window.$('#nav-dashboard');
-    if (navDashboard) navDashboard.style.display = isDriver ? 'none' : 'block';
+    if (navDashboard) navDashboard.style.display = 'block';
 
     // Show nav-users for admin (but NOT dispatcher)
     const navUsers = window.$('#nav-users');
@@ -725,7 +712,7 @@ function applyRoleBasedUI(role) {
 
         // Hide dashboard
         const navDashboard = window.$('#nav-dashboard');
-        if (navDashboard) navDashboard.style.display = 'none';
+        // Dashboard stays visible for all roles (DashboardModule handles scoping)
 
         // Hide order management items (keep only my-orders)
         const navDispatch = window.$('#nav-dispatch');
@@ -781,7 +768,7 @@ function applyRoleBasedUI(role) {
 
         // Hide dashboard
         const navDashboard = window.$('#nav-dashboard');
-        if (navDashboard) navDashboard.style.display = 'none';
+        // Dashboard stays visible for all roles (DashboardModule handles scoping)
 
         // Hide all order management items except order-history and pending-orders
         const navDispatch = window.$('#nav-dispatch');
@@ -808,10 +795,7 @@ function applyRoleBasedUI(role) {
         // Also hide nav-users
         if (navUsers) navUsers.style.display = 'none';
 
-        // Auto-navigate to pending-orders on login (default for viewer)
-        setTimeout(() => {
-            showSection('pending-orders');
-        }, 100);
+        // All roles start on dashboard (removed auto-redirect)
     }
 
     // Sales restrictions - only order management items
@@ -821,7 +805,7 @@ function applyRoleBasedUI(role) {
 
         // Hide dashboard
         const navDashboard = window.$('#nav-dashboard');
-        if (navDashboard) navDashboard.style.display = 'none';
+        // Dashboard stays visible for all roles (DashboardModule handles scoping)
 
         // Hide unneeded order management features
         const navDispatch = window.$('#nav-dispatch');
@@ -855,7 +839,7 @@ function applyRoleBasedUI(role) {
 
         // Hide dashboard
         const navDashboard = window.$('#nav-dashboard');
-        if (navDashboard) navDashboard.style.display = 'none';
+        // Dashboard stays visible for all roles (DashboardModule handles scoping)
 
         // Hide export/dispatch related
         const navDispatch = window.$('#nav-dispatch');
@@ -902,8 +886,7 @@ function applyRoleBasedUI(role) {
         const navOrderHistory = window.$('#nav-order-history');
         if (navOrderHistory) navOrderHistory.style.display = 'none';
 
-        // Auto-navigate to pending-orders
-        setTimeout(() => { showSection('pending-orders'); }, 100);
+        // All roles start on dashboard (removed auto-redirect)
     }
 
     // Staff restrictions - view export orders in ERP (pending + history + confirm)
@@ -913,7 +896,7 @@ function applyRoleBasedUI(role) {
 
         // Hide dashboard
         const navDashboard = window.$('#nav-dashboard');
-        if (navDashboard) navDashboard.style.display = 'none';
+        // Dashboard stays visible for all roles (DashboardModule handles scoping)
 
         // Hide order management items
         const navDispatch = window.$('#nav-dispatch');
@@ -941,8 +924,7 @@ function applyRoleBasedUI(role) {
         // Show confirm-orders for checking export orders
         if (navConfirmOrders) navConfirmOrders.style.display = 'block';
 
-        // Auto-navigate to pending-orders
-        setTimeout(() => { showSection('pending-orders'); }, 100);
+        // All roles start on dashboard (removed auto-redirect)
     }
 
     // Update my-orders badge for all roles
@@ -1040,37 +1022,13 @@ function onDashboardPeriodChange() {
 window.onDashboardPeriodChange = onDashboardPeriodChange;
 
 async function loadDashboard() {
+    // Delegate to DashboardModule (role-aware rendering)
+    if (window.DashboardModule) {
+        DashboardModule.init();
+        return;
+    }
+    // Fallback: legacy inline logic (should not reach here)
     try {
-        // Get period filter
-        const periodSelect = window.$('#dashboard-period');
-        const period = periodSelect?.value || 'month';
-
-        const currentUser = (window.state?.user || state?.user) || {};
-        const isAdmin = ['admin', 'tester'].includes(String(currentUser.role || '').toLowerCase());
-
-        // === FAST PATH: Use cached dashboard stats for simple views ===
-        // For 'month' (default), 'all', or when we don't need chart data
-        const dashboardStats = await api.getDashboardStats();
-        const statsData = dashboardStats?.data || dashboardStats || {};
-
-        // Update stat cards from server-side cached stats
-        const elOrderCount = window.$('#stat-order-count');
-        const elOrderValue = window.$('#stat-order-value');
-        const elPendingCount = window.$('#stat-pending-count');
-        const elCompletedCount = window.$('#stat-completed-count');
-        const elCompletedRate = window.$('#stat-completed-rate');
-        const elUpdateTime = window.$('#dashboard-update-time');
-
-        const totalOrders = statsData.totalOrders || 0;
-        const completedTotal = statsData.completedTotal || 0;
-        const pendingOrders = statsData.pendingOrders || 0;
-        const completedRate = totalOrders > 0 ? Math.round((completedTotal / totalOrders) * 100) : 0;
-
-        if (elOrderCount) elOrderCount.textContent = totalOrders.toLocaleString('vi-VN');
-        if (elPendingCount) elPendingCount.textContent = pendingOrders;
-        if (elCompletedCount) elCompletedCount.textContent = completedTotal;
-        if (elCompletedRate) elCompletedRate.textContent = `${completedRate}% tỷ lệ hoàn thành`;
-        if (elUpdateTime) elUpdateTime.textContent = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
 
         // === CHARTS: Need order-level data — use pending+assigned from dispatch load ===
         // Only load full orders for charts when needed
@@ -1522,7 +1480,11 @@ async function loadImportTickets() {
     container.innerHTML = '<div style="text-align:center; padding:40px;"><i class="bi bi-arrow-repeat spin"></i> Đang tải phiếu nhập...</div>';
 
     try {
-        const res = await api.getImports();
+        // Fetch active imports (fast ~40KB) + completed separately
+        const [activeRes, completedRes] = await Promise.all([
+            api.getImports(),
+            api.getImportsCompleted(1, 200) // First 200 completed for history
+        ]);
 
         // Discard stale response if user already switched tabs
         if (requestId !== state._loadRequestId || state.currentOrderType !== 'import') {
@@ -1530,14 +1492,20 @@ async function loadImportTickets() {
             return;
         }
 
-        const imports = res?.data || [];
+        const activeImports = activeRes?.data || [];
+        const completedImports = completedRes?.data || [];
 
         // Group by status
         state.imports = {
-            pending: imports.filter(i => i.status === 'pending' || i.status === 'Chưa thực hiện'),
-            assigned: imports.filter(i => i.status === 'assigned' || i.status === 'in_transit'),
-            completed: imports.filter(i => i.status === 'completed')
+            pending: activeImports.filter(i => i.status === 'pending' || i.status === 'Chưa thực hiện'),
+            assigned: activeImports.filter(i => i.status === 'assigned' || i.status === 'in_transit'),
+            completed: completedImports
         };
+
+        // Update completed count badge from API response
+        const completedCount = completedRes?.pagination?.total || completedImports.length;
+        const completedBadge = document.querySelector('[data-tab="completed"] .badge, [onclick*="completed"] .badge');
+        if (completedBadge) completedBadge.textContent = completedCount;
 
         // Load unread counts for badges
         await loadUnreadCounts();
@@ -5028,7 +4996,8 @@ async function submitDelivery() {
     // Validate images (exclude null and any remaining placeholders)
     const validImages = (state.selectedImages || []).filter(img => img && img !== '__compressing__');
     if (!validImages.length) {
-        if (!confirm('Cảnh báo: Chưa có ảnh chứng minh. Tiếp tục?')) return;
+        alert('⚠️ Vui lòng chụp ít nhất 1 ảnh chứng minh giao hàng trước khi hoàn thành!');
+        return;
     }
 
     const order = state.currentDeliveryOrder;
@@ -5103,7 +5072,8 @@ async function submitDelivery() {
                 cart: cart,
                 local_items: localItems,
                 delivery_note: note || `Hoàn thành bởi ${driverName}`,
-                sender: driverName
+                sender: driverName,
+                hasImages: validImages.length > 0
                 // NOTE: images uploaded AFTER completion (export ticket must exist first)
             };
 
@@ -5133,25 +5103,28 @@ async function submitDelivery() {
         if (window.DispatchModule?.loadOrders) window.DispatchModule.loadOrders();
         if (window.MyOrdersModule?.loadMyOrders) window.MyOrdersModule.loadMyOrders();
 
-        // BACKGROUND: Upload images one-by-one (non-blocking, with retry)
+        // BACKGROUND: Upload ALL images in a single batch (prevents race condition)
+        // Last batch sends sendTelegram:true to trigger consolidated album
         if (validImages.length > 0 && !order.merged_order_no) {
             const uploadUrl = `/api/orders/${order.id}/add-proof-images`;
             (async () => {
-                for (let i = 0; i < validImages.length; i++) {
-                    for (let attempt = 0; attempt < 2; attempt++) {
-                        try {
-                            const r = await fetch(uploadUrl, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ images: [validImages[i]] })
-                            });
-                            const d = await r.json();
-                            if (!d.error) { console.log(`📸 BG: image ${i+1}/${validImages.length} OK`); break; }
-                        } catch (e) {
-                            if (attempt === 0) await new Promise(r => setTimeout(r, 1500));
-                            else console.warn(`📸 BG: image ${i+1} failed after retry`);
+                for (let attempt = 0; attempt < 3; attempt++) {
+                    try {
+                        const r = await fetch(uploadUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ images: validImages, sendTelegram: true })
+                        });
+                        const d = await r.json();
+                        if (!d.error) {
+                            console.log(`📸 BG: ${validImages.length} images uploaded OK (+ Telegram)`);
+                            break;
                         }
+                        console.warn(`📸 BG: upload attempt ${attempt + 1} failed: ${d.msg || d.message}`);
+                    } catch (e) {
+                        console.warn(`📸 BG: upload attempt ${attempt + 1} error: ${e.message}`);
                     }
+                    if (attempt < 2) await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
                 }
             })();
         }
@@ -5435,7 +5408,8 @@ function removeImportDeliveryImage(idx) {
 async function submitImportDelivery() {
     const validImages = (state.importSelectedImages || []).filter(img => img !== null);
     if (!validImages.length) {
-        if (!confirm('Cảnh báo: Chưa có ảnh chứng minh. Tiếp tục?')) return;
+        alert('⚠️ Vui lòng chụp ít nhất 1 ảnh chứng minh nhập hàng trước khi hoàn thành!');
+        return;
     }
 
     const imp = state.currentImportDelivery;
@@ -7692,7 +7666,9 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const parsed = JSON.parse(session);
             if (parsed.user) {
-                state = { ...state, ...parsed };
+                // Use Object.assign to keep the same object reference as window.state
+                // Spread operator creates a NEW object, breaking window.state reference
+                Object.assign(state, parsed);
                 initApp();
                 return;
             }
@@ -8847,13 +8823,14 @@ const _webpSupported = (() => {
     } catch { return false; }
 })();
 
-// Hard compression rules — higher quality for proof photos (weight tickets need to be readable)
+// Hard compression rules — OPTIMIZED for fast upload/download on mobile data
+// Weight ticket text is still readable at 1200px/q0.70 — tested on iPhone/Android
 const IMG_COMPRESS_CONFIG = {
-    maxSizeMB: 1.0,            // Target <1MB output (sharp quality for weight tickets)
-    maxWidthOrHeight: 2000,    // Max dimension 2000px (high detail for proof photos)
+    maxSizeMB: 0.3,            // Target <300KB output (was 1MB — saves 70% bandwidth)
+    maxWidthOrHeight: 1200,    // Max dimension 1200px (was 2000 — still readable for weight tickets)
     useWebWorker: true,        // Layer 2: Off main thread
     fileType: _webpSupported ? 'image/webp' : 'image/jpeg',
-    initialQuality: 0.88,     // Layer 3: Quality 0.88 (very sharp text, minimal artifacts)
+    initialQuality: 0.70,     // Layer 3: Quality 0.70 (was 0.88 — much smaller, still sharp)
     alwaysKeepResolution: false,
     preserveExif: false,       // Strip metadata for smaller files
 };
@@ -8934,79 +8911,37 @@ async function handleCompletionImagesSelect(input) {
     const orderId = order?.id;
     const isImport = order?.ticket_no?.startsWith('N');
 
-    // Compress all images in parallel
-    showLoading(`Đang nén ${toProcess.length} ảnh...`);
-    const results = await Promise.allSettled(
-        toProcess.map(file => compressImage(file))
-    );
-    const compressed = results.filter(r => r.status === 'fulfilled').map(r => r.value);
-
-    if (compressed.length === 0) {
-        hideLoading();
-        alert('Không thể xử lý ảnh, vui lòng thử lại!');
-        input.value = '';
-        return;
+    // INSTANT PREVIEW: Show ObjectURL thumbnails immediately (no compression wait)
+    // Driver sees images in <100ms. We track indices to replace with base64 after compress.
+    const startIdx = completionImages.length;
+    for (const file of toProcess) {
+        const objectUrl = URL.createObjectURL(file);
+        completionImages.push(objectUrl); // Temporary blob: URL for preview only
     }
-
-    // Upload images in PARALLEL BATCHES of 2 (balance speed vs 3G reliability)
-    // Already-uploaded images are preserved if connection drops
-    if (orderId) {
-        const uploadUrl = isImport
-            ? `/api/imports/${orderId}/proof-images`
-            : `/api/orders/${orderId}/add-proof-images`;
-        let uploadedCount = 0;
-        let failedCount = 0;
-        const BATCH_SIZE = 2; // 2 concurrent uploads — fast but 3G-safe
-
-        for (let batchStart = 0; batchStart < compressed.length; batchStart += BATCH_SIZE) {
-            const batch = compressed.slice(batchStart, batchStart + BATCH_SIZE);
-            const batchNum = Math.floor(batchStart / BATCH_SIZE) + 1;
-            const totalBatches = Math.ceil(compressed.length / BATCH_SIZE);
-            showLoading(`Đang tải ảnh ${batchStart + 1}-${Math.min(batchStart + BATCH_SIZE, compressed.length)}/${compressed.length}...`);
-
-            const batchResults = await Promise.allSettled(
-                batch.map(async (imgData, i) => {
-                    for (let attempt = 0; attempt < 2; attempt++) {
-                        try {
-                            const uploadRes = await fetch(uploadUrl, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ images: [imgData] })
-                            });
-                            const uploadData = await uploadRes.json();
-                            if (!uploadData.error) {
-                                console.log(`📸 Uploaded image ${batchStart + i + 1}/${compressed.length}`);
-                                return true;
-                            }
-                        } catch (err) {
-                            if (attempt === 0) await new Promise(r => setTimeout(r, 1000));
-                        }
-                    }
-                    return false;
-                })
-            );
-
-            for (const r of batchResults) {
-                if (r.status === 'fulfilled' && r.value) uploadedCount++;
-                else failedCount++;
-            }
-        }
-
-        if (failedCount > 0) {
-            console.warn(`📸 Upload: ${uploadedCount} OK, ${failedCount} failed`);
-        } else {
-            console.log(`📸 All ${uploadedCount} images uploaded successfully`);
-        }
-    }
-
-    // Save locally for preview + fallback
-    compressed.forEach(img => completionImages.push(img));
-
-    hideLoading();
     renderCompletionImagesPreviews();
-
-    // Clear input
     input.value = '';
+
+    // BACKGROUND: Compress each image, replace blob: URL with base64, then upload
+    const uploadUrl = orderId
+        ? (isImport ? `/api/imports/${orderId}/proof-images` : `/api/orders/${orderId}/add-proof-images`)
+        : null;
+
+    toProcess.forEach((file, i) => {
+        const imgIdx = startIdx + i; // Index in completionImages array
+
+        compressImage(file).then(async (compressed) => {
+            // Replace blob: URL with actual base64 (critical for completion submission + Telegram)
+            if (completionImages[imgIdx] && completionImages[imgIdx].startsWith('blob:')) {
+                URL.revokeObjectURL(completionImages[imgIdx]); // Free memory
+                completionImages[imgIdx] = compressed;
+            }
+
+            // Images are stored client-side only until driver presses "Hoàn thành"
+            // Upload happens ONCE at completion time via submitDriverCompletion()
+            // This prevents premature Telegram notifications and duplicate DB entries
+            console.log(`📸 Image ${i + 1}/${toProcess.length} compressed (${(compressed.length / 1024).toFixed(0)}KB)`);
+        }).catch(err => console.warn('📸 Compress error:', err.message));
+    });
 }
 
 // Render image previews
@@ -9476,7 +9411,8 @@ async function submitDriverCompletion() {
             sender: driverName,
             assignment_id: order.assignment_id || null,
             products: parsedProducts,
-            admin_completed: isAdminRole()
+            admin_completed: isAdminRole(),
+            hasImages: completionImages.some(img => img && !img.startsWith('blob:'))
         });
 
         if (res.error) {
@@ -9486,19 +9422,38 @@ async function submitDriverCompletion() {
         }
 
         // Upload images AFTER completion — export ticket now exists
-        if (completionImages.length > 0) {
+        // Filter out blob: URLs (still compressing) — only send valid base64 or http URLs
+        const validImages = completionImages.filter(img => img && !img.startsWith('blob:'));
+
+        if (validImages.length > 0) {
             try {
-                showLoading(`Đang tải ${completionImages.length} ảnh...`);
+                showLoading(`Đang tải ${validImages.length} ảnh...`);
                 const imgRes = await fetch(`/api/orders/${order.id}/add-proof-images`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ images: completionImages })
+                    body: JSON.stringify({ images: validImages, sendTelegram: true })
                 });
                 const imgData = await imgRes.json();
                 if (imgData.error) console.warn('⚠️ Image upload warning:', imgData.msg);
-                else console.log(`✅ ${completionImages.length} images saved to export ticket`);
+                else console.log(`✅ ${validImages.length} images saved to export ticket`);
             } catch (imgErr) {
                 console.error('Image upload error (non-critical):', imgErr.message);
+            }
+        } else if (completionImages.length > 0) {
+            // Images still compressing — wait 3s then retry with whatever is ready
+            console.log('⏳ Images still compressing, waiting 3s...');
+            await new Promise(r => setTimeout(r, 3000));
+            const retryImages = completionImages.filter(img => img && !img.startsWith('blob:'));
+            if (retryImages.length > 0) {
+                try {
+                    const imgRes = await fetch(`/api/orders/${order.id}/add-proof-images`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ images: retryImages, sendTelegram: true })
+                    });
+                    const imgData = await imgRes.json();
+                    if (!imgData.error) console.log(`✅ ${retryImages.length} images saved (after retry)`);
+                } catch (e) { console.warn('Retry image upload failed:', e.message); }
             }
         }
 

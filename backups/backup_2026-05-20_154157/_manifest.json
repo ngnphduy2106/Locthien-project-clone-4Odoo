@@ -1,0 +1,21 @@
+{
+  "exported_at": "2026-05-20T08:41:57.753Z",
+  "supabase_url": "https://zfgrkvsaaxfvfddkkcrt.supabase.co",
+  "tables": {
+    "orders": 1095,
+    "users": 31,
+    "materials": 135,
+    "employees": 0,
+    "inventory": 0,
+    "order_messages": 21,
+    "import_tickets": 195,
+    "export_tickets": "485 (no images)",
+    "order_driver_assignments": "570 (no images)",
+    "import_driver_assignments": 2,
+    "suppliers": 31,
+    "customers": 106,
+    "merged_orders": 76,
+    "merged_order_checkins": 0
+  },
+  "total_rows": 2747
+}

@@ -39,8 +39,8 @@ const IS_NETLIFY = !!process.env.NETLIFY || !!process.env.LAMBDA_TASK_ROOT;
 // Middleware
 app.use(compression()); // Gzip — reduces 511KB app.js to ~120KB
 app.use(cors());
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(express.json({ limit: '10mb' })); // Reduced from 50mb — images now compressed to <300KB each
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Serve static files using Absolute Path (Critical for Render/Local)
 const __filename = fileURLToPath(import.meta.url);
