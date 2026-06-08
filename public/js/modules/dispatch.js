@@ -297,13 +297,27 @@ const DispatchModule = {
         const status = order.status;
         const orderId = order.id || order.order_id || order.soDon || order.orderCode;
 
-        if (status === 'Chờ xử lý' || status === 'PENDING' || status === 'NEW' || status === 'Chưa thực hiện') {
+        if (status === 'Chờ xử lý' || status === 'PENDING' || status === 'NEW' || status === 'Chưa thực hiện' || status === 'Chờ nhận') {
+            if (order.odoo_id) {
+                return `
+                    <button class="btn btn-info btn-sm" onclick="event.stopPropagation(); assignOdooDriverModal('${order.odoo_id}')" style="padding:3px 6px; font-size:9px; border-radius:50%; width:24px; height:24px;" title="Phân công tài xế">
+                        <i class="bi bi-person-plus"></i>
+                    </button>
+                `;
+            }
             return `
-                <button class="btn btn-info btn-sm" onclick="event.stopPropagation(); DispatchModule.showAssignDriverModal('${orderId}')" style="padding:3px 6px; font-size:9px; border-radius:50%; width:24px; height:24px;">
+                <button class="btn btn-info btn-sm" onclick="event.stopPropagation(); DispatchModule.showAssignDriverModal('${orderId}')" style="padding:3px 6px; font-size:9px; border-radius:50%; width:24px; height:24px;" title="Phân công tài xế">
                     <i class="bi bi-person-plus"></i>
                 </button>
             `;
         } else if (status === 'Đang giao' || status === 'DELIVERING' || status === 'IN_PROGRESS' || status === 'Đang thực hiện') {
+            if (order.odoo_id) {
+                return `
+                    <button class="btn btn-success btn-sm" onclick="event.stopPropagation(); confirmCompleteOdooOrder('${order.odoo_id}')" style="padding:3px 6px; font-size:9px; border-radius:50%; width:24px; height:24px;" title="Hoàn thành đơn">
+                        <i class="bi bi-check"></i>
+                    </button>
+                `;
+            }
             return `
                 <button class="btn btn-success btn-sm" onclick="event.stopPropagation(); viewOrderDetail('${orderId}')" style="padding:3px 6px; font-size:9px; border-radius:50%; width:24px; height:24px;">
                     <i class="bi bi-check"></i>
