@@ -1590,12 +1590,12 @@ async function loadImportTickets() {
             po.x_lt_po_status !== 'lt_cancelled'
         ).map(_normalizePurchaseOrder);
 
-        console.log(`📦 Loaded ${imports.length} import tickets + ${odooPos.length} Odoo purchase orders`);
+        console.log(`📦 Loaded ${activeImports.length} import tickets + ${odooPos.length} Odoo purchase orders`);
 
         // Group local imports by status
-        const localPending   = imports.filter(i => i.status === 'pending' || i.status === 'Chưa thực hiện');
-        const localAssigned  = imports.filter(i => i.status === 'assigned' || i.status === 'in_transit');
-        const localCompleted = imports.filter(i => i.status === 'completed');
+        const localPending   = activeImports.filter(i => i.status === 'pending' || i.status === 'Chưa thực hiện');
+        const localAssigned  = activeImports.filter(i => i.status === 'assigned' || i.status === 'in_transit');
+        const localCompleted = activeImports.filter(i => i.status === 'completed');
 
         // Group Odoo POs by normalized status
         const ooPending   = odooPos.filter(p => p.status === 'pending');

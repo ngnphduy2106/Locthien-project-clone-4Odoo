@@ -129,13 +129,38 @@ router.post('/:poId/assign-driver', async (req, res) => {
         if (!driver || !plate) {
             return res.status(400).json({ error: true, msg: 'Thiếu driver hoặc plate' });
         }
-        await odoo.assignPickupDriver(id, driver, plate);
-        if (autoStart) {
-            // PO chưa có action riêng cho 'lt_receiving' — write trực tiếp
-            await odoo.call('purchase.order', 'write',
-                [[id], { x_lt_po_status: 'lt_receiving' }], {});
+        
+        let odooFailed = false;
+        try {
+            await odoo.assignPickupDriver(id, driver, plate);
+            if (autoStart) {
+                // PO chưa có action riêng cho 'lt_receiving' — write trực tiếp
+                await odoo.call('purchase.order', 'write',
+                    [[id], { x_lt_po_status: 'lt_receiving' }], {});
+            }
+        } catch (e) {
+            console.error('[odoo-po] Odoo API assign fail, fallback to local update:', e.message);
+            odooFailed = true;
         }
-        return res.json({ error: false, msg: 'Đã ghi tài xế + chuyển sang Đang lấy hàng' });
+
+        // Cập nhật trực tiếp vào Supabase để đảm bảo hoạt động ngay cả khi Odoo offline
+        const { error: dbErr } = await supabase
+            .from('odoo_purchase_orders')
+            .update({
+                x_lt_po_driver_name: driver,
+                x_lt_po_plate: plate,
+                x_lt_po_status: autoStart ? 'lt_receiving' : 'lt_approved'
+            })
+            .eq('odoo_id', id);
+
+        if (dbErr) throw dbErr;
+
+        return res.json({ 
+            error: false, 
+            msg: odooFailed 
+                ? 'Đã ghi nhận tài xế lấy hàng trên ERP (Không thể kết nối Odoo)' 
+                : 'Đã ghi tài xế + chuyển sang Đang lấy hàng' 
+        });
     } catch (e) {
         console.error('[odoo-po] assign fail:', e.message);
         return res.status(500).json({ error: true, msg: e.message });
@@ -145,8 +170,28 @@ router.post('/:poId/assign-driver', async (req, res) => {
 // POST /api/odoo-purchase-orders/:poId/received — đã nhận đủ hàng
 router.post('/:poId/received', async (req, res) => {
     try {
-        await odoo.markPurchaseReceived(parseInt(req.params.poId, 10));
-        return res.json({ error: false, msg: 'Đã đánh dấu nhận đủ' });
+        const id = parseInt(req.params.poId, 10);
+        let odooFailed = false;
+        try {
+            await odoo.markPurchaseReceived(id);
+        } catch (e) {
+            console.error('[odoo-po] Odoo markPurchaseReceived fail, fallback to local update:', e.message);
+            odooFailed = true;
+        }
+
+        const { error: dbErr } = await supabase
+            .from('odoo_purchase_orders')
+            .update({ x_lt_po_status: 'lt_received' })
+            .eq('odoo_id', id);
+
+        if (dbErr) throw dbErr;
+
+        return res.json({ 
+            error: false, 
+            msg: odooFailed 
+                ? 'Đã đánh dấu nhận hàng trên ERP (Không thể kết nối Odoo)' 
+                : 'Đã đánh dấu nhận đủ' 
+        });
     } catch (e) {
         return res.status(500).json({ error: true, msg: e.message });
     }

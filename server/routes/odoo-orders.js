@@ -141,6 +141,85 @@ function toFrontend(row) {
     };
 }
 
+function poToFrontend(row) {
+    const detail = row.detail || {};
+    const lines  = detail.lines || [];
+    const sup    = detail.supplier || {};
+    const supplierAddress = [sup.street, sup.city].filter(Boolean).join(', ');
+    
+    // Status mapping for drivers (imports):
+    let status = 'Chờ nhận';
+    let statusCode = 'CHO_NHAN';
+    
+    switch (row.x_lt_po_status) {
+        case 'lt_approved':
+            status = 'Chờ nhận';
+            statusCode = 'CHO_NHAN';
+            break;
+        case 'lt_receiving':
+            status = 'Đang giao';
+            statusCode = 'DANG_GIAO';
+            break;
+        case 'lt_received':
+        case 'lt_billed':
+        case 'lt_closed':
+            status = 'Hoàn thành';
+            statusCode = 'HOAN_THANH';
+            break;
+        case 'lt_cancelled':
+            status = 'Đã hủy';
+            statusCode = 'HOAN_THANH';
+            break;
+    }
+
+    return {
+        id:                  row.odoo_id,
+        odoo_id:             row.odoo_id,
+        soDon:               row.name,
+        sale_order_no:       row.name,
+        status:              status,
+        statusCode:          statusCode,
+        type:                'import',
+
+        khach:               row.supplier_name,
+        customer:            row.supplier_name,
+        customer_name:       row.supplier_name,
+        
+        diaChi:              row.supplier_address || supplierAddress,
+        address:             row.supplier_address || supplierAddress,
+        delivery_address:    row.supplier_address || supplierAddress,
+        
+        ngay:                row.date_order,
+        date:                row.date_order,
+        expected_date:       row.date_planned,
+        
+        amount:              row.amount_total,
+        total:               row.amount_total,
+        total_amount:        row.amount_total,
+        
+        taiXe:               row.x_lt_po_driver_name || '',
+        driver:              row.x_lt_po_driver_name || '',
+        driver_name:         row.x_lt_po_driver_name || '',
+        custom_field13:      row.x_lt_po_driver_name || '',
+        bienSo:              row.x_lt_po_plate || '',
+        plate:               row.x_lt_po_plate || '',
+        custom_field14:      row.x_lt_po_plate || '',
+        
+        products: lines.map(l => ({
+            code:           l.product_code || '',
+            name:           l.product_name || '',
+            description:    l.description || '',
+            qty:            l.qty || 0,
+            unit:           (!l.uom || l.uom.trim().toLowerCase() === 'units' || l.uom.trim().toLowerCase() === 'unit') ? 'kg' : l.uom,
+        })),
+        
+        note:                row.note || '',
+        created_date:        row.date_order,
+        write_date:          row.write_date,
+    };
+}
+
+
 // ============================================================
 // GET /api/odoo-orders
 // Trả tất cả đơn (filter báo giá ra). Optional ?status=pending|delivering|completed
@@ -177,17 +256,27 @@ router.get('/my/:driverName', async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     try {
         const driverName = decodeURIComponent(req.params.driverName).trim();
-        const { data, error } = await supabase
-            .from('odoo_orders')
-            .select('*')
-            .eq('x_lt_is_quotation', false)
-            .ilike('x_lt_driver_name', `%${driverName}%`)
-            .order('date_order', { ascending: false });
-        if (error) throw error;
+        
+        // Parallel queries to both tables
+        const [ordersRes, poRes] = await Promise.all([
+            supabase
+                .from('odoo_orders')
+                .select('*')
+                .eq('x_lt_is_quotation', false)
+                .ilike('x_lt_driver_name', `%${driverName}%`)
+                .order('date_order', { ascending: false }),
+            supabase
+                .from('odoo_purchase_orders')
+                .select('*')
+                .ilike('x_lt_po_driver_name', `%${driverName}%`)
+                .order('date_order', { ascending: false })
+        ]);
+        
+        if (ordersRes.error) throw ordersRes.error;
+        if (poRes.error) throw poRes.error;
 
-        const orders = (data || []).map(row => {
+        const saleOrders = (ordersRes.data || []).map(row => {
             const o = toFrontend(row);
-            // Add status codes that my-orders.js expects
             const s = o.status;
             if (s === 'Đang giao')      { o.statusCode = 'DANG_GIAO'; }
             else if (s === 'Chờ nhận')  { o.statusCode = 'CHO_NHAN'; }
@@ -195,7 +284,14 @@ router.get('/my/:driverName', async (req, res) => {
             return o;
         });
 
-        return res.json({ error: false, data: orders });
+        const purchaseOrders = (poRes.data || []).map(row => poToFrontend(row));
+
+        // Combine both
+        const combined = [...saleOrders, ...purchaseOrders];
+        // Sort by date_order descending
+        combined.sort((a, b) => new Date(b.created_date || b.ngay || 0) - new Date(a.created_date || a.ngay || 0));
+
+        return res.json({ error: false, data: combined });
     } catch (e) {
         console.error('[odoo-orders] my-orders fail:', e.message);
         return res.json({ error: true, msg: e.message, data: [] });
@@ -278,17 +374,36 @@ router.post('/:odooId/assign-driver', async (req, res) => {
         if (!driver || !plate) {
             return res.status(400).json({ error: true, msg: 'Thiếu driver hoặc plate' });
         }
-        await odoo.assignDriver(id, driver, plate);
-        let startedMsg = '';
-        if (autoStart) {
-            try {
+        
+        let odooFailed = false;
+        try {
+            await odoo.assignDriver(id, driver, plate);
+            if (autoStart) {
                 await odoo.startDelivery(id);
-                startedMsg = ' + đã chuyển sang Đang giao';
-            } catch (e) {
-                console.warn('[odoo-orders] auto-start fail:', e.message);
             }
+        } catch (e) {
+            console.error('[odoo-orders] Odoo API assign fail, fallback to local update:', e.message);
+            odooFailed = true;
         }
-        return res.json({ error: false, msg: 'Đã ghi tài xế' + startedMsg });
+
+        // Cập nhật trực tiếp vào Supabase để đảm bảo hệ thống hoạt động ngay cả khi Odoo offline
+        const { error: dbErr } = await supabase
+            .from('odoo_orders')
+            .update({
+                x_lt_driver_name: driver,
+                x_lt_plate: plate,
+                x_lt_status: autoStart ? 'lt_delivering' : 'lt_approved'
+            })
+            .eq('odoo_id', id);
+
+        if (dbErr) throw dbErr;
+
+        return res.json({ 
+            error: false, 
+            msg: odooFailed 
+                ? 'Đã ghi nhận tài xế trên ERP (Không thể kết nối Odoo)' 
+                : 'Đã ghi tài xế' + (autoStart ? ' + đã chuyển sang Đang giao' : '') 
+        });
     } catch (e) {
         console.error('[odoo-orders] assign fail:', e.message);
         return res.status(500).json({ error: true, msg: e.message });
@@ -298,8 +413,28 @@ router.post('/:odooId/assign-driver', async (req, res) => {
 // POST /api/odoo-orders/:odooId/start — bấm "Bắt đầu giao"
 router.post('/:odooId/start', async (req, res) => {
     try {
-        await odoo.startDelivery(parseInt(req.params.odooId, 10));
-        return res.json({ error: false, msg: 'Đã chuyển sang trạng thái đang giao' });
+        const id = parseInt(req.params.odooId, 10);
+        let odooFailed = false;
+        try {
+            await odoo.startDelivery(id);
+        } catch (e) {
+            console.error('[odoo-orders] Odoo startDelivery fail, fallback to local update:', e.message);
+            odooFailed = true;
+        }
+
+        const { error: dbErr } = await supabase
+            .from('odoo_orders')
+            .update({ x_lt_status: 'lt_delivering' })
+            .eq('odoo_id', id);
+
+        if (dbErr) throw dbErr;
+
+        return res.json({ 
+            error: false, 
+            msg: odooFailed 
+                ? 'Đã bắt đầu giao trên ERP (Không thể kết nối Odoo)' 
+                : 'Đã chuyển sang trạng thái đang giao' 
+        });
     } catch (e) {
         return res.status(500).json({ error: true, msg: e.message });
     }
@@ -308,11 +443,32 @@ router.post('/:odooId/start', async (req, res) => {
 // POST /api/odoo-orders/:odooId/complete — bấm "Hoàn thành"
 router.post('/:odooId/complete', async (req, res) => {
     try {
-        await odoo.completeDelivery(parseInt(req.params.odooId, 10));
-        return res.json({ error: false, msg: 'Đã hoàn thành đơn' });
+        const id = parseInt(req.params.odooId, 10);
+        let odooFailed = false;
+        try {
+            await odoo.completeDelivery(id);
+        } catch (e) {
+            console.error('[odoo-orders] Odoo completeDelivery fail, fallback to local update:', e.message);
+            odooFailed = true;
+        }
+
+        const { error: dbErr } = await supabase
+            .from('odoo_orders')
+            .update({ x_lt_status: 'lt_delivered' })
+            .eq('odoo_id', id);
+
+        if (dbErr) throw dbErr;
+
+        return res.json({ 
+            error: false, 
+            msg: odooFailed 
+                ? 'Đã hoàn thành trên ERP (Không thể kết nối Odoo)' 
+                : 'Đã hoàn thành đơn' 
+        });
     } catch (e) {
         return res.status(500).json({ error: true, msg: e.message });
     }
 });
+
 
 export default router;
