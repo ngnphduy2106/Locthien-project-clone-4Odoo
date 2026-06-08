@@ -92,6 +92,13 @@ router.post('/odoo-webhook',
         case 'po.received':
           await dispatchService.onPoReceived(payload);
           break;
+        case 'order.synced':
+          // Re-sync event — chỉ upsert tên + metadata, không trigger downstream action
+          await dispatchService.onOrderSynced(payload);
+          break;
+        case 'po.synced':
+          await dispatchService.onPoSynced(payload);
+          break;
         default:
           console.warn('[webhook] event chưa hỗ trợ:', payload.event);
       }

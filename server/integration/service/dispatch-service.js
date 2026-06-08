@@ -55,6 +55,18 @@ export const dispatchService = {
     console.log(`[dispatch] PO đã nhận đủ: ${p.po_name} (driver ${p.x_lt_po_driver_name})`);
   },
 
+  // ---- Re-sync events (idempotent upsert, không trigger downstream) ----
+
+  async onOrderSynced(p) {
+    await upsertOrderFromWebhook(p);
+    console.log(`[dispatch] sync: ${p.order_name} (id=${p.order_id})`);
+  },
+
+  async onPoSynced(p) {
+    await upsertPurchaseOrderFromWebhook(p);
+    console.log(`[dispatch] PO sync: ${p.po_name} (id=${p.po_id})`);
+  },
+
   /**
    * Pull đơn pending từ Odoo (fallback khi webhook bị miss).
    * Trả về list rỗng nếu Odoo lỗi — caller tự handle.
