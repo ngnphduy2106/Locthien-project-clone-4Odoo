@@ -34,11 +34,10 @@ const OrdersModule = {
         }
     },
 
-    // Load danh sách đơn hàng
+    // Load danh sách đơn hàng (từ Odoo)
     async loadOrders() {
         try {
-            const response = await fetch('/api/orders');
-            const data = await response.json();
+            const data = await window.api.getOdooOrders();
 
             if (data.error) {
                 console.error('Error from API:', data.msg);
@@ -145,9 +144,9 @@ const OrdersModule = {
     // Filter orders by tab
     filterOrdersByTab() {
         const statusMap = {
-            'pending': ['Chờ xử lý', 'PENDING', 'NEW'],
+            'pending':    ['Chờ nhận', 'Chờ xử lý', 'PENDING', 'NEW'],
             'delivering': ['Đang giao', 'DELIVERING', 'IN_PROGRESS'],
-            'completed': ['Hoàn thành', 'COMPLETED', 'DONE']
+            'completed':  ['Hoàn thành', 'COMPLETED', 'DONE', 'Đã thực hiện']
         };
 
         const validStatuses = statusMap[this.currentTab] || [];

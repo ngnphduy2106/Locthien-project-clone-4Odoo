@@ -47,6 +47,62 @@ const api = {
         return res.json();
     },
 
+    // === ODOO ORDERS (sync từ Odoo qua webhook + cron 5 phút) ===
+    // Trả về schema MISA-compatible — drop-in cho dispatch module.
+    getOdooOrders: async (tab = '') => {
+        const url = tab ? `${API_BASE}/odoo-orders?tab=${tab}` : `${API_BASE}/odoo-orders`;
+        const res = await fetch(url);
+        return res.json();
+    },
+
+    getOdooOrderDetail: async (odooId) => {
+        const res = await fetch(`${API_BASE}/odoo-orders/${odooId}`);
+        return res.json();
+    },
+
+    assignOdooDriver: async (odooId, driver, plate) => {
+        const res = await fetch(`${API_BASE}/odoo-orders/${odooId}/assign-driver`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ driver, plate })
+        });
+        return res.json();
+    },
+
+    startOdooDelivery: async (odooId) => {
+        const res = await fetch(`${API_BASE}/odoo-orders/${odooId}/start`, { method: 'POST' });
+        return res.json();
+    },
+
+    completeOdooDelivery: async (odooId) => {
+        const res = await fetch(`${API_BASE}/odoo-orders/${odooId}/complete`, { method: 'POST' });
+        return res.json();
+    },
+
+    // === ODOO PURCHASE ORDERS (đơn mua) ===
+    getOdooPurchaseOrders: async (tab = '') => {
+        const url = tab ? `${API_BASE}/odoo-purchase-orders?tab=${tab}` : `${API_BASE}/odoo-purchase-orders`;
+        const res = await fetch(url);
+        return res.json();
+    },
+
+    getOdooPurchaseOrderDetail: async (poId) => {
+        const res = await fetch(`${API_BASE}/odoo-purchase-orders/${poId}`);
+        return res.json();
+    },
+
+    assignOdooPickupDriver: async (poId, driver, plate) => {
+        const res = await fetch(`${API_BASE}/odoo-purchase-orders/${poId}/assign-driver`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ driver, plate })
+        });
+        return res.json();
+    },
+
+    markOdooPurchaseReceived: async (poId) => {
+        const res = await fetch(`${API_BASE}/odoo-purchase-orders/${poId}/received`, { method: 'POST' });
+        return res.json();
+    },
+
     getOrderDetail: async (orderId) => {
         const res = await fetch(`${API_BASE}/orders/${encodeURIComponent(orderId)}`);
         return res.json();

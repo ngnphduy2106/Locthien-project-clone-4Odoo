@@ -62,7 +62,7 @@ const MyOrdersModule = {
                 return;
             }
 
-            const response = await fetch(`/api/orders/my/${encodeURIComponent(driverName)}?role=${role}`);
+            const response = await fetch(`/api/odoo-orders/my/${encodeURIComponent(driverName)}?role=${role}`);
             const data = await response.json();
 
             if (data.error) {

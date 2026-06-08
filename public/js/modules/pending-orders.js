@@ -69,25 +69,25 @@ const PendingOrdersModule = {
         containerImport.innerHTML = loadingHtml;
 
         try {
-            // Fetch both export orders and import tickets
-            const [ordersRes, importsRes] = await Promise.all([
-                fetch('/api/orders'),
+            // Fetch both export orders (Odoo) and import tickets
+            const [ordersData, importsRes] = await Promise.all([
+                window.api.getOdooOrders(),
                 fetch('/api/imports')
             ]);
 
-            const ordersData = await ordersRes.json();
             const importsData = await importsRes.json();
 
             let allOrders = [];
 
-            // Process export orders
+            // Process export orders (from Odoo)
             if (!ordersData.error) {
-                const pending = (ordersData.pending || []).map(o => ({
+                const allOdooOrders = ordersData.orders || [];
+                const pending = allOdooOrders.filter(o => o.status === 'Chờ nhận' || o.status === 'Chờ xử lý').map(o => ({
                     ...o,
                     _status: 'Chưa giao',
                     _type: 'export'
                 }));
-                const assigned = (ordersData.assigned || []).map(o => ({
+                const assigned = allOdooOrders.filter(o => o.status === 'Đang giao').map(o => ({
                     ...o,
                     _status: 'Đang giao',
                     _type: 'export'

@@ -23,9 +23,17 @@ const DispatchModule = {
         try {
             if (window.api) {
                 const data = await window.api.getEmployees();
-                if (!data.error) {
-                    // Include ASSISTANT as they work like drivers (without plate)
-                    this.employees = (data.employees || []).filter(e => e.role === 'DRIVER' || e.role === 'ASSISTANT');
+                if (!data.error && data.data) {
+                    // Map to normalized structure: name, fullName, plate, role, etc.
+                    this.employees = data.data
+                        .filter(e => e.role === 'DRIVER' || e.role === 'ASSISTANT')
+                        .map(e => ({
+                            id: e.id,
+                            name: e.fullName || e.name || '',
+                            fullName: e.fullName || e.name || '',
+                            role: e.role,
+                            plate: e.plate || ''
+                        }));
                 }
             }
         } catch (error) {
@@ -52,11 +60,11 @@ const DispatchModule = {
         }
     },
 
-    // Load danh sách đơn hàng
+    // Load danh sách đơn hàng — đọc từ Odoo (qua bảng cache `odoo_orders`)
     async loadOrders() {
         try {
             if (window.api) {
-                const data = await window.api.getOrders();
+                const data = await window.api.getOdooOrders();
 
                 if (data.error) {
                     console.error('Error from API:', data.msg);
@@ -187,7 +195,7 @@ const DispatchModule = {
 
         container.innerHTML = `
             <div class="tab-buttons">
-                <button class="tab-button ${this.currentTab === 'pending' ? 'active' : ''}" data-dispatch-tab="pending">Chờ xử lý</button>
+                <button class="tab-button ${this.currentTab === 'pending' ? 'active' : ''}" data-dispatch-tab="pending">Chờ nhận</button>
                 <button class="tab-button ${this.currentTab === 'delivering' ? 'active' : ''}" data-dispatch-tab="delivering">Đang giao</button>
                 <button class="tab-button ${this.currentTab === 'completed' ? 'active' : ''}" data-dispatch-tab="completed">Hoàn thành</button>
             </div>
@@ -309,9 +317,10 @@ const DispatchModule = {
     // Filter orders by tab (with sorting: pinned → today → future → past, then created_date DESC)
     filterOrdersByTab() {
         const statusMap = {
-            'pending': ['Chờ xử lý', 'PENDING', 'NEW', 'Chưa thực hiện'],
+            // Bao gồm cả nhãn cũ (MISA legacy) + nhãn mới đồng bộ với Odoo dispatch
+            'pending':    ['Chờ nhận', 'Chờ xử lý', 'PENDING', 'NEW', 'Chưa thực hiện'],
             'delivering': ['Đang giao', 'DELIVERING', 'IN_PROGRESS', 'Đang thực hiện'],
-            'completed': ['Hoàn thành', 'COMPLETED', 'DONE', 'Đã thực hiện']
+            'completed':  ['Hoàn thành', 'COMPLETED', 'DONE', 'Đã thực hiện']
         };
 
         const validStatuses = statusMap[this.currentTab] || [];
@@ -598,6 +607,18 @@ const DispatchModule = {
                             <div class="info-card" style="background: #fffbeb; border-left: 3px solid #f59e0b;">
                                 <div class="info-row" style="color: #78350f;">
                                     ${order.misa_note}
+                                </div>
+                            </div>
+                        </div>
+                        ` : ''}
+
+                        <!-- Ghi chú đơn hàng (từ Odoo) -->
+                        ${(order.note || order.description) ? `
+                        <div class="detail-section">
+                            <h4 class="section-title" style="color: #8B5CF6;"><i class="bi bi-chat-left-text"></i> Ghi chú đơn hàng</h4>
+                            <div class="info-card" style="background: #faf5ff; border-left: 3px solid #8B5CF6;">
+                                <div class="info-row" style="color: #4c1d95; white-space: pre-line;">
+                                    ${order.note || order.description}
                                 </div>
                             </div>
                         </div>

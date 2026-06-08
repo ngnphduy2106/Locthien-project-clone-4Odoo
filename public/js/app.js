@@ -1330,7 +1330,56 @@ async function loadOrders() {
     container.innerHTML = '<div class="loading-spinner" style="margin: 40px auto;"></div>';
 
     try {
-        const res = await api.getOrders();
+        // Đọc đơn từ Odoo (qua bảng cache odoo_orders) thay vì MISA cũ.
+        // getOdooOrders trả `{orders: [...]}` — phải tự chia theo status field
+        // thành pending/assigned/completed để khớp với render code legacy.
+        const odooRes = await api.getOdooOrders();
+        const all = (odooRes && odooRes.orders) || [];
+
+        // Map status -> 3 nhóm (đã đồng bộ với route mapStatus)
+        const pending  = [];   // 'Chờ nhận' (lt_approved)
+        const assigned = [];   // 'Đang giao' (lt_delivering)
+        const done     = [];   // 'Hoàn thành' (lt_delivered+)
+        let cancelledCount = 0;
+        for (const o of all) {
+            const s = o.status || '';
+            if (s === 'Chờ nhận' || s === 'Chờ xử lý')  pending.push(o);
+            else if (s === 'Đang giao')                 assigned.push(o);
+            else if (s === 'Hoàn thành' || s === 'Đã thực hiện') done.push(o);
+            else if (s === 'Đã hủy')                    cancelledCount++;
+        }
+        // Tài xế + assistants lấy song song từ employees
+        let drivers = [], assistants = [];
+        try {
+            const emp = await api.getEmployees();
+            if (!emp.error && emp.data) {
+                drivers = emp.data
+                    .filter(e => {
+                        const role = (e.role || '').toLowerCase();
+                        return role.includes('tài xế') || role.includes('tai xe') || role.includes('driver') || role.includes('lái xe');
+                    })
+                    .map(e => ({
+                        name: e.fullName || e.name || '',
+                        plate: e.plate || ''
+                    }));
+                assistants = emp.data
+                    .filter(e => {
+                        const role = (e.role || '').toLowerCase();
+                        return role.includes('phụ xe') || role.includes('phu xe') || role.includes('trợ lý') || role.includes('assistant');
+                    })
+                    .map(e => ({
+                        name: e.fullName || e.name || ''
+                    }));
+            }
+        } catch (e) { /* employees không bắt buộc */ }
+
+        const res = {
+            pending, assigned,
+            completed: done.slice(0, 50),    // lazy-load page đầu
+            completedCount: done.length,
+            cancelledCount,
+            drivers, assistants,
+        };
 
         // Discard stale response if user already switched tabs
         if (requestId !== state._loadRequestId || state.currentOrderType !== 'export') {
@@ -1470,6 +1519,47 @@ function switchOrderType(type) {
 }
 
 
+// Normalize an Odoo purchase order row to look like a local import ticket
+function _normalizePurchaseOrder(po) {
+    // Map Odoo PO status → local status string
+    const statusMap = {
+        lt_approved:  'pending',
+        lt_receiving: 'assigned',
+        lt_received:  'completed',
+        lt_billed:    'completed',
+        lt_closed:    'completed',
+        lt_cancelled: 'cancelled',
+    };
+    const rawStatus = po.x_lt_po_status || po.status || '';
+    const localStatus = statusMap[rawStatus] || 'pending';
+    return {
+        // Mark as Odoo PO so render can differentiate
+        _source:         'odoo_po',
+        id:              `odoo_po_${po.odoo_id || po.id}`,
+        odoo_id:         po.odoo_id || po.id,
+        ticket_no:       po.po_no || po.soDon || po.name || `P${po.odoo_id}`,
+        supplier_name:   po.supplier_name || po.supplier || '',
+        supplier_address: po.supplier_address || '',
+        expected_date:   po.date_planned || po.date || po.ngay || po.date_order || null,
+        created_at:      po.date_order || po.created_date || null,
+        status:          localStatus,
+        products:        (po.products || []).map(p => ({
+            name:      p.name || p.code || '',
+            qty:       p.qty || 0,
+            unit:      p.unit || 'kg',
+            price:     p.price_unit || 0,
+            subtotal:  p.price_subtotal || 0,
+            total:     p.price_total || 0,
+        })),
+        total_amount:    po.total || po.amount || 0,
+        assigned_driver: po.taiXe || '',
+        assigned_plate:  po.bienSo || '',
+        description:     po.note || '',   // hiển thị ở trường Mô tả
+        note:            '',              // ghi chú riêng (trống với Odoo PO)
+        x_lt_po_status:  rawStatus,
+    };
+}
+
 async function loadImportTickets() {
     const container = window.$('#dispatch-order-list');
     if (!container) return;
@@ -1480,10 +1570,11 @@ async function loadImportTickets() {
     container.innerHTML = '<div style="text-align:center; padding:40px;"><i class="bi bi-arrow-repeat spin"></i> Đang tải phiếu nhập...</div>';
 
     try {
-        // Fetch active imports (fast ~40KB) + completed separately
-        const [activeRes, completedRes] = await Promise.all([
+        // Fetch active imports + Odoo purchase orders in parallel
+        const [activeRes, completedRes, poRes] = await Promise.all([
             api.getImports(),
-            api.getImportsCompleted(1, 200) // First 200 completed for history
+            api.getImportsCompleted(1, 200), // First 200 completed for history
+            api.getOdooPurchaseOrders().catch(() => ({ orders: [] }))
         ]);
 
         // Discard stale response if user already switched tabs
@@ -1494,12 +1585,28 @@ async function loadImportTickets() {
 
         const activeImports = activeRes?.data || [];
         const completedImports = completedRes?.data || [];
+        // Normalize Odoo POs and exclude cancelled
+        const odooPos = (poRes?.orders || []).filter(po =>
+            po.x_lt_po_status !== 'lt_cancelled'
+        ).map(_normalizePurchaseOrder);
 
-        // Group by status
+        console.log(`📦 Loaded ${imports.length} import tickets + ${odooPos.length} Odoo purchase orders`);
+
+        // Group local imports by status
+        const localPending   = imports.filter(i => i.status === 'pending' || i.status === 'Chưa thực hiện');
+        const localAssigned  = imports.filter(i => i.status === 'assigned' || i.status === 'in_transit');
+        const localCompleted = imports.filter(i => i.status === 'completed');
+
+        // Group Odoo POs by normalized status
+        const ooPending   = odooPos.filter(p => p.status === 'pending');
+        const ooAssigned  = odooPos.filter(p => p.status === 'assigned');
+        const ooCompleted = odooPos.filter(p => p.status === 'completed');
+
+        // Merge: Odoo POs come first so they are prominent
         state.imports = {
-            pending: activeImports.filter(i => i.status === 'pending' || i.status === 'Chưa thực hiện'),
-            assigned: activeImports.filter(i => i.status === 'assigned' || i.status === 'in_transit'),
-            completed: completedImports
+            pending:   [...odooPos.filter(p => p.status === 'pending'),   ...activeImports.filter(i => i.status === 'pending' || i.status === 'Chưa thực hiện')],
+            assigned:  [...odooPos.filter(p => p.status === 'assigned'),  ...activeImports.filter(i => i.status === 'assigned' || i.status === 'in_transit')],
+            completed: [...odooPos.filter(p => p.status === 'completed'), ...completedImports]
         };
 
         // Update completed count badge from API response
@@ -1590,11 +1697,21 @@ function renderImportList() {
         return;
     }
 
-    // Compact 2-row layout for imports
+    // Compact 2-row layout — đơn Odoo và đơn nội bộ giống hệt nhau
     container.innerHTML = `
         <div class="compact-order-list" style="display:flex; flex-direction:column; gap:4px;">
-            ${imports.map(imp => `
-                <div class="compact-order-row" onclick="viewImportDetail('${imp.id}')" style="
+            ${imports.map(imp => {
+                const isOdooPo = imp._source === 'odoo_po';
+                const clickFn  = isOdooPo
+                    ? `viewOdooPurchaseDetail(${imp.odoo_id})`
+                    : `viewImportDetail('${imp.id}')`;
+                const borderColor = imp.status === 'completed'
+                    ? 'var(--success)'
+                    : imp.status === 'assigned'
+                        ? 'var(--info)'
+                        : '#4CAF50';
+                return `
+                <div class="compact-order-row" onclick="${clickFn}" style="
                     display: flex;
                     flex-direction: column;
                     gap: 2px;
@@ -1602,14 +1719,13 @@ function renderImportList() {
                     background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
                     border-radius: 6px;
                     cursor: pointer;
-                    border-left: 3px solid ${imp.status === 'Hoàn thành' || imp.status === 'completed' ? 'var(--success)' :
-            imp.status === 'Đang thực hiện' || imp.status === 'assigned' ? 'var(--info)' : '#4CAF50'};
+                    border-left: 3px solid ${borderColor};
                     transition: all 0.15s ease;
                     position: relative;
                 " onmouseenter="this.style.opacity='0.9'" onmouseleave="this.style.opacity='1'">
-                    ${getUnreadBadgeHtml(imp.id, 'import')}
-                    
-                    <!-- ROW 1: PO + Date + Status + BUTTONS -->
+                    ${!isOdooPo ? getUnreadBadgeHtml(imp.id, 'import') : ''}
+
+                    <!-- ROW 1: Mã đơn + Ngày + Trạng thái + Nút -->
                     <div style="display:flex; align-items:center; gap:6px; flex-wrap:nowrap; width:100%;">
                         <span style="font-weight:600; color:#16a34a; font-size:11px; white-space:nowrap;">
                             ${imp.ticket_no || imp.id}
@@ -1617,20 +1733,21 @@ function renderImportList() {
                         </span>
                         <span style="font-size:10px; color:var(--text-secondary); white-space:nowrap;">${formatDate(imp.expected_date || imp.created_at)}</span>
                         <span class="badge badge-${getStatusBadge(imp.status)}" style="font-size:9px; padding:2px 5px; white-space:nowrap;">${getStatusText(imp.status)}</span>
-                        ${imp.merged_order_no ? (() => { const sibs = getMergedSiblings(imp.merged_order_no, imp.id); return `<span style="background:linear-gradient(135deg, #3b82f6, #2563eb); color:white; padding:1px 5px; border-radius:8px; font-size:8px; font-weight:600; white-space:nowrap;" title="${sibs.join(', ')}"><i class="bi bi-link-45deg"></i> Ghép: ${sibs.join(', ')}</span>`; })() : ''}
+                        ${!isOdooPo && imp.merged_order_no ? (() => { const sibs = getMergedSiblings(imp.merged_order_no, imp.id); return `<span style="background:linear-gradient(135deg, #3b82f6, #2563eb); color:white; padding:1px 5px; border-radius:8px; font-size:8px; font-weight:600; white-space:nowrap;" title="${sibs.join(', ')}"><i class="bi bi-link-45deg"></i> Ghép: ${sibs.join(', ')}</span>`; })() : ''}
                         <div style="display:flex; gap:3px; flex-shrink:0;" onclick="event.stopPropagation()">
-                            <button class="btn ${imp.is_pinned ? 'btn-warning' : 'btn-outline'} btn-sm" onclick="toggleImportPin('${imp.id}', ${!imp.is_pinned})" style="padding:2px; font-size:9px; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center;" title="${imp.is_pinned ? 'Bỏ ghim' : 'Ghim đơn'}">
-                                <i class="bi bi-pin${imp.is_pinned ? '-fill' : ''}"></i>
-                            </button>
-                            <button class="btn btn-outline btn-sm" onclick="viewImportDetail('${imp.id}')" style="padding:2px; font-size:9px; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center;">
+                            ${!isOdooPo ? `<button class="btn ${imp.is_pinned ? 'btn-warning' : 'btn-outline'} btn-sm" onclick="toggleImportPin('${imp.id}', ${!imp.is_pinned})" style="padding:2px; font-size:9px; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center;" title="${imp.is_pinned ? 'Bỏ ghim' : 'Ghim đơn'}"><i class="bi bi-pin${imp.is_pinned ? '-fill' : ''}"></i></button>` : ''}
+                            <button class="btn btn-outline btn-sm" onclick="${clickFn}" style="padding:2px; font-size:9px; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center;">
                                 <i class="bi bi-eye"></i>
                             </button>
                             ${state.currentDispatchTab === 'pending' ? `
-                                <button class="btn btn-info btn-sm" onclick="assignImportDriver('${imp.id}')" style="padding:2px; font-size:9px; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center;">
+                                <button class="btn btn-info btn-sm"
+                                    onclick="${isOdooPo ? `assignOdooPickupDriverModal(${imp.odoo_id})` : `assignImportDriver('${imp.id}')`}"
+                                    style="padding:2px; font-size:9px; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center;"
+                                    title="Phân công tài xế">
                                     <i class="bi bi-person-plus"></i>
                                 </button>
                             ` : ''}
-                            ${state.currentDispatchTab === 'assigned' && isAdminRole() ? `
+                            ${!isOdooPo && state.currentDispatchTab === 'assigned' && isAdminRole() ? `
                                 <button class="btn btn-success btn-sm" onclick="showImportCompletionModal('${imp.id}')" style="padding:2px; font-size:9px; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center;" title="Hoàn thành">
                                     <i class="bi bi-check"></i>
                                 </button>
@@ -1643,17 +1760,18 @@ function renderImportList() {
                         </div>
                         ${(imp.assigned_driver || imp.driver_name) ? `<span style="font-size:10px; color:var(--info); margin-left:auto; white-space:nowrap;">${imp.assigned_driver || imp.driver_name}</span>` : ''}
                     </div>
-                    
-                    <!-- ROW 2: Customer + Address -->
+
+                    <!-- ROW 2: Nhà cung cấp + Địa chỉ -->
                     <div style="display:flex; align-items:center; gap:8px; width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                         <span style="font-weight:500; color:var(--text-primary); font-size:12px;">${imp.supplier_name || 'NCC'}</span>
-                        <span style="font-size:10px; color:var(--text-muted);"><i class="bi bi-geo-alt" style="font-size:9px;"></i> ${imp.supplier_address || 'Sunco'}</span>
+                        <span style="font-size:10px; color:var(--text-muted);"><i class="bi bi-geo-alt" style="font-size:9px;"></i> ${imp.supplier_address || ''}</span>
                     </div>
                 </div>
-            `).join('')}
+            `}).join('')}
         </div>
     `;
 }
+
 
 // Store filters for dispatch
 let currentSearchKeyword = '';
@@ -6487,8 +6605,11 @@ async function viewImportDetail(importId) {
         return;
     }
 
-    // Fetch all_assignments from API if not already present
-    if (!imp.all_assignments || imp.all_assignments.length === 0) {
+    // Flag: đây có phải đơn mua từ Odoo không?
+    const isOdooPo = imp._source === 'odoo_po';
+
+    // Fetch all_assignments — chỉ với đơn nội bộ (không phải Odoo PO)
+    if (!isOdooPo && (!imp.all_assignments || imp.all_assignments.length === 0)) {
         console.log(`📥 Fetching import_driver_assignments for import ${importId}...`);
         try {
             const res = await fetch(`/api/imports/${importId}/assignments`);
@@ -6797,12 +6918,21 @@ async function viewImportDetail(importId) {
 
             <!--ACTION BUTTONS-->
             <div style="margin-top:20px; padding-top:16px; border-top:1px solid var(--border); display:flex; gap:8px; flex-wrap:wrap;">
-                ${imp.status === 'pending' || imp.status === 'Chưa thực hiện' ? `
+                ${isOdooPo ? `
+                    ${imp.status === 'pending' ? `
+                    <button class="btn btn-primary" onclick="closeOrderModal(); assignOdooPickupDriverModal(${imp.odoo_id})">
+                        <i class="bi bi-person-plus"></i> Phân công tài xế
+                    </button>` : ''}
+                    ${imp.status === 'assigned' && isAdminRole() ? `
+                    <button class="btn btn-info" onclick="closeOrderModal(); assignOdooPickupDriverModal(${imp.odoo_id})" style="background:var(--info); color:white;">
+                        <i class="bi bi-person-gear"></i> Đổi tài xế
+                    </button>` : ''}
+                ` : `
+                    ${imp.status === 'pending' || imp.status === 'Chưa thực hiện' ? `
                     <button class="btn btn-primary" onclick="closeOrderModal(); assignImportDriver('${imp.id}')">
                         <i class="bi bi-person-plus"></i> Phân công tài xế
-                    </button>
-                ` : ''}
-                ${(imp.status === 'assigned' || imp.status === 'in_transit') && isAdminRole() ? `
+                    </button>` : ''}
+                    ${(imp.status === 'assigned' || imp.status === 'in_transit') && isAdminRole() ? `
                     <button class="btn btn-info" onclick="closeOrderModal(); assignImportDriver('${imp.id}')" style="background:var(--info); color:white;">
                         <i class="bi bi-person-gear"></i> Đổi tài xế
                     </button>
@@ -6811,32 +6941,28 @@ async function viewImportDetail(importId) {
                     </button>
                     <button class="btn btn-success" onclick="showImportCompletionModal('${imp.id}')">
                         <i class="bi bi-check-circle"></i> Hoàn thành
-                    </button>
-                ` : ''}
-                ${isAdminRole() ? `
+                    </button>` : ''}
+                    ${isAdminRole() ? `
                     <button class="btn btn-warning" onclick="closeOrderModal(); editImport('${imp.id}')">
                         <i class="bi bi-pencil"></i> Chỉnh sửa
                     </button>
                     ${imp.status !== 'completed' && imp.status !== 'cancelled' && imp.status !== 'Đã hủy bỏ' ? `
                     <button class="btn btn-danger" onclick="cancelImportTicket('${imp.id}')">
                         <i class="bi bi-x-circle"></i> Hủy đơn
-                    </button>
-                    ` : ''}
-                ` : ''}
+                    </button>` : ''}` : ''}
+                `}
                 <button class="btn btn-outline" onclick="closeOrderModal()">
                     <i class="bi bi-x-lg"></i> Đóng
                 </button>
             </div>
         `;
 
-        // Initialize chat for import
+        // Chat & proof images — dùng chung cho cả đơn nội bộ và Odoo PO
+        // Odoo PO dùng ticket_no (P00009) làm chat ID; proof images sẽ hiện empty state nếu chưa có
         currentChatOrderId = imp.ticket_no || imp.id;
-
-        // Load proof images
-        loadImportProofImages(imp.id);
-
-        // Auto-load chat messages (was requiring manual refresh before)
+        loadImportProofImages(isOdooPo ? (imp.ticket_no || imp.id) : imp.id);
         loadImportChat(imp.ticket_no || imp.id);
+
     }
 
     if (modal) modal.classList.remove('hidden');
@@ -7746,6 +7872,142 @@ window.loadImportTickets = loadImportTickets;
 window.renderImportList = renderImportList;
 window.viewImportDetail = viewImportDetail;
 window.assignImportDriver = assignImportDriver;
+
+// ============================================================
+// VIEW ODOO PURCHASE ORDER DETAIL — dùng chung layout với phiếu nhập nội bộ
+// ============================================================
+async function viewOdooPurchaseDetail(odooId) {
+    // Nếu PO chưa có trong state (ví dụ người dùng bookmark link), tải từ API
+    const allImports = [
+        ...(state.imports?.pending   || []),
+        ...(state.imports?.assigned  || []),
+        ...(state.imports?.completed || []),
+    ];
+    let po = allImports.find(i => i._source === 'odoo_po' && String(i.odoo_id) === String(odooId));
+
+    if (!po) {
+        try {
+            const resp = await fetch(`/api/odoo-purchase-orders/${odooId}`);
+            const data = await resp.json();
+            if (!data.error && data.order) {
+                po = _normalizePurchaseOrder(data.order);
+                // Đưa vào state để viewImportDetail tìm thấy
+                state.imports = state.imports || { pending: [], assigned: [], completed: [] };
+                if (po.status === 'pending')        state.imports.pending.unshift(po);
+                else if (po.status === 'assigned')  state.imports.assigned.unshift(po);
+                else                                state.imports.completed.unshift(po);
+            }
+        } catch (e) {
+            console.error('viewOdooPurchaseDetail fetch error:', e);
+        }
+    }
+
+    if (!po) { alert('Không tìm thấy đơn mua hàng Odoo!'); return; }
+
+    // Gọi viewImportDetail với ID đã normalize — dùng chung 100% layout
+    await viewImportDetail(po.id);
+}
+window.viewOdooPurchaseDetail = viewOdooPurchaseDetail;
+
+// ============================================================
+// ASSIGN DRIVER TO ODOO PURCHASE ORDER (lấy hàng)
+// ============================================================
+
+async function assignOdooPickupDriverModal(odooId) {
+    // Find PO info
+    const allImports = [
+        ...(state.imports?.pending  || []),
+        ...(state.imports?.assigned || []),
+    ];
+    const po = allImports.find(i => i._source === 'odoo_po' && String(i.odoo_id) === String(odooId));
+    const poNo = po?.ticket_no || `P${odooId}`;
+    const supplierName = po?.supplier_name || '';
+
+    // Build driver list
+    const driverOptions = (state.employees || [])
+        .filter(e => e.role === 'DRIVER')
+        .map(e => `<option value="${e.fullName || e.name}">${e.fullName || e.name}</option>`)
+        .join('');
+
+    const html = `
+        <div style="padding:16px; display:flex; flex-direction:column; gap:12px; min-width:300px;">
+            <div style="font-size:15px; font-weight:700;">Gán tài xế lấy hàng</div>
+            <div style="font-size:13px; color:var(--text-muted);">${poNo} - ${supplierName}</div>
+            <div>
+                <label style="font-size:12px; font-weight:600; margin-bottom:4px; display:block;">Tài xế</label>
+                <select id="odoo-po-driver-select" class="form-control" style="width:100%;">
+                    <option value="">-- Chọn tài xế --</option>
+                    ${driverOptions}
+                </select>
+                <input type="text" id="odoo-po-driver-input" class="form-control" style="width:100%; margin-top:6px;"
+                    placeholder="Hoặc nhập tên tài xế..." />
+            </div>
+            <div>
+                <label style="font-size:12px; font-weight:600; margin-bottom:4px; display:block;">Biển số xe</label>
+                <input type="text" id="odoo-po-plate-input" class="form-control" style="width:100%;"
+                    placeholder="Biển số xe..." />
+            </div>
+            <div style="display:flex; gap:8px; justify-content:flex-end;">
+                <button class="btn btn-outline" onclick="this.closest('.simple-modal-overlay')?.remove()">Hủy</button>
+                <button class="btn btn-warning" onclick="confirmOdooPickupDriver(${odooId})">
+                    <i class="bi bi-check-circle"></i> Xác nhận
+                </button>
+            </div>
+        </div>
+    `;
+
+    // Show in a simple overlay
+    const overlay = document.createElement('div');
+    overlay.className = 'simple-modal-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+    const box = document.createElement('div');
+    box.style.cssText = 'background:var(--bg-card,#fff);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.25);';
+    box.innerHTML = html;
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+
+    // Pre-fill if already assigned
+    if (po?.assigned_driver) {
+        const inp = document.getElementById('odoo-po-driver-input');
+        if (inp) inp.value = po.assigned_driver;
+    }
+    if (po?.assigned_plate) {
+        const plt = document.getElementById('odoo-po-plate-input');
+        if (plt) plt.value = po.assigned_plate;
+    }
+
+    // Sync select → input
+    document.getElementById('odoo-po-driver-select')?.addEventListener('change', (e) => {
+        const inp = document.getElementById('odoo-po-driver-input');
+        if (inp && e.target.value) inp.value = e.target.value;
+    });
+}
+window.assignOdooPickupDriverModal = assignOdooPickupDriverModal;
+
+async function confirmOdooPickupDriver(odooId) {
+    const driverSel = document.getElementById('odoo-po-driver-select')?.value || '';
+    const driverInp = document.getElementById('odoo-po-driver-input')?.value?.trim() || '';
+    const driver = driverInp || driverSel;
+    const plate  = document.getElementById('odoo-po-plate-input')?.value?.trim() || '';
+
+    if (!driver) { alert('Vui lòng nhập tên tài xế!'); return; }
+
+    try {
+        const res = await api.assignOdooPickupDriver(odooId, driver, plate);
+        if (res.error) {
+            alert('Lỗi: ' + (res.msg || 'Không thể gán tài xế'));
+            return;
+        }
+        // Remove overlay
+        document.querySelector('.simple-modal-overlay')?.remove();
+        showToast(`✅ Đã gán tài xế ${driver} cho đơn mua ${odooId}`, 'success');
+        // Refresh list
+        await loadImportTickets();
+    } catch (e) {
+        alert('Lỗi kết nối: ' + e.message);
+    }
+}
+window.confirmOdooPickupDriver = confirmOdooPickupDriver;
 
 // Merge order tag helpers
 function addMergeOrderTag() {

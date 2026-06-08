@@ -28,9 +28,16 @@ import customerRoutes from './routes/customers.js';
 import notificationRoutes from './routes/notifications.js';
 import mergedOrderRoutes from './routes/merged-orders.js';
 import systemRoutes from './routes/system.js';
+import odooOrdersRoutes from './routes/odoo-orders.js';
+import odooPurchaseOrdersRoutes from './routes/odoo-purchase-orders.js';
 
 import { syncMisaOrders, syncMisaProducts, getSyncStatus, updateMisaOrder } from './services/misa.js';
 import db from './db/index.js';
+
+// ----- Odoo integration -----
+import { webhookRouter as odooWebhookRouter } from './integration/webhook/webhook-router.js';
+import { createSyncService } from './integration/sync/sync-service.js';
+import { supabaseHooks } from './integration/supabase-hooks.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -39,8 +46,15 @@ const IS_NETLIFY = !!process.env.NETLIFY || !!process.env.LAMBDA_TASK_ROOT;
 // Middleware
 app.use(compression()); // Gzip — reduces 511KB app.js to ~120KB
 app.use(cors());
-app.use(express.json({ limit: '10mb' })); // Reduced from 50mb — images now compressed to <300KB each
+// `verify` callback giữ raw bytes vào req.rawBody — webhook Odoo cần để verify HMAC
+app.use(express.json({
+    limit: '10mb',
+    verify: (req, _res, buf) => { req.rawBody = buf; }
+}));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Odoo webhook — đặt SAU express.json (đã giữ rawBody) và TRƯỚC apiRouter
+app.use('/api', odooWebhookRouter);
 
 // Serve static files using Absolute Path (Critical for Render/Local)
 const __filename = fileURLToPath(import.meta.url);
@@ -71,6 +85,8 @@ apiRouter.use('/customers', customerRoutes);
 apiRouter.use('/notifications', notificationRoutes);
 apiRouter.use('/merged-orders', mergedOrderRoutes);
 apiRouter.use('/system', systemRoutes);
+apiRouter.use('/odoo-orders', odooOrdersRoutes);
+apiRouter.use('/odoo-purchase-orders', odooPurchaseOrdersRoutes);
 
 // Manual Sync Endpoint (Two-way: Pull New & Push Pending)
 apiRouter.post('/sync', async (req, res) => {
@@ -264,31 +280,22 @@ app.use((err, req, res, next) => {
 const IS_SERVERLESS = !!process.env.LAMBDA_TASK_ROOT || !!process.env.NETLIFY;
 
 if (!IS_SERVERLESS) {
-    // Defer startup sync by 30s — let API respond immediately
+    // --- MISA sync ĐÃ TẮT (chuyển sang Odoo). Giữ code legacy ở services/misa.js
+    //     để rollback nếu cần. Endpoint POST /api/sync vẫn còn dùng được manual. ---
+
+    // Odoo sync: bootstrap khi rỗng, sau đó setInterval mặc định 5 phút (SYNC_INTERVAL_MS).
+    const odooSync = createSyncService(supabaseHooks);
     setTimeout(() => {
-        syncMisaOrders()
-            .then(() => syncMisaProducts())
-            .catch(err => console.error('Startup Sync Failed:', err));
-    }, 30 * 1000);
-
-    // Background sync: 5 minutes (prevents Supabase rate limiting)
-    let isSyncing = false;
-    setInterval(async () => {
-        if (isSyncing) return;
-        isSyncing = true;
-        try { await syncMisaOrders(); }
-        catch (err) { console.error('Sync Job Failed:', err); }
-        finally { isSyncing = false; }
-    }, 5 * 60 * 1000);
-
-    // Retry failed syncs every 30 minutes (low priority background task)
-    setInterval(() => {
-        retryFailedSyncs().catch(err => console.error('Retry Job Failed:', err));
-    }, 30 * 60 * 1000);
+        // Chạy incremental ngay; nếu bảng odoo_* trống, lần đầu sẽ kéo TẤT CẢ
+        // vì last_sync = epoch. Để bootstrap đầy đủ (gồm bảng đã có data),
+        // chạy: `node scripts/odoo-bootstrap.js` (xem README integration).
+        odooSync.startIncremental();
+    }, 5 * 1000);
 
     app.listen(PORT, () => {
-        console.log('?? L?c Thi�n ERP running on port ' + PORT);
-        console.log('?? Client folder: ' + publicPath);
+        console.log('🚀 Lộc Thiên ERP running on port ' + PORT);
+        console.log('📁 Client folder: ' + publicPath);
+        console.log('🔌 Odoo webhook: POST /api/odoo-webhook');
     });
 }
 
