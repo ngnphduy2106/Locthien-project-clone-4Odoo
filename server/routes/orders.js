@@ -1790,6 +1790,27 @@ router.post('/:id/complete', async (req, res) => {
 
 
 
+        // Detect if this is an Odoo order
+        let isOdooOrder = false;
+        let odooOrder = null;
+        try {
+            const odooIdInt = parseInt(id, 10);
+            let odooQuery = supabase.from('odoo_orders').select('*');
+            if (!isNaN(odooIdInt)) {
+                odooQuery = odooQuery.or(`odoo_id.eq.${odooIdInt},name.eq.${id}`);
+            } else {
+                odooQuery = odooQuery.eq('name', id);
+            }
+            const { data: odooData } = await odooQuery.maybeSingle();
+            if (odooData) {
+                isOdooOrder = true;
+                odooOrder = odooData;
+                console.log(`🟢 Detected Odoo Order for completion: odoo_id=${odooOrder.odoo_id}, name=${odooOrder.name}`);
+            }
+        } catch (e) {
+            console.error('Odoo order lookup error:', e.message);
+        }
+
         // PERF: Single getOrder() call — reused everywhere
         let orderInfo = null;
         let alreadyCompleted = false;
@@ -1803,6 +1824,26 @@ router.post('/:id/complete', async (req, res) => {
                 }
             }
         } catch (e) { /* ignore */ }
+
+        // If it is Odoo and orderInfo is still null, map from odooOrder
+        if (isOdooOrder && !orderInfo) {
+            const ship = odooOrder.detail?.shipping || {};
+            orderInfo = {
+                soDon: odooOrder.name,
+                sale_order_no: odooOrder.name,
+                khach: odooOrder.partner_name,
+                account_name: odooOrder.partner_name,
+                diaChi: odooOrder.x_lt_shipping_address || [ship.street, ship.street2, ship.city].filter(Boolean).join(', '),
+                taiXe: odooOrder.x_lt_driver_name || '',
+                bienSo: odooOrder.x_lt_plate || '',
+                status: odooOrder.x_lt_status === 'lt_delivered' ? 'Hoàn thành' : 
+                        odooOrder.x_lt_status === 'lt_delivering' ? 'Đang giao' : 'Chờ nhận'
+            };
+            const s = (orderInfo.status || '').toLowerCase();
+            if (s === 'hoàn thành') {
+                alreadyCompleted = true;
+            }
+        }
 
         // ============================================================
         // MULTI-DRIVER COMPLETION: Check if this is a split order
@@ -2038,17 +2079,54 @@ router.post('/:id/complete', async (req, res) => {
             }
 
             // Update order status AND products + Set initial sync status
-            await db.updateOrder(id, {
-                status: CONFIG.STATUS.DELIVERED,
-                delivery_status: 'Đã giao hàng',
-                taiXe: isMultiDriverOrder ? firstDriverName : resolvedDriverName,
-                bienSo: isMultiDriverOrder && firstDriverPlate ? firstDriverPlate : resolvedPlate,
-                cart: updatedProducts,
-                local_items: local_items || [],
-                delivery_note: note || delivery_note || '',
-                crm_sync_status: 'PENDING_APPROVAL',
-                sync_error: null
-            });
+            if (isOdooOrder) {
+                // Update odoo_orders status and fields
+                const odooUpdateData = {
+                    x_lt_status: 'lt_delivered',
+                    x_lt_driver_name: isMultiDriverOrder ? firstDriverName : resolvedDriverName,
+                    x_lt_plate: isMultiDriverOrder && firstDriverPlate ? firstDriverPlate : resolvedPlate,
+                    detail: {
+                        ...(odooOrder.detail || {}),
+                        delivery_note: note || delivery_note || '',
+                        local_items: local_items || [],
+                        actual_products: updatedProducts
+                    }
+                };
+
+                const { error: odooDbErr } = await supabase
+                    .from('odoo_orders')
+                    .update(odooUpdateData)
+                    .eq('odoo_id', odooOrder.odoo_id);
+
+                if (odooDbErr) {
+                    console.error('❌ Update odoo_orders fail:', odooDbErr.message);
+                } else {
+                    console.log(`✅ Updated odoo_orders ${odooOrder.odoo_id} to lt_delivered`);
+                }
+
+                // Sync to Odoo API in background (completeDelivery)
+                try {
+                    const odoo = await import('../integration/odoo/odoo-client.js').then(m => m.default || m);
+                    if (odoo && typeof odoo.completeDelivery === 'function') {
+                        await odoo.completeDelivery(odooOrder.odoo_id);
+                        console.log(`✅ Odoo completeDelivery API synced for ${odooOrder.odoo_id}`);
+                    }
+                } catch (odooApiErr) {
+                    console.error('❌ Odoo API completeDelivery fail (non-blocking):', odooApiErr.message);
+                }
+            } else {
+                await db.updateOrder(id, {
+                    status: CONFIG.STATUS.DELIVERED,
+                    delivery_status: 'Đã giao hàng',
+                    taiXe: isMultiDriverOrder ? firstDriverName : resolvedDriverName,
+                    bienSo: isMultiDriverOrder && firstDriverPlate ? firstDriverPlate : resolvedPlate,
+                    cart: updatedProducts,
+                    local_items: local_items || [],
+                    delivery_note: note || delivery_note || '',
+                    crm_sync_status: 'PENDING_APPROVAL',
+                    sync_error: null
+                });
+            }
 
             // PERF: crm_sync_status already set in merged updateOrder above
             const crmSyncStatus = 'PENDING_APPROVAL';
@@ -2201,16 +2279,57 @@ router.post('/:id/complete', async (req, res) => {
         console.log(`👔 Admin Complete Flow - Order: ${id}`);
 
         // Update order status to completed
-        const prevOrder = await db.getOrder(id);
-        const order = await db.updateOrder(id, {
-            status: CONFIG.STATUS.COMPLETED,
-            delivery_status: 'Hoàn thành',
-            completed_at: new Date().toISOString(),
-            delivery_note: delivery_note || '',
-            local_items: local_items || [],
-            admin_completed: admin_completed || false
-        });
-        logStatusChange(id, prevOrder?.status, CONFIG.STATUS.COMPLETED, req.body.admin_name || 'ADMIN', 'Admin complete flow');
+        const prevOrder = isOdooOrder ? null : await db.getOrder(id);
+        let order;
+        if (isOdooOrder) {
+            const odooUpdateData = {
+                x_lt_status: 'lt_delivered',
+                detail: {
+                    ...(odooOrder.detail || {}),
+                    delivery_note: delivery_note || '',
+                    local_items: local_items || [],
+                    admin_completed: admin_completed || false
+                }
+            };
+            const { error: odooDbErr } = await supabase
+                .from('odoo_orders')
+                .update(odooUpdateData)
+                .eq('odoo_id', odooOrder.odoo_id);
+
+            if (odooDbErr) {
+                console.error('❌ Update odoo_orders admin fail:', odooDbErr.message);
+                return res.json(createResponse(true, 'Lỗi cập nhật đơn Odoo: ' + odooDbErr.message));
+            }
+            order = {
+                id: odooOrder.odoo_id,
+                soDon: odooOrder.name,
+                sale_order_no: odooOrder.name,
+                khach: odooOrder.partner_name,
+                account_name: odooOrder.partner_name,
+                diaChi: odooOrder.x_lt_shipping_address || '',
+                cart: products || []
+            };
+
+            // Sync to Odoo API in background (completeDelivery)
+            try {
+                const odoo = await import('../integration/odoo/odoo-client.js').then(m => m.default || m);
+                if (odoo && typeof odoo.completeDelivery === 'function') {
+                    await odoo.completeDelivery(odooOrder.odoo_id);
+                }
+            } catch (odooApiErr) {
+                console.error('❌ Odoo API completeDelivery fail (non-blocking):', odooApiErr.message);
+            }
+        } else {
+            order = await db.updateOrder(id, {
+                status: CONFIG.STATUS.COMPLETED,
+                delivery_status: 'Hoàn thành',
+                completed_at: new Date().toISOString(),
+                delivery_note: delivery_note || '',
+                local_items: local_items || [],
+                admin_completed: admin_completed || false
+            });
+            logStatusChange(id, prevOrder?.status, CONFIG.STATUS.COMPLETED, req.body.admin_name || 'ADMIN', 'Admin complete flow');
+        }
 
         if (!order) {
             return res.json(createResponse(true, 'Không tìm thấy đơn hàng!'));
