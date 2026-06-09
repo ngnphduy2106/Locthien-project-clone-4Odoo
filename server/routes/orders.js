@@ -533,6 +533,8 @@ router.get('/my/:driverName', async (req, res) => {
                         odoo_id: o.odoo_id,
                         soDon: o.name,
                         sale_order_no: o.name,
+                        status: o.x_lt_status === 'lt_delivering' ? 'Đang giao' : 
+                                o.x_lt_status === 'lt_delivered' ? 'Hoàn thành' : 'Chờ nhận',
                         ngay: o.date_order,
                         khach: o.partner_name,
                         diaChi: o.x_lt_shipping_address || '',
@@ -699,6 +701,8 @@ router.get('/my/:driverName', async (req, res) => {
                     odoo_id: o.odoo_id,
                     soDon: o.name,
                     sale_order_no: o.name,
+                    status: o.x_lt_status === 'lt_delivering' ? 'Đang giao' : 
+                            o.x_lt_status === 'lt_delivered' ? 'Hoàn thành' : 'Chờ nhận',
                     ngay: o.date_order,
                     khach: o.partner_name,
                     diaChi: o.x_lt_shipping_address || '',
