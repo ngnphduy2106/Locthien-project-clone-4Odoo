@@ -425,11 +425,16 @@ router.get('/my/:driverName', async (req, res) => {
             ? supabase.from('orders').select('*').not('custom_field13', 'is', null).neq('custom_field13', '')
             : supabase.from('orders').select('*').ilike('custom_field13', `%${driverName}%`);
 
+        const queryLegacyOdooOrders = isAdmin
+            ? supabase.from('odoo_orders').select('*').eq('x_lt_is_quotation', false).not('x_lt_driver_name', 'is', null).neq('x_lt_driver_name', '')
+            : supabase.from('odoo_orders').select('*').eq('x_lt_is_quotation', false).ilike('x_lt_driver_name', `%${driverName}%`);
+
         const mainResults = await Promise.allSettled([
             queryExportAssigns,
             queryImportAssigns,
             queryLegacyOrders,
-            db.getUsers()
+            db.getUsers(),
+            queryLegacyOdooOrders
         ]);
 
         function dedupe(arr) {
@@ -441,6 +446,7 @@ router.get('/my/:driverName', async (req, res) => {
         const preFetchedImportAssignments = dedupe(mainResults[1].status === 'fulfilled' ? (mainResults[1].value.data || []) : []);
         const legacyOrdersRaw = mainResults[2].status === 'fulfilled' ? (mainResults[2].value.data || []) : [];
         const users = mainResults[3].status === 'fulfilled' ? (mainResults[3].value || []) : [];
+        const legacyOdooOrdersRaw = mainResults[4] && mainResults[4].status === 'fulfilled' ? (mainResults[4].value.data || []) : [];
 
         if (mainResults.some(r => r.status === 'rejected')) {
             console.warn('⚠️ My Orders warning: Some queries failed', mainResults.map((r, i) => r.status === 'rejected' ? `query${i}: ${r.reason}` : 'ok'));
@@ -463,8 +469,9 @@ router.get('/my/:driverName', async (req, res) => {
                 const orderIds = [...new Set(assignments.map(a => a.order_id))];
 
                 // Parallel: fetch matching orders + all assignments for those orders
-                const [ordersResult, batchAssignsResult] = await Promise.all([
+                const [ordersResult, odooOrdersResult, batchAssignsResult] = await Promise.all([
                     supabase.from('orders').select('*').in('id', orderIds),
+                    supabase.from('odoo_orders').select('*').in('name', orderIds),
                     supabase.from('order_driver_assignments')
                         .select('id, status, assigned_qty, actual_qty, driver_name, order_id')
                         .in('order_id', orderIds)
@@ -497,6 +504,53 @@ router.get('/my/:driverName', async (req, res) => {
                         is_pinned: o.is_pinned || false
                     };
                 });
+
+                // Index Odoo orders as well
+                (odooOrdersResult.data || []).forEach(o => {
+                    let products = [];
+                    try {
+                        const detail = o.detail || {};
+                        const lines = detail.lines || [];
+                        products = lines.map(l => {
+                            const uomVal = (!l.uom || l.uom.trim().toLowerCase() === 'units' || l.uom.trim().toLowerCase() === 'unit') ? 'kg' : l.uom;
+                            return {
+                                ...l,
+                                product_code: l.product_code || '',
+                                product_name: l.product_name || '',
+                                qty: Number(l.qty || 0),
+                                uom: uomVal,
+                                unit: uomVal,
+                                price: Number(l.price_unit || 0),
+                                vat: Number(l.vat || 0),
+                                total: Number(l.price_subtotal || 0)
+                            };
+                        });
+                    } catch (e) {}
+
+                    const mappedOdoo = {
+                        ...o,
+                        id: o.odoo_id,
+                        odoo_id: o.odoo_id,
+                        soDon: o.name,
+                        sale_order_no: o.name,
+                        ngay: o.date_order,
+                        khach: o.partner_name,
+                        diaChi: o.x_lt_shipping_address || '',
+                        amount: o.amount_total || 0,
+                        taiXe: o.x_lt_driver_name || '',
+                        bienSo: o.x_lt_plate || '',
+                        driver: o.x_lt_driver_name || '',
+                        plate: o.x_lt_plate || '',
+                        misa_note: o.x_lt_note || '',
+                        creator_name: '',
+                        products, cart: products,
+                        is_pinned: false,
+                        is_odoo: true
+                    };
+                    orderMap[o.name] = mappedOdoo;
+                    orderMap[String(o.odoo_id)] = mappedOdoo;
+                });
+
                 // Also index by sale_order_no
                 Object.values(orderMap).forEach(o => { if (o.soDon) orderMap[o.soDon] = o; });
 
@@ -545,6 +599,7 @@ router.get('/my/:driverName', async (req, res) => {
         // ===== 2. FALLBACK: ORDERS WITHOUT ASSIGNMENTS (legacy/single driver) =====
         try {
             const assignedOrderIds = new Set(myOrders.map(o => o.id));
+            const assignedOdooNames = new Set(myOrders.filter(o => o.is_odoo).map(o => o.soDon));
 
             // Map legacy orders from Supabase format
             const legacyOrders = legacyOrdersRaw
@@ -591,6 +646,74 @@ router.get('/my/:driverName', async (req, res) => {
                     statusCode,
                     type: 'export',
                     is_split_order: false
+                });
+            }
+
+            // Map legacy Odoo orders
+            const legacyOdooOrders = legacyOdooOrdersRaw
+                .filter(o => !assignedOdooNames.has(o.name))
+                .filter(o => {
+                    const tName = String(o.x_lt_driver_name || '').trim().toUpperCase();
+                    if (!tName) return false;
+                    const match = (tName === myName) || tName.includes(myName) || myName.includes(tName);
+                    if (isAdmin) {
+                        const isExternal = tName && !internalDrivers.includes(tName);
+                        return match || isExternal;
+                    }
+                    return match;
+                });
+
+            for (const o of legacyOdooOrders) {
+                let products = [];
+                try {
+                    const detail = o.detail || {};
+                    const lines = detail.lines || [];
+                    products = lines.map(l => {
+                        const uomVal = (!l.uom || l.uom.trim().toLowerCase() === 'units' || l.uom.trim().toLowerCase() === 'unit') ? 'kg' : l.uom;
+                        return {
+                            ...l,
+                            product_code: l.product_code || '',
+                            product_name: l.product_name || '',
+                            qty: Number(l.qty || 0),
+                            uom: uomVal,
+                            unit: uomVal,
+                            price: Number(l.price_unit || 0),
+                            vat: Number(l.vat || 0),
+                            total: Number(l.price_subtotal || 0)
+                        };
+                    });
+                } catch (e) {}
+
+                const s = String(o.x_lt_status || '').toLowerCase();
+                let statusCode = 'CHO_NHAN';
+
+                const deliveringStatuses = ['lt_delivering', 'delivering', 'in_transit', 'đang giao'];
+                const completedStatuses = ['lt_delivered', 'delivered', 'completed', 'hoàn thành'];
+
+                if (deliveringStatuses.some(ds => s.includes(ds))) statusCode = 'DANG_GIAO';
+                else if (completedStatuses.some(cs => s.includes(cs))) statusCode = 'HOAN_THANH';
+
+                myOrders.push({
+                    ...o,
+                    id: o.odoo_id,
+                    odoo_id: o.odoo_id,
+                    soDon: o.name,
+                    sale_order_no: o.name,
+                    ngay: o.date_order,
+                    khach: o.partner_name,
+                    diaChi: o.x_lt_shipping_address || '',
+                    amount: o.amount_total || 0,
+                    taiXe: o.x_lt_driver_name || '',
+                    bienSo: o.x_lt_plate || '',
+                    driver: o.x_lt_driver_name || '',
+                    plate: o.x_lt_plate || '',
+                    misa_note: o.x_lt_note || '',
+                    creator_name: '',
+                    products, cart: products,
+                    statusCode,
+                    type: 'export',
+                    is_split_order: false,
+                    is_odoo: true
                 });
             }
         } catch (legacyErr) {
