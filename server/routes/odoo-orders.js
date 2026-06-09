@@ -364,6 +364,211 @@ router.get('/:odooId', async (req, res) => {
 });
 
 // ============================================================
+// POST /api/odoo-orders/:odooId/assign-multi — Multi-driver assignment
+// Lưu phân công nhiều tài xế + cập nhật odoo_orders + sync Odoo
+// ============================================================
+router.post('/:odooId/assign-multi', async (req, res) => {
+    try {
+        const id = parseInt(req.params.odooId, 10);
+        const { assignments } = req.body;
+
+        console.log(`\n📦 ODOO ASSIGN-MULTI for odoo_id ${id}`);
+        console.log(`📋 Received ${assignments?.length || 0} assignments:`, JSON.stringify(assignments, null, 2));
+
+        if (!assignments || !assignments.length) {
+            return res.json({ error: true, msg: 'Chưa có phân công nào!' });
+        }
+
+        // 1. Lấy thông tin đơn hàng từ odoo_orders
+        const { data: odooOrder, error: fetchErr } = await supabase
+            .from('odoo_orders')
+            .select('*')
+            .eq('odoo_id', id)
+            .maybeSingle();
+
+        if (fetchErr) {
+            console.error('❌ Fetch odoo order error:', fetchErr.message);
+        }
+
+        const orderName = odooOrder?.name || String(id);
+        // Use order name (e.g. "SO001") as order_id in assignments table for consistency
+        const assignmentOrderId = orderName;
+
+        // 2. Check existing assignments
+        const { data: existingAssignments } = await supabase
+            .from('order_driver_assignments')
+            .select('id, assigned_qty, driver_name, plate')
+            .eq('order_id', assignmentOrderId);
+
+        const hadPreviousAssignments = existingAssignments && existingAssignments.length > 0;
+        const previousDrivers = hadPreviousAssignments
+            ? existingAssignments.map(a => a.driver_name).filter(Boolean)
+            : [];
+
+        console.log(`📊 Previous assignments: ${existingAssignments?.length || 0}, drivers: ${previousDrivers.join(', ')}`);
+
+        // 3. Delete existing assignments
+        const { error: delErr } = await supabase
+            .from('order_driver_assignments')
+            .delete()
+            .eq('order_id', assignmentOrderId);
+        if (delErr) console.error('Delete existing assignments error:', delErr.message);
+
+        // Also try deleting by odoo_id string (in case old records used numeric id)
+        await supabase
+            .from('order_driver_assignments')
+            .delete()
+            .eq('order_id', String(id));
+
+        // 4. Insert new assignments
+        const insertData = assignments.map(a => ({
+            order_id: assignmentOrderId,
+            driver_name: a.driver_name,
+            driver_type: a.type || 'internal',
+            plate: a.plate || '',
+            assistant_name: a.assistant_name || null,
+            delivery_time: a.delivery_time || null,
+            assigned_qty: Number(a.qty) || 0,
+            assigned_products: a.products || null,
+            status: 'pending',
+            note: a.note || ''
+        }));
+
+        console.log(`🔄 Insert data (${insertData.length} rows):`, JSON.stringify(insertData, null, 2));
+
+        const { data: insertedRows, error: insertErr } = await supabase
+            .from('order_driver_assignments')
+            .insert(insertData)
+            .select();
+
+        if (insertErr) {
+            console.error('❌ Insert error:', insertErr.message);
+            return res.json({ error: true, msg: 'Lỗi lưu phân công: ' + insertErr.message });
+        }
+
+        console.log(`✅ Inserted ${insertedRows?.length || 0} assignment rows`);
+
+        // 5. Update odoo_orders: driver, plate, status → lt_delivering
+        const mainDriver = assignments[0];
+        const updateData = {
+            x_lt_driver_name: mainDriver.driver_name,
+            x_lt_plate: mainDriver.plate || '',
+            x_lt_status: 'lt_delivering'
+        };
+
+        // Also update detail JSON with driver info
+        if (odooOrder?.detail) {
+            const updatedDetail = {
+                ...odooOrder.detail,
+                x_driver_name: mainDriver.driver_name,
+                x_lt_driver_name: mainDriver.driver_name,
+                x_plate: mainDriver.plate || '',
+                x_lt_plate: mainDriver.plate || '',
+                x_assistant_name: mainDriver.assistant_name || ''
+            };
+            updateData.detail = updatedDetail;
+        }
+
+        const { error: updateErr } = await supabase
+            .from('odoo_orders')
+            .update(updateData)
+            .eq('odoo_id', id);
+
+        if (updateErr) {
+            console.error('❌ Update odoo_orders error:', updateErr.message);
+        } else {
+            console.log(`✅ Updated odoo_orders ${id}: status → lt_delivering, driver → ${mainDriver.driver_name}`);
+        }
+
+        // 6. Sync to Odoo API (best-effort, don't block on failure)
+        let odooFailed = false;
+        try {
+            await odoo.assignDriver(id, mainDriver.driver_name, mainDriver.plate || '');
+            await odoo.startDelivery(id);
+            console.log(`✅ Odoo API synced: driver + startDelivery for order ${id}`);
+        } catch (odooErr) {
+            console.error('[odoo-orders] Odoo API sync fail (non-blocking):', odooErr.message);
+            odooFailed = true;
+        }
+
+        // 7. Send Telegram notification (best-effort)
+        try {
+            const { sendTelegramMessage } = await import('../services/telegram.js');
+            const detail = odooOrder?.detail || {};
+            const lines = detail.lines || [];
+            const customer = odooOrder?.partner_name || '';
+            const address = odooOrder?.x_lt_shipping_address || '';
+
+            const prodLines = lines.map(l => {
+                const name = (l.product_name || '').replace(/^(Hóa chất |HC |Hoá chất )/i, '');
+                const qty = Number(l.qty || 0);
+                const uom = (!l.uom || l.uom.toLowerCase() === 'units') ? 'Kg' : l.uom;
+                return `  • ${name}: ${qty.toLocaleString('vi-VN')} ${uom}`;
+            }).filter(Boolean);
+
+            const fmtDate = odooOrder?.date_order
+                ? new Date(odooOrder.date_order).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit', month: '2-digit' })
+                : '';
+
+            let msg = `🚛 <b>ĐIỀU PHỐI</b> | 📅 ${fmtDate}`;
+            msg += `\n📦 <b>${orderName}</b>`;
+            msg += `\n👤 ${customer}`;
+            if (address) msg += `\n📍 ${address.substring(0, 80)}`;
+            if (prodLines.length > 0) msg += `\n${prodLines.join('\n')}`;
+
+            assignments.forEach((a) => {
+                const qtyStr = assignments.length > 1 ? ` ${Number(a.qty).toLocaleString('vi-VN')}kg` : '';
+                const asstStr = a.assistant_name ? ' + ' + a.assistant_name : '';
+                const plateStr = a.plate ? ` (${a.plate})` : '';
+                msg += `\n🚗 <b>${a.driver_name}</b>${qtyStr}${asstStr}${plateStr}`;
+            });
+
+            if (hadPreviousAssignments && previousDrivers.length > 0) {
+                msg += `\n⚠️ Cũ: ${previousDrivers.join(', ')}`;
+            }
+
+            console.log(`📤 Telegram msg: ${msg}`);
+            await sendTelegramMessage(msg, 'DRIVER');
+            console.log(`✅ Telegram notification sent for order ${orderName}`);
+        } catch (tgErr) {
+            console.error('❌ Telegram Error:', tgErr.message);
+        }
+
+        // 8. FCM push notification to each driver (best-effort)
+        try {
+            const { createNotification } = await import('./notifications.js');
+            const notifiedDrivers = new Set();
+            for (const a of assignments) {
+                if (a.driver_name && !notifiedDrivers.has(a.driver_name)) {
+                    notifiedDrivers.add(a.driver_name);
+                    await createNotification(
+                        a.driver_name,
+                        'order_assigned',
+                        '🚛 Đơn hàng mới',
+                        `#${orderName} - ${odooOrder?.partner_name || ''}`,
+                        orderName,
+                        orderName
+                    );
+                    console.log(`📬 FCM sent to driver: ${a.driver_name}`);
+                }
+            }
+        } catch (notifyErr) {
+            console.error('FCM notification error:', notifyErr.message);
+        }
+
+        const statusMsg = odooFailed
+            ? `Đã phân công ${assignments.length} tài xế (Odoo offline — đã lưu local)`
+            : `Đã phân công ${assignments.length} tài xế!`;
+
+        return res.json({ error: false, msg: statusMsg });
+
+    } catch (e) {
+        console.error('[odoo-orders] assign-multi error:', e.message);
+        return res.json({ error: true, msg: e.message });
+    }
+});
+
+// ============================================================
 // POST /api/odoo-orders/:odooId/assign-driver  body: { driver, plate, autoStart? }
 // Ghi tài xế NGƯỢC vào Odoo + log chatter + cập nhật local DB.
 // ============================================================

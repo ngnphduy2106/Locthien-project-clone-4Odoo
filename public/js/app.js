@@ -4556,7 +4556,7 @@ async function submitMultiDriverAssignment() {
         const isImport = state.currentOrderType === 'import';
         const apiUrl = isImport
             ? `/api/imports/${orderId}/assign-multi`
-            : `/api/orders/${orderId}/assign-multi`;
+            : `/api/odoo-orders/${orderId}/assign-multi`;
         const res = await fetch(apiUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -4612,7 +4612,7 @@ async function confirmAssignDriver() {
     showLoading('Đang gán tài xế...');
 
     try {
-        const res = await api.assignOrder(orderId, driverName, plate, note);
+        const res = await api.assignOdooDriver(orderId, driverName, plate);
         hideLoading();
 
         // Fix: API returns { error: false, msg: '...' }, not { success: true }
@@ -6123,7 +6123,7 @@ async function submitAllDriverAssignments() {
     showLoading('Đang phân công...');
 
     try {
-        const res = await fetch(`/api/orders/${currentModalOrderId}/assign-multi`, {
+        const res = await fetch(`/api/odoo-orders/${currentModalOrderId}/assign-multi`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ assignments: driverAssignments })

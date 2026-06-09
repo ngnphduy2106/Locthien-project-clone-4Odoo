@@ -525,7 +525,7 @@ const DispatchModule = {
 
         try {
             if (window.api) {
-                const data = await window.api.assignOrder(orderId, driverName, vehiclePlate, note, assistantName, deliveryTime);
+                const data = await window.api.assignOdooDriver(orderId, driverName, vehiclePlate);
 
                 if (data.error) {
                     alert('Lỗi: ' + data.msg);
