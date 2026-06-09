@@ -3934,30 +3934,12 @@ async function viewOrderDetail(orderId, options = {}) {
             
             <!--ACTION BUTTONS-->
         <div style="margin-top:20px; padding-top:16px; border-top:1px solid var(--border); display:flex; gap:8px; flex-wrap:wrap;">
-            ${order.odoo_id ? `
-                ${!isReadonly && (isAdminRole() || isSales) && (order.status === 'Chờ nhận' || order.status === 'Chờ xử lý') ? `
-                    <button class="btn btn-primary" onclick="closeOrderModal(); assignOdooDriverModal(${order.odoo_id})">
-                        <i class="bi bi-person-plus"></i> Phân công tài xế
-                    </button>
-                ` : ''}
-                ${!isReadonly && (order.status === 'Đang giao') && (isAdminRole() || isSales) ? `
-                    <button class="btn btn-info" onclick="closeOrderModal(); assignOdooDriverModal(${order.odoo_id})" style="background:var(--info); color:white;">
-                        <i class="bi bi-person-gear"></i> Đổi tài xế
-                    </button>
-                    <button class="btn btn-outline" onclick="cancelDispatch('${order.id}', 'export')" style="color:var(--danger); border-color:var(--danger);">
-                        <i class="bi bi-arrow-counterclockwise"></i> Hủy điều phối
-                    </button>
-                    <button class="btn btn-success" onclick="confirmCompleteOdooOrder(${order.odoo_id})">
-                        <i class="bi bi-check-circle"></i> Hoàn thành
-                    </button>
-                ` : ''}
-            ` : `
-                ${!isReadonly && (isAdminRole() || isSales) && (order.status === 'Mới' || order.status === 'Chưa thực hiện') ? `
+            ${!isReadonly && (isAdminRole() || isSales) && (order.status === 'Mới' || order.status === 'Chưa thực hiện') ? `
                     <button class="btn btn-primary" onclick="closeOrderModal(); assignDriver('${order.id}')">
                         <i class="bi bi-person-plus"></i> Phân công tài xế
                     </button>
                 ` : ''}
-                ${!isReadonly && (order.status === 'Đang thực hiện' || order.status === 'Chờ giao' || order.status === 'assigned') && (isAdminRole() || isSales) ? `
+            ${!isReadonly && (order.status === 'Đang thực hiện' || order.status === 'Chờ giao' || order.status === 'assigned') && (isAdminRole() || isSales) ? `
                     <button class="btn btn-info" onclick="closeOrderModal(); assignDriver('${order.id}')" style="background:var(--info); color:white;">
                         <i class="bi bi-person-gear"></i> Đổi tài xế
                     </button>
@@ -3965,12 +3947,11 @@ async function viewOrderDetail(orderId, options = {}) {
                         <i class="bi bi-arrow-counterclockwise"></i> Hủy điều phối
                     </button>
                 ` : ''}
-                ${!isReadonly && (order.status === 'Đang thực hiện' || order.status === 'Chờ giao' || order.status === 'assigned') && (isAdminRole() || isSales) ? `
+            ${!isReadonly && (order.status === 'Đang thực hiện' || order.status === 'Chờ giao' || order.status === 'assigned') && (isAdminRole() || isSales) ? `
                     <button class="btn btn-success" onclick="showDriverCompletionModal('${order.id}')">
                         <i class="bi bi-check-circle"></i> Hoàn thành
                     </button>
                 ` : ''}
-            `}
             ${!isReadonly && (isAdminRole() || isSales) ? `
                     <button class="btn btn-warning" onclick="closeOrderModal(); editOrder('${order.id}')">
                         <i class="bi bi-pencil"></i> Chỉnh sửa
@@ -8027,128 +8008,6 @@ async function confirmOdooPickupDriver(odooId) {
     }
 }
 window.confirmOdooPickupDriver = confirmOdooPickupDriver;
-
-// ============================================================
-// ASSIGN DRIVER TO ODOO SALES ORDER (giao hàng)
-// ============================================================
-async function assignOdooDriverModal(odooId) {
-    // Find Order info
-    const allOrders = [
-        ...(state.orders?.pending  || []),
-        ...(state.orders?.assigned || []),
-    ];
-    const order = allOrders.find(o => String(o.odoo_id) === String(odooId));
-    const orderNo = order?.soDon || `PO${odooId}`;
-    const customerName = order?.khach || '';
-
-    // Build driver list
-    const driverOptions = (state.employees || [])
-        .filter(e => {
-            const role = (e.role || '').toLowerCase();
-            return role.includes('tài xế') || role.includes('tai xe') || role.includes('driver') || role.includes('lái xe');
-        })
-        .map(e => `<option value="${e.fullName || e.name}">${e.fullName || e.name}</option>`)
-        .join('');
-
-    const html = `
-        <div style="padding:16px; display:flex; flex-direction:column; gap:12px; min-width:300px;">
-            <div style="font-size:15px; font-weight:700;">Gán tài xế giao hàng</div>
-            <div style="font-size:13px; color:var(--text-muted);">${orderNo} - ${customerName}</div>
-            <div>
-                <label style="font-size:12px; font-weight:600; margin-bottom:4px; display:block;">Tài xế</label>
-                <select id="odoo-order-driver-select" class="form-control" style="width:100%;">
-                    <option value="">-- Chọn tài xế --</option>
-                    ${driverOptions}
-                </select>
-                <input type="text" id="odoo-order-driver-input" class="form-control" style="width:100%; margin-top:6px;"
-                    placeholder="Hoặc nhập tên tài xế..." />
-            </div>
-            <div>
-                <label style="font-size:12px; font-weight:600; margin-bottom:4px; display:block;">Biển số xe</label>
-                <input type="text" id="odoo-order-plate-input" class="form-control" style="width:100%;"
-                    placeholder="Biển số xe..." />
-            </div>
-            <div style="display:flex; gap:8px; justify-content:flex-end;">
-                <button class="btn btn-outline" onclick="this.closest('.simple-modal-overlay')?.remove()">Hủy</button>
-                <button class="btn btn-primary" onclick="confirmOdooDriver(${odooId})">
-                    <i class="bi bi-check-circle"></i> Xác nhận
-                </button>
-            </div>
-        </div>
-    `;
-
-    // Show in a simple overlay
-    const overlay = document.createElement('div');
-    overlay.className = 'simple-modal-overlay';
-    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
-    const box = document.createElement('div');
-    box.style.cssText = 'background:var(--bg-card,#fff);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.25);';
-    box.innerHTML = html;
-    overlay.appendChild(box);
-    document.body.appendChild(overlay);
-
-    // Pre-fill if already assigned
-    if (order?.driver_name || order?.driver || order?.taiXe) {
-        const inp = document.getElementById('odoo-order-driver-input');
-        if (inp) inp.value = order.driver_name || order.driver || order.taiXe;
-    }
-    if (order?.plate || order?.bienSo) {
-        const plt = document.getElementById('odoo-order-plate-input');
-        if (plt) plt.value = order.plate || order.bienSo;
-    }
-
-    // Sync select → input
-    document.getElementById('odoo-order-driver-select')?.addEventListener('change', (e) => {
-        const inp = document.getElementById('odoo-order-driver-input');
-        if (inp && e.target.value) inp.value = e.target.value;
-    });
-}
-window.assignOdooDriverModal = assignOdooDriverModal;
-
-async function confirmOdooDriver(odooId) {
-    const driverSel = document.getElementById('odoo-order-driver-select')?.value || '';
-    const driverInp = document.getElementById('odoo-order-driver-input')?.value?.trim() || '';
-    const driver = driverInp || driverSel;
-    const plate  = document.getElementById('odoo-order-plate-input')?.value?.trim() || '';
-
-    if (!driver) { alert('Vui lòng nhập tên tài xế!'); return; }
-
-    try {
-        const res = await api.assignOdooDriver(odooId, driver, plate);
-        if (res.error) {
-            alert('Lỗi: ' + (res.msg || 'Không thể gán tài xế'));
-            return;
-        }
-        // Remove overlay
-        document.querySelector('.simple-modal-overlay')?.remove();
-        showToast(`✅ Đã gán tài xế ${driver} cho đơn hàng ${odooId}`, 'success');
-        // Refresh list
-        await loadOrders();
-    } catch (e) {
-        alert('Lỗi kết nối: ' + e.message);
-    }
-}
-window.confirmOdooDriver = confirmOdooDriver;
-
-async function confirmCompleteOdooOrder(odooId) {
-    if (!confirm('Xác nhận hoàn thành đơn hàng Odoo này?')) return;
-    showLoading('Đang hoàn thành...');
-    try {
-        const res = await api.completeOdooDelivery(odooId);
-        hideLoading();
-        if (res.error) {
-            alert('Lỗi: ' + (res.msg || 'Không thể hoàn thành đơn'));
-            return;
-        }
-        showToast('✅ Đã hoàn thành đơn hàng Odoo!', 'success');
-        closeOrderModal();
-        await loadOrders();
-    } catch (e) {
-        hideLoading();
-        alert('Lỗi kết nối: ' + e.message);
-    }
-}
-window.confirmCompleteOdooOrder = confirmCompleteOdooOrder;
 
 // Merge order tag helpers
 function addMergeOrderTag() {
