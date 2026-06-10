@@ -18,6 +18,10 @@ export function getNotifyGroupMentions() {
 }
 
 export const sendTelegramMessage = async (text, type = 'NOTIFY', replyToMessageId = null) => {
+    if (type === 'DRIVER' || type === 'DELIVERY') {
+        console.log(`ℹ️ Telegram notification for ${type} is disabled on this test environment.`);
+        return null;
+    }
     const token = process.env.TELEGRAM_TOKEN;
     const { CONFIG } = await import('../config.js');
 
@@ -78,6 +82,10 @@ export const sendTelegramMessage = async (text, type = 'NOTIFY', replyToMessageI
  * @param {number|null} replyToMessageId - Optional message ID to reply to
  */
 export const sendTelegramPhotos = async (photoUrls, caption = '', type = 'XUAT', replyToMessageId = null) => {
+    if (type === 'DRIVER' || type === 'DELIVERY') {
+        console.log(`ℹ️ Telegram photo notification for ${type} is disabled on this test environment.`);
+        return null;
+    }
     const token = process.env.TELEGRAM_TOKEN;
     const { CONFIG } = await import('../config.js');
 
