@@ -7430,6 +7430,51 @@ async function submitImportMultiDriverAssignment() {
         return;
     }
 
+    // Detect Odoo-sourced purchase order — normalized id format 'odoo_po_<odoo_id>'
+    // hoặc tìm trong state.imports với _source='odoo_po'
+    let odooPoId = null;
+    const importIdStr = String(importId);
+    if (importIdStr.startsWith('odoo_po_')) {
+        odooPoId = parseInt(importIdStr.replace('odoo_po_', ''), 10);
+    } else {
+        const allImports = [
+            ...(state.imports?.pending || []),
+            ...(state.imports?.assigned || []),
+            ...(state.imports?.completed || []),
+        ];
+        const found = allImports.find(i => String(i.id) === importIdStr);
+        if (found && found._source === 'odoo_po') {
+            odooPoId = found.odoo_id;
+        }
+    }
+
+    // Odoo PO chỉ có 1 driver field — nếu multi-driver, đẩy driver đầu lên Odoo
+    // (giữ tracking multi trong Supabase qua /imports/.../assign-multi sau)
+    if (odooPoId) {
+        showLoading('Đang gán tài xế (Odoo PO)...');
+        try {
+            const first = assignments[0];
+            const odooRes = await api.assignOdooPickupDriver(
+                odooPoId, first.driver_name, first.plate || '');
+            if (odooRes.error) {
+                hideLoading();
+                alert('Lỗi đẩy Odoo: ' + odooRes.msg);
+                return;
+            }
+            hideLoading();
+            const extra = assignments.length > 1
+                ? ` (+ ${assignments.length - 1} tài xế phụ chỉ lưu local)`
+                : '';
+            alert(`Đã gán tài xế ${first.driver_name} lên Odoo${extra}`);
+            closeOrderModal();
+            loadImportTickets();
+        } catch (e) {
+            hideLoading();
+            alert('Lỗi: ' + e.message);
+        }
+        return;
+    }
+
     // Handle merge with another order
     const mergeCheckbox = window.$('#import-is-merged-order');
     const mergeInput = window.$('#import-merge-order-input');
