@@ -8,6 +8,8 @@
 import { Router } from 'express';
 import { supabase } from '../db/supabase.js';
 import * as odoo from '../integration/odoo/odoo-client.js';
+import { uploadImages } from '../services/storage.js';
+import { pushProofToOdoo, saveProofUrls } from '../services/odoo-proof.js';
 
 const router = Router();
 
@@ -582,13 +584,19 @@ router.post('/:odooId/assign-driver', async (req, res) => {
         
         let odooFailed = false;
         try {
-            await odoo.assignDriver(id, driver, plate);
+            // Layer 2: retry 3 lần với backoff (1s/5s/30s), persist dead-letter nếu fail hết.
+            // SLA: normal <2s; với retry max ~36s.
+            const { retryOdooCall } = await import('../integration/retry-queue.js');
+            await retryOdooCall(`assignDriver:${id}`,
+                () => odoo.assignDriver(id, driver, plate));
             if (autoStart) {
-                await odoo.startDelivery(id);
+                await retryOdooCall(`startDelivery:${id}`,
+                    () => odoo.startDelivery(id));
             }
         } catch (e) {
-            console.error('[odoo-orders] Odoo API assign fail, fallback to local update:', e.message);
+            console.error('[odoo-orders] Odoo XML-RPC fail sau retry:', e.message);
             odooFailed = true;
+            // Layer 3 (Odoo cron pull 30s) sẽ tự sync sau
         }
 
         // Cập nhật trực tiếp vào Supabase để đảm bảo hệ thống hoạt động ngay cả khi Odoo offline
@@ -646,9 +654,15 @@ router.post('/:odooId/start', async (req, res) => {
 });
 
 // POST /api/odoo-orders/:odooId/complete — bấm "Hoàn thành"
+// Body (optional): { images: [base64 dataURL, ...] } — ảnh xác nhận giao hàng
+// của tài xế. Ảnh được: (1) upload Supabase Storage (CDN) → lưu URL vào
+// odoo_orders.proof_images (nguồn cho cron Odoo pull bù), (2) push thẳng
+// sang webhook Odoo /lt/erp/delivery_proof → Sale thấy ngay trên tab
+// "📎 Chứng từ xác thực" của đơn hàng.
 router.post('/:odooId/complete', async (req, res) => {
     try {
         const id = parseInt(req.params.odooId, 10);
+        const images = Array.isArray(req.body?.images) ? req.body.images : [];
         let odooFailed = false;
         try {
             await odoo.completeDelivery(id);
@@ -664,13 +678,65 @@ router.post('/:odooId/complete', async (req, res) => {
 
         if (dbErr) throw dbErr;
 
-        return res.json({ 
-            error: false, 
-            msg: odooFailed 
-                ? 'Đã hoàn thành trên ERP (Không thể kết nối Odoo)' 
-                : 'Đã hoàn thành đơn' 
+        // Trả lời tài xế NGAY — ảnh xử lý background (không chặn UI)
+        res.json({
+            error: false,
+            msg: odooFailed
+                ? 'Đã hoàn thành trên ERP (Không thể kết nối Odoo)'
+                : 'Đã hoàn thành đơn'
+        });
+
+        if (images.length > 0) {
+            setImmediate(async () => {
+                try {
+                    // 1. Upload CDN → lưu URL cho cron Odoo pull bù (Layer 3)
+                    const urls = await uploadImages(images, `odoo_${id}`);
+                    await saveProofUrls(id, urls);
+                    // 2. Push thẳng sang Odoo (Layer 1 — Sale thấy ngay)
+                    const r = await pushProofToOdoo('sale.order', id, images);
+                    console.log(`📸 [odoo-orders] complete#${id}: ${images.length} ảnh | CDN ${urls.filter(u => u.startsWith('http')).length} | Odoo pushed ${r.pushed}/${images.length}`);
+                } catch (bgErr) {
+                    console.error(`⚠️ [odoo-orders] BG proof #${id} fail:`, bgErr.message);
+                }
+            });
+        }
+        return;
+    } catch (e) {
+        return res.status(500).json({ error: true, msg: e.message });
+    }
+});
+
+
+/**
+ * Layer 3 endpoint: Odoo cron pull orders changed since timestamp.
+ * Trả về các order Supabase đã update mà Odoo có thể chưa biết.
+ *
+ * GET /api/odoo-orders/changed-since/:ts
+ *   :ts = ISO timestamp (vd 2026-06-10T08:00:00Z) hoặc "0" để get tất cả
+ * Response: { orders: [{odoo_id, name, x_lt_driver_name, x_lt_plate, x_lt_status, write_date}] }
+ */
+router.get('/changed-since/:ts', async (req, res) => {
+    try {
+        const since = req.params.ts === '0' || !req.params.ts
+            ? new Date(Date.now() - 2 * 60 * 1000).toISOString()  // default 2 phút trước
+            : req.params.ts;
+
+        const { data, error } = await supabase
+            .from('odoo_orders')
+            .select('odoo_id, name, x_lt_driver_name, x_lt_plate, x_lt_status, proof_images, synced_at, write_date')
+            .gte('synced_at', since)
+            .order('synced_at', { ascending: true })
+            .limit(500);
+
+        if (error) throw error;
+
+        return res.json({
+            orders: data || [],
+            cutoff: since,
+            count: (data || []).length,
         });
     } catch (e) {
+        console.error('[odoo-orders] changed-since fail:', e.message);
         return res.status(500).json({ error: true, msg: e.message });
     }
 });

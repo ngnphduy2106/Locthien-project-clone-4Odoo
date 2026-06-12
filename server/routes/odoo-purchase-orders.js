@@ -7,6 +7,8 @@
 import { Router } from 'express';
 import { supabase } from '../db/supabase.js';
 import * as odoo from '../integration/odoo/odoo-client.js';
+import { uploadImages } from '../services/storage.js';
+import { pushProofToOdoo } from '../services/odoo-proof.js';
 
 const router = Router();
 
@@ -168,9 +170,13 @@ router.post('/:poId/assign-driver', async (req, res) => {
 });
 
 // POST /api/odoo-purchase-orders/:poId/received — đã nhận đủ hàng
+// Body (optional): { images: [base64 dataURL, ...] } — ảnh phiếu nhận hàng.
+// Ảnh: upload CDN (lưu trữ) + push webhook Odoo → tab "📎 Chứng từ xác thực"
+// trên purchase.order (x_lt_po_delivery_proof_ids).
 router.post('/:poId/received', async (req, res) => {
     try {
         const id = parseInt(req.params.poId, 10);
+        const images = Array.isArray(req.body?.images) ? req.body.images : [];
         let odooFailed = false;
         try {
             await odoo.markPurchaseReceived(id);
@@ -186,12 +192,26 @@ router.post('/:poId/received', async (req, res) => {
 
         if (dbErr) throw dbErr;
 
-        return res.json({ 
-            error: false, 
-            msg: odooFailed 
-                ? 'Đã đánh dấu nhận hàng trên ERP (Không thể kết nối Odoo)' 
-                : 'Đã đánh dấu nhận đủ' 
+        // Trả lời ngay — ảnh xử lý background
+        res.json({
+            error: false,
+            msg: odooFailed
+                ? 'Đã đánh dấu nhận hàng trên ERP (Không thể kết nối Odoo)'
+                : 'Đã đánh dấu nhận đủ'
         });
+
+        if (images.length > 0) {
+            setImmediate(async () => {
+                try {
+                    const urls = await uploadImages(images, `odoo_po_${id}`);
+                    const r = await pushProofToOdoo('purchase.order', id, images);
+                    console.log(`📸 [odoo-po] received#${id}: ${images.length} ảnh | CDN ${urls.filter(u => u.startsWith('http')).length} | Odoo pushed ${r.pushed}/${images.length}`);
+                } catch (bgErr) {
+                    console.error(`⚠️ [odoo-po] BG proof #${id} fail:`, bgErr.message);
+                }
+            });
+        }
+        return;
     } catch (e) {
         return res.status(500).json({ error: true, msg: e.message });
     }

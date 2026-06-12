@@ -7,6 +7,8 @@ import { Router } from 'express';
 import { supabase } from '../db/supabase.js';
 import { createResponse, getTimestamp } from '../config.js';
 import { updateMisaOrder } from '../services/misa.js';
+import { uploadImages } from '../services/storage.js';
+import { syncProofIfOdooLinked } from '../services/odoo-proof.js';
 import db from '../db/index.js';
 
 const router = Router();
@@ -473,6 +475,17 @@ router.post('/:id/checkin', async (req, res) => {
                         .eq('id', assigns[0].id);
                     console.log(`📸 Saved ${images.length} proof images for merged checkin`);
                 }
+
+                // Stop có link Odoo → upload CDN + đẩy ảnh sang Odoo
+                // (tab "Chứng từ xác thực"). Background, best-effort.
+                setImmediate(async () => {
+                    try {
+                        const urls = await uploadImages(images, orderIdForImg);
+                        await syncProofIfOdooLinked(order_no, urls);
+                    } catch (e) {
+                        console.warn('BG: merged checkin syncProofIfOdooLinked:', e.message);
+                    }
+                });
             } catch (imgErr) {
                 console.warn('Proof image save error during checkin:', imgErr.message);
             }

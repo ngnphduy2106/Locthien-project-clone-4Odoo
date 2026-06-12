@@ -73,8 +73,13 @@ const api = {
         return res.json();
     },
 
-    completeOdooDelivery: async (odooId) => {
-        const res = await fetch(`${API_BASE}/odoo-orders/${odooId}/complete`, { method: 'POST' });
+    completeOdooDelivery: async (odooId, images = []) => {
+        const res = await fetch(`${API_BASE}/odoo-orders/${odooId}/complete`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            // images: base64 dataURL[] — server upload CDN + push sang Odoo
+            // (tab "Chứng từ xác thực") để Sale theo dõi
+            body: JSON.stringify({ images })
+        });
         return res.json();
     },
 

@@ -8,6 +8,7 @@ import { CONFIG, createResponse, formatDate, getTimestamp, standardizeData, gene
 import db from '../db/index.js';
 import { updateMisaOrder } from '../services/misa.js';
 import { uploadImages } from '../services/storage.js';
+import { syncProofIfOdooLinked } from '../services/odoo-proof.js';
 import { createNotification } from './notifications.js';
 
 // AUDIT: Log all status changes to order_status_log table for debugging
@@ -2148,6 +2149,12 @@ router.post('/:id/complete', async (req, res) => {
                             console.warn('BG: Image upload to storage failed, keeping base64:', uploadErr.message);
                         }
                     }
+                    // 0b. Đơn có link Odoo → đẩy ảnh sang Odoo (tab "Chứng từ xác thực")
+                    //     để Sale theo dõi. Best-effort + dedupe trong service.
+                    if (uploadedUrls?.some(u => u.startsWith('http'))) {
+                        syncProofIfOdooLinked(orderNo, uploadedUrls)
+                            .catch(e => console.warn('BG: syncProofIfOdooLinked:', e.message));
+                    }
 
                     // 0a. Create warehouse tickets (moved from blocking path)
                     try {
@@ -2965,6 +2972,10 @@ router.post('/:id/add-proof-images', async (req, res) => {
                 console.log(`📸 BG: Uploaded ${cdnCount}/${images.length} images to CDN`);
 
                 if (cdnCount > 0) {
+                    // Đơn có link Odoo → đẩy ảnh sang Odoo (tab "Chứng từ xác thực")
+                    syncProofIfOdooLinked(orderSoDon, cdnUrls)
+                        .catch(e => console.warn('BG: syncProofIfOdooLinked:', e.message));
+
                     // Replace base64 with CDN URLs in export_tickets
                     try {
                         const orFilter = lookupIds.map(lid => `order_id.eq.${lid},order_no.eq.${lid}`).join(',');
