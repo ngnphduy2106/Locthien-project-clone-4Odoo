@@ -230,9 +230,14 @@ router.get('/', async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     try {
         const tab = req.query.tab || '';
+        // ?page=N kích hoạt phân trang (tab Hoàn thành có ~1000 đơn — không
+        // thể trả hết một lần; Supabase cũng cap 1000 row/query)
+        const page = parseInt(req.query.page) || 0;
+        const limit = parseInt(req.query.limit) || 50;
+
         let q = supabase
             .from('odoo_orders')
-            .select('*')
+            .select('*', page ? { count: 'exact' } : {})
             .eq('x_lt_is_quotation', false)
             .order('date_order', { ascending: false });
 
@@ -242,9 +247,21 @@ router.get('/', async (req, res) => {
         else if (tab === 'completed')  q = q.in('x_lt_status',
             ['lt_delivered', 'lt_confirmed', 'lt_invoiced', 'lt_closed']);
 
-        const { data, error } = await q;
+        if (page) q = q.range((page - 1) * limit, page * limit - 1);
+
+        const { data, error, count } = await q;
         if (error) throw error;
-        return res.json({ error: false, orders: (data || []).map(toFrontend) });
+        const orders = (data || []).map(toFrontend);
+
+        if (page) {
+            const total = count || 0;
+            const totalPages = Math.ceil(total / limit) || 1;
+            return res.json({
+                error: false, orders, completed: orders,
+                pagination: { page, limit, total, totalPages, hasNext: page < totalPages }
+            });
+        }
+        return res.json({ error: false, orders });
     } catch (e) {
         console.error('[odoo-orders] list fail:', e.message);
         return res.json({ error: true, msg: e.message, orders: [] });
@@ -678,29 +695,28 @@ router.post('/:odooId/complete', async (req, res) => {
 
         if (dbErr) throw dbErr;
 
-        // Trả lời tài xế NGAY — ảnh xử lý background (không chặn UI)
-        res.json({
+        // Ảnh xử lý ĐỒNG BỘ trước khi trả lời — app chạy serverless (Vercel),
+        // mọi việc nền (setImmediate) sau res.json bị đóng băng, không bao giờ chạy.
+        if (images.length > 0) {
+            try {
+                // 1. Upload CDN → lưu URL cho cron Odoo pull bù (Layer 3)
+                const urls = await uploadImages(images, `odoo_${id}`);
+                await saveProofUrls(id, urls);
+                // 2. Push thẳng sang Odoo (Layer 1 — Sale thấy ngay)
+                const r = await pushProofToOdoo('sale.order', id, images);
+                console.log(`📸 [odoo-orders] complete#${id}: ${images.length} ảnh | CDN ${urls.filter(u => u.startsWith('http')).length} | Odoo pushed ${r.pushed}/${images.length}`);
+            } catch (proofErr) {
+                // Best-effort: ảnh fail không chặn việc hoàn thành đơn
+                console.error(`⚠️ [odoo-orders] proof #${id} fail:`, proofErr.message);
+            }
+        }
+
+        return res.json({
             error: false,
             msg: odooFailed
                 ? 'Đã hoàn thành trên ERP (Không thể kết nối Odoo)'
                 : 'Đã hoàn thành đơn'
         });
-
-        if (images.length > 0) {
-            setImmediate(async () => {
-                try {
-                    // 1. Upload CDN → lưu URL cho cron Odoo pull bù (Layer 3)
-                    const urls = await uploadImages(images, `odoo_${id}`);
-                    await saveProofUrls(id, urls);
-                    // 2. Push thẳng sang Odoo (Layer 1 — Sale thấy ngay)
-                    const r = await pushProofToOdoo('sale.order', id, images);
-                    console.log(`📸 [odoo-orders] complete#${id}: ${images.length} ảnh | CDN ${urls.filter(u => u.startsWith('http')).length} | Odoo pushed ${r.pushed}/${images.length}`);
-                } catch (bgErr) {
-                    console.error(`⚠️ [odoo-orders] BG proof #${id} fail:`, bgErr.message);
-                }
-            });
-        }
-        return;
     } catch (e) {
         return res.status(500).json({ error: true, msg: e.message });
     }

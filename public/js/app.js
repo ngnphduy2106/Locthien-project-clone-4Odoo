@@ -1430,7 +1430,9 @@ async function loadCompletedOrders(page = 1) {
     }
 
     try {
-        const res = await fetch(`/api/orders?tab=completed&page=${page}&limit=50`);
+        // Đơn hoàn thành đọc từ odoo_orders (cùng nguồn với badge đếm) —
+        // /api/orders chỉ có bảng orders legacy, thiếu toàn bộ đơn Odoo
+        const res = await fetch(`/api/odoo-orders?tab=completed&page=${page}&limit=50`);
         const data = await res.json();
 
         // Discard stale response if user already switched tabs

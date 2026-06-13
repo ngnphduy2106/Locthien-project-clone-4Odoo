@@ -2877,7 +2877,24 @@ router.post('/:id/add-proof-images', async (req, res) => {
 
         console.log(`📸 Resolved IDs: uuid=${orderUuid}, soDon=${orderSoDon}, param=${id}`);
 
-        // STEP 1: Save images to DB IMMEDIATELY (fast response to driver)
+        // STEP 1: Upload CDN TRƯỚC khi lưu DB — app chạy serverless (Vercel),
+        // mọi việc nền sau res.json() bị đóng băng nên không thể "lưu base64
+        // rồi thay URL sau". Lưu thẳng URL CDN, fallback base64 nếu upload fail.
+        let cdnUrls = null;
+        let storedImages = images;
+        try {
+            cdnUrls = await uploadImages(images, orderUuid);
+            const cdnCount = cdnUrls.filter(u => u && u.startsWith('http')).length;
+            if (cdnCount > 0) {
+                storedImages = images.map((img, i) =>
+                    cdnUrls[i]?.startsWith('http') ? cdnUrls[i] : img);
+            }
+            console.log(`📸 Uploaded ${cdnCount}/${images.length} images to CDN`);
+        } catch (storageErr) {
+            console.warn('Storage upload failed (base64 preserved):', storageErr.message);
+        }
+
+        // STEP 2: Save images to DB
 
         // 1a. Save to order_driver_assignments (try all possible order_ids)
         let assignmentId = null;
@@ -2893,7 +2910,7 @@ router.post('/:id/add-proof-images', async (req, res) => {
                 const assignment = assignments[0];
                 assignmentId = assignment.id;
                 const existingImages = assignment.proof_images || [];
-                const updatedImages = [...existingImages, ...images].slice(0, 10);
+                const updatedImages = [...existingImages, ...storedImages].slice(0, 10);
 
                 await supabase
                     .from('order_driver_assignments')
@@ -2922,6 +2939,7 @@ router.post('/:id/add-proof-images', async (req, res) => {
             ticket = ticketData;
         } catch (e) { /* no ticket found */ }
 
+        let respPayload;
         if (!ticket) {
             // No export ticket exists - create one with images
             const ts = new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14);
@@ -2935,12 +2953,12 @@ router.post('/:id/add-proof-images', async (req, res) => {
                 plate: orderInfo?.bienSo || '',
                 warehouse: 'LT1',
                 products: orderInfo?.cart || [],
-                images: images.slice(0, 10),
+                images: storedImages.slice(0, 10),
                 note: 'Ảnh bổ sung'
             });
 
-            console.log(`✅ Created export ticket with ${images.length} images`);
-            res.json(createResponse(false, `Đã thêm ${images.length} ảnh!`));
+            console.log(`✅ Created export ticket with ${storedImages.length} images`);
+            respPayload = createResponse(false, `Đã thêm ${images.length} ảnh!`);
         } else {
             // Ticket exists - append new images
             const existingImages = ticket.images || [];
@@ -2950,7 +2968,7 @@ router.post('/:id/add-proof-images', async (req, res) => {
                 return res.json(createResponse(true, 'Đã đạt giới hạn 10 ảnh!'));
             }
 
-            const newImages = images.slice(0, totalAllowed);
+            const newImages = storedImages.slice(0, totalAllowed);
             const updatedImages = [...existingImages, ...newImages];
 
             await supabase
@@ -2959,121 +2977,52 @@ router.post('/:id/add-proof-images', async (req, res) => {
                 .eq('id', ticket.id);
 
             console.log(`✅ Appended ${newImages.length} images to ticket ${ticket.id} (${updatedImages.length}/10)`);
-            res.json(createResponse(false, `Đã thêm ${newImages.length} ảnh (${updatedImages.length}/10)!`));
+            respPayload = createResponse(false, `Đã thêm ${newImages.length} ảnh (${updatedImages.length}/10)!`);
         }
 
-        // STEP 2: BACKGROUND — Upload to Supabase Storage (CDN), replace base64, send Telegram
-        setImmediate(async () => {
-            // 2a. CDN upload (non-blocking, best-effort)
-            let cdnUrls = null;
+        // STEP 3: Đơn có link Odoo → đẩy ảnh sang Odoo (tab "Chứng từ xác thực").
+        // Chạy ĐỒNG BỘ trước res.json — serverless đóng băng mọi việc nền sau response.
+        const httpUrls = (cdnUrls || []).filter(u => u && u.startsWith('http'));
+        if (httpUrls.length > 0) {
+            await syncProofIfOdooLinked(orderSoDon, httpUrls);
+        }
+
+        // STEP 4: Send Telegram photos (chỉ batch cuối — sendTelegram flag)
+        if (sendTelegram) {
             try {
-                cdnUrls = await uploadImages(images, orderUuid);
-                const cdnCount = cdnUrls.filter(u => u.startsWith('http')).length;
-                console.log(`📸 BG: Uploaded ${cdnCount}/${images.length} images to CDN`);
+                const { sendTelegramPhotos } = await import('../services/telegram.js');
+                const orderNo = orderSoDon;
+                const customer = orderInfo?.khach || orderInfo?.account_name || '';
+                const driverName = orderInfo?.taiXe || orderInfo?.custom_field13 || '';
+                const drvPlate = orderInfo?.bienSo || orderInfo?.custom_field14 || '';
+                const assistant = orderInfo?.assistant_name || '';
 
-                if (cdnCount > 0) {
-                    // Đơn có link Odoo → đẩy ảnh sang Odoo (tab "Chứng từ xác thực")
-                    syncProofIfOdooLinked(orderSoDon, cdnUrls)
-                        .catch(e => console.warn('BG: syncProofIfOdooLinked:', e.message));
+                let caption = `✅ <b>ĐƠN ĐÃ HOÀN THÀNH</b>\n📦 Mã: <b>#${orderNo}</b>\n`;
+                caption += `👤 Khách: <b>${customer}</b>\n`;
+                if (driverName) caption += `🚛 TX: ${driverName}${drvPlate ? ` (${drvPlate})` : ''}\n`;
+                if (assistant) caption += `👷 PX: ${assistant}\n`;
+                (orderInfo?.products || orderInfo?.cart || []).forEach(p => {
+                    const pName = p.name || p.code || '';
+                    const pQty = Number(p.qty || 0);
+                    if (pName) caption += `📦 ${pName} — ${pQty.toLocaleString('vi-VN')} ${p.unit || 'Kg'}\n`;
+                });
 
-                    // Replace base64 with CDN URLs in export_tickets
-                    try {
-                        const orFilter = lookupIds.map(lid => `order_id.eq.${lid},order_no.eq.${lid}`).join(',');
-                        const { data: freshTicket } = await supabase
-                            .from('export_tickets')
-                            .select('id, images')
-                            .or(orFilter)
-                            .order('created_at', { ascending: false })
-                            .limit(1)
-                            .single();
+                // Use CDN URLs if available, otherwise fall back to original images
+                const photosToSend = (httpUrls.length ? httpUrls : images)
+                    .filter(i => i && !i.startsWith('blob:'));
 
-                        if (freshTicket) {
-                            const currentImages = freshTicket.images || [];
-                            // Replace: for each current image that's base64, find its CDN URL
-                            const updatedWithUrls = currentImages.map(img => {
-                                if (img.startsWith('http')) return img; // Already CDN
-                                // Find matching base64 in the batch we just uploaded
-                                const idx = images.indexOf(img);
-                                if (idx >= 0 && cdnUrls[idx]?.startsWith('http')) return cdnUrls[idx];
-                                return img; // Keep as-is if no match
-                            });
-
-                            await supabase.from('export_tickets')
-                                .update({ images: updatedWithUrls })
-                                .eq('id', freshTicket.id);
-                            console.log(`📸 BG: Replaced base64 with CDN in export_ticket ${freshTicket.id}`);
-                        }
-                    } catch (bgErr) {
-                        console.warn('BG: CDN URL replacement in export_tickets failed:', bgErr.message);
-                    }
-
-                    // Also replace in assignment proof_images
-                    if (assignmentId) {
-                        try {
-                            const { data: freshAssign } = await supabase
-                                .from('order_driver_assignments')
-                                .select('id, proof_images')
-                                .eq('id', assignmentId)
-                                .single();
-
-                            if (freshAssign) {
-                                const currentImgs = freshAssign.proof_images || [];
-                                const updatedAssignImgs = currentImgs.map(img => {
-                                    if (img.startsWith('http')) return img;
-                                    const idx = images.indexOf(img);
-                                    if (idx >= 0 && cdnUrls[idx]?.startsWith('http')) return cdnUrls[idx];
-                                    return img;
-                                });
-
-                                await supabase.from('order_driver_assignments')
-                                    .update({ proof_images: updatedAssignImgs })
-                                    .eq('id', assignmentId);
-                                console.log(`📸 BG: Replaced base64 with CDN in assignment ${assignmentId}`);
-                            }
-                        } catch (bgErr) {
-                            console.warn('BG: CDN URL replacement in assignments failed:', bgErr.message);
-                        }
-                    }
+                if (photosToSend.length > 0) {
+                    await sendTelegramPhotos(photosToSend, caption, 'XUAT');
+                    console.log(`📨 Telegram: ${photosToSend.length} proof photos sent for ${orderNo}`);
+                } else {
+                    console.warn(`⚠️ No valid images for Telegram on order ${orderNo}`);
                 }
-            } catch (storageErr) {
-                console.warn('BG: Storage upload failed (base64 preserved):', storageErr.message);
+            } catch (tgErr) {
+                console.error('Telegram photo send failed:', tgErr.message);
             }
+        }
 
-            // 2b. Send Telegram photos
-            if (sendTelegram) {
-                try {
-                    const { sendTelegramPhotos } = await import('../services/telegram.js');
-                    const orderNo = orderSoDon;
-                    const customer = orderInfo?.khach || orderInfo?.account_name || '';
-                    const driverName = orderInfo?.taiXe || orderInfo?.custom_field13 || '';
-                    const drvPlate = orderInfo?.bienSo || orderInfo?.custom_field14 || '';
-                    const assistant = orderInfo?.assistant_name || '';
-
-                    let caption = `✅ <b>ĐƠN ĐÃ HOÀN THÀNH</b>\n📦 Mã: <b>#${orderNo}</b>\n`;
-                    caption += `👤 Khách: <b>${customer}</b>\n`;
-                    if (driverName) caption += `🚛 TX: ${driverName}${drvPlate ? ` (${drvPlate})` : ''}\n`;
-                    if (assistant) caption += `👷 PX: ${assistant}\n`;
-                    (orderInfo?.products || orderInfo?.cart || []).forEach(p => {
-                        const pName = p.name || p.code || '';
-                        const pQty = Number(p.qty || 0);
-                        if (pName) caption += `📦 ${pName} — ${pQty.toLocaleString('vi-VN')} ${p.unit || 'Kg'}\n`;
-                    });
-
-                    // Use CDN URLs if available, otherwise fall back to original images
-                    const photosToSend = (cdnUrls || images)
-                        .filter(i => i && !i.startsWith('blob:'));
-
-                    if (photosToSend.length > 0) {
-                        await sendTelegramPhotos(photosToSend, caption, 'XUAT');
-                        console.log(`📨 Telegram: ${photosToSend.length} proof photos sent for ${orderNo}`);
-                    } else {
-                        console.warn(`⚠️ No valid images for Telegram on order ${orderNo}`);
-                    }
-                } catch (tgErr) {
-                    console.error('BG: Telegram photo send failed:', tgErr.message);
-                }
-            }
-        });
+        return res.json(respPayload);
 
     } catch (e) {
         console.error('Add proof images error:', e.message);
