@@ -746,10 +746,17 @@ router.get('/changed-since/:ts', async (req, res) => {
 
         if (error) throw error;
 
+        const orders = data || [];
+        // cutoff = mốc TIẾN TỚI cho lần pull kế tiếp: synced_at lớn nhất đã thấy
+        // (orders sort tăng dần theo synced_at). Trước đây trả `since` (echo query)
+        // → cửa sổ KHÔNG nhích, cron Odoo pull lặp mãi 1 window. Rỗng → now().
+        const cutoff = orders.length
+            ? orders[orders.length - 1].synced_at
+            : new Date().toISOString();
         return res.json({
-            orders: data || [],
-            cutoff: since,
-            count: (data || []).length,
+            orders,
+            cutoff,
+            count: orders.length,
         });
     } catch (e) {
         console.error('[odoo-orders] changed-since fail:', e.message);
