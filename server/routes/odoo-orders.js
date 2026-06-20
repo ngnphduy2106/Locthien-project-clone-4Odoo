@@ -55,8 +55,15 @@ async function handlePull(req, res) {
         console.log(`[odoo-orders/pull] done in ${ms}ms`, r);
         return res.json({ error: false, msg: 'pull done', ms, ...r });
     } catch (e) {
-        console.error('[odoo-orders/pull] fail:', e.message);
-        return res.status(500).json({ error: true, msg: e.message, ms: Date.now() - t0 });
+        // "fetch failed" của undici giấu nguyên nhân thật trong e.cause — surface ra
+        // để chẩn đoán reachability (ENOTFOUND=DNS, ECONNREFUSED=sai host/localhost,
+        // ETIMEDOUT/UND_ERR_CONNECT_TIMEOUT=firewall/routing).
+        let odooHost;
+        try { odooHost = new URL(process.env.ODOO_URL).host; }
+        catch { odooHost = process.env.ODOO_URL || '(empty)'; }
+        const cause = e.cause?.code || e.cause?.message || null;
+        console.error('[odoo-orders/pull] fail:', e.message, '| cause:', cause, '| odooHost:', odooHost);
+        return res.status(500).json({ error: true, msg: e.message, cause, odooHost, ms: Date.now() - t0 });
     }
 }
 

@@ -98,8 +98,13 @@ apiRouter.post('/sync', async (req, res) => {
         const r = await manualOdooSync.incrementalSync();
         res.json({ success: true, message: 'Đồng bộ Odoo hoàn tất!', ...r });
     } catch (e) {
-        console.error('[/api/sync] fail:', e.message);
-        res.status(500).json({ success: false, error: e.message });
+        // surface e.cause để chẩn đoán reachability Vercel→Odoo (ENOTFOUND/ECONNREFUSED/ETIMEDOUT)
+        const cause = e.cause?.code || e.cause?.message || null;
+        let odooHost;
+        try { odooHost = new URL(process.env.ODOO_URL).host; }
+        catch { odooHost = process.env.ODOO_URL ? '(set, unparseable)' : '(empty)'; }
+        console.error('[/api/sync] fail:', e.message, '| cause:', cause, '| odooHost:', odooHost);
+        res.status(500).json({ success: false, error: e.message, cause, odooHost });
     }
 });
 
