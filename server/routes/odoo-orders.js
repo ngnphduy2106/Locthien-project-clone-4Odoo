@@ -5,13 +5,63 @@
 // → `window.api.getOdooOrders` là chạy.
 // ===============================================
 
+import crypto from 'node:crypto';
 import { Router } from 'express';
 import { supabase } from '../db/supabase.js';
 import * as odoo from '../integration/odoo/odoo-client.js';
 import { uploadImages } from '../services/storage.js';
 import { pushProofToOdoo, saveProofUrls } from '../services/odoo-proof.js';
+import { createSyncService } from '../integration/sync/sync-service.js';
+import { supabaseHooks } from '../integration/supabase-hooks.js';
 
 const router = Router();
+
+// Layer 3 (inbound): ERP chủ động pull đơn mới/đổi từ Odoo về Supabase.
+// Tái dùng máy móc incrementalSync (đọc cursor odoo_sync_state → listOrdersSince
+// → upsert). Tạo 1 lần ở module scope; mỗi cold-start serverless là instance mới
+// nên an toàn (incrementalSync idempotent theo odoo_id).
+const odooSync = createSyncService(supabaseHooks);
+
+/**
+ * Layer 3 endpoint (chiều ngược lại của /changed-since): trigger ERP kéo đơn
+ * mới/đổi TỪ Odoo về. Chạy MỘT lần incrementalSync ĐỒNG BỘ trong request rồi
+ * mới res.json — bắt buộc trên serverless (mọi việc nền sau response bị đóng băng).
+ *
+ * POST|GET /api/odoo-orders/pull
+ *   Auth: header `x-sync-token` hoặc query `?token=` phải khớp WEBHOOK_SECRET.
+ * Gọi bởi: Netlify Scheduled Function (functions/odoo-pull.mjs), Odoo ir.cron,
+ *          external cron, hoặc thủ công.
+ *
+ * ĐĂNG KÝ TRƯỚC route động `/:odooId` bên dưới — nếu không `GET /pull` sẽ bị
+ * `/:odooId` (odooId="pull") nuốt.
+ */
+function pullTokenOk(req) {
+    const expected = process.env.SYNC_TRIGGER_TOKEN || process.env.WEBHOOK_SECRET || '';
+    const got = req.get('x-sync-token') || req.query.token || '';
+    if (!expected) return false; // chưa cấu hình token → từ chối (fail-safe)
+    const a = Buffer.from(String(got));
+    const b = Buffer.from(String(expected));
+    return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+async function handlePull(req, res) {
+    if (!pullTokenOk(req)) {
+        return res.status(401).json({ error: true, msg: 'unauthorized' });
+    }
+    const t0 = Date.now();
+    try {
+        const r = await odooSync.incrementalSync();
+        const ms = Date.now() - t0;
+        console.log(`[odoo-orders/pull] done in ${ms}ms`, r);
+        return res.json({ error: false, msg: 'pull done', ms, ...r });
+    } catch (e) {
+        console.error('[odoo-orders/pull] fail:', e.message);
+        return res.status(500).json({ error: true, msg: e.message, ms: Date.now() - t0 });
+    }
+}
+
+router.post('/pull', handlePull);
+router.get('/pull', handlePull); // tiện cho external cron / kiểm thử nhanh bằng GET
 
 // ---- Map x_lt_status Odoo → status frontend filter ----
 function mapStatus(x) {

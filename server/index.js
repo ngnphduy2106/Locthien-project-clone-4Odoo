@@ -88,23 +88,17 @@ apiRouter.use('/system', systemRoutes);
 apiRouter.use('/odoo-orders', odooOrdersRoutes);
 apiRouter.use('/odoo-purchase-orders', odooPurchaseOrdersRoutes);
 
-// Manual Sync Endpoint (Two-way: Pull New & Push Pending)
+// Manual Sync Endpoint — KÉO đơn mới/đổi từ Odoo (nút "Đồng bộ" trên UI).
+// Trước đây gọi syncMisaOrders() (MISA legacy đã tắt) nên không bao giờ kéo Odoo.
+// Nay chạy incrementalSync() Odoo — cùng máy móc với Scheduled Function & /api/odoo-orders/pull.
+const manualOdooSync = createSyncService(supabaseHooks);
 apiRouter.post('/sync', async (req, res) => {
-    if (getSyncStatus()) { // Check mismatching logic: using the helper
-        return res.json({ success: false, error: 'Tiến trình đồng bộ đang chạy, vui lòng thử lại sau.' });
-    }
-
     try {
-        console.log('⚡ Two-way Sync Triggered...');
-
-        // 1. Pull from MISA (Sync wrapper handles locking)
-        await syncMisaOrders();
-
-        // 2. Extra Push for failed ones
-        await retryFailedSyncs();
-
-        res.json({ success: true, message: `Đồng bộ hoàn tất! Đã kiểm tra và đẩy lại các đơn kẹt.` });
+        console.log('⚡ Manual Odoo incremental sync triggered...');
+        const r = await manualOdooSync.incrementalSync();
+        res.json({ success: true, message: 'Đồng bộ Odoo hoàn tất!', ...r });
     } catch (e) {
+        console.error('[/api/sync] fail:', e.message);
         res.status(500).json({ success: false, error: e.message });
     }
 });

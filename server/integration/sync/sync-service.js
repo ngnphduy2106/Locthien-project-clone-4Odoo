@@ -150,11 +150,15 @@ export function createSyncService(hooks = {}) {
     console.log('=== ODOO BOOTSTRAP DONE ===');
   }
 
-  /** Chỉ pull thay đổi mới — chống chồng lần chạy bằng cờ `running`. */
+  /**
+   * Chỉ pull thay đổi mới — chống chồng lần chạy bằng cờ `running`.
+   * Trả về `{ skipped, since, partners, products, orders, purchaseOrders }` để
+   * caller (endpoint /pull, scheduled function) báo summary.
+   */
   async function incrementalSync() {
     if (running) {
       console.warn('[sync] lần trước chưa xong, skip');
-      return;
+      return { skipped: true };
     }
     running = true;
     try {
@@ -163,12 +167,13 @@ export function createSyncService(hooks = {}) {
       console.log(`[sync] since=${since}`);
       const now = nowUtc();
 
-      await paginateSince(odoo.listPartnersSince,       since, 'partners',        onPartner);
-      await paginateSince(odoo.listProductsSince,       since, 'products',        onProduct);
-      await paginateSince(odoo.listOrdersSince,         since, 'sale orders',     onOrder);
-      await paginateSince(odoo.listPurchaseOrdersSince, since, 'purchase orders', onPurchaseOrder);
+      const partners        = await paginateSince(odoo.listPartnersSince,       since, 'partners',        onPartner);
+      const products        = await paginateSince(odoo.listProductsSince,       since, 'products',        onProduct);
+      const orders          = await paginateSince(odoo.listOrdersSince,         since, 'sale orders',     onOrder);
+      const purchaseOrders  = await paginateSince(odoo.listPurchaseOrdersSince, since, 'purchase orders', onPurchaseOrder);
 
       await saveLastSyncDate(now);
+      return { skipped: false, since, partners, products, orders, purchaseOrders };
     } finally {
       running = false;
     }

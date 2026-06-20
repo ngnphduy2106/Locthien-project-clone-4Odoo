@@ -5,6 +5,11 @@
 [functions]
   node_bundler = "esbuild"
 
+# Scheduled Function: ERP chủ động pull đơn mới/đổi từ Odoo mỗi 2 phút
+# (lưới an toàn Layer-3 inbound — xem functions/odoo-pull.mjs).
+[functions."odoo-pull"]
+  schedule = "*/2 * * * *"
+
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/api/:splat"

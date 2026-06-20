@@ -290,6 +290,14 @@ export async function getLastSyncDate() {
 }
 
 export async function saveLastSyncDate(iso) {
+  // Monotonic: chỉ ghi nếu mốc mới TIẾN TỚI. Trên serverless 2 lần pull có thể
+  // chạy chồng; nếu lần bắt đầu sớm kết thúc muộn, nó sẽ ghi đè cursor LÙI về
+  // quá khứ → lần sau pull thừa (vô hại vì upsert idempotent, nhưng tốn công).
+  // Format cursor "yyyy-MM-dd HH:mm:ss" cố định nên so sánh chuỗi = so sánh thời gian.
+  const current = await getLastSyncDate();
+  if (current && String(iso) <= String(current)) {
+    return; // không lùi cursor
+  }
   const { error } = await supabase
     .from('odoo_sync_state')
     .upsert({ key: 'last_sync', value: iso, updated_at: new Date().toISOString() },
