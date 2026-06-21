@@ -1743,7 +1743,7 @@ function renderImportList() {
                             </button>
                             ${state.currentDispatchTab === 'pending' ? `
                                 <button class="btn btn-info btn-sm"
-                                    onclick="${isOdooPo ? `assignOdooPickupDriverModal(${imp.odoo_id})` : `assignImportDriver('${imp.id}')`}"
+                                    onclick="assignImportDriver('${imp.id}')"
                                     style="padding:2px; font-size:9px; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center;"
                                     title="Phân công tài xế">
                                     <i class="bi bi-person-plus"></i>
@@ -6922,11 +6922,11 @@ async function viewImportDetail(importId) {
             <div style="margin-top:20px; padding-top:16px; border-top:1px solid var(--border); display:flex; gap:8px; flex-wrap:wrap;">
                 ${isOdooPo ? `
                     ${imp.status === 'pending' ? `
-                    <button class="btn btn-primary" onclick="closeOrderModal(); assignOdooPickupDriverModal(${imp.odoo_id})">
+                    <button class="btn btn-primary" onclick="closeOrderModal(); assignImportDriver('${imp.id}')">
                         <i class="bi bi-person-plus"></i> Phân công tài xế
                     </button>` : ''}
                     ${imp.status === 'assigned' && isAdminRole() ? `
-                    <button class="btn btn-info" onclick="closeOrderModal(); assignOdooPickupDriverModal(${imp.odoo_id})" style="background:var(--info); color:white;">
+                    <button class="btn btn-info" onclick="closeOrderModal(); assignImportDriver('${imp.id}')" style="background:var(--info); color:white;">
                         <i class="bi bi-person-gear"></i> Đổi tài xế
                     </button>` : ''}
                 ` : `
@@ -6986,6 +6986,27 @@ async function assignImportDriver(importId) {
 
     // Store current import ID for assignment
     state.currentAssignImportId = importId;
+
+    // Odoo PO: list chỉ có header (không có order_line). Fetch detail để form điều phối
+    // hiển thị đầy đủ sản phẩm + địa chỉ lấy hàng — giống hệt phiếu nhập tay.
+    if (imp._source === 'odoo_po' && (!imp.products || imp.products.length === 0)) {
+        try {
+            const r = await fetch(`/api/odoo-purchase-orders/${imp.odoo_id}`).then(r => r.json());
+            const o = r.order || {};
+            if (Array.isArray(o.products) && o.products.length) {
+                imp.products = o.products.map(p => ({
+                    name:  p.name || p.description || p.code || '',
+                    code:  p.code || '',
+                    qty:   p.qty || p.quantity || 0,
+                    unit:  p.unit || 'kg',
+                    price: p.price_unit || 0,
+                }));
+            }
+            if (!imp.supplier_address && o.supplier_address) imp.supplier_address = o.supplier_address;
+        } catch (e) {
+            console.warn('[odoo-po] Load detail for dispatch form failed:', e.message);
+        }
+    }
 
     // Calculate total qty from products (handle JSON string)
     let products = imp.products || imp.cart || [];
@@ -7055,7 +7076,7 @@ async function assignImportDriver(importId) {
     const modalBody = window.$('#modal-order-body');
     const modalTitle = window.$('#modal-order-title');
 
-    if (modalTitle) modalTitle.textContent = `Phân công tài xế - Phiếu nhập #${imp.ticket_no || imp.id}`;
+    if (modalTitle) modalTitle.textContent = `Phân công tài xế - ${imp._source === 'odoo_po' ? 'Đơn mua' : 'Phiếu nhập'} #${imp.ticket_no || imp.id}`;
 
     if (modalBody) {
         modalBody.innerHTML = `
