@@ -11,6 +11,11 @@ import { uploadImages } from '../services/storage.js';
 import { syncProofIfOdooLinked } from '../services/odoo-proof.js';
 import { createNotification } from './notifications.js';
 
+// Cột is_pinned trong DB là TEXT, lưu chuỗi "true"/"false"/"False" (không phải boolean).
+// Trong JS chuỗi "false"/"False" là TRUTHY → frontend tưởng đơn đã ghim và KHÔNG bỏ ghim
+// được. Ép về boolean thật trước khi trả cho frontend (chỉ "true"/t/1/yes mới là ghim).
+const pinBool = (v) => v === true || v === 1 || (typeof v === 'string' && ['true', 't', '1', 'yes'].includes(v.trim().toLowerCase()));
+
 // AUDIT: Log all status changes to order_status_log table for debugging
 // Fire-and-forget — never blocks the main operation
 function logStatusChange(orderId, oldStatus, newStatus, changedBy, reason) {
@@ -92,7 +97,7 @@ router.get('/', async (req, res) => {
                 delivery_time: o.delivery_time || '',
                 assistant_name: o.assistant_name || '',
                 merged_order_no: o.merged_order_no || '',
-                is_pinned: o.is_pinned || false,
+                is_pinned: pinBool(o.is_pinned),
                 products: o.products || o.cart || [],
                 completed_at: o.completed_at || o.updated_at || ''
             }));
@@ -161,7 +166,7 @@ router.get('/', async (req, res) => {
                     creator_name: o.owner_name || '',
                     products,
                     cart: products,
-                    is_pinned: o.is_pinned || false
+                    is_pinned: pinBool(o.is_pinned)
                 };
             });
         } else {
@@ -502,7 +507,7 @@ router.get('/my/:driverName', async (req, res) => {
                         misa_note: o.description || '',
                         creator_name: o.owner_name || '',
                         products, cart: products,
-                        is_pinned: o.is_pinned || false
+                        is_pinned: pinBool(o.is_pinned)
                     };
                 });
 

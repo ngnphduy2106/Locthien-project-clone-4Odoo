@@ -203,8 +203,9 @@ export const db = {
                     // Products
                     products: products,
                     cart: products,
-                    // Pin status for sorting
-                    is_pinned: o.is_pinned || false
+                    // Pin status for sorting. Cột DB là TEXT lưu "true"/"false"/"False";
+                    // chuỗi "false" là truthy trong JS → ép boolean thật (chỉ "true" mới ghim).
+                    is_pinned: (o.is_pinned === true || String(o.is_pinned).trim().toLowerCase() === 'true')
                 };
             });
         }

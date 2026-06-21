@@ -10,6 +10,11 @@ import { createNotification } from './notifications.js';
 
 const router = Router();
 
+// Cột is_pinned trong DB là TEXT, lưu chuỗi "true"/"false"/"False" (không phải boolean).
+// Trong JS chuỗi "false"/"False" là TRUTHY → frontend tưởng phiếu đã ghim và KHÔNG bỏ ghim
+// được. Ép về boolean thật trước khi trả cho frontend (chỉ "true"/t/1/yes mới là ghim).
+const pinBool = (v) => v === true || v === 1 || (typeof v === 'string' && ['true', 't', '1', 'yes'].includes(v.trim().toLowerCase()));
+
 // Helper: Create Telegram mention tag (same as orders.js)
 function getTelegramTag(telegramUsername, telegramUserId, displayName) {
     if (telegramUserId) {
@@ -74,7 +79,7 @@ router.get('/', async (req, res) => {
             return res.json({
                 error: false,
                 tab: 'completed',
-                data: data || [],
+                data: (data || []).map(d => ({ ...d, is_pinned: pinBool(d.is_pinned) })),
                 pagination: { page, limit, total, totalPages, hasNext: page < totalPages }
             });
         }
@@ -131,6 +136,9 @@ router.get('/', async (req, res) => {
                 .eq('status', 'completed');
             completedCount = count || 0;
         } catch (e) { /* ignore */ }
+
+        // Ép is_pinned về boolean thật (cột TEXT lưu chuỗi "false"/"False" → truthy gây kẹt ghim)
+        for (const imp of imports) imp.is_pinned = pinBool(imp.is_pinned);
 
         res.json({
             error: false,
