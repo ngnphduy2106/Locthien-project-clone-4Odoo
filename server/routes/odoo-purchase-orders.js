@@ -116,6 +116,26 @@ router.get('/:poId', async (req, res) => {
             .maybeSingle();
         if (error) throw error;
         if (!data) return res.status(404).json({ error: true, msg: 'Not found' });
+
+        // Lazy-load: PO sync qua cron/pull chỉ có header (không có order_line). Nếu chưa có
+        // chi tiết sản phẩm thì kéo live từ Odoo (get_lt_po_dispatch_detail) rồi cache lại.
+        if (!data.detail || !data.detail.lines || data.detail.lines.length === 0) {
+            try {
+                console.log(`[odoo-po] Lazy-loading detail for PO ${id} from Odoo...`);
+                const fullDetail = await odoo.getPurchaseOrderDetail(id);
+                if (fullDetail && fullDetail.lines && fullDetail.lines.length > 0) {
+                    data.detail = fullDetail;
+                    await supabase
+                        .from('odoo_purchase_orders')
+                        .update({ detail: fullDetail })
+                        .eq('odoo_id', id);
+                    console.log(`[odoo-po] Cached detail for PO ${id} (${fullDetail.lines.length} dòng).`);
+                }
+            } catch (odooErr) {
+                console.error(`[odoo-po] Lazy-loading detail failed for PO ${id}:`, odooErr.message);
+            }
+        }
+
         return res.json({ error: false, order: toFrontend(data) });
     } catch (e) {
         return res.json({ error: true, msg: e.message });
