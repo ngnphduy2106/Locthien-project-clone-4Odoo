@@ -29,8 +29,7 @@ const odooSync = createSyncService(supabaseHooks);
  *
  * POST|GET /api/odoo-orders/pull
  *   Auth: header `x-sync-token` hoặc query `?token=` phải khớp WEBHOOK_SECRET.
- * Gọi bởi: Netlify Scheduled Function (functions/odoo-pull.mjs), Odoo ir.cron,
- *          external cron, hoặc thủ công.
+ * Gọi bởi: Odoo ir.cron, external cron, hoặc thủ công (mỗi 2-3 phút — lưới tự chữa).
  *
  * ĐĂNG KÝ TRƯỚC route động `/:odooId` bên dưới — nếu không `GET /pull` sẽ bị
  * `/:odooId` (odooId="pull") nuốt.

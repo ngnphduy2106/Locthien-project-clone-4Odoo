@@ -127,7 +127,7 @@ Lộc Thiên ERP là giải pháp quản lý toàn diện cho ngành kinh doanh 
 - ✅ **Supabase**: Database realtime
 - ✅ **Firebase**: Push notifications
 - ✅ **Telegram Bot**: Thông báo tự động
-- ✅ **Netlify Functions**: Serverless deployment
+- ✅ **Vercel**: Serverless deployment
 
 ---
 
@@ -141,7 +141,7 @@ Lộc Thiên ERP là giải pháp quản lý toàn diện cho ngành kinh doanh 
 | **Auth** | Custom authentication với phone number |
 | **CRM** | MISA CRM API Integration |
 | **Notifications** | Firebase Cloud Messaging, Telegram Bot |
-| **Hosting** | Netlify (Serverless Functions) |
+| **Hosting** | Vercel (Serverless Functions) |
 
 ---
 
@@ -242,7 +242,6 @@ loc-thien-scm/
 │           ├── create-order.js     # Create import order module
 │           ├── suppliers.js        # Supplier management module
 │           └── customers.js        # Customer management module
-├── functions/                      # Netlify serverless functions
 └── src/                            # (Legacy) Google Apps Script code
 ```
 

@@ -13,7 +13,7 @@ const getApiBase = () => {
     if (savedApi) return savedApi;
 
     // 3. Fallback to default
-    // If running on localhost or Netlify, use relative /api
+    // If running on localhost or Vercel, use relative /api
     return '/api';
 };
 
