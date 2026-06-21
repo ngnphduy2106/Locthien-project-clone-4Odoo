@@ -163,6 +163,15 @@ const api = {
         return res.json();
     },
 
+    pinOdooPurchaseOrder: async (odooId, isPinned) => {
+        const res = await fetch(`${API_BASE}/odoo-purchase-orders/${odooId}/pin`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ is_pinned: isPinned })
+        });
+        return res.json();
+    },
+
     assignOrder: async (id, driverName, plate, note, assistantName = null, deliveryTime = null) => {
         const res = await fetch(`${API_BASE}/orders/${id}/assign`, {
             method: 'PUT',

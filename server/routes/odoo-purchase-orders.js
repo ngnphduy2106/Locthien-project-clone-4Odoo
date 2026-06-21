@@ -25,6 +25,10 @@ function mapStatus(x) {
     }
 }
 
+// is_pinned: cột boolean của odoo_purchase_orders (thêm bằng ALTER TABLE). Ép boolean
+// thật phòng trường hợp lưu chuỗi "false"/"False" (truthy trong JS) như bảng cũ.
+const pinBool = (v) => v === true || v === 1 || (typeof v === 'string' && ['true', 't', '1', 'yes'].includes(v.trim().toLowerCase()));
+
 function toFrontend(row) {
     const detail = row.detail || {};
     const lines  = detail.lines || [];
@@ -78,6 +82,7 @@ function toFrontend(row) {
         created_date:        row.date_order,
         write_date:          row.write_date,
         synced_at:           row.synced_at,
+        is_pinned:           pinBool(row.is_pinned),
     };
 }
 
@@ -212,28 +217,47 @@ router.post('/:poId/received', async (req, res) => {
 
         if (dbErr) throw dbErr;
 
-        // Trả lời ngay — ảnh xử lý background
-        res.json({
+        // Ảnh xử lý ĐỒNG BỘ trước khi trả lời — serverless (Vercel) đóng băng mọi việc
+        // nền (setImmediate) sau res.json nên không bao giờ chạy.
+        if (images.length > 0) {
+            try {
+                const urls = await uploadImages(images, `odoo_po_${id}`);
+                const r = await pushProofToOdoo('purchase.order', id, images);
+                console.log(`📸 [odoo-po] received#${id}: ${images.length} ảnh | CDN ${urls.filter(u => u.startsWith('http')).length} | Odoo pushed ${r.pushed}/${images.length}`);
+            } catch (proofErr) {
+                console.error(`⚠️ [odoo-po] proof #${id} fail:`, proofErr.message);
+            }
+        }
+
+        return res.json({
             error: false,
             msg: odooFailed
                 ? 'Đã đánh dấu nhận hàng trên ERP (Không thể kết nối Odoo)'
                 : 'Đã đánh dấu nhận đủ'
         });
-
-        if (images.length > 0) {
-            setImmediate(async () => {
-                try {
-                    const urls = await uploadImages(images, `odoo_po_${id}`);
-                    const r = await pushProofToOdoo('purchase.order', id, images);
-                    console.log(`📸 [odoo-po] received#${id}: ${images.length} ảnh | CDN ${urls.filter(u => u.startsWith('http')).length} | Odoo pushed ${r.pushed}/${images.length}`);
-                } catch (bgErr) {
-                    console.error(`⚠️ [odoo-po] BG proof #${id} fail:`, bgErr.message);
-                }
-            });
-        }
-        return;
     } catch (e) {
         return res.status(500).json({ error: true, msg: e.message });
+    }
+});
+
+// PUT /api/odoo-purchase-orders/:poId/pin — ghim/bỏ ghim đơn mua Odoo
+// Yêu cầu cột boolean `is_pinned` trên odoo_purchase_orders:
+//   ALTER TABLE odoo_purchase_orders ADD COLUMN IF NOT EXISTS is_pinned boolean DEFAULT false;
+router.put('/:poId/pin', async (req, res) => {
+    try {
+        const id = parseInt(req.params.poId, 10);
+        const { is_pinned } = req.body;
+        const { error } = await supabase
+            .from('odoo_purchase_orders')
+            .update({ is_pinned: is_pinned === true })
+            .eq('odoo_id', id);
+        if (error) {
+            return res.json({ error: true, msg: 'Lỗi ghim đơn mua: ' + error.message });
+        }
+        console.log(`📌 Odoo PO ${id} pinned: ${is_pinned === true}`);
+        return res.json({ error: false, msg: is_pinned ? 'Đã ghim đơn mua!' : 'Đã bỏ ghim đơn mua!' });
+    } catch (e) {
+        return res.json({ error: true, msg: e.message });
     }
 });
 

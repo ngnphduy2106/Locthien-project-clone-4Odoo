@@ -1559,6 +1559,7 @@ function _normalizePurchaseOrder(po) {
         description:     po.note || '',   // hiển thị ở trường Mô tả
         note:            '',              // ghi chú riêng (trống với Odoo PO)
         x_lt_po_status:  rawStatus,
+        is_pinned:       po.is_pinned === true,
     };
 }
 
@@ -1737,7 +1738,7 @@ function renderImportList() {
                         <span class="badge badge-${getStatusBadge(imp.status)}" style="font-size:9px; padding:2px 5px; white-space:nowrap;">${getStatusText(imp.status)}</span>
                         ${!isOdooPo && imp.merged_order_no ? (() => { const sibs = getMergedSiblings(imp.merged_order_no, imp.id); return `<span style="background:linear-gradient(135deg, #3b82f6, #2563eb); color:white; padding:1px 5px; border-radius:8px; font-size:8px; font-weight:600; white-space:nowrap;" title="${sibs.join(', ')}"><i class="bi bi-link-45deg"></i> Ghép: ${sibs.join(', ')}</span>`; })() : ''}
                         <div style="display:flex; gap:3px; flex-shrink:0;" onclick="event.stopPropagation()">
-                            ${!isOdooPo ? `<button class="btn ${imp.is_pinned ? 'btn-warning' : 'btn-outline'} btn-sm" onclick="toggleImportPin('${imp.id}', ${!imp.is_pinned})" style="padding:2px; font-size:9px; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center;" title="${imp.is_pinned ? 'Bỏ ghim' : 'Ghim đơn'}"><i class="bi bi-pin${imp.is_pinned ? '-fill' : ''}"></i></button>` : ''}
+                            <button class="btn ${imp.is_pinned ? 'btn-warning' : 'btn-outline'} btn-sm" onclick="${isOdooPo ? `toggleOdooPoPin(${imp.odoo_id}, ${!imp.is_pinned})` : `toggleImportPin('${imp.id}', ${!imp.is_pinned})`}" style="padding:2px; font-size:9px; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center;" title="${imp.is_pinned ? 'Bỏ ghim' : 'Ghim đơn'}"><i class="bi bi-pin${imp.is_pinned ? '-fill' : ''}"></i></button>
                             <button class="btn btn-outline btn-sm" onclick="${clickFn}" style="padding:2px; font-size:9px; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center;">
                                 <i class="bi bi-eye"></i>
                             </button>
@@ -1749,11 +1750,11 @@ function renderImportList() {
                                     <i class="bi bi-person-plus"></i>
                                 </button>
                             ` : ''}
-                            ${!isOdooPo && state.currentDispatchTab === 'assigned' && isAdminRole() ? `
+                            ${state.currentDispatchTab === 'assigned' && isAdminRole() ? `
                                 <button class="btn btn-success btn-sm" onclick="showImportCompletionModal('${imp.id}')" style="padding:2px; font-size:9px; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center;" title="Hoàn thành">
                                     <i class="bi bi-check"></i>
                                 </button>
-                                ${imp.has_external_driver ? `
+                                ${!isOdooPo && imp.has_external_driver ? `
                                 <button class="btn btn-outline btn-sm" onclick="quickEditDriver('${imp.id}', '${imp.ticket_no || imp.id}', true)" style="padding:2px; font-size:9px; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center;" title="Sửa tài xế ngoài">
                                     <i class="bi bi-pencil"></i>
                                 </button>
@@ -2145,6 +2146,22 @@ async function toggleImportPin(importId, isPinned) {
         alert('Không thể ghim/bỏ ghim phiếu nhập');
     }
 }
+
+// Toggle pin status for an Odoo purchase order (đơn mua)
+async function toggleOdooPoPin(odooId, isPinned) {
+    try {
+        const res = await window.api.pinOdooPurchaseOrder(odooId, isPinned);
+        if (res.error) {
+            alert('Lỗi: ' + (res.msg || res.message || 'Không thể ghim đơn mua'));
+            return;
+        }
+        loadImportTickets();
+    } catch (error) {
+        console.error('Error toggling Odoo PO pin:', error);
+        alert('Không thể ghim/bỏ ghim đơn mua');
+    }
+}
+window.toggleOdooPoPin = toggleOdooPoPin;
 
 
 // === CREATE ORDER ===
@@ -9828,7 +9845,7 @@ window.compressImage = compressImage;
 // IMPORT COMPLETION MODAL (giống Export)
 // ===============================================
 
-function showImportCompletionModal(importId, assignmentId = null) {
+async function showImportCompletionModal(importId, assignmentId = null) {
     // Find import from all lists including myOrders
     const allImports = [
         ...(state.imports?.pending || []),
@@ -9844,6 +9861,23 @@ function showImportCompletionModal(importId, assignmentId = null) {
     if (!imp) {
         alert('Không tìm thấy phiếu nhập!');
         return;
+    }
+
+    // Odoo PO: list chỉ có header → fetch chi tiết sản phẩm để modal hoàn thành hiện đủ
+    // (giống form điều phối). Đơn nhập tay đã có products sẵn.
+    if (imp._source === 'odoo_po' && (!imp.products || imp.products.length === 0)) {
+        try {
+            const r = await fetch(`/api/odoo-purchase-orders/${imp.odoo_id}`).then(r => r.json());
+            const o = r.order || {};
+            if (Array.isArray(o.products) && o.products.length) {
+                imp.products = o.products.map(p => ({
+                    name: p.name || p.description || p.code || '',
+                    code: p.code || '',
+                    qty:  p.qty || p.quantity || 0,
+                    unit: p.unit || 'kg',
+                }));
+            }
+        } catch (e) { console.warn('[odoo-po] load products for completion failed:', e.message); }
     }
 
     // Reset images and local items
@@ -10069,6 +10103,30 @@ async function submitImportCompletion() {
     }
 
     showLoading('Đang xử lý hoàn thành phiếu nhập...');
+
+    // Đơn mua Odoo: hoàn thành = đánh dấu đã nhận (mark received) + ảnh proof → endpoint riêng.
+    if (imp._source === 'odoo_po') {
+        try {
+            const res = await fetch(`/api/odoo-purchase-orders/${imp.odoo_id}/received`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ images: completionImages || [] })
+            });
+            const data = await res.json();
+            hideLoading();
+            if (data.error) { alert('Lỗi: ' + (data.msg || 'Không thể hoàn thành')); return; }
+            alert(data.msg || 'Đã hoàn thành đơn mua!');
+            closeOrderModal();
+            loadImportTickets();
+            completionLocalItems = [];
+            state.currentCompletionImport = null;
+            return;
+        } catch (e) {
+            hideLoading();
+            alert('Lỗi kết nối: ' + e.message);
+            return;
+        }
+    }
 
     try {
         // Get driver info from localStorage
