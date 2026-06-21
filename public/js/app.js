@@ -10094,6 +10094,14 @@ async function submitImportCompletion() {
         return;
     }
 
+    // BẮT BUỘC ít nhất 1 ảnh minh chứng (cả đơn nhập tay lẫn đơn mua Odoo).
+    // Đếm <img> trong gallery: legacy = ảnh đã upload server; Odoo PO = ảnh trong buffer.
+    const proofImgCount = document.querySelectorAll('#importProofImagesGallery img').length;
+    if (proofImgCount === 0) {
+        alert('⚠️ Vui lòng chụp/thêm ít nhất 1 ảnh minh chứng trước khi hoàn thành!');
+        return;
+    }
+
     const noteEl = window.$('#completion-note');
     const deliveryNote = noteEl?.value?.trim() || '';
 
@@ -10110,7 +10118,7 @@ async function submitImportCompletion() {
             const res = await fetch(`/api/odoo-purchase-orders/${imp.odoo_id}/received`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ images: completionImages || [] })
+                body: JSON.stringify({ images: (completionImages || []).filter(img => img && !img.startsWith('blob:')) })
             });
             const data = await res.json();
             hideLoading();
@@ -10622,11 +10630,43 @@ async function deleteProofImage(orderId, imageIndex) {
 // ===============================================
 
 // Load proof images for import ticket detail modal
+// Đơn mua Odoo: ảnh hoàn thành giữ CLIENT-SIDE trong completionImages, submit gửi qua
+// /api/odoo-purchase-orders/:id/received. KHÔNG đẩy sang /api/imports (id 'odoo_po_*'
+// không có trong import_tickets → server trả "Không tìm thấy phiếu nhập").
+function renderOdooPoCompletionImages() {
+    const gallery = window.$('#importProofImagesGallery');
+    const counter = window.$('#importProofImagesCount');
+    const imgs = completionImages || [];
+    if (counter) counter.textContent = imgs.length ? `${imgs.length}/10 ảnh` : '';
+    if (!gallery) return;
+    if (!imgs.length) {
+        gallery.innerHTML = `<div style="text-align:center; width:100%; color:var(--text-muted); padding:20px;"><i class="bi bi-camera-slash" style="font-size:24px;"></i><p style="margin-top:8px;">Chưa có ảnh minh chứng</p></div>`;
+        return;
+    }
+    gallery.innerHTML = imgs.map((src, idx) => `
+        <div style="position:relative;">
+            <img src="${src}" style="width:80px; height:80px; object-fit:cover; border-radius:8px; border:2px solid var(--border);">
+            <button onclick="removeOdooPoCompletionImage(${idx})" style="position:absolute; top:-6px; right:-6px; width:20px; height:20px; border-radius:50%; background:var(--danger); color:white; border:none; cursor:pointer; font-size:12px; display:flex; align-items:center; justify-content:center;" title="Xóa ảnh">×</button>
+        </div>
+    `).join('');
+}
+function removeOdooPoCompletionImage(idx) {
+    if (!Array.isArray(completionImages)) return;
+    completionImages.splice(idx, 1);
+    renderOdooPoCompletionImages();
+}
+window.removeOdooPoCompletionImage = removeOdooPoCompletionImage;
+
 async function loadImportProofImages(importId) {
     const gallery = window.$('#importProofImagesGallery');
     const counter = window.$('#importProofImagesCount');
 
     if (!gallery) return;
+
+    // Đơn mua Odoo → render từ buffer client (không fetch /api/imports)
+    if (String(importId).startsWith('odoo_po_')) {
+        return renderOdooPoCompletionImages();
+    }
 
     try {
         const res = await fetch(`/api/imports/${importId}/proof-images`);
@@ -10707,6 +10747,16 @@ async function handleAddImportProofImages(input, importId) {
     if (images.length === 0) {
         hideLoading();
         alert('Không thể xử lý ảnh!');
+        return;
+    }
+
+    // Đơn mua Odoo: KHÔNG POST sang /api/imports (id 'odoo_po_*' không có trong import_tickets
+    // → "Không tìm thấy phiếu nhập"). Gom vào completionImages; submit gửi qua /received.
+    if (String(importId).startsWith('odoo_po_')) {
+        completionImages = [...(completionImages || []), ...images].slice(0, 10);
+        hideLoading();
+        renderOdooPoCompletionImages();
+        input.value = '';
         return;
     }
 
