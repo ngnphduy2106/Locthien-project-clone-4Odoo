@@ -21,6 +21,10 @@ export const config = {
     db:     getEnv('ODOO_DB'),
     login:  getEnv('ODOO_LOGIN'),
     apiKey: getEnv('ODOO_API_KEY'),
+    // Timeout mỗi call JSON-RPC. Trên serverless (Vercel) một fetch KHÔNG timeout
+    // sẽ treo cả hàm /pull tới khi platform tự kill → cursor không nhích, pha cuối
+    // (purchase orders) không bao giờ chạy. Cắt sớm để fail-fast, vòng sau retry.
+    rpcTimeoutMs: Number.parseInt(process.env.ODOO_RPC_TIMEOUT_MS ?? '20000', 10),
   },
   webhook: {
     port:   Number.parseInt(process.env.PORT ?? '9000', 10),

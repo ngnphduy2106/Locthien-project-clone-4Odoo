@@ -79,7 +79,6 @@ function mapStatus(x) {
         case 'lt_delivered':
         case 'lt_confirmed':
         case 'lt_invoiced':
-        case 'lt_closed':
             return 'Hoàn thành';
         case 'lt_cancelled':
             return 'Đã hủy';
@@ -220,7 +219,6 @@ function poToFrontend(row) {
             break;
         case 'lt_received':
         case 'lt_billed':
-        case 'lt_closed':
             status = 'Hoàn thành';
             statusCode = 'HOAN_THANH';
             break;
@@ -301,7 +299,7 @@ router.get('/', async (req, res) => {
         if (tab === 'pending')      q = q.eq('x_lt_status', 'lt_approved');
         else if (tab === 'delivering') q = q.eq('x_lt_status', 'lt_delivering');
         else if (tab === 'completed')  q = q.in('x_lt_status',
-            ['lt_delivered', 'lt_confirmed', 'lt_invoiced', 'lt_closed']);
+            ['lt_delivered', 'lt_confirmed', 'lt_invoiced']);
 
         if (page) q = q.range((page - 1) * limit, page * limit - 1);
 

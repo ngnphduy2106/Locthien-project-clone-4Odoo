@@ -18,8 +18,7 @@ function mapStatus(x) {
         case 'lt_approved':  return 'Chờ nhận';      // đồng bộ với đơn bán hàng
         case 'lt_receiving': return 'Đang lấy hàng';
         case 'lt_received':
-        case 'lt_billed':
-        case 'lt_closed':    return 'Đã nhận';
+        case 'lt_billed':    return 'Đã nhận';
         case 'lt_cancelled': return 'Đã hủy';
         default:             return 'Khác';
     }
@@ -99,7 +98,7 @@ router.get('/', async (req, res) => {
         if (tab === 'dispatch')       q = q.eq('x_lt_po_status', 'lt_approved');
         else if (tab === 'receiving') q = q.eq('x_lt_po_status', 'lt_receiving');
         else if (tab === 'done')      q = q.in('x_lt_po_status',
-            ['lt_received', 'lt_billed', 'lt_closed']);
+            ['lt_received', 'lt_billed']);
 
         const { data, error } = await q;
         if (error) throw error;

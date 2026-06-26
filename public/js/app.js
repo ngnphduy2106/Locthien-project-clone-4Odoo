@@ -1529,7 +1529,6 @@ function _normalizePurchaseOrder(po) {
         lt_receiving: 'assigned',
         lt_received:  'completed',
         lt_billed:    'completed',
-        lt_closed:    'completed',
         lt_cancelled: 'cancelled',
     };
     const rawStatus = po.x_lt_po_status || po.status || '';

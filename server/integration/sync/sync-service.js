@@ -167,10 +167,15 @@ export function createSyncService(hooks = {}) {
       console.log(`[sync] since=${since}`);
       const now = nowUtc();
 
+      // THỨ TỰ QUAN TRỌNG: kéo dữ liệu NGHIỆP VỤ (đơn mua + đơn bán) TRƯỚC dữ liệu
+      // tham chiếu (partners/products). Upsert chạy ngay trong paginateSince, nên
+      // nếu hàm bị Vercel kill giữa chừng thì đơn vẫn đã được ghi — chỉ partners/
+      // products (ít quan trọng, lại có webhook riêng) là có thể trễ. Trước đây POs
+      // ở pha CUỐI nên hễ pha orders chậm là đơn mua bị bỏ đói hoàn toàn.
+      const purchaseOrders  = await paginateSince(odoo.listPurchaseOrdersSince, since, 'purchase orders', onPurchaseOrder);
+      const orders          = await paginateSince(odoo.listOrdersSince,         since, 'sale orders',     onOrder);
       const partners        = await paginateSince(odoo.listPartnersSince,       since, 'partners',        onPartner);
       const products        = await paginateSince(odoo.listProductsSince,       since, 'products',        onProduct);
-      const orders          = await paginateSince(odoo.listOrdersSince,         since, 'sale orders',     onOrder);
-      const purchaseOrders  = await paginateSince(odoo.listPurchaseOrdersSince, since, 'purchase orders', onPurchaseOrder);
 
       await saveLastSyncDate(now);
       return { skipped: false, since, partners, products, orders, purchaseOrders };

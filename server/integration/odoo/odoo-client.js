@@ -58,15 +58,31 @@ const PO_FIELDS = [
 let uid = null;
 
 async function rpc(service, method, args) {
-  const res = await fetch(`${config.odoo.url}/jsonrpc`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      jsonrpc: '2.0',
-      method: 'call',
-      params: { service, method, args },
-    }),
-  });
+  // AbortController = "tử huyệt" trên serverless: fetch mặc định KHÔNG có timeout,
+  // nên một Odoo chậm/treo sẽ giữ hàm /pull mở tới khi Vercel kill (cursor đứng im,
+  // pha purchase orders bị bỏ đói). Cắt ở rpcTimeoutMs để fail-fast.
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), config.odoo.rpcTimeoutMs);
+  let res;
+  try {
+    res = await fetch(`${config.odoo.url}/jsonrpc`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        method: 'call',
+        params: { service, method, args },
+      }),
+      signal: ctrl.signal,
+    });
+  } catch (e) {
+    if (e.name === 'AbortError') {
+      throw new Error(`Odoo RPC timeout (${config.odoo.rpcTimeoutMs}ms) @ ${service}.${method}`);
+    }
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
   if (!res.ok) throw new Error(`Odoo HTTP ${res.status}`);
   return res.json();
 }
