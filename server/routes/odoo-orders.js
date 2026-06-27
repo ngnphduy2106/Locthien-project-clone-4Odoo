@@ -73,6 +73,7 @@ router.get('/pull', handlePull); // tiện cho external cron / kiểm thử nhan
 function mapStatus(x) {
     switch (x) {
         case 'lt_approved':
+        case 'lt_preview':
             return 'Chờ nhận';
         case 'lt_delivering':
             return 'Đang giao';
@@ -296,7 +297,7 @@ router.get('/', async (req, res) => {
             .order('date_order', { ascending: false });
 
         // Filter sớm theo tab — đỡ truyền data thừa
-        if (tab === 'pending')      q = q.eq('x_lt_status', 'lt_approved');
+        if (tab === 'pending')      q = q.in('x_lt_status', ['lt_approved', 'lt_preview']);
         else if (tab === 'delivering') q = q.eq('x_lt_status', 'lt_delivering');
         else if (tab === 'completed')  q = q.in('x_lt_status',
             ['lt_delivered', 'lt_confirmed', 'lt_invoiced']);

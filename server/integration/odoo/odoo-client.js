@@ -124,11 +124,11 @@ export async function call(model, method, args, kwargs = {}) {
 // Method nghiệp vụ điều phối
 // ------------------------------------------------------------------
 
-/** Đơn ĐÃ DUYỆT + CHƯA có tài xế (sẵn sàng điều phối). */
+/** Đơn ĐÃ DUYỆT / CHỜ DUYỆT + CHƯA có tài xế (sẵn sàng điều phối). */
 export function listPendingDispatch(limit = 50) {
   return call('sale.order', 'search_read', [[
     ['x_lt_is_quotation', '=', false],
-    ['x_lt_status', '=', 'lt_approved'],
+    ['x_lt_status', 'in', ['lt_approved', 'lt_preview']],
     '|',
     ['x_driver_name', '=', false],
     ['x_driver_name', '=', ''],
